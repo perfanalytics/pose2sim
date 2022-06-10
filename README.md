@@ -33,7 +33,7 @@ Pull requests, suggestions, and issues are very welcome. [![GitHub issues](https
 
 ### Installation
 1. **Install OpenPose** (instructions [there](https://github.com/CMU-Perceptual-Computing-Lab/openpose#installation)).
-2. **Install OpenSim 4.+** ([there](https://simtk.org/frs/index.php?group_id=91)).
+2. **Install OpenSim 4.x** ([there](https://simtk.org/frs/index.php?group_id=91)).
 3. ***Optional.*** *Install Anaconda or [Miniconda](https://docs.conda.io/en/latest/miniconda.html). \
    Open an Anaconda terminal and create a virtual environment with typing:*
    <pre><i>conda create -n Pose2Sim python=3.8.8 
