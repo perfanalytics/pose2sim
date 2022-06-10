@@ -167,4 +167,3 @@ def filter3D(config='User/Config.toml'):
     logging.info(f"\nProject directory: {project_dir}")
     
     filter_all(config_dict)
-    
