@@ -1,13 +1,13 @@
 [![PyPI version](https://badge.fury.io/py/Pose2Sim.svg)](https://badge.fury.io/py/Pose2Sim)
 [![Downloads](https://pepy.tech/badge/pose2sim)](https://pepy.tech/project/pose2sim)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
-[![GitHub issues](https://img.shields.io/github/issues/davidpagnon/pose2sim)](https://github.com/davidpagnon/pose2sim/issues)
+[![GitHub issues](https://img.shields.io/github/issues/perfanalytics/pose2sim)](https://github.com/perfanalytics/pose2sim/issues)
 \
 [![status](https://joss.theoj.org/papers/a31cb207a180f7ac9838d049e3a0de26/status.svg)](https://joss.theoj.org/papers/a31cb207a180f7ac9838d049e3a0de26)
 
 # Pose2Sim
 This Python repository offers a way to perform a markerless kinematic analysis from multiple calibrated views as a unified workflow from an OpenPose input to an OpenSim result. \
-Pull requests, suggestions, and issues are very welcome. [![GitHub issues](https://img.shields.io/github/issues/davidpagnon/pose2sim)](https://github.com/davidpagnon/pose2sim/issues)
+Pull requests, suggestions, and issues are very welcome. [![GitHub issues](https://img.shields.io/github/issues/perfanalytics/pose2sim)](https://github.com/perfanalytics/pose2sim/issues)
 
 <img src="Content/Overview.png" width="760">
 
