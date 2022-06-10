@@ -14,7 +14,7 @@
     Please correct in the resulting .toml file if needed. Take your image size as a reference.
     
     Usage: 
-        from Pose2Sim.Utilities import calib_yml_to_toml; calib_yml_to_toml.calib_yml_to_toml_func(r'<intrinsic_yml_file>', r'<extrinsic_yml_file>')
+        import calib_yml_to_toml; calib_yml_to_toml.calib_yml_to_toml_func(r'<intrinsic_yml_file>', r'<extrinsic_yml_file>')
         OR python -m calib_yml_to_toml -i <intrinsic_yml_file> -e <extrinsic_yml_file>
         OR python -m calib_yml_to_toml -i <intrinsic_yml_file> -e <extrinsic_yml_file> -o "<output_toml_file>"
 '''
@@ -53,8 +53,9 @@ def read_intrinsic_yml(intrinsic_path):
     N = intrinsic_yml.getNode('names').size()
     S, D, K = [], [], []
     for i in range(N):
-        K.append(intrinsic_yml.getNode(f'K_{i+1}').mat())
-        D.append(intrinsic_yml.getNode(f'dist_{i+1}').mat().flatten()[:-1])
+        name = intrinsic_yml.getNode('names').at(i).string()
+        K.append(intrinsic_yml.getNode(f'K_{name}').mat())
+        D.append(intrinsic_yml.getNode(f'dist_{name}').mat().flatten()[:-1])
         S.append([K[i][0,2]*2, K[i][1,2]*2])
     return S, K, D
     
@@ -70,8 +71,9 @@ def read_extrinsic_yml(extrinsic_path):
     N = extrinsic_yml.getNode('names').size()
     R, T = [], []
     for i in range(N):
-        R.append(extrinsic_yml.getNode(f'R_{i+1}').mat().flatten()) # R_1 pour Rodrigues, Rot_1 pour matrice
-        T.append(extrinsic_yml.getNode(f'T_{i+1}').mat().flatten())
+        name = extrinsic_yml.getNode('names').at(i).string()
+        R.append(extrinsic_yml.getNode(f'R_{name}').mat().flatten()) # R_1 pour Rodrigues, Rot_1 pour matrice
+        T.append(extrinsic_yml.getNode(f'T_{name}').mat().flatten())
     return R, T
 
 
