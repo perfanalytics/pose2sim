@@ -52,8 +52,4 @@ jobs:
       - name: Test with pytest
         run: |
           pip install pytest
-          python -m pytest
-      - name: Run functional tests
-        run: |
-          pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
-          python Pose2Sim/Demo/Demo.py
+          pytest Pose2Sim/Demo/Demo.py
