@@ -53,4 +53,5 @@ jobs:
         run: |
           pip install pytest
           pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
-          pytest Pose2Sim/Demo/Demo.py
+          cd Pose2Sim/Demo
+          pytest Demo.py
