@@ -20,12 +20,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-11, windows-latest]
-        python-version: [3.6, 3.7, 3.8, 3.9, "3.10"]
+        python-version: 3.8 #[3.6, 3.7, 3.8, 3.9, "3.10"]
         include:
-          - os: ubuntu-latest
-            path: ~/.cache/pip
-          - os: macos-11
-            path: ~/Library/Caches/pip
+          #- os: ubuntu-latest
+          #  path: ~/.cache/pip
+          #- os: macos-11
+          #  path: ~/Library/Caches/pip
           - os: windows-latest
             path: ~\AppData\Local\pip\Cache
 
@@ -52,4 +52,5 @@ jobs:
       - name: Test with pytest
         run: |
           pip install pytest
+          pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
           pytest Pose2Sim/Demo/Demo.py
