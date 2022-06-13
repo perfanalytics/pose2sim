@@ -1,7 +1,5 @@
-<!-- continuous integration --> <!-- pypi version --><!-- downloads -->
-<!-- licence --> <!-- issues -->
-<!-- joss -->
-[![PyPI version](https://badge.fury.io/py/Pose2Sim.svg)](https://badge.fury.io/py/Pose2Sim)
+[![Continuous integration](https://github.com/perfanalytics/pose2sim/actions/workflows/continuous-integration.yml/badge.svg)](https://github.com/perfanalytics/pose2sim/actions)
+[![PyPI version](https://badge.fury.io/py/Pose2Sim.svg)](https://badge.fury.io/py/Pose2Sim) \
 [![Downloads](https://pepy.tech/badge/pose2sim)](https://pepy.tech/project/pose2sim)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 [![GitHub issues](https://img.shields.io/github/issues/perfanalytics/pose2sim)](https://github.com/perfanalytics/pose2sim/issues)
