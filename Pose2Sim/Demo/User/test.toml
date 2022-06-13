@@ -50,7 +50,7 @@ interpolation = 'cubic' #linear, slinear, quadratic, cubic
 
 [3d-filtering]
 type = 'butterworth' # butterworth, butterworth_on_speed, gaussian, LOESS, median.
-display_figures = 'False' # 'True' or 'False'
+display_figures = 'True' # 'True' or 'False'
 
    [3d-filtering.butterworth]
    type = 'low'
