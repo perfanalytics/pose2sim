@@ -52,4 +52,4 @@ jobs:
       - name: Test with pytest
         run: |
           cd Pose2Sim/Demo
-          pytest -v test*
+          pytest -v test.py
