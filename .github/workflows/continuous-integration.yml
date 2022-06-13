@@ -1,7 +1,7 @@
-# This workflow will install Python dependencies, run tests and lint with a several versions of Python
+# This workflow will install Python dependencies, run tests and lint on several OS with a several versions of Python
 # See: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: CI for Win, MacOS, Ubuntu on python 3.7 to 3.10
+name: Build on Win-MacOS-Ubuntu with Python 3.7-3.10
 
 on:
   push:
