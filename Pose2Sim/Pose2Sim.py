@@ -43,9 +43,9 @@ import time
 import logging, logging.handlers
 
 if not os.path.exists('User'): os.mkdir('User')
-with open('User/logs.txt', 'a+') as log_f: pass
+with open(os.path.join('User', 'logs.txt')):, 'a+') as log_f: pass
 logging.basicConfig(format='%(message)s', level=logging.INFO, 
-    handlers = [logging.handlers.TimedRotatingFileHandler('User/logs.txt', when='D', interval=7), logging.StreamHandler()]) 
+    handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join('User', 'logs.txt')):, when='D', interval=7), logging.StreamHandler()]) 
 
 
 ## AUTHORSHIP INFORMATION
@@ -83,7 +83,7 @@ def base_params(config_dict):
     return project_dir, seq_name, frames
 
 
-def calibrateCams(config='User/Config.toml'):
+def calibrateCams(config=os.path.join('User', 'Config.toml')):
     '''
     Cameras calibration from checkerboards or from qualisys files.
     '''
@@ -106,7 +106,7 @@ def calibrateCams(config='User/Config.toml'):
     
     
     
-def track2D(config='User/Config.toml'):
+def track2D(config=os.path.join('User', 'Config.toml')):
     '''
     Tracking of the person of interest in case of multiple persons detection.
     Needs a calibration file.
@@ -129,7 +129,7 @@ def track2D(config='User/Config.toml'):
     logging.info(f'Tracking took {end-start:.2f} s.')
     
     
-def triangulate3D(config='User/Config.toml'):
+def triangulate3D(config=os.path.join('User', 'Config.toml')):
     '''
     Robust triangulation of 2D points coordinates.
     '''
@@ -151,7 +151,7 @@ def triangulate3D(config='User/Config.toml'):
     logging.info(f'Triangulation took {end-start:.2f} s.')
     
     
-def filter3D(config='User/Config.toml'):
+def filter3D(config=os.path.join('User', 'Config.toml')):
     '''
     Filter trc 3D coordinates.
     '''
