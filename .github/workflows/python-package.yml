@@ -52,4 +52,5 @@ jobs:
       - name: Test with pytest
         run: |
           cd Pose2Sim/Demo
+          Write-Output kljh
           pytest test.py
