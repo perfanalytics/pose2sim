@@ -43,9 +43,9 @@ import time
 import logging, logging.handlers
 
 if not os.path.exists('User'): os.mkdir('User')
-with open(os.path.join('User', 'logs.txt')):, 'a+') as log_f: pass
+with open(os.path.join('User', 'logs.txt')), 'a+') as log_f: pass
 logging.basicConfig(format='%(message)s', level=logging.INFO, 
-    handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join('User', 'logs.txt')):, when='D', interval=7), logging.StreamHandler()]) 
+    handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join('User', 'logs.txt')), when='D', interval=7), logging.StreamHandler()]) 
 
 
 ## AUTHORSHIP INFORMATION
