@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint with a several versions of Python
 # See: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Python package
+name: CI for Win, MacOS, Ubuntu on python 3.7 to 3.10
 
 on:
   push:
@@ -22,8 +22,7 @@ jobs:
         os: [ubuntu-latest, macos-11, windows-latest]
         python-version: [3.7, 3.8, 3.9, "3.10"]
         include:
-          - os: ubuntu-latest
-            path: ~/.cache/pip
+          - os: ubuntu-latest            path: ~/.cache/pip
           - os: macos-11
             path: ~/Library/Caches/pip
           - os: windows-latest
