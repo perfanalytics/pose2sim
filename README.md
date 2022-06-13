@@ -8,7 +8,7 @@
 
 # Pose2Sim
 This Python repository offers a way to perform a markerless kinematic analysis from multiple calibrated views as a unified workflow from an OpenPose input to an OpenSim result. \
-Pull requests, suggestions, and issues are very welcome. [![GitHub issues](https://img.shields.io/github/issues/perfanalytics/pose2sim)](https://github.com/perfanalytics/pose2sim/issues)
+Pull requests, suggestions, and issues are very welcome.
 
 <img src="Content/Overview.png" width="760">
 
