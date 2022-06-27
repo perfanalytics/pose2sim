@@ -12,8 +12,13 @@
     Note that not all face keypoints are reported, since less are needed to determine head orientation.
 
     You can also build your own custom skeleton. Verify your structure by typing: 
+    from anytree import Node, RenderTree
     for pre, _, node in RenderTree(CUSTOM): 
             print(f'{pre}{node.name} id={node.id}')
+    
+    Note that only Body_25 and Body_25b OpenSim files are provided (in "Empty project" folder).
+    If you wish to use any other, you will need to adjust the markerset in the .osim model file, 
+    as well as in the scaling and IK setup files.
     
 '''
 
@@ -117,7 +122,7 @@ BODY_25 = Node("CHip", id=8, children=[
 
 # BLAZEPOSE / MEDIAPIPE https://google.github.io/mediapipe/solutions/pose
 BLAZEPOSE = Node("root", id=None, children=[
-    Node("righ_hip", id=24, children=[
+    Node("right_hip", id=24, children=[
         Node("right_knee", id=26, children=[
             Node("right_ankle", id=28, children=[
                 Node("right_heel", id=30),
