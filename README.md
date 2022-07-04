@@ -545,8 +545,8 @@ If you use this code or data, please cite [Pagnon et al., 2022](https://www.mdpi
 #### How to contribute
 
 I would happily welcome any proposal for new features, code improvement, and more!\
-If you want to contribute to Pose2Sim, please follow [this guide](https://docs.github.com/en/get-started/quickstart/contributing-to-projects) on how to fork, modify and push code, and submit a pull request. I would appreciate it if you provided as much useful information as possible about how you modified the code, and a rationale for why you're making this pull request.\
-Please also specify on which operating system and on which python version you have tested the code.
+If you want to contribute to Pose2Sim, please follow [this guide](https://docs.github.com/en/get-started/quickstart/contributing-to-projects) on how to fork, modify and push code, and submit a pull request.\
+I would appreciate it if you provided as much useful information as possible about how you modified the code, and a rationale for why you're making this pull request. Please also specify on which operating system and on which python version you have tested the code.
 
 *Here is a to-do list, for general guidance purposes only:*
 > <li> Integrate as a Blender and / or Maya add-on. See <a href="https://github.com/davidpagnon/Maya-Mocap">Maya-Mocap</a> and <a href="https://github.com/JonathanCamargo/BlendOsim">BlendOSim</a>
