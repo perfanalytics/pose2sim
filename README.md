@@ -30,8 +30,8 @@ Pull requests, suggestions, and issues are very welcome.
 ## Installation and Demonstration
 
 ### Installation
-1. **Install OpenPose** (instructions [there](https://github.com/CMU-Perceptual-Computing-Lab/openpose#installation)).
-2. **Install OpenSim 4.x** ([there](https://simtk.org/frs/index.php?group_id=91)).
+1. **Install OpenPose** (instructions [there](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/installation/0_index.md)). Portable demo is enough.
+2. **Install OpenSim 4.x** ([there](https://simtk.org/frs/index.php?group_id=91)). Tested up to v4.4-beta.
 3. ***Optional.*** *Install Anaconda or [Miniconda](https://docs.conda.io/en/latest/miniconda.html). \
    Open an Anaconda terminal and create a virtual environment with typing:*
    <pre><i>conda create -n Pose2Sim python=3.8.8 
@@ -39,12 +39,12 @@ Pull requests, suggestions, and issues are very welcome.
    
 3. **Install Pose2Sim**: \
 If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.6 is installed.
-   - **Quick install:** Open a terminal. 
+   - OPTION 1: **Quick install:** Open a terminal. 
        ```
-       pip install Pose2Sim
+       pip install pose2sim
        ```
      
-   - **Build from source:**
+   - OPTION 2: **Build from source:**
      Open a terminal in the directory of your choice and Clone the Pose2Sim repository.
        ```
        git clone https://gitlab.inria.fr/perfanalytics/pose2sim.git
@@ -53,10 +53,11 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.6
        ```
           
 ### Demonstration   
-> _**This demonstration provides an example experiment of a person balancing on a beam, filmed with 4 calibrated cameras processed with OpenPose.**_ 
+> _**This demonstration provides an example experiment of a person balancing on a beam, filmed with 4 calibrated cameras processed with OpenPose. Deeper explanations and instructions are given on the section below.**_ 
 
-Open a terminal and check package location with `pip show Pose2Sim | grep Location`. \
-Open a python session in your `Pose2Sim\Demo` folder, and test the following code:
+Open a terminal and check package location with `pip show pose2sim | grep Location`. \
+Copy this <path> and go to the Demo folder with `cd <path>\pose2sim\Demo`. \
+Open a python session with `python` command, and test the following code:
 ```
 from Pose2Sim import Pose2Sim
 Pose2Sim.calibrateCams()
