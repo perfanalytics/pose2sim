@@ -7,7 +7,7 @@
 [![status](https://joss.theoj.org/papers/a31cb207a180f7ac9838d049e3a0de26/status.svg)](https://joss.theoj.org/papers/a31cb207a180f7ac9838d049e3a0de26)
 
 # Pose2Sim
-This Python repository offers a way to perform a markerless kinematic analysis from multiple calibrated views as a unified workflow from an OpenPose input to an OpenSim result. \
+This Python repository offers a way to perform a markerless kinematic analysis from multiple calibrated views as a unified workflow from an OpenPose input to an OpenSim result.
 
 <img src="Content/Overview.png" width="760">
 
@@ -24,7 +24,9 @@ This Python repository offers a way to perform a markerless kinematic analysis f
    6. [3D filtering](#3d-filtering)
    7. [OpenSim kinematics](#opensim-kinematics)
 3. [Utilities](#utilities)
-4. [How to cite and others](#how-to-cite-and-others)
+4. [How to cite and how to contribute](#how-to-cite-and-how-to-contribute)
+   1. [How to cite](#how-to-cite)
+   2. [How to contribute](#how-to-contribute)
 
 ## Installation and Demonstration
 
@@ -517,7 +519,7 @@ Detects gait events from point coordinates according to [Zeni et al. (2008)](htt
 </details>
 
 
-## How to cite and others
+## How to cite and how to contribute
 #### How to cite
 If you use this code or data, please cite [Pagnon et al., 2022](https://www.mdpi.com/1424-8220/22/7/2712) or [Pagnon et al., 2021](https://www.mdpi.com/1424-8220/21/19/6530).
     
@@ -539,22 +541,28 @@ If you use this code or data, please cite [Pagnon et al., 2022](https://www.mdpi
       URL = {https://www.mdpi.com/1424-8220/21/19/6530},
     }
 
-#### Contributers
-David Pagnon (maintainer, developer), contact@david-pagnon.com\
-Lionel Reveret, lionel.reveret@inria.fr\
-Mathieu Domalain, mathieu.domalain@univ-poitiers.fr
 
-#### To do list
-* Conda install and Docker image
-* Multiple persons kinematics (triangulating multiple persons, and sorting them in time)
-* Solve limb swapping
-* Implement normalized DLT and RANSAC triangulation
-* Implement triangulation refinement step (cf DOI:10.1109/TMM.2022.3171102)
-* Implement optimal fixed-interval Kalman smoothing
-* Calibrate with Aruco, Charuco, and refine results: take inspiration from AniPose
-* Utilities: convert Vicon xcp calibration file to toml
-* Run from command line via click or typer
-* Make GUI interface
-* Catch errors
+#### How to contribute
 
-Pull requests and suggestions are always welcome!
+I am currently the sole developer of Pose2Sim, but I would happily welcome any proposal for new features, code improvement, etc!\
+If you want to contribute, please follow [this guide](https://docs.github.com/en/get-started/quickstart/contributing-to-projects) on how to fork, modify and push code, and submit a pull request. \
+I would appreciate it if you provided as much useful information as possible about how you modified the code, and a rationale for why you're making this pull request.\
+Please also specify on which operating system and on which python version you have tested the code.
+
+<details>
+  <summary><b>To-do list, for general guidance purposes only</b> (CLICK TO SHOW)</summary>
+<li> Integrate as a Blender and / or Maya add-on. See <a href="https://github.com/davidpagnon/Maya-Mocap">Maya-Mocap</a> and <a href="https://github.com/JonathanCamargo/BlendOsim">BlendOSim</a>
+<li> Multiple persons kinematics (triangulating multiple persons, and sorting them in time)</li>
+<li> Use aniposelib for better calibration </li>
+
+
+<li> Conda package and Docker image</li>
+<li> Solve limb swapping</li>
+<li> Implement normalized DLT and RANSAC triangulation, as well as a triangulation refinement step (cf DOI:10.1109/TMM.2022.3171102)</li>
+<li> Implement optimal fixed-interval Kalman smoothing</li>
+<li> Utilities: convert Vicon xcp calibration file to toml</li>
+<li> Run from command line via click or typer</li>
+<li> Catch errors</li>
+
+
+</details>
