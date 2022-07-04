@@ -551,8 +551,9 @@ I would appreciate it if you provided as much useful information as possible abo
 *Here is a to-do list, for general guidance purposes only:*
 > <li> Integrate as a Blender and / or Maya add-on. See <a href="https://github.com/davidpagnon/Maya-Mocap">Maya-Mocap</a> and <a href="https://github.com/JonathanCamargo/BlendOsim">BlendOSim</a>
 > <li> Multiple persons kinematics (triangulating multiple persons, and sorting them in time)</li>
-> <li> Use aniposelib for better calibration </li></br>
-> 
+> <li> Use aniposelib for better calibration </li>
+> <li> Finish deploying Body_135, MediaPipe, AlphaPose, and DeepLabCut compatibility </li>
+> </br>
 > <li> Conda package and Docker image</li>
 > <li> Solve limb swapping</li>
 > <li> Implement normalized DLT and RANSAC triangulation, as well as a triangulation refinement step (cf DOI:10.1109/TMM.2022.3171102)</li>
