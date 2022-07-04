@@ -8,7 +8,6 @@
 
 # Pose2Sim
 This Python repository offers a way to perform a markerless kinematic analysis from multiple calibrated views as a unified workflow from an OpenPose input to an OpenSim result. \
-Pull requests, suggestions, and issues are very welcome.
 
 <img src="Content/Overview.png" width="760">
 
@@ -66,10 +65,10 @@ Pose2Sim.triangulate3D()
 Pose2Sim.filter3D()
 ```
 You should obtain a plot of all the 3D coordinates trajectories. You can check the logs in`Demo\Users\logs.txt`.\
-Results are stored as .trc files in the `Demo/pose-3d` directory. 
+Results are stored as .trc files in the `Demo/pose-3d` directory. \
+Section [Opensim kinematics](#opensim-kinematics) describes how to obtain physically accurate 3D joint angles.
 
-Default parameters have been provided in `Demo\Users\Config.toml` but can be edited.\
-Section [Opensim kinematics](#opensim-kinematics) describes how to obtain 3D joint angles.
+*N.B.:* Default parameters have been provided in `Demo\Users\Config.toml` but can be edited.\
 
 ## Use on your own data
 
