@@ -1,6 +1,11 @@
 name: JOSS pdf constructor
 
-on: [push]
+on:
+  push:
+    paths:
+      - 'Content\paper.md'
+      - 'Content\paper.bib'
+      - 'Content\Pipeline.png'
 
 jobs:
   paper:
