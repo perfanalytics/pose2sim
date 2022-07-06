@@ -34,12 +34,12 @@ bibliography: paper.bib
 Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D coordinates obtained from multiple videos) and leads to an OpenSim result (full-body 3D joint angles). 
 
 The repository presents a framework for:\
-- Detecting 2D joint coordinates from videos, e.g. via OpenPose [@Cao_2019],\ 
-- Calibrating cameras, \
-- Tracking the main person on the scene,\
-- Triangulating 2D joint coordinates and storing them as 3D positions in a .trc file,\
-- Filtering these calculated 3D positions,\
-- Scaling and running inverse kinematics via OpenSim [@Delp_2007; @Seth_2018], in order to obtain full-body 3D joint angles.
+• Detecting 2D joint coordinates from videos, e.g. via OpenPose [@Cao_2019],\ 
+• Calibrating cameras, \
+• Tracking the main person on the scene,\
+• Triangulating 2D joint coordinates and storing them as 3D positions in a .trc file,\
+• Filtering these calculated 3D positions,\
+• Scaling and running inverse kinematics via OpenSim [@Delp_2007; @Seth_2018], in order to obtain full-body 3D joint angles.
 
 Each task is easily customizable, and requires only moderate Python skills. Pose2Sim is accessible at [https://github.com/perfanalytics/pose2sim](https://github.com/perfanalytics/pose2sim). 
 
@@ -56,9 +56,11 @@ So far, little work has been done towards obtaining 3D angles from multiple view
 
 # Features
 ## Pose2Sim workflow
+![Pose2Sim full pipeline: (1) OpenPose 2D joint detection; (2i) Camera calibration; (2ii–iv) Tracking the person of interest, Triangulating his coordinates, and Filtering them; (3) Constraining the 3D coordinates to a physically consistent OpenSim skeletal model.\label{fig:Pose2Sim pipeline}](Pipeline.png)
+
 `Pose2Sim` connects two of the most widely recognized (and open source) pieces of software of their respective fields:\
-- OpenPose [@Cao_2019], a 2D human pose estimation neural network\
-- OpenSim [@Delp_2007], a 3D biomechanics analysis software
+• OpenPose [@Cao_2019], a 2D human pose estimation neural network\
+• OpenSim [@Delp_2007], a 3D biomechanics analysis software
 
 The workflow is organized as follows:\
 1. Preliminary OpenPose [@Cao_2019] 2D keypoint detection.\
@@ -71,64 +73,62 @@ The workflow is organized as follows:\
 
 OpenPose, OpenSim, as well as the whole `Pose2Sim` workflow run from any video cameras, on any computer, equipped with any operating system. 
 
-![Pose2Sim pipeline.\label{fig:Pose2Sim full pipeline: (1) OpenPose 2D joint detection; (2i) Camera calibration; (2ii–iv) Tracking the person of interest, Triangulating his coordinates, and Filtering them; (3) Constraining the 3D coordinates to a physically consistent OpenSim skeletal model.}](Pipeline.png)
-
 
 ## Pose2Sim core
 Each step of the Pose2Sim core is easily customizable through the 'User/Config.toml' file. Among other things, users can edit:\
-- The project hierarchy, the video framerate, the range of analyzed frames,\
-- The OpenPose model they wish to use. They can also use AlphaPose [@Fang_2017], or even create their own model (e.g. with DeepLabCut [@Mathis_2018]),\
-- Whether they are going to calibrate their cameras with a checkerboard, or to simply convert a calibration file provided by a Qualisys system,\
-- Which keypoint they want to track in order to automatically single out the person of interest,\
-- The thresholds in confidence and in reprojection error for using or not a camera while triangulating a keypoint,\
-- The minimum number of cameras below which the keypoint won't be triangulated at this frame,\
-- The interpolation and filter types and parameters.
+• The project hierarchy, the video framerate, the range of analyzed frames,\
+• The OpenPose model they wish to use. They can also use AlphaPose [@Fang_2017], or even create their own model (e.g. with DeepLabCut [@Mathis_2018]),\
+• Whether they are going to calibrate their cameras with a checkerboard, or to simply convert a calibration file provided by a Qualisys system,\
+• Which keypoint they want to track in order to automatically single out the person of interest,\
+• The thresholds in confidence and in reprojection error for using or not a camera while triangulating a keypoint,\
+• The minimum number of cameras below which the keypoint won't be triangulated at this frame,\
+• The interpolation and filter types and parameters.
 
 ## Pose2Sim utilities
 Some standalone Python tools are also provided.
 
 **Conversion to and from Pose2Sim** 
 
-`DLC_to_OpenPose.py`
+• `DLC_to_OpenPose.py`
 Converts a DeepLabCut [@Mathis_2018] (h5) 2D pose estimation file into OpenPose [@Cao_2019] (json) files.
 
-`calib_qca_to_toml.py`
+• `calib_qca_to_toml.py`
 Converts a Qualisys .qca.txt calibration file to the Pose2Sim .toml calibration file.
 
-`calib_toml_to_qca.py`
+• `calib_toml_to_qca.py`
 Converts a Pose2Sim .toml calibration file (e.g., from a checkerboard) to a Qualisys .qca.txt calibration file.
 
-`calib_from_checkerboard.py`
+• `calib_from_checkerboard.py`
 Calibrates cameras with images or a video of a checkerboard, saves calibration in a Pose2Sim .toml calibration file.
 
-`c3d_to_trc.py`
+• `c3d_to_trc.py`
 Converts 3D point data of a .c3d file to a .trc file compatible with OpenSim. No analog data (force plates, emg) nor computed data (angles, powers, etc) are retrieved.
 
 
 **Plotting tools**
 
-`json_display_with_img.py` 
+• `json_display_with_img.py` 
 Overlays 2D detected json coordinates on original raw images. High confidence keypoints are green, low confidence ones are red.
 
-`json_display_without_img.py`
+• `json_display_without_img.py`
 Plots an animation of 2D detected json coordinates. 
 
-`trc_plot.py`
+• `trc_plot.py`
 Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different matplotlib tab.
 
 
 **Other trc tools**
 
-`trc_desample.py`
+• `trc_desample.py`
 Undersamples a trc file.
 
-`trc_Zup_to_Yup.py`
+• `trc_Zup_to_Yup.py`
 Changes Z-up system coordinates to Y-up system coordinates.
 
-`trc_filter.py`
+• `trc_filter.py`
 Filters trc files. Available filters: Butterworth, Butterworth on speed, Gaussian, LOESS, Median.
 
-`trc_gaitevents.py`
+• `trc_gaitevents.py`
 Detects gait events from point coordinates according to [@Zeni_2008].
 
 # Acknowledgements
