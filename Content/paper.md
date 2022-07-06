@@ -127,6 +127,6 @@ Detects gait events from point coordinates according to [@Zeni_2008].\
 
 # Acknowledgements
 
-We acknowledge the dedicated people involved in major software programs and packages used by Pose2Sim, such as Python, OpenPose, OpenSim, OpenCV [@Bradski_2000], and many others.
+We acknowledge the dedicated people involved in major software programs and packages used by Pose2Sim, such as Python, OpenPose, OpenSim, OpenCV [@Bradski_2000], and many others. 
 
 # References
