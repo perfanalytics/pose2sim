@@ -34,7 +34,7 @@ bibliography: paper.bib
 `Pose2Sim` stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D coordinates obtained from multiple videos) and leads to an OpenSim result (full-body 3D joint angles). 
 
 The repository presents a framework for:\
-• Detecting 2D joint coordinates from videos, e.g. via OpenPose [@Cao_2019], \ 
+• Detecting 2D joint coordinates from videos, e.g. via OpenPose [@Cao_2019], \
 • Calibrating cameras, \
 • Tracking the main person on the scene, \
 • Triangulating 2D joint coordinates and storing them as 3D positions in a .trc file, \
@@ -63,9 +63,9 @@ So far, little work has been done towards obtaining 3D angles from multiple view
 • OpenPose [@Cao_2019], a 2D human pose estimation neural network\
 • OpenSim [@Delp_2007], a 3D biomechanics analysis software
 
-![Pose2Sim full pipeline: (1) OpenPose 2D joint detection; (2i) Camera calibration; (2ii–iv) Tracking the person of interest, Triangulating his coordinates, and Filtering them; (3) Constraining the 3D coordinates to a physically consistent OpenSim skeletal model.\label{fig:Pose2Sim pipeline}](Pipeline.png)
+![Pose2Sim full pipeline: (1) OpenPose 2D joint detection; (2i) Camera calibration; (2ii–iv) Tracking the person of interest, Triangulating his coordinates, and Filtering them; (3) Constraining the 3D coordinates to a physically consistent OpenSim skeletal model.\label{fig:pipeline}](Pipeline.png)
 
-The workflow is organized as follows:\
+The workflow is organized as follows \autoref{fig:pipeline}:\
 1. Preliminary OpenPose [@Cao_2019] 2D keypoint detection.\
 2. Pose2Sim core includes 4 customizable steps:\
 &nbsp;&nbsp;&nbsp;&nbsp;2.i. Camera calibration\
@@ -93,13 +93,13 @@ Some standalone Python tools are also provided.
 **Conversion to and from Pose2Sim** 
 
 • `DLC_to_OpenPose.py`
-Converts a DeepLabCut [@Mathis_2018] (h5) 2D pose estimation file into OpenPose [@Cao_2019] (json) files.
+Converts a DeepLabCut [@Mathis_2018] (h5) 2D pose estimation file into OpenPose [@Cao_2019] (json) files.\
 • `calib_qca_to_toml.py`
-Converts a Qualisys .qca.txt calibration file to the Pose2Sim .toml calibration file.
+Converts a Qualisys .qca.txt calibration file to the Pose2Sim .toml calibration file.\
 • `calib_toml_to_qca.py`
-Converts a Pose2Sim .toml calibration file (e.g., from a checkerboard) to a Qualisys .qca.txt calibration file.
+Converts a Pose2Sim .toml calibration file (e.g., from a checkerboard) to a Qualisys .qca.txt calibration file.\
 • `calib_from_checkerboard.py`
-Calibrates cameras with images or a video of a checkerboard, saves calibration in a Pose2Sim .toml calibration file.
+Calibrates cameras with images or a video of a checkerboard, saves calibration in a Pose2Sim .toml calibration file.\
 • `c3d_to_trc.py`
 Converts 3D point data of a .c3d file to a .trc file compatible with OpenSim. No analog data (force plates, emg) nor computed data (angles, powers, etc) are retrieved.
 
@@ -107,11 +107,11 @@ Converts 3D point data of a .c3d file to a .trc file compatible with OpenSim. No
 **Plotting tools**
 
 • `json_display_with_img.py` 
-Overlays 2D detected json coordinates on original raw images. High confidence keypoints are green, low confidence ones are red.
+Overlays 2D detected json coordinates on original raw images. High confidence keypoints are green, low confidence ones are red.\
 • `json_display_without_img.py`
-Plots an animation of 2D detected json coordinates. 
+Plots an animation of 2D detected json coordinates.\
 • `trc_plot.py`
-Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different matplotlib tab.
+Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different matplotlib tab.\
 
 
 **Other trc tools**
@@ -119,11 +119,11 @@ Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different ma
 • `trc_desample.py`
 Undersamples a trc file.
 • `trc_Zup_to_Yup.py`
-Changes Z-up system coordinates to Y-up system coordinates.
+Changes Z-up system coordinates to Y-up system coordinates.\
 • `trc_filter.py`
-Filters trc files. Available filters: Butterworth, Butterworth on speed, Gaussian, LOESS, Median.
+Filters trc files. Available filters: Butterworth, Butterworth on speed, Gaussian, LOESS, Median.\
 • `trc_gaitevents.py`
-Detects gait events from point coordinates according to [@Zeni_2008].
+Detects gait events from point coordinates according to [@Zeni_2008].\
 
 # Acknowledgements
 
