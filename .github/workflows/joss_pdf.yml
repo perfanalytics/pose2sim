@@ -1,3 +1,5 @@
+name: JOSS pdf constructor
+
 on: [push]
 
 jobs:
