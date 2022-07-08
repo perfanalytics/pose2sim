@@ -6,6 +6,9 @@ name: Build on Win-MacOS-Ubuntu with Python 3.7-3.10
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - 'README.md'
+      - 'Content/**'
   pull_request:
     branches: [ "main" ]
 
