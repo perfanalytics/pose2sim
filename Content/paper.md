@@ -16,7 +16,7 @@ authors:
     affiliation: 2
   - name: Lionel Reveret
     orcid: 0000-0002-0810-5187
-    affiliation: 3
+    affiliation: 1, 3
 affiliations:
  - name: Laboratoire Jean Kuntzmann, Université Grenoble Alpes, 700 avenue Centrale, 38400 Saint Martin d’Hères, France
    index: 1
