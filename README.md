@@ -69,7 +69,7 @@ Pose2Sim.triangulate3D()
 Pose2Sim.filter3D()
 ```
 You should obtain a plot of all the 3D coordinates trajectories. You can check the logs in`Demo\Users\logs.txt`.\
-Results are stored as .trc files in the `Demo/pose-3d` directory. \
+Results are stored as .trc files in the `Demo/pose-3d` directory.
 
 *N.B.:* Default parameters have been provided in `Demo\Users\Config.toml` but can be edited.
 <br/>
