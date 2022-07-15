@@ -36,7 +36,7 @@ bibliography: paper.bib
 The repository presents a framework for:\
 • Detecting 2D joint coordinates from videos, e.g. via OpenPose [@Cao_2019], \
 • Calibrating cameras, \
-• Tracking the main person on the scene, \
+• Tracking of the person viewed by the most cameras, \
 • Triangulating 2D joint coordinates and storing them as 3D positions in a .trc file, \
 • Filtering these calculated 3D positions, \
 • Scaling and running inverse kinematics via OpenSim [@Delp_2007; @Seth_2018], in order to obtain full-body 3D joint angles.
@@ -45,16 +45,16 @@ Each task is easily customizable, and requires only moderate Python skills. Pose
 
 # Statement of need
 
-For the last few decades, marker-based kinematics has been considered as the best choice for the analysis of human movement, when regarding the trade-off between ease-of-use and accuracy. However, a marker-based system is hard to set outdoors or in "ecological" conditions, and it requires placing markers on the body, which can hinder natural movement. 
+For the last few decades, marker-based kinematics has been considered the best choice for the analysis of human movement, when regarding the trade-off between ease of use and accuracy. However, a marker-based system is hard to set up outdoors or in context, and it requires placing markers on the body, which can hinder natural movement. 
 
-The emergence of markerless kinematics opens up new possibilities. Indeed, the interest in deep learning pose estimation neural networks has been growing fast since 2015 [@Zheng_2022], which makes it now possible to collect accurate and reliable kinematic data without the use of physical markers. OpenPose, for example, is a widespread open-source software which provides 2D joint coordinate estimations from videos. These coordinates can then be triangulated in order to produce 3D positions. Yet, when it comes to biomechanic analysis of human motion, it is often more useful to obtain joint angles than absolute positions. Indeed, joint angles allow for better comparison among trials and individuals, and they represent the first step for other analysis such as inverse dynamics. 
+The emergence of markerless kinematics opens up new possibilities. Indeed, the interest in deep-learning pose estimation neural networks has been growing fast since 2015 [@Zheng_2022], which makes it now possible to collect accurate and reliable kinematic data without the use of physical markers. OpenPose, for example, is a widespread open-source software which provides 2D joint coordinate estimations from videos. These coordinates can then be triangulated in order to produce 3D positions. Yet, when it comes to the biomechanical analysis of human motion, it is often more useful to obtain joint angles than their XYZ positions in space. Joint angles allow for better comparison among trials and individuals, and they represent the first step for other analysis such as inverse dynamics. 
 
-OpenSim is an other widespread open-source software which helps compute 3D joint angles, usually from marker coordinates. It lets scientists define a detailed muskuloskeletal model, scale it to individual subjects, and perform inverse kinematics with customizable biomechanical constraints. It provides other features such as net joint moments calculation or individual muscle forces resolution, although this is out of the scope of our contribution.
+OpenSim is another widespread open-source software which helps compute 3D joint angles, usually from marker coordinates. It lets scientists define a detailed musculoskeletal model, scale it to individual subjects, and perform inverse kinematics with customizable biomechanical constraints. It provides other features such as net calculation of joint moments or individual muscle forces resolution, although this is out of the scope of our contribution.
 
 The goal of `Pose2Sim` is to build a bridge between the communities of computer vision and biomechanics, by providing a simple and open-source pipeline connecting the two aforementioned state-of-the-art tools: OpenPose and OpenSim. 
-`Pose2Sim` has already been used and tested in a number of situations (walking, running, cycling, balancing, swimming, boxing), and published in peer-review scientific publications [@Pagnon_2021; @Pagnon_2022] assessing its robustness and accuracy. The combination of its ease of use, customizable characteristics, and robustness and accuracy makes it promising, especially for "in-the-wild" sports movement analysis.
+`Pose2Sim` has already been used and tested in a number of situations (walking, running, cycling, balancing, swimming, boxing), and published in peer-reviewed scientific publications [@Pagnon_2021; @Pagnon_2022] assessing its robustness and accuracy. The combination of its ease of use, customizable characteristics, and high robustness and accuracy makes it promising, especially for "in-the-wild" sports movement analysis.
 
-So far, little work has been done towards obtaining 3D angles from multiple views [@Zheng_2022]. However, two softwares are worth being mentionend. Anipose [@Karashchuk_2021] proposes a Python open-source framework which allows for joint angle estimation with spatio-temporal constraints, but it is primarily designed for animal motion analysis. Theia3D [@Kanko_2021] provides a software for human gait kinematics from videos. Although the GUI is more user friendly, it is not open-source nor easily customizable. Our results on inverse kinematics are similar, or slightly better [@Pagnon_2022]. 
+So far, little work has been done towards obtaining 3D angles from multiple views [@Zheng_2022]. However, two software applications are worth mentioning. Anipose [@Karashchuk_2021] proposes a Python open-source framework which allows for joint angle estimation with spatio-temporal constraints, but it is primarily designed for animal motion analysis. Theia3D [@Kanko_2021] is a software application for human gait kinematics from videos. Although the GUI is more user friendly, it is not open-source nor easily customizable. Our results on inverse kinematics were deemed good when compared to marker-based ones. See [@Pagnon_2022] for more details on concurrent accuracy with other systems. 
 
 # Features
 ## Pose2Sim workflow
@@ -66,15 +66,15 @@ So far, little work has been done towards obtaining 3D angles from multiple view
 ![Pose2Sim full pipeline: (1) OpenPose 2D joint detection; (2i) Camera calibration; (2ii–iv) Tracking the person of interest, Triangulating his coordinates, and Filtering them; (3) Constraining the 3D coordinates to a physically consistent OpenSim skeletal model.\label{fig:pipeline}](Pipeline.png)
 
 The workflow is organized as follows \autoref{fig:pipeline}:\
-1. Preliminary OpenPose [@Cao_2019] 2D keypoint detection.\
-2. Pose2Sim core includes 4 customizable steps:\
+1. Preliminary OpenPose [@Cao_2019] 2D keypoints detection.\
+2. Pose2Sim core, including 4 customizable steps:\
 &nbsp;&nbsp;&nbsp;&nbsp;2.i. Camera calibration\
 &nbsp;&nbsp;&nbsp;&nbsp;2.ii. Tracking of the person viewed by the most cameras\
-&nbsp;&nbsp;&nbsp;&nbsp;2.iii. 2D keypoint triangulation\
+&nbsp;&nbsp;&nbsp;&nbsp;2.iii. 2D keypoints triangulation\
 &nbsp;&nbsp;&nbsp;&nbsp;2.iv. 3D coordinates filtering\
-3. A full-body OpenSim [@Delp_2007] skeletal model with OpenPose keypoints is provided, as well as scaling and inverse kinematics setup files. As the position of triangulated keypoints are not dependent on the operator nor on the subject, these setup files can be taken as is.
+3. A full-body OpenSim [@Delp_2007] skeletal model with OpenPose keypoints is provided, as well as scaling and inverse kinematics setup files. As the position of triangulated keypoints are not dependent on either the operator nor the subject, these setup files can be taken as is.
 
-OpenPose, OpenSim, and the whole `Pose2Sim` workflow run from any video cameras, on any computer, equipped with any operating system. 
+OpenPose, OpenSim, and the whole `Pose2Sim` workflow run from any video cameras, on any computer, equipped with any operating system. However, on Linux, OpenSim has to be compiled from source.
 
 
 ## Pose2Sim core
@@ -83,7 +83,7 @@ Each step of the Pose2Sim core is easily customizable through the 'User/Config.t
 • The OpenPose model they wish to use. They can also use AlphaPose [@Fang_2017], or even create their own model (e.g. with DeepLabCut [@Mathis_2018]),\
 • Whether they are going to calibrate their cameras with a checkerboard, or to simply convert a calibration file provided by a Qualisys system,\
 • Which keypoint they want to track in order to automatically single out the person of interest,\
-• The thresholds in confidence and in reprojection error for using or not a camera while triangulating a keypoint,\
+• The thresholds in confidence and reprojection errors for using or not using a camera while triangulating a keypoint,\
 • The minimum number of cameras below which the keypoint won't be triangulated at this frame,\
 • The interpolation and filter types and parameters.
 
@@ -111,7 +111,7 @@ Overlays 2D detected json coordinates on original raw images. High confidence ke
 • `json_display_without_img.py`
 Plots an animation of 2D detected json coordinates.\
 • `trc_plot.py`
-Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different matplotlib tab.\
+Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different matplotlib tab.
 
 
 **Other trc tools**
@@ -127,6 +127,6 @@ Detects gait events from point coordinates according to [@Zeni_2008].\
 
 # Acknowledgements
 
-We acknowledge the dedicated people involved in major software programs and packages used by Pose2Sim, such as Python, OpenPose, OpenSim, OpenCV [@Bradski_2000], and many others. 
+We acknowledge the dedicated people involved in the many major software programs and packages used by Pose2Sim, such as Python, OpenPose, OpenSim, OpenCV [@Bradski_2000], among others. 
 
 # References
