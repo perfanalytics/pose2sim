@@ -111,7 +111,7 @@ Overlays 2D detected json coordinates on original raw images. High confidence ke
 • `json_display_without_img.py`
 Plots an animation of 2D detected json coordinates.\
 • `trc_plot.py`
-Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different matplotlib tab.
+Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different matplotlib tab.\
 
 
 **Other trc tools**
