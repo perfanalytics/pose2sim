@@ -68,7 +68,7 @@ So far, little work has been done towards obtaining 3D angles from multiple view
 The workflow is organized as follows \autoref{fig:pipeline}:\
 1. Preliminary OpenPose [@Cao_2019] 2D keypoints detection.\
 2. Pose2Sim core, including 4 customizable steps:\
-&nbsp;&nbsp;&nbsp;&nbsp;2.i. Camera calibration\
+&nbsp;&nbsp;&nbsp;&nbsp;2.i. Camera calibration \
 &nbsp;&nbsp;&nbsp;&nbsp;2.ii. Tracking of the person viewed by the most cameras\
 &nbsp;&nbsp;&nbsp;&nbsp;2.iii. 2D keypoints triangulation\
 &nbsp;&nbsp;&nbsp;&nbsp;2.iv. 3D coordinates filtering\
