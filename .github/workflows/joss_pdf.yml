@@ -3,7 +3,8 @@ name: JOSS pdf constructor
 on:
   push:
     paths:
-      - 'Content/*joss*'
+      - 'Content/paper.md'
+      - 'Content/paper.bib'
       - 'Content/Pipeline.png'
 
 jobs:
@@ -18,7 +19,7 @@ jobs:
         with:
           journal: joss
           # This should be the path to the paper within your repo.
-          paper-path: Content/paper_joss.md
+          paper-path: Content/paper.md
       - name: Upload
         uses: actions/upload-artifact@v1
         with:
