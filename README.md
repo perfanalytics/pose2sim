@@ -13,6 +13,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoi
 <img src="Content/Pose2Sim_workflow.png" width="760">
 <img src="Content/Overview.png" width="760">
 
+
 ## Contents
 1. [Installation and Demonstration](#installation-and-demonstration)
    1. [Installation](#installation)
