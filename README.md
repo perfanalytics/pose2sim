@@ -11,7 +11,6 @@
 Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoints coordinates obtained from multiple videos) and leads to an OpenSim result (full-body 3D joint angles). 
 
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
-<img src="Content/Overview.png" width="760">
 
 
 ## Contents
