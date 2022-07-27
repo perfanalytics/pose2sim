@@ -80,9 +80,9 @@ def zup2yup(Q):
     return Q
 
 
-def interpolate_zeros(col, *kind):
+def interpolate_nans(col, *kind):
     '''
-    Interpolate missing points (of value 0.)
+    Interpolate missing points (of value nan)
 
     INPUTS:
     - col: pandas column of coordinates
@@ -426,7 +426,7 @@ def triangulate_all(config):
     nb_cams_excluded_tot['mean'] = nb_cams_excluded_tot.mean(axis = 1)
 
     # Interpolate missing values
-    Q_tot = Q_tot.apply(interpolate_zeros, axis=0, args = [interpolation_kind])
+    Q_tot = Q_tot.apply(interpolate_nans, axis=0, args = [interpolation_kind])
    
     # Create TRC file
     trc_path = make_trc(config, Q_tot, keypoints_names, f_range)
