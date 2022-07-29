@@ -13,9 +13,9 @@
     and you want to assemble both detections before running OpenSim.
     
     Usage:
-    from Pose2Sim.Utilities import combine_trc; combine_trc.combine_trc_func(r'<first_path>', r'<second_path>', r'<output_path>')
-    OR python -m combine_trc -i "<first_path>" -j "<second_path>" -o "<output_path>"
-    OR python -m combine_trc -i "<first_path>" -j "<second_path>"
+    from Pose2Sim.Utilities import trc_combine; trc_combine.trc_combine_func(r'<first_path>', r'<second_path>', r'<output_path>')
+    OR python -m trc_combine -i "<first_path>" -j "<second_path>" -o "<output_path>"
+    OR python -m trc_combine -i "<first_path>" -j "<second_path>"
 '''
 
 
@@ -124,7 +124,7 @@ def trc_from_header_data(Header, Data, combined_path):
         Data.to_csv(trc_o, sep='\t', index=False, header=None, line_terminator='\n')
         
 
-def combine_trc_func(*args):
+def trc_combine_func(*args):
     '''
     Combine two trc files.
     Example: you have run Pose2Sim with OpenPose AND with a DeepLabCut model 
@@ -132,9 +132,9 @@ def combine_trc_func(*args):
     and you want to assemble both detections before running OpenSim.
 
     Usage:
-    from Pose2Sim.Utilities import combine_trc; combine_trc.combine_trc_func(r'<first_path>', r'<second_path>', r'<output_path>')
-    OR python -m combine_trc -i "<first_path>" -j "<second_path>" -o "<output_path>"
-    OR python -m combine_trc -i "<first_path>" -j "<second_path>"
+    from Pose2Sim.Utilities import trc_combine; trc_combine.trc_combine_func(r'<first_path>', r'<second_path>', r'<output_path>')
+    OR python -m trc_combine -i "<first_path>" -j "<second_path>" -o "<output_path>"
+    OR python -m trc_combine -i "<first_path>" -j "<second_path>"
     '''
 
     try:
@@ -164,5 +164,5 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output_path', required = False, help='path of combined trc files')
     args = vars(parser.parse_args())
     
-    combine_trc_func(args)
+    trc_combine_func(args)
     
