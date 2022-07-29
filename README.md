@@ -537,6 +537,9 @@ Filters trc files. Available filters: Butterworth, Butterworth on speed, Gaussia
 
 `trc_gaitevents.py`
 Detects gait events from point coordinates according to [Zeni et al. (2008)](https://www.sciencedirect.com/science/article/abs/pii/S0966636207001804?via%3Dihub).
+
+`trc_combine.py`
+Combine two trc files, for example a triangulated DeepLabCut trc file and a triangulated OpenPose trc file.
    </pre>
 </details>
 
