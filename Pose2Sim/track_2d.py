@@ -266,6 +266,7 @@ def track_2d_all(config):
     pose_listdirs_names = natural_sort(pose_listdirs_names)
     json_dirs_names = [k for k in pose_listdirs_names if json_folder_extension in k]
     json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+    json_files_names = [natural_sort(j) for j in json_files_names]
     json_files = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # 2d-pose-tracked files creation
