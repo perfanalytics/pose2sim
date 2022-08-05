@@ -37,7 +37,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoi
 1. **Install OpenPose** (instructions [there](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/installation/0_index.md)). \
 *Windows portable demo is enough.*
 2. **Install OpenSim 4.x** ([there](https://simtk.org/frs/index.php?group_id=91)). \
-*Tested up to v4.4-beta on Windows. Has to be compiled from source on Linux.*
+*Tested up to v4.4-beta on Windows. Has to be compiled from source on Linux (see [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Linux+Support)).*
 3. ***Optional.*** *Install Anaconda or [Miniconda](https://docs.conda.io/en/latest/miniconda.html). \
    Open an Anaconda terminal and create a virtual environment with typing:*
    <pre><i>conda create -n Pose2Sim python=3.8.8 
