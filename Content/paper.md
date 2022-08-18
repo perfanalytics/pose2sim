@@ -62,7 +62,7 @@ So far, little work has been done towards obtaining 3D angles from multiple view
 
 ![Pose2Sim full pipeline: (1) OpenPose 2D joint detection; (2i) Camera calibration; (2ii–iv) Tracking the person of interest, Triangulating his coordinates, and Filtering them; (3) Constraining the 3D coordinates to a physically consistent OpenSim skeletal model.\label{fig:pipeline}](Pipeline.png)
 
-The workflow is organized as follows \autoref{fig:pipeline}:\
+The workflow is organized as follows \autoref{fig:pipeline}: \
 1. Preliminary OpenPose [@Cao_2019] 2D keypoints detection.\
 2. Pose2Sim core, including 4 customizable steps:\
 &nbsp;&nbsp;&nbsp;&nbsp;2.i. Camera calibration. \
@@ -103,8 +103,8 @@ It should be noted that OpenPose natively provides a module for reconstructing 3
 The filter type and its parameters. Waveforms before and after filtering can be displayed and compared.
 
 ### OpenSim
-The main contribution of this software is to build a bridge between OpenPose and OpenSim. The latter allows for much more accurate and robust results [@Pagnon_2022], which constrains kinematics to an individually scaled and physically accurate skeletal model. This model also takes into account systematic labelling errors in OpenPose [@Needham_2022]. Since these are considered similar regardless of the subject, neither the model nor the scaling or inverse kinematic files necessarily need to be modified when changing the operator or the participant.\
-The OpenSim model, scaling setup file, and inverse kinematics setup files will not be edited or adjusted in the OpenSim GUI, rather than by using the 'User\Config.toml' file. This can be done in the same way as one would do with a standard marker-based experiment.
+The main contribution of this software is to build a bridge between OpenPose and OpenSim. The latter allows for much more accurate and robust results [@Pagnon_2022], which constrains kinematics to an individually scaled and physically accurate skeletal model. This model also takes into account systematic labelling errors in OpenPose [@Needham_2021]. Since these are considered similar regardless of the subject, neither the model nor the scaling or inverse kinematic files necessarily need to be modified when changing the operator or the participant.\
+The OpenSim model, scaling setup file, and inverse kinematics setup files will not be edited or adjusted in the OpenSim GUI, rather than by using the `User\Config.toml` file. This can be done in the same way as one would do with a standard marker-based experiment.
 
 ## Pose2Sim utilities
 A large part of Pose2Sim functions are also provided as standalone python scripts. Other tools are also provided for extending its usage, such as the ones presented below  \autoref{fig:utilities}.
