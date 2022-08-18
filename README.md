@@ -132,6 +132,7 @@ bin\OpenPoseDemo.exe --model_pose BODY_25B --image_dir <PATH_TO_PROJECT_DIR>\raw
 * *N.B.:* The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results; however, feel free to use any OpenPose model (BODY_25B, BODY_25, COCO, with face and/or hands, etc), and to work with videos instead of image files.
 * *N.B.:* You can also use [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut), or other 2D pose estimators instead. \
 If you decide to do so, you'll have to (1) translate the format to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)); (2) report the model keypoints in the 'skeleton.py' file; (3) create an OpenSim model if you need 3D joint angles.
+* *N.B.:* Use one of the scripts `json_display_with_img.py` or `json_display_with_img.py` if you want to display 2D pose detections.
 
 <img src="Content/Pose2D.png" width="760">
 
@@ -478,7 +479,7 @@ opensim-cmd run-tool <PATH_TO_POSE2SIM>/OpenSim/Setup/<YOUR SCALING OR IK SETUP 
 </details>
 
 ## Utilities
-A list of standalone tools, which can be both run as scripts or imported as functions. Check usage in the docstrings of each python file.\
+A list of standalone tools, which can be both run as scripts or imported as functions. Check usage in the docstrings of each python file.
 
 <details>
   <summary><b>Converting files and Calibrating</b> (CLICK TO SHOW)</summary>
