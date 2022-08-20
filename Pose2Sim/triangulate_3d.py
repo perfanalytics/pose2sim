@@ -213,6 +213,8 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, projection_matrices):
     2. Tries all possible triangulations
     3. Chooses the one with smallest reprojection error
     If error too big, take off one more camera.
+        If then below threshold, retain result.
+        If better but still too big, take off one more camera.
     
     INPUTS:
     - a Config.toml file
