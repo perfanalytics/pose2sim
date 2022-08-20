@@ -480,7 +480,8 @@ opensim-cmd run-tool <PATH_TO_POSE2SIM>/OpenSim/Setup/<YOUR SCALING OR IK SETUP 
 </details>
 
 ## Utilities
-A list of standalone tools, which can be both run as scripts or imported as functions. Check usage in the docstrings of each python file.
+A list of standalone tools, which can be either run as scripts, or imported as functions. Check usage in the docstrings of each Python file. The figure below shows how some of these toolscan be used to further extend Pose2Sim usage.
+
 
 <details>
   <summary><b>Converting files and Calibrating</b> (CLICK TO SHOW)</summary>
@@ -545,6 +546,7 @@ Combine two trc files, for example a triangulated DeepLabCut trc file and a tria
    </pre>
 </details>
 
+<img src="Content/Pose2Sim_workflow_utilities.jpg" width="760">
 
 ## How to cite and how to contribute
 #### How to cite
