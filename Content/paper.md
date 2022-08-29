@@ -33,11 +33,11 @@ bibliography: paper.bib
 `Pose2Sim` stands for "OpenPose to OpenSim", as it uses `OpenPose` inputs (2D coordinates obtained from multiple videos) and leads to an `OpenSim` result (full-body 3D joint angles). 
 
 The repository presents a framework for: \
-• Detecting 2D joint coordinates from videos, e.g. via `OpenPose` [@Cao_2019], \
-• Calibrating cameras, \
-• Detecting the person of interest, \
-• Triangulating 2D joint coordinates and storing them as 3D positions in a .trc file, \
-• Filtering these calculated 3D positions, \
+• Detecting 2D joint coordinates from videos, e.g. via `OpenPose` [@Cao_2019]. \
+• Calibrating cameras. \
+• Detecting the person of interest. \
+• Triangulating 2D joint coordinates and storing them as 3D positions in a .trc file. \
+• Filtering these calculated 3D positions. \
 • Scaling and running inverse kinematics via `OpenSim` [@Delp_2007; @Seth_2018], in order to obtain full-body 3D joint angles.
 
 Each task is easily customizable, and requires only moderate Python skills. `Pose2Sim` is accessible at [https://github.com/perfanalytics/pose2sim](https://github.com/perfanalytics/pose2sim). 
