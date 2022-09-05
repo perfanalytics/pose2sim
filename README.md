@@ -579,7 +579,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 *Here is a to-do list, for general guidance purposes only:*
 > <li> Integrate as a Blender and / or Maya add-on. See <a href="https://github.com/davidpagnon/Maya-Mocap">Maya-Mocap</a> and <a href="https://github.com/JonathanCamargo/BlendOsim">BlendOSim</a>
 > <li> Multiple persons kinematics (triangulating multiple persons, and sorting them in time)</li>
-> <li> Use aniposelib for better calibration </li>
+> <li> Use <a href='https://github.com/lambdaloop/aniposelib'>aniposelib</a> for better calibration, and/or autocalibration <a href='https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130'>based on a person's dimensions</a> </li>
 > <li> Copy-paste muscles from OpenSim <a href="https://simtk.org/projects/lfbmodel">lifting full-body model</a> for inverse dynamics and more</li>
 > <li> Finish deploying Body_135, MediaPipe, AlphaPose, and DeepLabCut compatibility </li>
 > </br>
