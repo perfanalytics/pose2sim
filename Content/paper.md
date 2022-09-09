@@ -54,7 +54,7 @@ So far, little work has been done towards obtaining 3D angles from multiple view
 The goal of `Pose2Sim` is to build a bridge between the communities of computer vision and biomechanics, by providing a simple and open-source pipeline connecting the two aforementioned state-of-the-art tools: `OpenPose` and `OpenSim`. The whole workflow runs from any video cameras, on any computer, equipped with any operating system (although `OpenSim` has to be compiled from source on Linux.) `Pose2Sim` has already been used and tested in a number of situations (walking, running, cycling, dancing, balancing, swimming, boxing), and published in peer-reviewed scientific publications assessing its robustness [@Pagnon_2021] and accuracy [@Pagnon_2022]. Its results for inverse kinematics were deemed good when compared to marker-based ones, with errors generally below 4.0° across several activities, on both lower and on upper limbs. The combination of its ease of use, customizable parameters, and high robustness and accuracy makes it promising, especially for "in-the-wild" sports movement analysis.
 
 # Pose2Sim workflow
-`Pose2Sim` connects two of the most widely recognized (and open-source) pieces of software in their respective fields:\
+`Pose2Sim` connects two of the most widely recognized (and open-source) softwares in their respective fields:\
 • `OpenPose` [@Cao_2019], a 2D human pose estimation neural network.\
 • `OpenSim` [@Delp_2007], a 3D biomechanics analysis software.
 
@@ -100,7 +100,7 @@ We recommend choosing the neck point or one of the hip points. In most cases the
 Other parameters can be specified, such as:\
 • The minimum likelihood (given by `OpenPose` for each detected keypoint) below which a 2D point will not be taken into account for triangulation.\
 • The maximum in reprojection error above which triangulation results will not be accepted. This can happen if `OpenPose` provides a bad 2D keypoint estimate, or if the person of interest leaves the camera field. Triangulation will then be tried again on all subsets of all cameras minus one. If the best of the resulting reprojection errors is below the threshold, it is retained. If it is still above the threshold, one more camera is excluded.\
-• The minimum number of "good" cameras (i.e., cameras remaining after the last two steps) required for triangulating a keypoint. If there is not enough, the 3D keypoint is dropped for this frame. 
+• The minimum number of "good" cameras (i.e., cameras remaining after the last two steps) required for triangulating a keypoint. If there are not enough cameras left, the 3D keypoint is dropped for this frame. 
 
 Once all frames are triangulated, the ones with missing keypoint coordinates are interpolated. The interpolation method can also be chosen from among linear, slinear, quadratic, and cubic. The mean reprojection error over all frames is given for each point and saved to a log file, as well as the number of cameras excluded to reach the demanded thresholds. The resulting 3D coordinates are formatted as a .trc file, which can be read by `OpenSim`.
 
