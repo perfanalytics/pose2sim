@@ -1,5 +1,5 @@
 ---
-title: 'Pose2Sim: An Open-source Python Package for multiview markerless kinematics'
+title: 'Pose2Sim: An open-source Python package for multiview markerless kinematics'
 tags:
   - python
   - markerless kinematics
