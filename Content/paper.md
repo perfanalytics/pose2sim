@@ -75,10 +75,10 @@ The workflow is organized as follows (\autoref{fig:pipeline}):
 # Pose2Sim method details
 `Pose2Sim` is meant to be as fully and easily configurable as possible, by editing the 'User/Config.toml' file. Optional tools are also provided for extending its usage (\autoref{fig:utilities}).
 
-![The Pose2Sim workflow, along with some optional utilities provided in the package.\label{fig:utilities}](Pose2Sim_workflow_utilities.jpg)
-
 ## Project
 The user can specify the project path and folder names, the video frame rate, and the range of analyzed frames.
+
+![The Pose2Sim workflow, along with some optional utilities provided in the package.\label{fig:utilities}](Pose2Sim_workflow_utilities.jpg)
 
 ## 2D keypoint detection
 It is possible to define which 2D pose estimation model is used. This choice will affect how keypoint indices will be mapped to model markers in `OpenSim`, corresponding to anatomical landmarks or joint centers. Only 21 of the 25 keypoints detected by the default `OpenPose` models are tracked, since eye and ear keypoints would be redundant in the determination of the head orientation.
