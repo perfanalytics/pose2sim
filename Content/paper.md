@@ -60,8 +60,6 @@ The goal of `Pose2Sim` is to build a bridge between the communities of computer 
 * `OpenPose` [@Cao_2019], a 2D human pose estimation neural network
 * `OpenSim` [@Delp_2007], a 3D biomechanics analysis software
 
-![Pose2Sim full pipeline: (1) OpenPose 2D joint detection; (2i) Camera calibration; (2ii–iv) Tracking the person of interest, Triangulating keypoints coordinates, and Filtering them; (3) Constraining the 3D coordinates to a physically consistent OpenSim skeletal model.\label{fig:pipeline}](Pipeline.png)
-
 The workflow is organized as follows (\autoref{fig:pipeline}):
 
 1. Preliminary `OpenPose` [@Cao_2019] 2D keypoints detection
@@ -71,6 +69,8 @@ The workflow is organized as follows (\autoref{fig:pipeline}):
     3. 3D keypoint triangulation
     4. 3D coordinate filtering
 3. A full-body `OpenSim` [@Delp_2007] skeletal model with `OpenPose` keypoints is provided, as well as scaling and inverse kinematics setup files.
+
+![Pose2Sim full pipeline: (1) OpenPose 2D joint detection; (2i) Camera calibration; (2ii–iv) Tracking the person of interest, Triangulating keypoints coordinates, and Filtering them; (3) Constraining the 3D coordinates to a physically consistent OpenSim skeletal model.\label{fig:pipeline}](Pipeline.png)
 
 # Pose2Sim method details
 `Pose2Sim` is meant to be as fully and easily configurable as possible, by editing the 'User/Config.toml' file. Optional tools are also provided for extending its usage (\autoref{fig:utilities}).
