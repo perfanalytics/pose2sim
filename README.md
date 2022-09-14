@@ -566,7 +566,6 @@ If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org
       TITLE = {Pose2Sim: An End-to-End Workflow for 3D Markerless Sports Kinematics—Part 2: Accuracy},
       JOURNAL = {Sensors},
       YEAR = {2022},
-      PUBLISHER = {Multidisciplinary Digital Publishing Institute},
       DOI = {10.3390/s22072712},
       URL = {https://www.mdpi.com/1424-8220/22/7/2712}
     }
@@ -576,7 +575,6 @@ If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org
       TITLE = {Pose2Sim: An End-to-End Workflow for 3D Markerless Sports Kinematics—Part 1: Robustness},
       JOURNAL = {Sensors},
       YEAR = {2021},
-      PUBLISHER = {Multidisciplinary Digital Publishing Institute},
       DOI = {10.3390/s21196530},
       URL = {https://www.mdpi.com/1424-8220/21/19/6530}
     }
