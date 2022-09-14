@@ -550,26 +550,36 @@ Combine two trc files, for example a triangulated DeepLabCut trc file and a tria
 
 ## How to cite and how to contribute
 #### How to cite
-If you use this code or data, please cite [Pagnon et al., 2022](https://www.mdpi.com/1424-8220/22/7/2712) or [Pagnon et al., 2021](https://www.mdpi.com/1424-8220/21/19/6530).
+If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org/10.21105/joss.04362), [Pagnon et al., 2022a](https://www.mdpi.com/1424-8220/22/7/2712), or [Pagnon et al., 2021](https://www.mdpi.com/1424-8220/21/19/6530).
     
-    @Article{Pagnon_2022_Pose2Sim,
+    @Article{Pagnon_2022_JOSS, 
+      AUTHOR = {Pagnon, David and Domalain, Mathieu and Reveret, Lionel}, 
+      TITLE = {Pose2Sim: An open-source Python package for multiview markerless kinematics}, 
+      JOURNAL = {Journal of Open Source Software}, 
+      YEAR = {2022},
+      DOI = {10.21105/joss.04362}, 
+      URL = {https://joss.theoj.org/papers/10.21105/joss.04362}
+     }
+
+    @Article{Pagnon_2022_Accuracy,
       AUTHOR = {Pagnon, David and Domalain, Mathieu and Reveret, Lionel},
       TITLE = {Pose2Sim: An End-to-End Workflow for 3D Markerless Sports Kinematics—Part 2: Accuracy},
       JOURNAL = {Sensors},
       YEAR = {2022},
       PUBLISHER = {Multidisciplinary Digital Publishing Institute},
+      DOI = {10.3390/s22072712},
       URL = {https://www.mdpi.com/1424-8220/22/7/2712}
     }
 
-    @Article{Pagnon_2021_Pose2Sim,
+    @Article{Pagnon_2021_Robustness,
       AUTHOR = {Pagnon, David and Domalain, Mathieu and Reveret, Lionel},
       TITLE = {Pose2Sim: An End-to-End Workflow for 3D Markerless Sports Kinematics—Part 1: Robustness},
       JOURNAL = {Sensors},
       YEAR = {2021},
       PUBLISHER = {Multidisciplinary Digital Publishing Institute},
-      URL = {https://www.mdpi.com/1424-8220/21/19/6530},
+      DOI = {10.3390/s21196530},
+      URL = {https://www.mdpi.com/1424-8220/21/19/6530}
     }
-
 
 #### How to contribute
 
