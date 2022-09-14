@@ -65,12 +65,12 @@ The workflow is organized as follows (\autoref{fig:pipeline}):
 1. Preliminary `OpenPose` [@Cao_2019] 2D keypoints detection
 2. `Pose2Sim` core, including 4 customizable steps:
     1. Camera calibration
-    2. 2D Tracking the person of interest
+    2. 2D tracking of the person of interest
     3. 3D keypoint triangulation
     4. 3D coordinate filtering
 3. A full-body `OpenSim` [@Delp_2007] skeletal model with `OpenPose` keypoints is provided, as well as scaling and inverse kinematics setup files.
 
-![Pose2Sim full pipeline: (1) OpenPose 2D joint detection; (2i) Camera calibration; (2ii–iv) Tracking the person of interest, Triangulating keypoints coordinates, and Filtering them; (3) Constraining the 3D coordinates to a physically consistent OpenSim skeletal model.\label{fig:pipeline}](Pipeline.png)
+![Pose2Sim full pipeline: (1) OpenPose 2D keypoint detection; (2.1) Camera calibration; (2.1–2.4) Tracking of the person of interest, Triangulation of keypoint coordinates, and Filtering; (3) Constraining the 3D coordinates to an individually scaled, physically consistent OpenSim skeletal model.\label{fig:pipeline}](Pipeline.png)
 
 # Pose2Sim method details
 `Pose2Sim` is meant to be as fully and easily configurable as possible, by editing the 'User/Config.toml' file. Optional tools are also provided for extending its usage (\autoref{fig:utilities}).
@@ -114,7 +114,9 @@ If needed, other standalone tools are provided to further work on the .trc 3D co
 ## OpenSim scaling and inverse kinematics
 The main contribution of this software is to build a bridge between `OpenPose` and `OpenSim`. The latter allows for much more accurate and robust results [@Pagnon_2022], since it constrains kinematics to an individually scaled and physically accurate skeletal model. Bones are constrained to a constant length, and joints to coherent angle limits.
 
-The provided model is adapted from the human gait full-body model [@Rajagopal_2016] and the lifting full-body model [@Beaucage_2019]. The first one has a better definition of the knee joint: abduction/adduction and internal/external rotation angles are constrained to the flexion/extension angle. The latter has a better definition of the spine: each lumbar vertebra is constrained to the next one, which makes it possible for the spine to bend in a coherent way with only a few tracked keypoints, without having to make it a rigid single bone. Combining those two models allows for ours to be as versatile as possible. Hand movements are locked, because the standard `OpenPose` models don't provide any hand detection. This model also takes into account systematic labelling errors in `OpenPose` [@Needham_2021], and offsets model markers as regards true joint centers accordingly. Unlike in marker-based capture, and despite the aforementioned systematic errors, keypoints detection hardly depends on the subject, the operator, nor the context. For this reason, the scaling and the inverse kinematic steps are straightforward, and the provided setup files require little to no adjusting.
+The provided model is adapted from the human gait full-body model [@Rajagopal_2016] and the lifting full-body model [@Beaucage_2019]. The first one has a better definition of the knee joint: abduction/adduction and internal/external rotation angles are constrained to the flexion/extension angle. The latter has a better definition of the spine: each lumbar vertebra is constrained to the next one, which makes it possible for the spine to bend in a coherent way with only a few tracked keypoints, without having to make it a rigid single bone. Combining those two models allows for ours to be as versatile as possible. Hand movements are locked, because the standard `OpenPose` models don't provide any hand detection. 
+
+This model also takes into account systematic labelling errors in `OpenPose` [@Needham_2021], and offsets model markers as regards true joint centers accordingly. Unlike in marker-based capture, and despite the aforementioned systematic errors, keypoints detection hardly depends on the subject, the operator, nor the context. For this reason, the scaling and the inverse kinematic steps are straightforward, and the provided setup files require little to no adjusting.
 
 # Acknowledgements
 We acknowledge the dedicated people involved in the many major software programs and packages used by `Pose2Sim`, such as `Python`, `OpenPose`, `OpenSim`, `OpenCV` [@Bradski_2000], among others. 
