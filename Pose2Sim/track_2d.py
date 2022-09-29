@@ -244,7 +244,7 @@ def track_2d_all(config):
     calib_folder_name = config.get('project').get('calib_folder_name')
     poseTracked_folder_name = config.get('project').get('poseTracked_folder_name')
     pose_folder_name = config.get('project').get('pose_folder_name')
-    openpose_model = config.get('pose-2d').get('openpose_model')
+    pose_model = config.get('pose-2d').get('pose_model')
     tracked_keypoint = config.get('2d-tracking').get('tracked_keypoint')
     json_folder_extension =  config.get('project').get('pose_json_folder_extension')
     frames_range = config.get('project').get('frames_range')
@@ -258,7 +258,7 @@ def track_2d_all(config):
     P = computeP(calib_file)
     
     # selection of tracked keypoint id
-    model = eval(openpose_model)
+    model = eval(pose_model)
     tracked_keypoint_id = [node.id for _, _, node in RenderTree(model) if node.name==tracked_keypoint][0]
     
     # 2d-pose files selection

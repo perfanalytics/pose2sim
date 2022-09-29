@@ -359,7 +359,7 @@ def triangulate_all(config):
     project_dir = config.get('project').get('project_dir')
     if project_dir == '': project_dir = os.getcwd()
     calib_folder_name = config.get('project').get('calib_folder_name')
-    openpose_model = config.get('pose-2d').get('openpose_model')
+    pose_model = config.get('pose-2d').get('pose_model')
     pose_folder_name = config.get('project').get('pose_folder_name')
     json_folder_extension =  config.get('project').get('pose_json_folder_extension')
     frames_range = config.get('project').get('frames_range')
@@ -375,7 +375,7 @@ def triangulate_all(config):
     P = computeP(calib_file)
     
     # Retrieve keypoints from model
-    model = eval(openpose_model)
+    model = eval(pose_model)
     keypoints_ids = [node.id for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_idx = list(range(len(keypoints_ids)))
