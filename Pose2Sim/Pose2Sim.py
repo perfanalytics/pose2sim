@@ -76,9 +76,9 @@ def base_params(config_dict):
 
     project_dir = config_dict.get('project').get('project_dir')
     if project_dir == '': project_dir = os.getcwd()
-    frames_range = config_dict.get('project').get('frames_range')
+    frame_range = config_dict.get('project').get('frame_range')
     seq_name = os.path.basename(project_dir)
-    frames = ["all frames" if frames_range == [] else f"frames {frames_range[0]} to {frames_range[1]}"][0]
+    frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
     return project_dir, seq_name, frames
 

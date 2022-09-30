@@ -362,7 +362,7 @@ def triangulate_all(config):
     pose_model = config.get('pose-2d').get('pose_model')
     pose_folder_name = config.get('project').get('pose_folder_name')
     json_folder_extension =  config.get('project').get('pose_json_folder_extension')
-    frames_range = config.get('project').get('frames_range')
+    frame_range = config.get('project').get('frame_range')
     likelihood_threshold = config.get('3d-triangulation').get('likelihood_threshold')
     interpolation_kind = config.get('3d-triangulation').get('interpolation')
     pose_dir = os.path.join(project_dir, pose_folder_name)
@@ -394,7 +394,7 @@ def triangulate_all(config):
         json_tracked_files = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # Triangulation
-    f_range = [[0,min([len(j) for j in json_files_names])] if frames_range==[] else frames_range][0]
+    f_range = [[0,min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
 
     n_cams = len(json_dirs_names)
     Q_tot, error_tot, nb_cams_excluded_tot = [], [], []

@@ -247,7 +247,7 @@ def track_2d_all(config):
     pose_model = config.get('pose-2d').get('pose_model')
     tracked_keypoint = config.get('2d-tracking').get('tracked_keypoint')
     json_folder_extension =  config.get('project').get('pose_json_folder_extension')
-    frames_range = config.get('project').get('frames_range')
+    frame_range = config.get('project').get('frame_range')
     
     calib_dir = os.path.join(project_dir, calib_folder_name)
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
@@ -276,7 +276,7 @@ def track_2d_all(config):
     json_tracked_files = [[os.path.join(poseTracked_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # person's tracking
-    f_range = [[min([len(j) for j in json_files])] if frames_range==[] else frames_range][0]
+    f_range = [[min([len(j) for j in json_files])] if frame_range==[] else frame_range][0]
     n_cams = len(json_dirs_names)
     error_min_tot, cameras_off_tot = [], []
     

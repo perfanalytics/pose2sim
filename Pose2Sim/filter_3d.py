@@ -281,7 +281,7 @@ def filter_all(config):
         pose_folder_name = config.get('project').get('pose_folder_name')
     pose_dir = os.path.join(project_dir, pose_folder_name)
     json_folder_extension =  config.get('project').get('pose_json_folder_extension')
-    frames_range = config.get('project').get('frames_range')
+    frame_range = config.get('project').get('frame_range')
     seq_name = os.path.basename(project_dir)
     pose3d_folder_name = config.get('project').get('pose3d_folder_name')
     pose3d_dir = os.path.join(project_dir, pose3d_folder_name)
@@ -292,7 +292,7 @@ def filter_all(config):
     pose_listdirs_names = next(os.walk(pose_dir))[1]
     json_dirs_names = [k for k in pose_listdirs_names if json_folder_extension in k]
     json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
-    f_range = [[0,min([len(j) for j in json_files_names])] if frames_range==[] else frames_range][0]
+    f_range = [[0,min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
     
     # Trc paths
     trc_f_in = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
