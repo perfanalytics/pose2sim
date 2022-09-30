@@ -394,8 +394,10 @@ def triangulate_all(config):
         json_tracked_files = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # Triangulation
-    f_range = [[0,min([len(j) for j in json_files_names])] if frames_range==[] else frames_range][0]
-
+    if frames_range == []:
+        f_range = [0,min([len(j) for j in json_files_names])]
+    else:
+        f_range = [val - frames_range[0] for val in frames_range]
     n_cams = len(json_dirs_names)
     Q_tot, error_tot, nb_cams_excluded_tot = [], [], []
     for f in tqdm(range(*f_range)):
