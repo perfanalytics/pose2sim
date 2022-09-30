@@ -590,7 +590,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > <li> People association (tracking) with a neural network instead of brute force</li>
 > <li> Use <a href='https://github.com/lambdaloop/aniposelib'>aniposelib</a> for better calibration, and/or autocalibration <a href='https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130'>based on a person's dimensions</a> </li>
 > <li> Copy-paste muscles from OpenSim <a href="https://simtk.org/projects/lfbmodel">lifting full-body model</a> for inverse dynamics and more</li>
-> <li> Finish deploying Body_135, MediaPipe, AlphaPose, and DeepLabCut compatibility </li>
+> <li> Finish deploying OpenPose body_135, AlphaPose HALPE_26, AlphaPose HALPE_136, AlphaPose COCO-WholeBody, MediaPipe BlazePose, COCO, MPII (skeleton.py and OpenSim models). Write SLEAP converter.</li>
 > </br>
 > <li> Conda package and Docker image</li>
 > <li> Solve limb swapping</li>
