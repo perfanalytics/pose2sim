@@ -92,8 +92,10 @@ def json_display_without_img_func(**args):
         output_img_folder = os.path.join(json_folder+'_img')
     else:
         output_img_folder =  os.path.realpath(output_img_folder)
-    save = args.get('save')
     display = args.get('display')
+    if display==None: 
+        display = True
+    save = args.get('save')
 
     # Save
     if save == True or save == 'True':
