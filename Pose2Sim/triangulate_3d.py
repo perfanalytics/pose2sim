@@ -144,7 +144,7 @@ def make_trc(config, Q, keypoints_names, f_range):
     Q = zup2yup(Q)
     
     #Add Frame# and Time columns
-    Q.index = np.array(range(f_range[0], f_range[1])) + 1
+    Q.index = np.array(range(f_range[0]-f_range[0], f_range[1]-f_range[0])) + 1
     Q.insert(0, 't', Q.index / frame_rate)
 
     #Write file
@@ -394,8 +394,8 @@ def triangulate_all(config):
         json_tracked_files = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # Triangulation
-    f_range = [[0,min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
-
+    f_range = [[0,min([len(j) for j in json_files_names])] if frame_range==[] else [i - min(frame_range) for i in frame_range]][0]
+    
     n_cams = len(json_dirs_names)
     Q_tot, error_tot, nb_cams_excluded_tot = [], [], []
     for f in tqdm(range(*f_range)):
@@ -433,7 +433,7 @@ def triangulate_all(config):
     Q_tot = Q_tot.apply(interpolate_nans, axis=0, args = [interpolation_kind])
    
     # Create TRC file
-    trc_path = make_trc(config, Q_tot, keypoints_names, f_range)
+    trc_path = make_trc(config, Q_tot, keypoints_names, frame_range)
     
     # Recap message
     recap_triangulate(config, error_tot, nb_cams_excluded_tot, keypoints_names, trc_path)
