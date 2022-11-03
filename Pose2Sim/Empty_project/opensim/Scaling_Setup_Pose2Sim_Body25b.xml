@@ -390,7 +390,7 @@
 			<!--Flag (true or false) indicating whether or not to preserve relative mass between segments.-->
 			<preserve_mass_distribution>true</preserve_mass_distribution>
 			<!--Name of OpenSim model file (.osim) to write when done scaling.-->
-			<output_model_file>Unassigned</output_model_file>
+			<output_model_file>Model_Pose2Sim_Body25_scaled.osim</output_model_file>
 			<!--Name of file to write containing the scale factors that were applied to the unscaled model (optional).-->
 			<output_scale_file>Unassigned</output_scale_file>
 		</ModelScaler>
