@@ -41,7 +41,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoi
 *Tested up to v4.4-beta on Windows. Has to be compiled from source on Linux (see [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Linux+Support)).*
 3. ***Optional.*** *Install Anaconda or [Miniconda](https://docs.conda.io/en/latest/miniconda.html). \
    Open an Anaconda terminal and create a virtual environment with typing:*
-   <pre><i>conda create -n Pose2Sim python=3.8.8 
+   <pre><i>conda create -n Pose2Sim python=3.7 
    conda activate Pose2Sim</i></pre>
    
 3. **Install Pose2Sim**: \
@@ -62,7 +62,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.6
 ### Demonstration Part-1: Build 3D TRC file on Python  
 > _**This demonstration provides an example experiment of a person balancing on a beam, filmed with 4 calibrated cameras processed with OpenPose.**_ 
 
-Open a terminal and check package location with `pip show pose2sim | grep Location`. \
+Open a terminal, enter `pip show pose2sim`, report package location. \
 Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo`. \
 Type `python`, and test the following code:
 ```
@@ -101,7 +101,7 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
   
   1. Find your `Pose2Sim\Empty_project`, copy-paste it where you like and give it the name of your choice.
   2. Edit the `User\Config.toml` file as needed, **especially regarding the path to your project**. 
-  2. Populate the `raw-2d`folder with your camera images or videos.
+  3. Populate the `raw-2d`folder with your camera images or videos.
   
        <pre>
        Project
@@ -429,12 +429,21 @@ Output:\
 
 #### Command line
 Alternatively, you can use command-line tools:
-Open an Anaconda terminal in your OpenSim/bin directory, typically `C:\OpenSim <Version>\bin`.\
-You'll need to adjust the `time_range`, `output_motion_file`, and the paths to the .osim and .trc files in your setup file.
-```
-opensim-cmd run-tool <PATH_TO_POSE2SIM>/OpenSim/Setup/<YOUR SCALING OR IK SETUP FILE>.xml
-```
 
+- Open an Anaconda terminal in your OpenSim/bin directory, typically `C:\OpenSim <Version>\bin`.\
+  You'll need to adjust the `time_range`, `output_motion_file`, and enter the full paths to the input and output `.osim`, `.trc`, and `.mot` files in your setup file.
+  ```
+  opensim-cmd run-tool <PATH TO YOUR SCALING OR IK SETUP FILE>.xml
+  ```
+
+- You can also run OpenSim directly in Python:
+  ```
+  import subprocess
+  subprocess.call(["opensim-cmd", "run-tool", "<PATH TO YOUR SCALING OR IK SETUP FILE>.xml"])
+  ```
+
+- Or take advantage of the full the OpenSim Python API. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python) for installation instructions. \
+Note that it is easier to install on Python 3.7 and with OpenSim 4.2. 
 
 <details>
   <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
