@@ -597,7 +597,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > <li> Integrate as a Blender and / or Maya add-on. See <a href="https://github.com/davidpagnon/Maya-Mocap">Maya-Mocap</a> and <a href="https://github.com/JonathanCamargo/BlendOsim">BlendOSim</a>
 > <li> Multiple persons kinematics (triangulating multiple persons, and sorting them in time)</li>
 > <li> People association (tracking) with a neural network instead of brute force</li>
-> <li> Use <a href='https://github.com/lambdaloop/aniposelib'>aniposelib</a> for better calibration, and/or autocalibration <a href='https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130'>based on a person's dimensions</a> </li>
+> <li> Use <a href='https://github.com/lambdaloop/aniposelib'>aniposelib</a> for better calibration, and/or wand calibration cf <a href='https://argus.web.unc.edu/'>Argus</a> (conversion script from Argus/EasyWand/DLTdv8 <a href='https://shibboleth.univ-grenoble-alpes.fr/idp/Authn/External?conversation=e1s2&ticket=ST-2468723-dddQP1WR6Kjm2KGEUchg-cas-uga.grenet.fr'>here</a>), autocalibration <a href='https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130'>based on a person's dimensions</a> </li>
 > <li> Copy-paste muscles from OpenSim <a href="https://simtk.org/projects/lfbmodel">lifting full-body model</a> for inverse dynamics and more</li>
 > <li> Finish deploying OpenPose body_135, AlphaPose HALPE_26, AlphaPose HALPE_136, AlphaPose COCO-WholeBody, MediaPipe BlazePose, COCO, MPII (skeleton.py and OpenSim models). Write SLEAP converter.</li>
 > </br>
