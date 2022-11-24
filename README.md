@@ -13,6 +13,8 @@ Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoi
 
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
 
+<figure><img src='Content/Activities_verylow.gif' title='Other more or less challenging tasks and conditions.'>
+<figcaption>Pose2Sim has been tested on various challenging tasks and conditions.</figcaption></figure>
 
 ## Contents
 1. [Installation and Demonstration](#installation-and-demonstration)
@@ -422,10 +424,6 @@ Output:\
 
 <img src="Content/OpenSim.JPG" width="380">
 
-
-
-<figure><img src='Content/Activities_verylow.gif' title='Other more or less challenging tasks and conditions.'>
-<figcaption>Pose2Sim has been tested on other more or less challenging tasks and conditions.</figcaption></figure>
 
 #### Command line
 Alternatively, you can use command-line tools:
