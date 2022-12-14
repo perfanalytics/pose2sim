@@ -602,7 +602,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > <li> Conda package and Docker image</li>
 > <li> Solve limb swapping</li>
 > <li> Implement normalized DLT and RANSAC triangulation, as well as a triangulation refinement step (cf DOI:10.1109/TMM.2022.3171102)</li>
-> <li> Implement optimal fixed-interval Kalman smoothing</li>
+> <li> Implement optimal fixed-interval Kalman smoothing for inverse kinematics (<a href='https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp'>Biorbd</a> or <a href='https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp'>OpenSim fork</a>)</li>
 > <li> Utilities: convert Vicon xcp calibration file to toml</li>
 > <li> Run from command line via click or typer</li>
 > <li> Catch errors</li>
