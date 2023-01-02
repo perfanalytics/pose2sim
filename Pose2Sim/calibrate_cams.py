@@ -57,7 +57,7 @@ def calib_qca_fun(config):
     '''
     Convert a Qualisys .qca.txt calibration file
     Converts from camera view to object view, Pi rotates cameras, 
-    and converts rotation with Roodrigues formula
+    and converts rotation with Rodrigues formula
 
     INPUTS:
     - a Config.toml file
@@ -120,7 +120,7 @@ def read_qca(qca_path, binning_factor):
     
     # Camera name
     for tag in root.findall('cameras/camera'):
-        if tag.attrib.get('model')=='Miqus Video':
+        if tag.attrib.get('model') in ('Miqus Video', 'none'):
             ret += [float(tag.attrib.get('avg-residual'))/1000]
             C += [tag.attrib.get('serial')]
     
