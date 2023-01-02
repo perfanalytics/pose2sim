@@ -20,6 +20,7 @@
 ## INIT
 import os
 import argparse
+import re
 import numpy as np
 from lxml import etree
 import cv2
