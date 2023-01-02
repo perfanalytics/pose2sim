@@ -38,7 +38,7 @@ import toml
 import re
 from lxml import etree
 
-from Pose2Sim.common import RT_qca2cv, rotate_cam, euclidean_distance
+from Pose2Sim.common import RT_qca2cv, rotate_cam, euclidean_distance, natural_sort
 
 
 ## AUTHORSHIP INFORMATION
@@ -118,10 +118,11 @@ def read_qca(qca_path, binning_factor):
     root = etree.parse(qca_path).getroot()
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
     
-    # Cameraa name
+    # Camera name
     for tag in root.findall('cameras/camera'):
-        ret += [float(tag.attrib.get('avg-residual'))/1000]
-        C += [tag.attrib.get('serial')]
+        if tag.attrib.get('model')=='Miqus Video':
+            ret += [float(tag.attrib.get('avg-residual'))/1000]
+            C += [tag.attrib.get('serial')]
     
     # Image size
     for tag in root.findall('cameras/camera/fov_marker'):
@@ -161,6 +162,16 @@ def read_qca(qca_path, binning_factor):
         # Rotation (by-column to by-line)
         R += [np.array([r11, r21, r31, r12, r22, r32, r13, r23, r33]).reshape(3,3)]
         T += [np.array([tx, ty, tz])]
+   
+    # Cameras names by natural order
+    C_index = [C.index(c) for c in natural_sort(C)]
+    C = [C[c] for c in C_index]
+    ret = [ret[c] for c in C_index]
+    S = [S[c] for c in C_index]
+    D = [D[c] for c in C_index]
+    K = [K[c] for c in C_index]
+    R = [R[c] for c in C_index]
+    T = [T[c] for c in C_index]
    
     return ret, C, S, D, K, R, T
 

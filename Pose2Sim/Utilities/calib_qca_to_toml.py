@@ -52,9 +52,10 @@ def read_qca(qca_path, binning_factor):
     root = etree.parse(qca_path).getroot()
     C, S, D, K, R, T = [], [], [], [], [], []
 
-    # Cameraa name
+    # Camera name
     for tag in root.findall('cameras/camera'):
-        C += [tag.attrib.get('serial')]
+        if tag.attrib.get('model')=='Miqus Video':
+            C += [tag.attrib.get('serial')]
 
     # Image size
     for tag in root.findall('cameras/camera/fov_marker'):
@@ -95,6 +96,16 @@ def read_qca(qca_path, binning_factor):
         R += [np.array([r11, r21, r31, r12, r22, r32, r13, r23, r33]).reshape(3,3)]
         T += [np.array([tx, ty, tz])]
    
+    # Cameras names by natural order
+    C_index = [C.index(c) for c in natural_sort(C)]
+    C = [C[c] for c in C_index]
+    ret = [ret[c] for c in C_index]
+    S = [S[c] for c in C_index]
+    D = [D[c] for c in C_index]
+    K = [K[c] for c in C_index]
+    R = [R[c] for c in C_index]
+    T = [T[c] for c in C_index]
+   
     return C, S, D, K, R, T
 
 
@@ -134,6 +145,19 @@ def rotate_cam(r, t, ang_x=np.pi, ang_y=0, ang_z=0):
 
     return r, t
 
+
+def natural_sort(list): 
+    '''
+    Sorts list of strings with numbers in natural order
+    Example: ['item_1', 'item_2', 'item_10']
+    Taken from: https://stackoverflow.com/a/11150413/12196632
+    '''
+
+    convert = lambda text: int(text) if text.isdigit() else text.lower() 
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)] 
+    
+    return sorted(list, key=alphanum_key)
+    
 
 def toml_write(toml_path, C, S, D, K, R, T):
     '''
