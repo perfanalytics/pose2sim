@@ -54,7 +54,7 @@ def read_qca(qca_path, binning_factor):
 
     # Camera name
     for tag in root.findall('cameras/camera'):
-        if tag.attrib.get('model')=='Miqus Video':
+        if tag.attrib.get('model') in ('Miqus Video', 'none'):
             C += [tag.attrib.get('serial')]
 
     # Image size
