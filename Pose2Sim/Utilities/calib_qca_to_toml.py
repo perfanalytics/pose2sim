@@ -20,6 +20,7 @@
 ## INIT
 import os
 import argparse
+import re
 import numpy as np
 from lxml import etree
 import cv2
@@ -99,7 +100,6 @@ def read_qca(qca_path, binning_factor):
     # Cameras names by natural order
     C_index = [C.index(c) for c in natural_sort(C)]
     C = [C[c] for c in C_index]
-    ret = [ret[c] for c in C_index]
     S = [S[c] for c in C_index]
     D = [D[c] for c in C_index]
     K = [K[c] for c in C_index]
