@@ -59,7 +59,7 @@ def read_qca(qca_path, binning_factor):
             C += [tag.attrib.get('serial')]
 
     # Image size
-    for tag in root.findall('cameras/camera/fov_marker'):
+    for tag in root.findall('cameras/camera/fov_video'):
         w = float(tag.attrib.get('right'))/binning_factor
         h = float(tag.attrib.get('bottom'))/binning_factor
         S += [[w, h]]
