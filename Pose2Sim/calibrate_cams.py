@@ -126,8 +126,8 @@ def read_qca(qca_path, binning_factor):
     
     # Image size
     for tag in root.findall('cameras/camera/fov_video'):
-        w = float(tag.attrib.get('right'))/binning_factor
-        h = float(tag.attrib.get('bottom'))/binning_factor
+        w = (float(tag.attrib.get('right')) - float(tag.attrib.get('left'))) /binning_factor
+        h = (float(tag.attrib.get('bottom')) - float(tag.attrib.get('top'))) /binning_factor
         S += [[w, h]]
     
     # Intrinsic parameters: distorsion and intrinsic matrix
