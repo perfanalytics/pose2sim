@@ -9,7 +9,7 @@
 
 # Pose2Sim
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to the more usual marker-based motion capture methods.\
-Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoints coordinates obtained from multiple videos) and leads to an OpenSim result (full-body 3D joint angles). 
+Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoints coordinates obtained from multiple videos) and leads to an OpenSim result (full-body 3D joint angles). Other 2D solutions can alternatively be used as inputs.
 
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
 
@@ -24,7 +24,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoi
 2. [Use on your own data](#use-on-your-own-data)
    1. [Prepare for running on your own data](#prepare-for-running-on-your-own-data)
    2. [2D pose estimation](#2d-pose-estimation)
-   3. [Cameras calibration](#cameras-calibration)
+   3. [Camera calibration](#camera-calibration)
    4. [2D Tracking of person](#2d-tracking-of-person)
    5. [3D triangulation](#3d-triangulation)
    6. [3D filtering](#3d-filtering)
@@ -124,22 +124,39 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
        </b>
     
 ### 2D pose estimation
-> _**Estimate 2D pose from images with Openpose.**_
+> _**Estimate 2D pose from images with Openpose or an other pose estimation solution.**_
 
-Open a command prompt in your **OpenPose** directory. \
-Launch OpenPose for each raw image folder: 
-```
-bin\OpenPoseDemo.exe --model_pose BODY_25B --image_dir <PATH_TO_PROJECT_DIR>\raw-2d\raw_cam1_img --write_json <PATH_TO_PROJECT_DIR>\pose-2d\pose_cam1_json
-```
+<ins>With OpenPose:</ins>
+* Open a command prompt in your **OpenPose** directory. \
+  Launch OpenPose for each raw image folder: 
+  ```
+  bin\OpenPoseDemo.exe --model_pose BODY_25B --image_dir <PATH_TO_PROJECT_DIR>\raw-2d\raw_cam1_img --write_json <PATH_TO_PROJECT_DIR>\pose-2d\pose_cam1_json
+  ```
+* The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results and is default in Pose2Sim. However, feel free to use any OpenPose model (BODY_25B, BODY_25, BODY_135n COCO, MPII). \
+Make sure you modify the `User\Config.toml` file accordingly.
+* Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
 
-* *N.B.:* The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results; however, feel free to use any OpenPose model (BODY_25B, BODY_25, COCO, with face and/or hands, etc), and to work with videos instead of image files.
-* *N.B.:* You can also use [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut), or other 2D pose estimators instead. \
-If you decide to do so, you'll have to (1) translate the format to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)); (2) report the model keypoints in the 'skeleton.py' file; (3) create an OpenSim model if you need 3D joint angles.
-* *N.B.:* Use one of the scripts `json_display_with_img.py` or `json_display_with_img.py` if you want to display 2D pose detections.
+<ins>With BlazePose (MediaPipe):</ins>
+* BlazePose is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
+However, it is less robust and accurate than OpenPose, and can only detect a single person.
+* Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format (see docstring for more parameters): 
+  ```
+  python -m Blazepose_runsave -i "<input_file>" -dJs
+  ```
+* Make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
+
+<ins>With DeepLabCut:</ins>
+* If you want to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut), or other 2D pose estimators instead.
+* (1) translate the format to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
+  ```
+  python -m DLC_to_OpenPose -i "<input_h5_file>"
+  ```
+* (2) report the model keypoints in the 'skeleton.py' file.
+* (3) create an OpenSim model if you need 3D joint angles.
 
 <img src="Content/Pose2D.png" width="760">
 
-N.B.: Markers are not needed and are used only for validation
+N.B.: Markers are not needed in Pose2Sim and were used here for validation
 
 
 <details>
@@ -168,7 +185,7 @@ N.B.: Markers are not needed and are used only for validation
    </pre>
 </details>
 
-### Cameras calibration
+### Camera calibration
 > _**Calibrate your cameras.**_
 
 1. If you already have a calibration file (.qca.txt from Qualisys for example):
@@ -487,12 +504,14 @@ Note that it is easier to install on Python 3.7 and with OpenSim 4.2.
 </details>
 
 ## Utilities
-A list of standalone tools, which can be either run as scripts, or imported as functions. Check usage in the docstrings of each Python file. The figure below shows how some of these toolscan be used to further extend Pose2Sim usage.
+A list of standalone tools (see [Utilities](https://github.com/perfanalytics/pose2sim/tree/main/Pose2Sim/Utilities)), which can be either run as scripts, or imported as functions. Check usage in the docstrings of each Python file. The figure below shows how some of these toolscan be used to further extend Pose2Sim usage.
 
 
 <details>
   <summary><b>Converting files and Calibrating</b> (CLICK TO SHOW)</summary>
     <pre>
+`Blazepose_runsave.py`
+Runs BlazePose on a video, and saves coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format.
 
 `DLC_to_OpenPose.py`
 Converts a DeepLabCut (h5) 2D pose estimation file into OpenPose (json) files.
@@ -597,7 +616,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > <li> People association (tracking) with a neural network instead of brute force</li>
 > <li> Use <a href='https://github.com/lambdaloop/aniposelib'>aniposelib</a> for better calibration, and/or wand calibration cf <a href='https://argus.web.unc.edu/'>Argus</a> (conversion script from Argus/EasyWand/DLTdv8 <a href='https://shibboleth.univ-grenoble-alpes.fr/idp/Authn/External?conversation=e1s2&ticket=ST-2468723-dddQP1WR6Kjm2KGEUchg-cas-uga.grenet.fr'>here</a>), autocalibration <a href='https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130'>based on a person's dimensions</a> </li>
 > <li> Copy-paste muscles from OpenSim <a href="https://simtk.org/projects/lfbmodel">lifting full-body model</a> for inverse dynamics and more</li>
-> <li> Finish deploying OpenPose body_135, AlphaPose HALPE_26, AlphaPose HALPE_136, AlphaPose COCO-WholeBody, MediaPipe BlazePose, COCO, MPII (skeleton.py and OpenSim models). Write SLEAP converter.</li>
+> <li> Finish deploying OpenPose body_135, AlphaPose HALPE_26, AlphaPose HALPE_136, AlphaPose COCO-WholeBody, MediaPipe BlazePose, COCO, MPII, SLEAP (skeleton.py and OpenSim models). Write SLEAP converter.</li>
 > </br>
 > <li> Conda package and Docker image</li>
 > <li> Outlier rejection (sliding z-score?) Also solve limb swapping</li>
