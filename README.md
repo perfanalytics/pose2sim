@@ -24,6 +24,9 @@ Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoi
 2. [Use on your own data](#use-on-your-own-data)
    1. [Prepare for running on your own data](#prepare-for-running-on-your-own-data)
    2. [2D pose estimation](#2d-pose-estimation)
+      1. [With OpenPose](#with-openpose)
+      2. [With BlazePose](#with-blazepose)
+      3. [With DeepLabCut](#with-deeplabcut)
    3. [Camera calibration](#camera-calibration)
    4. [2D Tracking of person](#2d-tracking-of-person)
    5. [3D triangulation](#3d-triangulation)
@@ -126,7 +129,7 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
 ### 2D pose estimation
 > _**Estimate 2D pose from images with Openpose or an other pose estimation solution.**_
 
-<ins>With OpenPose:</ins>
+#### With OpenPose:
 * Open a command prompt in your **OpenPose** directory. \
   Launch OpenPose for each raw image folder: 
   ```
@@ -136,7 +139,7 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
 Make sure you modify the `User\Config.toml` file accordingly.
 * Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
 
-<ins>With BlazePose (MediaPipe):</ins>
+#### With BlazePose (MediaPipe)
 * BlazePose is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 * Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format (see docstring for more parameters): 
@@ -145,7 +148,7 @@ However, it is less robust and accurate than OpenPose, and can only detect a sin
   ```
 * Make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
 
-<ins>With DeepLabCut:</ins>
+#### With DeepLabCut:
 * If you want to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut), or other 2D pose estimators instead.
 * (1) translate the format to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
   ```
