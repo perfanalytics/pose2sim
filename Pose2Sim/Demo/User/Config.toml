@@ -39,7 +39,8 @@ type = 'qca' # 'qca', 'checkerboard', 'arucoboard', or 'charucoboard'
    img_extension = 'jpg' # 'png', 'jpg', etc
 
 [2d-tracking]
-tracked_keypoint = 'Neck' # Check skeleton.py and choose a stable point for tracking the person of interest
+tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
+# and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
 error_threshold_tracking = 20 # px
 
 [3d-triangulation]
