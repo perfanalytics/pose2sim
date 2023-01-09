@@ -153,7 +153,7 @@ def blazepose_detec_func(**args):
     to_h5 = args.get('to_h5')
     to_json = args.get('to_json')
     
-    model_complexity = args.get('model_complexity')
+    model_complexity = int(args.get('model_complexity'))
     if model_complexity == None: model_complexity=2
 
     if to_csv or to_h5 or to_json or save_images or save_video:
