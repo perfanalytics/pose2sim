@@ -103,7 +103,7 @@ def save_to_json(kpt_list, output_folder, video_name):
         os.mkdir(json_folder)
     print(json_folder)
 
-  # json preparation
+    # json preparation
     json_dict = {'version':1.3, 'people':[]}
     json_dict['people'] = [{'person_id':[-1], 
                     'pose_keypoints_2d': [], 
@@ -174,10 +174,14 @@ def blazepose_detec_func(**args):
             if ret == True:  
                 # Blazepose detection
                 results = pose.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))            
-                kpt = [[p.x*W, p.y*H, p.visibility] for p in results.pose_landmarks.landmark]
-                kpt = [item for sublist in kpt for item in sublist]  
+                try:
+                    kpt = [[p.x*W, p.y*H, p.visibility] for p in results.pose_landmarks.landmark]
+                    kpt = [item for sublist in kpt for item in sublist]  
 
-                mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS, landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style())
+                    mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS, landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style())
+                except:
+                    print(f'No person detected by BlazePose on frame {count}')
+                    kpt=[np.nan*3*33]
 
                 # Display images
                 if display: 
@@ -236,4 +240,3 @@ if __name__ == '__main__':
     args = vars(parser.parse_args())
     
     blazepose_detec_func(**args)
-
