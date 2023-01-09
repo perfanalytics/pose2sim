@@ -15,10 +15,10 @@
     You may also need to install tables: `pip install tables`
         
     Usage: 
-    python -m blazepose_runsave -i "<input_file>" --display --save_images --to_video --to_csv --to_h5 --to_json --model_complexity 2 -o "<output_folder>"
-    OR python -m blazepose_runsave -i "<input_file>" --display --to_json --save_images 
-    OR python -m blazepose_runsave -i "<input_file>" -dJs
-    OR import blazepose_runsave; blazepose_runsave.blazepose_detec_func(input_file=r'input_file', save_images=True, to_json=True)
+    python -m Blazepose_runsave -i "<input_file>" --display --save_images --to_video --to_csv --to_h5 --to_json --model_complexity 2 -o "<output_folder>"
+    OR python -m Blazepose_runsave -i "<input_file>" --display --to_json --save_images 
+    OR python -m Blazepose_runsave -i "<input_file>" -dJs
+    OR import Blazepose_runsave; Blazepose_runsave.blazepose_detec_func(input_file=r'input_file', save_images=True, to_json=True)
 '''
 
 
@@ -133,10 +133,10 @@ def blazepose_detec_func(**args):
     You may also need to install tables: `pip install tables`
         
     Usage: 
-    python -m blazepose_runsave -i "<input_file>" --display --save_images --to_video --to_csv --to_h5 --to_json --model_complexity 2 -o "<output_folder>"
-    OR python -m blazepose_runsave -i "<input_file>" --display --to_json --save_images
-    OR python -m blazepose_runsave -i "<input_file>" -dJs
-    OR import blazepose_runsave; blazepose_runsave.blazepose_detec_func(input_file=r'input_file', save_images=True, to_json=True)
+    python -m Blazepose_runsave -i "<input_file>" --display --save_images --to_video --to_csv --to_h5 --to_json --model_complexity 2 -o "<output_folder>"
+    OR python -m Blazepose_runsave -i "<input_file>" --display --to_json --save_images
+    OR python -m Blazepose_runsave -i "<input_file>" -dJs
+    OR import Blazepose_runsave; Blazepose_runsave.blazepose_detec_func(input_file=r'input_file', save_images=True, to_json=True)
     '''
 
     # Retrieve arguments
