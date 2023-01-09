@@ -19,7 +19,7 @@ pose3d_folder_name = 'pose-3d'
 opensim_folder_name = 'opensim'
 
 [pose-2d]
-pose_model = 'BODY_25B' #BODY_25B, BODY_25, COCO, MPI are available
+pose_model = 'BODY_25B' #BODY_25B, BODY_25, BLAZEPOSE, COCO, MPI are available
 # set your own model in skeleton.py if you don't use openpose
 
 [calibration]
