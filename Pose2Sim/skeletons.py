@@ -8,7 +8,11 @@
     ###########################################################################
     
     Skeletons definition and hierarchy.
-    Openpose BODY_25B, BODY_25, HALPE (AlphaPose), BLAZEPOSE (MediaPipe), COCO and MPI are provided.
+    - CUSTOM (i.e., from DeepLabCut),
+    - OpenPose BODY_25B, BODY_25, BODY_135, COCO, MPII,
+    - AlphaPose 
+    - Mediapipe (BLAZEPOSE),
+    HALPE (AlphaPose), BLAZEPOSE (MediaPipe), COCO and MPI are provided.
     Note that not all face keypoints are reported, since less are needed to determine head orientation.
 
     You can also build your own custom skeleton. Verify your structure by typing: 
@@ -38,13 +42,13 @@ __status__ = "Development"
 
 
 ## SKELETONS
-# CUSTOM SKELETON
+# CUSTOM SKELETON (i.e., from DeepLabCut detection)
 CUSTOM = Node("Root", id=0, children=[
     Node("Child1", id=1),
     Node("Child2", id=2),
     ])
 
-# BODY_25B
+# BODY_25B (experimental, from OpenPose https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/blob/master/experimental_models/README.md)
 BODY_25B = Node("CHip", id=None, children=[
     Node("RHip", id=12, children=[
         Node("RKnee", id=14, children=[
@@ -83,7 +87,7 @@ BODY_25B = Node("CHip", id=None, children=[
     ]),
 ])
 
-# BODY_25
+# BODY_25 (from OpenPose, standard )
 BODY_25 = Node("CHip", id=8, children=[
     Node("RHip", id=9, children=[
         Node("RKnee", id=10, children=[
@@ -120,7 +124,7 @@ BODY_25 = Node("CHip", id=8, children=[
     ]),
 ])
 
-# BLAZEPOSE / MEDIAPIPE https://google.github.io/mediapipe/solutions/pose
+# BLAZEPOSE (from mediapipe https://google.github.io/mediapipe/solutions/pose)
 BLAZEPOSE = Node("root", id=None, children=[
     Node("right_hip", id=24, children=[
         Node("right_knee", id=26, children=[
@@ -163,7 +167,7 @@ BLAZEPOSE = Node("root", id=None, children=[
 ])
 
 
-# HALPE / ALPHAPOSE https://github.com/Fang-Haoshu/Halpe-FullBody
+# HALPE (from AlphaPose) https://github.com/Fang-Haoshu/Halpe-FullBody
 ALPHAPOSE = Node("Hip", id=19, children=[
     Node("RHip", id=12, children=[
         Node("RKnee", id=14, children=[
@@ -203,7 +207,7 @@ ALPHAPOSE = Node("Hip", id=19, children=[
 ])
 
 
-# COCO
+# COCO (from OpenPose, AlphaPose, OpenPifPaf, YOLO-pose, etc)
 COCO = Node("CHip", id=None, children=[
     Node("RHip", id=8, children=[
         Node("RKnee", id=9, children=[
@@ -230,8 +234,8 @@ COCO = Node("CHip", id=None, children=[
     ]),
 ])
 
-# MPI
-MPI = Node("CHip", id=14, children=[
+# MPII (from OpenPose, AlphaPose, OpenPifPaf, YOLO-pose, etc)
+MPII = Node("CHip", id=14, children=[
     Node("RHip", id=8, children=[
         Node("RKnee", id=9, children=[
             Node("RAnkle", id=10),
@@ -257,5 +261,5 @@ MPI = Node("CHip", id=14, children=[
     ]),
 ])
 
-# BODY_135
+# BODY_135 (experimental, from OpenPose https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/blob/master/experimental_models/README.md)
 BODY_135 = Node("")
