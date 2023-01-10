@@ -135,7 +135,7 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
   ```
   bin\OpenPoseDemo.exe --model_pose BODY_25B --image_dir <PATH_TO_PROJECT_DIR>\raw-2d\raw_cam1_img --write_json <PATH_TO_PROJECT_DIR>\pose-2d\pose_cam1_json
   ```
-* The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results and is default in Pose2Sim. However, feel free to use any OpenPose model (BODY_25B, BODY_25, BODY_135n COCO, MPII). \
+* The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results and is default in Pose2Sim. However, feel free to use any OpenPose model (BODY_25B, BODY_25, BODY_135, COCO, MPII). \
 Make sure you modify the `User\Config.toml` file accordingly.
 * Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
 
