@@ -135,27 +135,31 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
   ```
   bin\OpenPoseDemo.exe --model_pose BODY_25B --image_dir <PATH_TO_PROJECT_DIR>\raw-2d\raw_cam1_img --write_json <PATH_TO_PROJECT_DIR>\pose-2d\pose_cam1_json
   ```
-* The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results and is default in Pose2Sim. However, feel free to use any OpenPose model (BODY_25B, BODY_25, BODY_135, COCO, MPII). \
+* The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results than the standard BODY_25 one and has been extensively tested for Pose2Sim. \
+You can also use the [BODY_135 model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models), which allows for the evaluation of pronation/supination, wrist flexion, and wrist deviation.\
+All other OpenPose models (BODY_25, COCO, MPII) are also supported.\
 Make sure you modify the `User\Config.toml` file accordingly.
 * Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
 
 #### With BlazePose (MediaPipe)
 * BlazePose is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
-* Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format (see docstring for more parameters): 
+* Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format. See docstring for more parameters: 
   ```
   python -m Blazepose_runsave -i "<input_file>" -dJs
   ```
 * Make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
 
 #### With DeepLabCut:
-* If you want to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut), or other 2D pose estimators instead.
-* (1) translate the format to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
+* If you want to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut).
+* 1. Train your DeepLabCut model and run it on your images or videos
+* 2. Translate the format to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
   ```
   python -m DLC_to_OpenPose -i "<input_h5_file>"
   ```
-* (2) report the model keypoints in the 'skeleton.py' file.
-* (3) create an OpenSim model if you need 3D joint angles.
+* 3. Report the model keypoints in the 'skeleton.py' file, and make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
+* 4. Create an OpenSim model if you need 3D joint angles.
+
 
 <img src="Content/Pose2D.png" width="760">
 
