@@ -160,18 +160,18 @@ BODY_135 = Node("CHip", id=None, children=[
         Node("RShoulder", id=6, children=[
             Node("RElbow", id=8, children=[
                 Node("RWrist", id=10, children=[
-                    Node("RThumb", id=27),
-                    Node("RIndex", id=30),
-                    Node("RPinky", id=42),
+                    Node("RThumb", id=48),
+                    Node("RIndex", id=51),
+                    Node("RPinky", id=63),
                 ]),
             ]),
         ]),
         Node("LShoulder", id=5, children=[
             Node("LElbow", id=7, children=[
                 Node("LWrist", id=9, children=[
-                    Node("LThumb", id=48),
-                    Node("LIndex", id=51),
-                    Node("LPinky", id=63),
+                    Node("LThumb", id=27),
+                    Node("LIndex", id=30),
+                    Node("LPinky", id=42),
                 ]),
             ]),
         ]),
