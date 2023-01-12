@@ -169,9 +169,9 @@ BODY_135 = Node("CHip", id=None, children=[
         Node("LShoulder", id=5, children=[
             Node("LElbow", id=7, children=[
                 Node("LWrist", id=9, children=[
-                    Node("RThumb", id=48),
-                    Node("RIndex", id=51),
-                    Node("RPinky", id=63),
+                    Node("LThumb", id=48),
+                    Node("LIndex", id=51),
+                    Node("LPinky", id=63),
                 ]),
             ]),
         ]),
