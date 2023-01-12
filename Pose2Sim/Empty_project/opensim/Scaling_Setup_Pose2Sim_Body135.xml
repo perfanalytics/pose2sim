@@ -12,7 +12,7 @@
 		<!--Specifies the name of the unscaled model (.osim) and the marker set.-->
 		<GenericModelMaker>
 			<!--Model file (.osim) for the unscaled model.-->
-			<model_file>Model_Pose2Sim_Body25b.osim</model_file>
+			<model_file>Unassigned</model_file>
 			<!--Set of model markers used to scale the model. Scaling is done based on distances between model markers compared to the same distances between the corresponding experimental markers.-->
 			<marker_set_file>Unassigned</marker_set_file>
 		</GenericModelMaker>
@@ -386,7 +386,7 @@
 			<!--TRC file (.trc) containing the marker positions used for measurement-based scaling. This is usually a static trial, but doesn't need to be.  The marker-pair distances are computed for each time step in the TRC file and averaged across the time range.-->
 			<marker_file>Standing_for_Scaling.trc</marker_file>
 			<!--Time range over which to average marker-pair distances in the marker file (.trc) for measurement-based scaling.-->
-			<time_range> 0.016666666666666666 0.4166666666666667 </time_range>
+			<time_range> 0.0166667 0.1</time_range>
 			<!--Flag (true or false) indicating whether or not to preserve relative mass between segments.-->
 			<preserve_mass_distribution>true</preserve_mass_distribution>
 			<!--Name of OpenSim model file (.osim) to write when done scaling.-->
@@ -585,11 +585,11 @@
 			<!--Name of file containing the joint angles used to set the initial configuration of the model for the purpose of placing the markers. These coordinate values can also be included in the optimization problem used to place the markers. Before the model markers are placed, a single frame of an inverse kinematics (IK) problem is solved. The IK problem can be solved simply by matching marker positions, but if the model markers are not in the correct locations, the IK solution will not be very good and neither will marker placement. Alternatively, coordinate values (specified in this file) can be specified and used to influence the IK solution. This is valuable particularly if you have high confidence in the coordinate values. For example, you know for the static trial the subject was standing will all joint angles close to zero. If the coordinate set (see the CoordinateSet property) contains non-zero weights for coordinates, the IK solution will try to match not only the marker positions, but also the coordinates in this file. Least-squared error is used to solve the IK problem. -->
 			<coordinate_file>Unassigned</coordinate_file>
 			<!--Time range over which the marker positions are averaged.-->
-			<time_range> 0.016666666666666666 0.4166666666666667 </time_range>
+			<time_range> 0.0166667 0.1</time_range>
 			<!--Name of the motion file (.mot) written after marker relocation (optional).-->
 			<output_motion_file>Unassigned</output_motion_file>
 			<!--Output OpenSim model file (.osim) after scaling and maker placement.-->
-			<output_model_file>Model_Pose2Sim_Body25b_scaled.osim</output_model_file>
+			<output_model_file>Model_Pose2Sim_Body135_scaled.osim</output_model_file>
 			<!--Output marker set containing the new marker locations after markers have been placed.-->
 			<output_marker_file>Unassigned</output_marker_file>
 			<!--Maximum amount of movement allowed in marker data when averaging frames of the static trial. A negative value means there is not limit.-->

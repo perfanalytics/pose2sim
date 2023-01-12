@@ -21,7 +21,7 @@
 		<!--Acceleration due to gravity, expressed in ground.-->
 		<gravity>0 -9.8066499999999994 0</gravity>
 		<!--Credits (e.g., model author names) associated with the model.-->
-		<credits>Full-body model adapted from Beaucage-Gauvreau et al., with Rajagopal et al. knee angles. Openpose body_25b markers. No muscles included. Free pelvis translation, unlocked subtalar angle, added ball joint between head and torso, locked arm pronation/supination, clamped hip flexion to 150° instead of 120°.</credits>
+		<credits>Full-body model adapted from Beaucage-Gauvreau et al., with Rajagopal et al. knee angles. Mediapipe BlazePose markers. No muscles included. Free pelvis translation, unlocked subtalar angle, added ball joint between head and torso, clamped hip flexion to 150° instead of 120°.</credits>
 		<!--Publications and references associated with the model.-->
 		<publications>Pagnon, D., Domalain, M., Reveret, L. (2021). Pose2Sim: An End-to-End Workflow for 3D Markerless Sports Kinematics—Part 1: Robustness. Sensors, 21(19), 6530.</publications>
 		<!--Units for all lengths.-->
