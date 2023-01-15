@@ -130,6 +130,7 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
 > _**Estimate 2D pose from images with Openpose or an other pose estimation solution.**_
 
 #### With OpenPose:
+The accuracy and robustness of Pose2Sim have been thoroughly assessed only with OpenPose, and especially with the BODY_25B model. Consequently, we recommend using this 2D pose estimation solution. See [OpenPose repository](https://github.com/CMU-Perceptual-Computing-Lab/openpose) for installation and running.
 * Open a command prompt in your **OpenPose** directory. \
   Launch OpenPose for each raw image folder: 
   ```
@@ -142,7 +143,7 @@ Make sure you modify the `User\Config.toml` file accordingly.
 * Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
 
 #### With BlazePose (MediaPipe)
-* BlazePose is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
+[BlazePose](https://google.github.io/mediapipe/solutions/pose.html) is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 * Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format. See docstring for more parameters: 
   ```
@@ -151,14 +152,14 @@ However, it is less robust and accurate than OpenPose, and can only detect a sin
 * Make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
 
 #### With DeepLabCut:
-* If you want to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut).
-* 1. Train your DeepLabCut model and run it on your images or videos
-* 2. Translate the format to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
-  ```
-  python -m DLC_to_OpenPose -i "<input_h5_file>"
-  ```
-* 3. Report the model keypoints in the 'skeleton.py' file, and make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
-* 4. Create an OpenSim model if you need 3D joint angles.
+If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut).
+1. Train your DeepLabCut model and run it on your images or videos (more intruction on their repository)
+2. Translate the format to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
+   ```
+   python -m DLC_to_OpenPose -i "<input_h5_file>"
+   ```
+3. Report the model keypoints in the 'skeleton.py' file, and make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
+4. Create an OpenSim model if you need 3D joint angles.
 
 
 <img src="Content/Pose2D.png" width="760">
@@ -622,8 +623,9 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > <li> Multiple persons kinematics (triangulating multiple persons, and sorting them in time)</li>
 > <li> People association (tracking) with a neural network instead of brute force</li>
 > <li> Use <a href='https://github.com/lambdaloop/aniposelib'>aniposelib</a> for better calibration, and/or wand calibration cf <a href='https://argus.web.unc.edu/'>Argus</a> (conversion script from Argus/EasyWand/DLTdv8 <a href='https://shibboleth.univ-grenoble-alpes.fr/idp/Authn/External?conversation=e1s2&ticket=ST-2468723-dddQP1WR6Kjm2KGEUchg-cas-uga.grenet.fr'>here</a>), autocalibration <a href='https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130'>based on a person's dimensions</a> </li>
+> <li> Add a camera synchronization script in the Utilities.
 > <li> Copy-paste muscles from OpenSim <a href="https://simtk.org/projects/lfbmodel">lifting full-body model</a> for inverse dynamics and more</li>
-> <li> Finish deploying OpenPose body_135, AlphaPose HALPE_26, AlphaPose HALPE_136, AlphaPose COCO-WholeBody, MediaPipe BlazePose, COCO, MPII, SLEAP (skeleton.py and OpenSim models). Write SLEAP converter.</li>
+> <li> Implement SLEAP as an other 2D pose estimation solution (converter, skeleton.py, OpenSim model and setup files).</li>
 > </br>
 > <li> Conda package and Docker image</li>
 > <li> Outlier rejection (sliding z-score?) Also solve limb swapping</li>
