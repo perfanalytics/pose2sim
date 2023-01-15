@@ -19,8 +19,9 @@ pose3d_folder_name = 'pose-3d'
 opensim_folder_name = 'opensim'
 
 [pose-2d]
-pose_model = 'BODY_25B' #BODY_25B, BODY_25, BLAZEPOSE, COCO, MPI are available
-# set your own model in skeleton.py if you don't use openpose
+pose_model = 'BODY_25B' #CUSTOM, BODY_25B, BODY_25, BODY_135, BLAZEPOSE, HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII are available,
+# from DeepLabCut, OpenPose, MediaPipe BlazePose, and AlphaPose
+# See Pose2Sim\skeleton.py for their skeleton hierarchy
 
 [calibration]
 type = 'qca' # 'qca', 'checkerboard', 'arucoboard', or 'charucoboard'
