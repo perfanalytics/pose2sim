@@ -129,6 +129,8 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
 ### 2D pose estimation
 > _**Estimate 2D pose from images with Openpose or an other pose estimation solution.**_
 
+OpenPose BODY_25B is the default 2D pose estimation model used in Pose2Sim. However, other skeleton models from other 2D pose estimation solutions can be used alternatively. To specify the model, make sure you change the `pose_model` in the `User\Config.toml` file. You may also need to choose a different `tracked_keypoint` if the Neck is not detected by the chosen model. All alternative OpenSim model and setup files are provided in the `Empty_project\opensim` folder.
+
 #### With OpenPose:
 The accuracy and robustness of Pose2Sim have been thoroughly assessed only with OpenPose, and especially with the BODY_25B model. Consequently, we recommend using this 2D pose estimation solution. See [OpenPose repository](https://github.com/CMU-Perceptual-Computing-Lab/openpose) for installation and running.
 * Open a command prompt in your **OpenPose** directory. \
