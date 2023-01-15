@@ -25,7 +25,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoi
    1. [Prepare for running on your own data](#prepare-for-running-on-your-own-data)
    2. [2D pose estimation](#2d-pose-estimation)
       1. [With OpenPose](#with-openpose)
-      2. [With BlazePose](#with-blazepose)
+      2. [With BlazePose (MediaPipe)](#with-blazepose-mediapipe)
       3. [With DeepLabCut](#with-deeplabcut)
    3. [Camera calibration](#camera-calibration)
    4. [2D Tracking of person](#2d-tracking-of-person)
@@ -129,9 +129,7 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
 ### 2D pose estimation
 > _**Estimate 2D pose from images with Openpose or an other pose estimation solution.**_
 
-OpenPose BODY_25B is the default 2D pose estimation model used in Pose2Sim. However, other skeleton models from other 2D pose estimation solutions can be used alternatively. To specify the model, make sure you change the `pose_model` in the `User\Config.toml` file. You may also need to choose a different `tracked_keypoint` if the Neck is not detected by the chosen model. All alternative OpenSim model and setup files are provided in the `Empty_project\opensim` folder.
-
-#### With OpenPose:
+  #### With OpenPose:
 The accuracy and robustness of Pose2Sim have been thoroughly assessed only with OpenPose, and especially with the BODY_25B model. Consequently, we recommend using this 2D pose estimation solution. See [OpenPose repository](https://github.com/CMU-Perceptual-Computing-Lab/openpose) for installation and running.
 * Open a command prompt in your **OpenPose** directory. \
   Launch OpenPose for each raw image folder: 
@@ -144,7 +142,20 @@ All other OpenPose models (BODY_25, COCO, MPII) are also supported.\
 Make sure you modify the `User\Config.toml` file accordingly.
 * Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
 
-#### With BlazePose (MediaPipe)
+**N.B.:** *OpenPose BODY_25B is the default 2D pose estimation model used in Pose2Sim. However, other skeleton models from other 2D pose estimation solutions can be used alternatively.* \
+    - You will first need to convert your 2D detection files to the OpenPose format (see [Utilities](#utilities)). \
+    - Then, change the `pose_model` in the `User\Config.toml` file. You may also need to choose a different `tracked_keypoint` if the Neck is not detected by the chosen model. \
+    - Finally, use the right OpenSim model and setup files, which are provided in the `Empty_project\opensim` folder. 
+  
+ Available models are:    
+    - OpenPose BODY_25B, BODY_25, BODY_135, COCO, MPII \
+    - Mediapipe BLAZEPOSE \
+    - DEEPLABCUT \
+    - AlphaPose HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII
+
+
+
+#### With BlazePose (MediaPipe):
 [BlazePose](https://google.github.io/mediapipe/solutions/pose.html) is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 * Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format. See docstring for more parameters: 
