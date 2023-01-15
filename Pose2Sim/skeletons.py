@@ -266,7 +266,7 @@ HALPE_26 = Node("Hip", id=19, children=[
 
 # HALPE_68 (full-body with hands without face, from AlphaPose)
 # https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md
-HALPE_26 = Node("Hip", id=19, children=[
+HALPE_68 = Node("Hip", id=19, children=[
     Node("RHip", id=12, children=[
         Node("RKnee", id=14, children=[
             Node("RAnkle", id=16, children=[
