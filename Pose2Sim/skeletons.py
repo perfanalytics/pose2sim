@@ -382,11 +382,9 @@ COCO_133 = Node("Hip", id=None, children=[
         ]),
     ]),
     Node("Neck", id=None, children=[
-        Node("Head", id=17, children=[
-            Node("Nose", id=0, children=[
-                Node("right_eye", id=3),
-                Node("left_eye", id=2),
-            ]),
+        Node("Nose", id=1, children=[
+            Node("right_eye", id=3),
+            Node("left_eye", id=2),
         ]),
         Node("RShoulder", id=7, children=[
             Node("RElbow", id=9, children=[
