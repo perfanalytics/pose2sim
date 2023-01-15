@@ -84,7 +84,7 @@ def DLC_to_OpenPose_func(*args):
     for f, frame in enumerate(h5_file.index):
         h5_line = np.array([[h5_file.iloc[f, 3*k], h5_file.iloc[f, 3*k+1], h5_file.iloc[f, 3*k+2]] for k in range(kpt_nb)]).flatten().tolist()
         json_dict['people'][0]['pose_keypoints_2d'] = h5_line
-        json_file = os.path.join(json_folder_path, os.path.splitext(os.path.basename(str(frame)))[0]+'.json')
+        json_file = os.path.join(json_folder_path, os.path.splitext(os.path.basename(str(frame).zfill(5)))[0]+'.json')
         with open(json_file, 'w') as js_f:
             js_f.write(json.dumps(json_dict))
 
