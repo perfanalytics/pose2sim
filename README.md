@@ -27,6 +27,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoi
       1. [With OpenPose](#with-openpose)
       2. [With BlazePose (MediaPipe)](#with-blazepose-mediapipe)
       3. [With DeepLabCut](#with-deeplabcut)
+      4. [With AlphaPose](#with-alphapose)
    3. [Camera calibration](#camera-calibration)
    4. [2D Tracking of person](#2d-tracking-of-person)
    5. [3D triangulation](#3d-triangulation)
@@ -145,15 +146,13 @@ Make sure you modify the `User\Config.toml` file accordingly.
 **N.B.:** *OpenPose BODY_25B is the default 2D pose estimation model used in Pose2Sim. However, other skeleton models from other 2D pose estimation solutions can be used alternatively.* \
     - You will first need to convert your 2D detection files to the OpenPose format (see [Utilities](#utilities)). \
     - Then, change the `pose_model` in the `User\Config.toml` file. You may also need to choose a different `tracked_keypoint` if the Neck is not detected by the chosen model. \
-    - Finally, use the right OpenSim model and setup files, which are provided in the `Empty_project\opensim` folder. 
+    - Finally, use the corresponding OpenSim model and setup files, which are provided in the `Empty_project\opensim` folder. 
   
  Available models are:    
     - OpenPose BODY_25B, BODY_25, BODY_135, COCO, MPII \
     - Mediapipe BLAZEPOSE \
     - DEEPLABCUT \
     - AlphaPose HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII
-
-
 
 #### With BlazePose (MediaPipe):
 [BlazePose](https://google.github.io/mediapipe/solutions/pose.html) is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
@@ -167,12 +166,23 @@ However, it is less robust and accurate than OpenPose, and can only detect a sin
 #### With DeepLabCut:
 If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut).
 1. Train your DeepLabCut model and run it on your images or videos (more intruction on their repository)
-2. Translate the format to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
+2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
    ```
    python -m DLC_to_OpenPose -i "<input_h5_file>"
    ```
 3. Report the model keypoints in the 'skeleton.py' file, and make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
 4. Create an OpenSim model if you need 3D joint angles.
+
+#### With AlphaPose:
+[AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) is slightly less renowned than OpenPose and not as easy to run on non-Linux machines, but its accuracy is comparable. As a top-down approach (unlike OpenPose which is bottom-up), it is faster on single-person detection, but slower on multi-person detection.
+* Install and run AlphaPose on your videos (more intruction on their repository)
+* Translate the AlphaPose single json file to OpenPose frame-by-frame files (with `AlphaPose_to_OpenPose.py` script, see [Utilities](#utilities)): 
+   ```
+   python -m AlphaPose_to_OpenPose -i "<input_alphapose_json_file>"
+   ```
+* Make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
+
+
 
 
 <img src="Content/Pose2D.png" width="760">
