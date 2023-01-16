@@ -107,7 +107,7 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
   
   1. Find your `Pose2Sim\Empty_project`, copy-paste it where you like and give it the name of your choice.
   2. Edit the `User\Config.toml` file as needed, **especially regarding the path to your project**. 
-  3. Populate the `raw-2d`folder with your camera images or videos.
+  3. Populate the `raw-2d`folder with your videos.
   
        <pre>
        Project
@@ -119,9 +119,9 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
        │    └──IK_Setup_Pose2Sim_Body25b.xml
        │        
        ├── <b>raw-2d
-       │    ├──raw_cam1_img
+       │    ├──vid_cam1.mp4 (or other extension)
        │    ├──...
-       │    └──raw_camN_img</b>
+       │    └──vid_camN.mp4</b>
        │
        └──User
            └──Config.toml
@@ -135,7 +135,7 @@ The accuracy and robustness of Pose2Sim have been thoroughly assessed only with 
 * Open a command prompt in your **OpenPose** directory. \
   Launch OpenPose for each raw image folder: 
   ```
-  bin\OpenPoseDemo.exe --model_pose BODY_25B --image_dir <PATH_TO_PROJECT_DIR>\raw-2d\raw_cam1_img --write_json <PATH_TO_PROJECT_DIR>\pose-2d\pose_cam1_json
+  bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_PROJECT_DIR>\raw-2d\vid_cam1.mp4 --write_json <PATH_TO_PROJECT_DIR>\pose-2d\pose_cam1_json
   ```
 * The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results than the standard BODY_25 one and has been extensively tested for Pose2Sim. \
 You can also use the [BODY_135 model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models), which allows for the evaluation of pronation/supination, wrist flexion, and wrist deviation.\
@@ -174,7 +174,7 @@ If you need to detect specific points on a human being, an animal, or an object,
 4. Create an OpenSim model if you need 3D joint angles.
 
 #### With AlphaPose:
-[AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) is slightly less renowned than OpenPose and not as easy to run on non-Linux machines, but its accuracy is comparable. As a top-down approach (unlike OpenPose which is bottom-up), it is faster on single-person detection, but slower on multi-person detection.
+[AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) is one of the main competitors of OpenPose, and its accuracy is comparable. As a top-down approach (unlike OpenPose which is bottom-up), it is faster on single-person detection, but slower on multi-person detection.
 * Install and run AlphaPose on your videos (more intruction on their repository)
 * Translate the AlphaPose single json file to OpenPose frame-by-frame files (with `AlphaPose_to_OpenPose.py` script, see [Utilities](#utilities)): 
    ```
@@ -207,9 +207,9 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
    │    └──pose_camN_json</i></b>
    │        
    ├── raw-2d
-   │   ├──raw_cam1_img
-   │   ├──...
-   │   └──raw_camN_img
+   │    ├──vid_cam1.mp4
+   │    ├──...
+   │    └──vid_camN.mp4
    │
    └──User
        └──Config.toml
@@ -267,9 +267,9 @@ Output:\
    │    └──pose_camN_json
    │        
    ├── raw-2d
-   │   ├──raw_cam1_img
-   │   ├──...
-   │   └──raw_camN_img
+   │    ├──vid_cam1.mp4
+   │    ├──...
+   │    └──vid_camN.mp4
    │
    └──User
        └──Config.toml
@@ -321,9 +321,9 @@ Output:\
    │   └──tracked_camN_json</i></b>
    │        
    ├── raw-2d
-   │   ├──raw_cam1_img
-   │   ├──...
-   │   └──raw_camN_img
+   │    ├──vid_cam1.mp4
+   │    ├──...
+   │    └──vid_camN.mp4
    │
    └──User
        └──Config.toml
@@ -379,9 +379,9 @@ Output:\
        └──Pose-3d.trc</i></b>>
    │        
    ├── raw-2d
-   │   ├──raw_cam1_img
-   │   ├──...
-   │   └──raw_camN_img
+   │    ├──vid_cam1.mp4
+   │    ├──...
+   │    └──vid_camN.mp4
    │
    └──User
        └──Config.toml
@@ -440,9 +440,9 @@ Output:\
    │   └──Pose-3d-filtered.trc</i></b>
    │        
    ├── raw-2d
-   │   ├──raw_cam1_img
-   │   ├──...
-   │   └──raw_camN_img
+   │    ├──vid_cam1.mp4
+   │    ├──...
+   │    └──vid_camN.mp4
    │
    └──User
        └──Config.toml
@@ -525,9 +525,9 @@ Note that it is easier to install on Python 3.7 and with OpenSim 4.2.
    │   └──Pose-3d-filtered.trc
    │        
    ├── raw-2d
-   │   ├──raw_cam1_img
-   │   ├──...
-   │   └──raw_camN_img
+   │    ├──vid_cam1.mp4
+   │    ├──...
+   │    └──vid_camN.mp4
    │
    └──User
        └──Config.toml
