@@ -157,10 +157,11 @@ Make sure you modify the `User\Config.toml` file accordingly.
 #### With BlazePose (MediaPipe):
 [BlazePose](https://google.github.io/mediapipe/solutions/pose.html) is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
-* Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format. See docstring for more parameters: 
+* Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
   ```
   python -m Blazepose_runsave -i "<input_file>" -dJs
   ```
+  Type in `python -m Blazepose_runsave -h` for explanation on parameters and for additional ones.
 * Make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
 
 #### With DeepLabCut:
