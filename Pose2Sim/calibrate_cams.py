@@ -120,7 +120,7 @@ def read_qca(qca_path, binning_factor):
     
     # Camera name
     for tag in root.findall('cameras/camera'):
-        if tag.attrib.get('model') in ('Miqus Video', 'none'):
+        if tag.attrib.get('model') in ('Miqus Video', 'Miqus Video UnderWater', 'none'):
             ret += [float(tag.attrib.get('avg-residual'))/1000]
             C += [tag.attrib.get('serial')]
     
