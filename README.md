@@ -159,7 +159,7 @@ Make sure you modify the `User\Config.toml` file accordingly.
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 * Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
   ```
-  python -m Blazepose_runsave -i "<input_file>" -dJs
+  python -m Blazepose_runsave -i r"<input_file>" -dJs
   ```
   Type in `python -m Blazepose_runsave -h` for explanation on parameters and for additional ones.
 * Make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
@@ -169,7 +169,7 @@ If you need to detect specific points on a human being, an animal, or an object,
 1. Train your DeepLabCut model and run it on your images or videos (more intruction on their repository)
 2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
    ```
-   python -m DLC_to_OpenPose -i "<input_h5_file>"
+   python -m DLC_to_OpenPose -i r"<input_h5_file>"
    ```
 3. Report the model keypoints in the 'skeleton.py' file, and make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
 4. Create an OpenSim model if you need 3D joint angles.
@@ -179,7 +179,7 @@ If you need to detect specific points on a human being, an animal, or an object,
 * Install and run AlphaPose on your videos (more intruction on their repository)
 * Translate the AlphaPose single json file to OpenPose frame-by-frame files (with `AlphaPose_to_OpenPose.py` script, see [Utilities](#utilities)): 
    ```
-   python -m AlphaPose_to_OpenPose -i "<input_alphapose_json_file>"
+   python -m AlphaPose_to_OpenPose -i r"<input_alphapose_json_file>"
    ```
 * Make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
 
@@ -486,7 +486,7 @@ Alternatively, you can use command-line tools:
 - You can also run OpenSim directly in Python:
   ```
   import subprocess
-  subprocess.call(["opensim-cmd", "run-tool", "<PATH TO YOUR SCALING OR IK SETUP FILE>.xml"])
+  subprocess.call(["opensim-cmd", "run-tool", r"<PATH TO YOUR SCALING OR IK SETUP FILE>.xml"])
   ```
 
 - Or take advantage of the full the OpenSim Python API. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python) for installation instructions. \
@@ -643,21 +643,21 @@ I would happily welcome any proposal for new features, code improvement, and mor
 If you want to contribute to Pose2Sim, please follow [this guide](https://docs.github.com/en/get-started/quickstart/contributing-to-projects) on how to fork, modify and push code, and submit a pull request. I would appreciate it if you provided as much useful information as possible about how you modified the code, and a rationale for why you're making this pull request. Please also specify on which operating system and on which python version you have tested the code.
 
 *Here is a to-do list, for general guidance purposes only:*
-> <li> Integrate as a Blender and / or Maya add-on. See <a href="https://github.com/davidpagnon/Maya-Mocap">Maya-Mocap</a> and <a href="https://github.com/JonathanCamargo/BlendOsim">BlendOSim</a>
-> <li> Multiple persons kinematics (triangulating multiple persons, and sorting them in time)</li>
-> <li> People association (tracking) with a neural network instead of brute force</li>
-> <li> Use <a href='https://github.com/lambdaloop/aniposelib'>aniposelib</a> for better calibration, and/or wand calibration cf <a href='https://argus.web.unc.edu/'>Argus</a> (conversion script from Argus/EasyWand/DLTdv8 <a href='https://shibboleth.univ-grenoble-alpes.fr/idp/Authn/External?conversation=e1s2&ticket=ST-2468723-dddQP1WR6Kjm2KGEUchg-cas-uga.grenet.fr'>here</a>), autocalibration <a href='https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130'>based on a person's dimensions</a> </li>
-> <li> Add a camera synchronization script in the Utilities.
-> <li> Copy-paste muscles from OpenSim <a href="https://simtk.org/projects/lfbmodel">lifting full-body model</a> for inverse dynamics and more</li>
-> <li> Implement SLEAP as an other 2D pose estimation solution (converter, skeleton.py, OpenSim model and setup files).</li>
+> <li> <b>calibrateCams:</b> (1) Intrinsic with checkerboard, extrinsic with object or ChArUco board, or (2) SBA calibration with wand (cf <a href='https://argus.web.unc.edu/'>Argus</a>, see converter <a href='https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py'>here</a>), or (3) autocalibration <a href='https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130'>based on a person's dimensions</a>. Also see <a href='https://github.com/lambdaloop/aniposelib'>aniposelib</a> for calibration with ChArUco.</li>
+> <li> <b>synchronizeCams:</b> Synchronize cameras on 2D keypoint speeds.</li>   
+> <li> <b>track2D:</b> Multiple persons association (rename to peopleAssociation and ensure backcompatibility). With a neural network instead of brute force?</li>
+> <li> <b>triangulate3D:</b> Multiple persons kinematics (output multiple .trc coordinates files).</li>
+> <li> <b>GUI:</b> Blender add-on, or webapp. See <a href="https://github.com/davidpagnon/Maya-Mocap">Maya-Mocap</a> and <a href="https://github.com/JonathanCamargo/BlendOsim">BlendOSim</a>.</li>
 > </br>
+> <li> Catch errors</li>
 > <li> Conda package and Docker image</li>
+> <li> Copy-paste muscles from OpenSim <a href="https://simtk.org/projects/lfbmodel">lifting full-body model</a> for inverse dynamics and more</li>
+> <li> Implement optimal fixed-interval Kalman smoothing for inverse kinematics (<a href='https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp'>Biorbd</a> or <a href='https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp'>OpenSim fork</a>)</li>
+> </br>
+> <li> Implement SLEAP as an other 2D pose estimation solution (converter, skeleton.py, OpenSim model and setup files).</li>
 > <li> Outlier rejection (sliding z-score?) Also solve limb swapping</li>
 > <li> Implement normalized DLT and RANSAC triangulation, as well as a triangulation refinement step (cf DOI:10.1109/TMM.2022.3171102)</li>
-> <li> Implement optimal fixed-interval Kalman smoothing for inverse kinematics (<a href='https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp'>Biorbd</a> or <a href='https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp'>OpenSim fork</a>)</li>
 > <li> Utilities: convert Vicon xcp calibration file to toml</li>
 > <li> Run from command line via click or typer</li>
-> <li> Catch errors</li>
-> <li> Make GUI</li>
 
 
