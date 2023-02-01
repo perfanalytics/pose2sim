@@ -18,7 +18,7 @@
     python -m Blazepose_runsave -i "<input_file>" --display --save_images --to_video --to_csv --to_h5 --to_json --model_complexity 2 -o "<output_folder>"
     OR python -m Blazepose_runsave -i "<input_file>" --display --to_json --save_images 
     OR python -m Blazepose_runsave -i "<input_file>" -dJs
-    OR import Blazepose_runsave; Blazepose_runsave.blazepose_detec_func(input_file=r'input_file', save_images=True, to_json=True)
+    OR from Pose2Sim.Utilities import Blazepose_runsave; Blazepose_runsave.blazepose_detec_func(input_file=r'input_file', save_images=True, to_json=True, model_)
 '''
 
 
@@ -154,7 +154,7 @@ def blazepose_detec_func(**args):
     to_json = args.get('to_json')
     
     model_complexity = int(args.get('model_complexity'))
-    if model_complexity == None: model_complexity=2
+    if 'model_complexity' not in vars(): model_complexity=2
 
     if to_csv or to_h5 or to_json or save_images or save_video:
         if output_folder == None: 
