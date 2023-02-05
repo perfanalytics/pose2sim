@@ -40,6 +40,7 @@ import pandas as pd
 import toml
 from tqdm import tqdm
 from scipy import interpolate
+from collections import Counter
 import logging
 
 from Pose2Sim.common import computeP, weighted_triangulation, reprojection, \
@@ -95,6 +96,7 @@ def interpolate_nans(col, *kind):
     idx = col.index
     idx_good = np.where(np.isfinite(col))[0] #index of non zeros
     if len(idx_good) <= 10: return col
+    # idx_notgood = np.delete(np.arange(len(col)), idx_good)
 
     if not kind: # 'linear', 'slinear', 'quadratic', 'cubic'
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind="cubic", bounds_error=False)
@@ -103,7 +105,7 @@ def interpolate_nans(col, *kind):
     col_interp = np.where(np.isfinite(col), col, f_interp(idx)) #replace nans with interpolated values
     col_interp = np.where(np.isfinite(col_interp), col_interp, np.nanmean(col_interp)) #replace remaining nans
 
-    return col_interp
+    return col_interp #, idx_notgood
 
 
 def make_trc(config, Q, keypoints_names, f_range):
@@ -157,7 +159,7 @@ def make_trc(config, Q, keypoints_names, f_range):
     return trc_path
 
 
-def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, trc_path):
+def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excluded_count, interp_frames, trc_path):
     '''
     Print a message giving statistics on reprojection errors (in pixel and in m)
     as well as the number of cameras that had to be excluded to reach threshold 
@@ -179,28 +181,49 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, trc_path
     calib_folder_name = config.get('project').get('calib_folder_name')
     calib_dir = os.path.join(project_dir, calib_folder_name)
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
+    calib = toml.load(calib_file)
+    cam_names = np.array([calib[c].get('name') for c in list(calib.keys())])
+    cam_names = cam_names[list(cam_excluded_count.keys())]
     error_threshold_triangulation = config.get('3d-triangulation').get('error_threshold_triangulation')
     likelihood_threshold = config.get('3d-triangulation').get('likelihood_threshold')
+    show_interp_indices = config.get('3d-triangulation').get('show_interp_indices')
+    interpolation_kind = config.get('3d-triangulation').get('interpolation')
     
     # Recap
-    calib = toml.load(calib_file)
     calib_cam1 = calib[list(calib.keys())[0]]
     fm = calib_cam1['matrix'][0][0]
     Dm = euclidean_distance(calib_cam1['translation'], [0,0,0])
 
+    logging.info('')
     for idx, name in enumerate(keypoints_names):
         mean_error_keypoint_px = np.around(error.iloc[:,idx].mean(), decimals=1) # RMS à la place?
         mean_error_keypoint_m = np.around(mean_error_keypoint_px * Dm / fm, decimals=3)
         mean_cam_excluded_keypoint = np.around(nb_cams_excluded.iloc[:,idx].mean(), decimals=2)
         logging.info(f'Mean reprojection error for {name} is {mean_error_keypoint_px} px (~ {mean_error_keypoint_m} m), reached with {mean_cam_excluded_keypoint} excluded cameras. ')
-
+        if show_interp_indices:
+            interp_frames_keypoint = interp_frames[1][np.where(interp_frames[0]==idx)[0]]
+            if interpolation_kind != 'none':
+                logging.info(f'Frames {list(interp_frames_keypoint)} had to be interpolated. ')
+            else:
+                logging.info(f'Frames {list(interp_frames_keypoint)} need to be interpolated, or thresholds need to be adjusted. ')
+    
     mean_error_px = np.around(error['mean'].mean(), decimals=1)
     mean_error_mm = np.around(mean_error_px * Dm / fm *1000, decimals=1)
     mean_cam_excluded = np.around(nb_cams_excluded['mean'].mean(), decimals=2)
 
-    logging.info(f'--> Mean reprojection error for all points on all frames is {mean_error_px} px, which roughly corresponds to {mean_error_mm} mm. ')
-    logging.info(f'\nCameras were excluded if likelihood was below {likelihood_threshold} and if the reprojection error was above {error_threshold_triangulation} px.')
+    logging.info(f'\n--> Mean reprojection error for all points on all frames is {mean_error_px} px, which roughly corresponds to {mean_error_mm} mm. ')
+    logging.info(f'Cameras were excluded if likelihood was below {likelihood_threshold} and if the reprojection error was above {error_threshold_triangulation} px.')
     logging.info(f'In average, {mean_cam_excluded} cameras had to be excluded to reach these thresholds.')
+    cam_excluded_count = {i: v for i, v in zip(cam_names, cam_excluded_count.values())}
+    for i, (k, v) in enumerate(cam_excluded_count.items()):
+        if i ==0:
+             str_cam_excluded_count = f'Camera {k} was excluded {int(np.round(v*100))}% of the time, '
+        elif i == len(cam_excluded_count)-1:
+            str_cam_excluded_count += f'and Camera {k}: {int(np.round(v*100))}%.'
+        else:
+            str_cam_excluded_count += f'Camera {k}: {int(np.round(v*100))}%, '
+    logging.info(str_cam_excluded_count)
+
     logging.info(f'\n3D coordinates are stored at {trc_path}.')
 
 
@@ -240,7 +263,6 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, projection_matrices):
     while error_min > error_threshold_triangulation and n_cams - nb_cams_off >= min_cameras_for_triangulation:
         # Create subsets with "nb_cams_off" cameras excluded
         id_cams_off = np.array(list(it.combinations(range(n_cams), nb_cams_off)))
-        
         projection_matrices_filt = [projection_matrices]*len(id_cams_off)
         x_files_filt = np.vstack([list(x_files).copy()]*len(id_cams_off))
         y_files_filt = np.vstack([y_files.copy()]*len(id_cams_off))
@@ -273,7 +295,7 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, projection_matrices):
             q_file = [(x_files_filt[config_id][i], y_files_filt[config_id][i]) for i in range(len(x_files_filt[config_id]))]
             q_calc = [(x_calc_filt[config_id][i], y_calc_filt[config_id][i]) for i in range(len(x_calc_filt[config_id]))]
             error.append( np.mean( [euclidean_distance(q_file[i], q_calc[i]) for i in range(len(q_file))] ) )
-        
+            
         # Choosing best triangulation (with min reprojection error)
         error_min = min(error)
         best_cams = np.argmin(error)
@@ -282,14 +304,17 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, projection_matrices):
         Q = Q_filt[best_cams][:-1]
         
         nb_cams_off += 1
-
+    
+    # Index of excluded cams for this keypoint
+    id_excluded_cams = id_cams_off[best_cams]
+    
     # If triangulation not successful, error = 0,  and 3D coordinates as missing values
     if error_min > error_threshold_triangulation:
         error_min = np.nan
         # Q = np.array([0.,0.,0.])
         Q = np.array([np.nan, np.nan, np.nan])
-    
-    return Q, error_min, nb_cams_excluded
+        
+    return Q, error_min, nb_cams_excluded, id_excluded_cams
                 
 
 def extract_files_frame_f(json_tracked_files_f, keypoints_ids):
@@ -365,6 +390,7 @@ def triangulate_all(config):
     frame_range = config.get('project').get('frame_range')
     likelihood_threshold = config.get('3d-triangulation').get('likelihood_threshold')
     interpolation_kind = config.get('3d-triangulation').get('interpolation')
+    show_interp_indices = config.get('3d-triangulation').get('show_interp_indices')
     pose_dir = os.path.join(project_dir, pose_folder_name)
     poseTracked_folder_name = config.get('project').get('poseTracked_folder_name')
     calib_dir = os.path.join(project_dir, calib_folder_name)
@@ -379,6 +405,7 @@ def triangulate_all(config):
     keypoints_ids = [node.id for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_idx = list(range(len(keypoints_ids)))
+    keypoints_nb = len(keypoints_ids)
     
     # 2d-pose files selection
     pose_listdirs_names = next(os.walk(pose_dir))[1]
@@ -395,9 +422,10 @@ def triangulate_all(config):
     
     # Triangulation
     f_range = [[0,min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
+    frames_nb = f_range[1]-f_range[0]
     
     n_cams = len(json_dirs_names)
-    Q_tot, error_tot, nb_cams_excluded_tot = [], [], []
+    Q_tot, error_tot, nb_cams_excluded_tot,id_excluded_cams_tot = [], [], [], []
     for f in tqdm(range(*f_range)):
         # Get x,y,likelihood values from files
         json_tracked_files_f = [json_tracked_files[c][f] for c in range(n_cams)]
@@ -407,33 +435,47 @@ def triangulate_all(config):
         with np.errstate(invalid='ignore'):
             likelihood_files[likelihood_files<likelihood_threshold] = 0.
         
-        Q, error, nb_cams_excluded = [], [], []
+        Q, error, nb_cams_excluded, id_excluded_cams = [], [], [], []
         for keypoint_idx in keypoints_idx:
         # Triangulate cameras with min reprojection error
             coords_2D_kpt = ( x_files[:, keypoint_idx], y_files[:, keypoint_idx], likelihood_files[:, keypoint_idx] )
-            Q_kpt, error_kpt, nb_cams_excluded_kpt = triangulation_from_best_cameras(config, coords_2D_kpt, P)
-            
+            Q_kpt, error_kpt, nb_cams_excluded_kpt, id_excluded_cams_kpt = triangulation_from_best_cameras(config, coords_2D_kpt, P)
+
             Q.append(Q_kpt)
             error.append(error_kpt)
             nb_cams_excluded.append(nb_cams_excluded_kpt)
-
+            id_excluded_cams.append(id_excluded_cams_kpt)
+            
         # Add triangulated points, errors and excluded cameras to pandas dataframes
         Q_tot.append(np.concatenate(Q))
         error_tot.append(error)
         nb_cams_excluded_tot.append(nb_cams_excluded)
-    
+        id_excluded_cams = [item for sublist in id_excluded_cams for item in sublist]
+        id_excluded_cams_tot.append(id_excluded_cams)
+            
     Q_tot = pd.DataFrame(Q_tot)
     error_tot = pd.DataFrame(error_tot)
     nb_cams_excluded_tot = pd.DataFrame(nb_cams_excluded_tot)
     
+    id_excluded_cams_tot = [item for sublist in id_excluded_cams_tot for item in sublist]
+    cam_excluded_count = dict(Counter(id_excluded_cams_tot))
+    cam_excluded_count.update((x, y/keypoints_nb/frames_nb) for x, y in cam_excluded_count.items())
+    
     error_tot['mean'] = error_tot.mean(axis = 1)
     nb_cams_excluded_tot['mean'] = nb_cams_excluded_tot.mean(axis = 1)
 
+    # Optionally, for each keypoint, show indices of frames that should be interpolated
+    if show_interp_indices:
+        interp_frames = np.where(~np.isfinite(Q_tot.iloc[:,::3].T))
+    else:
+        interp_frames = None
+    
     # Interpolate missing values
-    Q_tot = Q_tot.apply(interpolate_nans, axis=0, args = [interpolation_kind])
-   
+    if interpolation_kind != 'none':
+        Q_tot = Q_tot.apply(interpolate_nans, axis=0, args = [interpolation_kind])
+    
     # Create TRC file
     trc_path = make_trc(config, Q_tot, keypoints_names, f_range)
     
     # Recap message
-    recap_triangulate(config, error_tot, nb_cams_excluded_tot, keypoints_names, trc_path)
+    recap_triangulate(config, error_tot, nb_cams_excluded_tot, keypoints_names, cam_excluded_count, interp_frames, trc_path)

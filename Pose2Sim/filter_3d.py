@@ -313,7 +313,7 @@ def filter_all(config):
     Q_filt = Q_coord.apply(filter1d, axis=0, args = [config, filter_type])
 
     # Display figures
-    if display_figures=='True':
+    if display_figures:
         # Retrieve keypoints
         keypoints_names = pd.read_csv(trc_path_in, sep="\t", skiprows=3, nrows=0).columns[2::3].to_numpy()
         display_figures_fun(Q_coord, Q_filt, time_col, keypoints_names)

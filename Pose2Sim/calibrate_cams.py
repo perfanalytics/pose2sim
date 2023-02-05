@@ -117,12 +117,14 @@ def read_qca(qca_path, binning_factor):
 
     root = etree.parse(qca_path).getroot()
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
+    vid_id = []
     
     # Camera name
-    for tag in root.findall('cameras/camera'):
+    for i, tag in enumerate(root.findall('cameras/camera')):
+        ret += [float(tag.attrib.get('avg-residual'))/1000]
+        C += [tag.attrib.get('serial')]
         if tag.attrib.get('model') in ('Miqus Video', 'Miqus Video UnderWater', 'none'):
-            ret += [float(tag.attrib.get('avg-residual'))/1000]
-            C += [tag.attrib.get('serial')]
+            vid_id += [i]
     
     # Image size
     for tag in root.findall('cameras/camera/fov_video'):
@@ -131,7 +133,7 @@ def read_qca(qca_path, binning_factor):
         S += [[w, h]]
     
     # Intrinsic parameters: distorsion and intrinsic matrix
-    for tag in root.findall('cameras/camera/intrinsic'):
+    for i, tag in enumerate(root.findall('cameras/camera/intrinsic')):
         k1 = float(tag.get('radialDistortion1'))/64/binning_factor
         k2 = float(tag.get('radialDistortion2'))/64/binning_factor
         p1 = float(tag.get('tangentalDistortion1'))/64/binning_factor
@@ -140,8 +142,10 @@ def read_qca(qca_path, binning_factor):
         
         fu = float(tag.get('focalLengthU'))/64/binning_factor
         fv = float(tag.get('focalLengthV'))/64/binning_factor
-        cu = float(tag.get('centerPointU'))/64/binning_factor
-        cv = float(tag.get('centerPointV'))/64/binning_factor
+        cu = float(tag.get('centerPointU'))/64/binning_factor \
+            - float(root.findall('cameras/camera/fov_video')[i].attrib.get('left'))
+        cv = float(tag.get('centerPointV'))/64/binning_factor \
+            - float(root.findall('cameras/camera/fov_video')[i].attrib.get('top'))
         K += [np.array([fu, 0., cu, 0., fv, cv, 0., 0., 1.]).reshape(3,3)]
 
     # Extrinsic parameters: rotation matrix and translation vector
@@ -164,14 +168,16 @@ def read_qca(qca_path, binning_factor):
         T += [np.array([tx, ty, tz])]
    
     # Cameras names by natural order
-    C_index = [C.index(c) for c in natural_sort(C)]
-    C = [C[c] for c in C_index]
-    ret = [ret[c] for c in C_index]
-    S = [S[c] for c in C_index]
-    D = [D[c] for c in C_index]
-    K = [K[c] for c in C_index]
-    R = [R[c] for c in C_index]
-    T = [T[c] for c in C_index]
+    C_vid = [C[v] for v in vid_id]
+    C_vid_id = [C_vid.index(c) for c in natural_sort(C_vid)]
+    C_id = [vid_id[c] for c in C_vid_id]
+    C = [C[c] for c in C_id]
+    ret = [ret[c] for c in C_id]
+    S = [S[c] for c in C_id]
+    D = [D[c] for c in C_id]
+    K = [K[c] for c in C_id]
+    R = [R[c] for c in C_id]
+    T = [T[c] for c in C_id]
    
     return ret, C, S, D, K, R, T
 
@@ -285,6 +291,8 @@ def calib_checkerboard_fun(config):
         r, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
                                         None, None, flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_PRINCIPAL_POINT))
         h, w = [np.float(i) for i in img.shape[:-1]]
+        print(r, repr(mtx), repr(dist))
+        print(w,h)
         
         ret.append(r)
         C.append(cam)
@@ -418,7 +426,7 @@ def calibrate_cams_all(config):
         calib_path = qca_path.replace('.qca.txt', '_qca.toml')
     elif calib_type=='checkerboard':
         calib_path = os.path.join(calib_dir, 'Calib_checkerboard.toml')
-
+    
     # Calibrate
     ret, C, S, D, K, R, T = calibrate(config)
 
