@@ -42,6 +42,7 @@ def read_qca(qca_path, binning_factor):
     '''
     Read a Qualisys .qca.txt calibration file
     Returns 5 lists of size N (N=number of cameras):
+    - ret: residual reprojection error in _mm_: list of floats
     - C (camera name),
     - S (image size),
     - D (distorsion), 
@@ -51,7 +52,7 @@ def read_qca(qca_path, binning_factor):
     '''
 
     root = etree.parse(qca_path).getroot()
-    C, S, D, K, R, T = [], [], [], [], [], []
+    ret, C, S, D, K, R, T = [], [], [], [], [], [], []
     vid_id = []
 
     # Camera name
