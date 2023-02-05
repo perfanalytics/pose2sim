@@ -36,7 +36,7 @@ type = 'qca' # 'qca', 'checkerboard', 'arucoboard', or 'charucoboard'
    # extrinsic parameters will be wrong. Set show_corner_detection to true to check it.
    show_corner_detection = false # true or false (lowercase)
    from_vid_or_img = 'img' # 'vid' or 'img'
-   vid_snapshot_every_N_frames = 100
+   vid_snapshot_every_N_frames = 20
    vid_extension = 'mp4'
    img_extension = 'jpg' # 'png', 'jpg', etc
 
