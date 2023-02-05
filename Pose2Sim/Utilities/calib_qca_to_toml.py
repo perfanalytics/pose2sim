@@ -52,6 +52,7 @@ def read_qca(qca_path, binning_factor):
 
     root = etree.parse(qca_path).getroot()
     C, S, D, K, R, T = [], [], [], [], [], []
+    vid_id = []
 
     # Camera name
     for i, tag in enumerate(root.findall('cameras/camera')):
