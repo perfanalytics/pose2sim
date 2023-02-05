@@ -70,7 +70,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.6
 
 Open a terminal, enter `pip show pose2sim`, report package location. \
 Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo`. \
-Type `python`, and test the following code:
+Type `ipython`, and test the following code:
 ```
 from Pose2Sim import Pose2Sim
 Pose2Sim.calibrateCams()
@@ -231,7 +231,7 @@ or
 - copy there the images or videos of the checkerboard
 - set [calibration] type to 'checkerboard' in your `Config.toml` file, and adjust other parameters.
 
-Open an Anaconda prompt or a terminal. \
+Open an Anaconda prompt or a terminal, type `ipython`.\
 By default, `calibrateCams()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.calibrateCams(r'path_to_config.toml')`.
 
 ```
@@ -281,7 +281,7 @@ Output:\
 > _**Track the person viewed by the most cameras, in case of several detections by OpenPose.**_ \
 *N.B.: Skip this step if only one person is in the field of view.*
 
-Open an Anaconda terminal
+Open an Anaconda prompt or a terminal, type `ipython`.\
 By default, `track2D()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.track2D(r'path_to_config.toml')`.
 ```
 from Pose2Sim import Pose2Sim
@@ -334,7 +334,7 @@ Output:\
 ### 3D triangulation
 > _**Triangulate your 2D coordinates in a robust way.**_
 
-Open an Anaconda terminal.
+Open an Anaconda prompt or a terminal, type `ipython`.\
 By default, `triangulate3D()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.triangulate3D(r'path_to_config.toml')`.
 
 ```
@@ -393,7 +393,7 @@ Output:\
 ### 3D Filtering
 > _**Filter your 3D coordinates.**_
 
-Open an Anaconda terminal.
+Open an Anaconda prompt or a terminal, type `ipython`.\
 By default, `filter3D()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.filter3D(r'path_to_config.toml')`.
 
 ```
