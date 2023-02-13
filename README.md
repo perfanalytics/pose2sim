@@ -647,7 +647,8 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > <li> <b>synchronizeCams:</b> Synchronize cameras on 2D keypoint speeds.</li>   
 > <li> <b>track2D:</b> Multiple persons association (rename to peopleAssociation and ensure backcompatibility). With a neural network instead of brute force?</li>
 > <li> <b>triangulate3D:</b> Multiple persons kinematics (output multiple .trc coordinates files).</li>
-> <li> <b>GUI:</b> Blender add-on, or webapp. See <a href="https://github.com/davidpagnon/Maya-Mocap">Maya-Mocap</a> and <a href="https://github.com/JonathanCamargo/BlendOsim">BlendOSim</a>.</li>
+> <li> <b>GUI:</b> Blender add-on, or webapp (e.g., with <a href="https://napari.org/stable/">Napari</a>). See <a href="https://github.com/davidpagnon/Maya-Mocap">Maya-Mocap</a> and <a href="https://github.com/JonathanCamargo/BlendOsim">BlendOSim</a>.</li>
+> <li> <b>Doc:</b> Use <a href="https://www.sphinx-doc.org/en/master/">Sphinx</a> or <a href="https://www.mkdocs.org/">MkDocs</a> for clearer documentation.</li>
 > </br>
 > <li> Catch errors</li>
 > <li> Conda package and Docker image</li>
