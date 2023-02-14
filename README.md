@@ -128,7 +128,9 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
        </b>
     
 ### 2D pose estimation
-> _**Estimate 2D pose from images with Openpose or an other pose estimation solution.**_
+> _**Estimate 2D pose from images with Openpose or an other pose estimation solution.**_ \
+N.B.: Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json'.
+
 
   #### With OpenPose:
 The accuracy and robustness of Pose2Sim have been thoroughly assessed only with OpenPose, and especially with the BODY_25B model. Consequently, we recommend using this 2D pose estimation solution. See [OpenPose repository](https://github.com/CMU-Perceptual-Computing-Lab/openpose) for installation and running.
