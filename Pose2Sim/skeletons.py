@@ -8,7 +8,7 @@
     ###########################################################################
     
     The definition and hierarchy of the following skeletons are available: 
-    - CUSTOM (i.e., from DeepLabCut),
+    - CUSTOM (e.g.., from DeepLabCut),
     - OpenPose BODY_25B, BODY_25, BODY_135, COCO, MPII
     - Mediapipe BLAZEPOSE
     - AlphaPose HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII 
@@ -25,6 +25,8 @@
     from anytree import Node, RenderTree
     for pre, _, node in RenderTree(CUSTOM): 
             print(f'{pre}{node.name} id={node.id}')
+    If you build it from a DeepLabCut model, make sure the node ids 
+    correspond to the column numbers, starting from zero.
 '''
 
 ## INIT
@@ -42,16 +44,19 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
-## SKELETONS
-# CUSTOM SKELETON (i.e., from DeepLabCut detection)
+'''
+SKELETONS
+'''
+
+'''CUSTOM SKELETON (e.g., from DeepLabCut detection)'''
 CUSTOM = Node("Root", id=0, children=[
     Node("Child1", id=1),
     Node("Child2", id=2),
     ])
 
 
-# BODY_25B (full-body without hands, experimental, from OpenPose)
-# https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/blob/master/experimental_models/README.md
+'''BODY_25B (full-body without hands, experimental, from OpenPose)
+https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/blob/master/experimental_models/README.md'''
 BODY_25B = Node("CHip", id=None, children=[
     Node("RHip", id=12, children=[
         Node("RKnee", id=14, children=[
@@ -91,8 +96,8 @@ BODY_25B = Node("CHip", id=None, children=[
 ])
 
 
-# BODY_25 (full-body without hands, standard, from OpenPose)
-# https://github.com/CMU-Perceptual-Computing-Lab/openpose/tree/master/models
+'''BODY_25 (full-body without hands, standard, from OpenPose)
+https://github.com/CMU-Perceptual-Computing-Lab/openpose/tree/master/models'''
 BODY_25 = Node("CHip", id=8, children=[
     Node("RHip", id=9, children=[
         Node("RKnee", id=10, children=[
@@ -130,8 +135,8 @@ BODY_25 = Node("CHip", id=8, children=[
 ])
 
 
-# BODY_135 (full-body with hands and face, experimental, from OpenPose)
-# https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/blob/master/experimental_models/README.md)
+'''BODY_135 (full-body with hands and face, experimental, from OpenPose)
+https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/blob/master/experimental_models/README.md)'''
 BODY_135 = Node("CHip", id=None, children=[
     Node("RHip", id=12, children=[
         Node("RKnee", id=14, children=[
@@ -179,8 +184,8 @@ BODY_135 = Node("CHip", id=None, children=[
 ])
 
 
-# BLAZEPOSE (full-body with simplified hand and foot, from mediapipe)
-# https://google.github.io/mediapipe/solutions/pose
+'''BLAZEPOSE (full-body with simplified hand and foot, from mediapipe)
+https://google.github.io/mediapipe/solutions/pose'''
 BLAZEPOSE = Node("root", id=None, children=[
     Node("right_hip", id=24, children=[
         Node("right_knee", id=26, children=[
@@ -223,8 +228,8 @@ BLAZEPOSE = Node("root", id=None, children=[
 ])
 
 
-# HALPE_26 (full-body without hands, from AlphaPose)
-# https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md
+'''HALPE_26 (full-body without hands, from AlphaPose)
+https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md'''
 HALPE_26 = Node("Hip", id=19, children=[
     Node("RHip", id=12, children=[
         Node("RKnee", id=14, children=[
@@ -264,8 +269,8 @@ HALPE_26 = Node("Hip", id=19, children=[
 ])
 
 
-# HALPE_68 (full-body with hands without face, from AlphaPose)
-# https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md
+'''HALPE_68 (full-body with hands without face, from AlphaPose)
+https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md'''
 HALPE_68 = Node("Hip", id=19, children=[
     Node("RHip", id=12, children=[
         Node("RKnee", id=14, children=[
@@ -311,8 +316,8 @@ HALPE_68 = Node("Hip", id=19, children=[
 ])
 
 
-# HALPE_136 (full-body with hands and face, from AlphaPose)
-# https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md
+'''HALPE_136 (full-body with hands and face, from AlphaPose)
+https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md'''
 HALPE_136 = Node("Hip", id=19, children=[
     Node("RHip", id=12, children=[
         Node("RKnee", id=14, children=[
@@ -358,8 +363,8 @@ HALPE_136 = Node("Hip", id=19, children=[
 ])
 
 
-# COCO_133 (full-body with hands and face, from AlphaPose)
-# https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md
+'''COCO_133 (full-body with hands and face, from AlphaPose)
+https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md'''
 COCO_133 = Node("Hip", id=None, children=[
     Node("RHip", id=13, children=[
         Node("RKnee", id=15, children=[
@@ -408,8 +413,8 @@ COCO_133 = Node("Hip", id=None, children=[
 ])
 
 
-# COCO (full-body without hands and feet, from OpenPose, AlphaPose, OpenPifPaf, YOLO-pose, etc)
-# https://github.com/CMU-Perceptual-Computing-Lab/openpose/tree/master/models
+'''COCO (full-body without hands and feet, from OpenPose, AlphaPose, OpenPifPaf, YOLO-pose, etc)
+https://github.com/CMU-Perceptual-Computing-Lab/openpose/tree/master/models'''
 COCO = Node("CHip", id=None, children=[
     Node("RHip", id=8, children=[
         Node("RKnee", id=9, children=[
@@ -437,8 +442,8 @@ COCO = Node("CHip", id=None, children=[
 ])
 
 
-# MPII (full-body without hands and feet, from OpenPose, AlphaPose, OpenPifPaf, YOLO-pose, etc)
-# https://github.com/CMU-Perceptual-Computing-Lab/openpose/tree/master/models
+'''MPII (full-body without hands and feet, from OpenPose, AlphaPose, OpenPifPaf, YOLO-pose, etc)
+https://github.com/CMU-Perceptual-Computing-Lab/openpose/tree/master/models'''
 MPII = Node("CHip", id=14, children=[
     Node("RHip", id=8, children=[
         Node("RKnee", id=9, children=[
