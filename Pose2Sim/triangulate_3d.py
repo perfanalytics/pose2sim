@@ -154,7 +154,7 @@ def make_trc(config, Q, keypoints_names, f_range):
     trc_path = os.path.join(pose3d_dir, trc_f)
     with open(trc_path, 'w') as trc_o:
         [trc_o.write(line+'\n') for line in header_trc]
-        Q.to_csv(trc_o, sep='\t', index=True, header=None, lineterminator='\n')
+        Q.to_csv(trc_o, sep='\t', index=True, header=None, line_terminator='\n')
 
     return trc_path
 
