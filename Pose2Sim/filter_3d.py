@@ -275,11 +275,14 @@ def filter_all(config):
     # Read config
     project_dir = config.get('project').get('project_dir')
     if project_dir == '': project_dir = os.getcwd()
+    pose_tracked_folder_name = config.get('project').get('poseTracked_folder_name')
+    pose_folder_name = config.get('project').get('pose_folder_name')
     try:
-        pose_folder_name = config.get('project').get('poseTracked_folder_name')
+        pose_tracked_dir = os.path.join(project_dir, pose_folder_name)
+        os.path.isdir(pose_tracked_dir)
+        pose_dir = pose_tracked_dir
     except:
-        pose_folder_name = config.get('project').get('pose_folder_name')
-    pose_dir = os.path.join(project_dir, pose_folder_name)
+        pose_dir = os.path.join(project_dir, pose_folder_name)
     json_folder_extension =  config.get('project').get('pose_json_folder_extension')
     frame_range = config.get('project').get('frame_range')
     seq_name = os.path.basename(project_dir)
