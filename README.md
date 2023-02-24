@@ -657,6 +657,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > <li> Copy-paste muscles from OpenSim <a href="https://simtk.org/projects/lfbmodel">lifting full-body model</a> for inverse dynamics and more</li>
 > <li> Implement optimal fixed-interval Kalman smoothing for inverse kinematics (<a href='https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp'>Biorbd</a> or <a href='https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp'>OpenSim fork</a>)</li>
 > </br>
+> <li> <a href="https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c">Undistort</a> 2D points before triangulating (and <a href="https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301">distort</a> them before computing reprojection error).</li>
 > <li> Implement SLEAP as an other 2D pose estimation solution (converter, skeleton.py, OpenSim model and setup files).</li>
 > <li> Outlier rejection (sliding z-score?) Also solve limb swapping</li>
 > <li> Implement normalized DLT and RANSAC triangulation, as well as a triangulation refinement step (cf DOI:10.1109/TMM.2022.3171102)</li>
