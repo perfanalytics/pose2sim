@@ -650,7 +650,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > <li> <b>calibrateCams:</b> (1) Intrinsic with checkerboard, extrinsic with object or ChArUco board, or (2) SBA calibration with wand (cf <a href='https://argus.web.unc.edu/'>Argus</a>, see converter <a href='https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py'>here</a>), or (3) autocalibration <a href='https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130'>based on a person's dimensions</a>. Also see <a href='https://github.com/lambdaloop/aniposelib'>aniposelib</a> for calibration with ChArUco.</li>
 > <li> <b>synchronizeCams:</b> Synchronize cameras on 2D keypoint speeds.</li>   
 > <li> <b>track2D:</b> Multiple persons association (rename to peopleAssociation and ensure backcompatibility). With a neural network instead of brute force?</li>
-> <li> <b>triangulate3D:</b> Multiple persons kinematics (output multiple .trc coordinates files).</li>
+> <li> <b>triangulate3D:</b> Multiple persons kinematics (output multiple .trc coordinates files). See <a href="https://arxiv.org/pdf/1901.04111.pdf">Dong 2021</a>.</li>
 > <li> <b>GUI:</b> Blender add-on, or webapp (e.g., with <a href="https://napari.org/stable/">Napari</a>). See <a href="https://github.com/davidpagnon/Maya-Mocap">Maya-Mocap</a> and <a href="https://github.com/JonathanCamargo/BlendOsim">BlendOSim</a>.</li>
 > <li> <b>Doc:</b> Use <a href="https://www.sphinx-doc.org/en/master/">Sphinx</a> or <a href="https://www.mkdocs.org/">MkDocs</a> for clearer documentation.</li>
 > </br>
