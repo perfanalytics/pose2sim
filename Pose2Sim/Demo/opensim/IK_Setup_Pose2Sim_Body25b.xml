@@ -10,7 +10,7 @@
 		<!--The accuracy of the solution in absolute terms, i.e. the number of significant digits to which the solution can be trusted. Default 1e-5.-->
 		<accuracy>1.0000000000000001e-05</accuracy>
 		<!--The time range for the study.-->
-		<time_range>2.5166666666666666 4.166666666666667</time_range>
+		<time_range>0.0166666666666666 1.6666666666666667</time_range>
 		<!--Name of the resulting inverse kinematics motion (.mot) file.-->
 		<output_motion_file>Balancing_for_IK.mot</output_motion_file>
 		<!--Flag (true or false) indicating whether or not to report errors from the inverse kinematics solution. Default is true.-->
