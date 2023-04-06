@@ -6,7 +6,7 @@
 
 [project]
 project_dir = '' # BETWEEN SINGLE QUOTES! # If empty, project dir is current dir
-frame_range = [] #For example [10,300], or [] if all frames.
+frame_range = [0,20] #For example [10,300], or [] if all frames.
 frame_rate = 60 #Hz
 
 rawImg_folder_name = 'raw-2d'
