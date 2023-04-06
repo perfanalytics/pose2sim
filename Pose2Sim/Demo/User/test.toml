@@ -50,7 +50,7 @@ likelihood_threshold = 0.3
 min_cameras_for_triangulation = 2
 interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
 # 'none' if you don't want to interpolate missing points
-show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
+show_interp_indices = false # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 
 [3d-filtering]
 type = 'butterworth' # butterworth, butterworth_on_speed, gaussian, LOESS, median.
