@@ -121,7 +121,7 @@ def trc_from_header_data(Header, Data, combined_path):
 
     with open(combined_path, 'w') as trc_o:
         trc_o.write(header_trc+'\n')
-        Data.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+        Data.to_csv(trc_o, sep='\t', index=False, header=None, line_terminator='\n')
         
 
 def trc_combine_func(*args):

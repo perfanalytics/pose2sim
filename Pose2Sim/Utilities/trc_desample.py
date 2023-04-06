@@ -74,7 +74,7 @@ def trc_desample_func(*args):
     # write trc
     with open(trc_desampled_path, 'w') as trc_o:
         [trc_o.write(line) for line in header]
-        Q.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+        Q.to_csv(trc_o, sep='\t', index=False, header=None, line_terminator='\n')
     
 
 if __name__ == '__main__':

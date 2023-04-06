@@ -77,7 +77,7 @@ def save_to_csv_or_h5(kpt_list, output_folder, video_name, to_csv, to_h5):
 
     if to_csv:
         csv_file = os.path.join(output_folder, video_name+'.csv')
-        df.to_csv(csv_file, sep=',', index=True, lineterminator='\n')
+        df.to_csv(csv_file, sep=',', index=True, line_terminator='\n')
 
     if to_h5:
         h5_file = os.path.join(output_folder, video_name+'.h5')
