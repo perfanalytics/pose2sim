@@ -19,7 +19,7 @@
 
     It has been tested on Windows 10 but should work similarly on Linux.
     Please subscribe to this issue if you wish to be notified of the code release. 
-    See https://github.com/davidpagnon/Openpose-to-Opensim  
+    See https://github.com/perfanalytics/pose2sim
     
     Installation: 
     # Open Anaconda prompt. Type:
