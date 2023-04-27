@@ -57,7 +57,7 @@ show_interp_indices = true # true or false (lowercase). For each keypoint, retur
 
 [3d-filtering]
 type = 'butterworth' # butterworth, butterworth_on_speed, gaussian, LOESS, median
-display_figures = true # true or false (lowercase)
+display_figures = false # true or false (lowercase)
 
    [3d-filtering.butterworth]
    type = 'low'
