@@ -25,6 +25,7 @@
 ## INIT
 import os
 import fnmatch
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import logging
@@ -50,25 +51,41 @@ __status__ = "Development"
 def butterworth_filter_1d(config, col):
     '''
     1D Zero-phase Butterworth filter (dual pass)
+    Deals with nans
 
     INPUT:
-    - col: Pandas dataframe column
-    - frame rate, order, cut-off frequency, type (from Config.toml)
+    - col: numpy array
+    - order: int
+    - cutoff: int
+    - framerate: int
 
     OUTPUT
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    butterworth_filter_type = config.get('3d-filtering').get('butterworth').get('type')
-    butterworth_filter_order = int(config.get('3d-filtering').get('butterworth').get('order'))
-    butterworth_filter_cutoff = int(config.get('3d-filtering').get('butterworth').get('cut_off_frequency'))    
-    frame_rate = config.get('project').get('frame_rate')
+    type = config.get('3d-filtering').get('butterworth').get('type')
+    order = int(config.get('3d-filtering').get('butterworth').get('order'))
+    cutoff = int(config.get('3d-filtering').get('butterworth').get('cut_off_frequency'))    
+    framerate = config.get('project').get('frame_rate')
 
-    b, a = signal.butter(butterworth_filter_order/2, butterworth_filter_cutoff/(frame_rate/2), butterworth_filter_type, analog = False) 
-    col_filtered = signal.filtfilt(b, a, col)
+    b, a = signal.butter(order/2, cutoff/(framerate/2), type, analog = False) 
+    padlen = 3 * max(len(a), len(b))
+    
+    # split into sequences of not nans
+    col_filtered = col.copy()
+    mask = np.isnan(col_filtered)  | col_filtered.eq(0)
+    falsemask_indices = np.where(~mask)[0]
+    gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
+    idx_sequences = np.split(falsemask_indices, gaps)
+    if idx_sequences[0].size > 0:
+        idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > padlen]
+    
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        col_filtered[seq_f] = signal.filtfilt(b, a, col_filtered[seq_f])
     
     return col_filtered
-
+    
 
 def butterworth_on_speed_filter_1d(config, col):
     '''
@@ -82,17 +99,31 @@ def butterworth_on_speed_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    butter_speed_filter_type = config.get('3d-filtering').get('butterworth_on_speed').get('type')
-    butter_speed_filter_order = int(config.get('3d-filtering').get('butterworth_on_speed').get('order'))
-    butter_speed_filter_cutoff = int(config.get('3d-filtering').get('butterworth_on_speed').get('cut_off_frequency'))
-    frame_rate = config.get('project').get('frame_rate')
+    type = config.get('3d-filtering').get('butterworth_on_speed').get('type')
+    order = int(config.get('3d-filtering').get('butterworth_on_speed').get('order'))
+    cutoff = int(config.get('3d-filtering').get('butterworth_on_speed').get('cut_off_frequency'))
+    framerate = config.get('project').get('frame_rate')
 
-    b, a = signal.butter(butter_speed_filter_order/2, butter_speed_filter_cutoff/(frame_rate/2), butter_speed_filter_type, analog = False)
+    b, a = signal.butter(order/2, cutoff/(framerate/2), type, analog = False)
+    padlen = 3 * max(len(a), len(b))
     
-    col_diff = col.diff()   # derivative
-    col_diff = col_diff.fillna(col_diff.iloc[1]/2) # set first value correctly instead of nan
-    col_diff_filt = signal.filtfilt(b, a, col_diff) # filter derivative
-    col_filtered = col_diff_filt.cumsum() + col.iloc[0] # integrate filtered derivative
+    # derivative
+    col_filtered = col.copy()
+    col_filtered_diff = col_filtered.diff()   # derivative
+    col_filtered_diff = col_filtered_diff.fillna(col_filtered_diff.iloc[1]/2) # set first value correctly instead of nan
+    
+    # split into sequences of not nans
+    mask = np.isnan(col_filtered_diff)  | col_filtered_diff.eq(0)
+    falsemask_indices = np.where(~mask)[0]
+    gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
+    idx_sequences = np.split(falsemask_indices, gaps)
+    if idx_sequences[0].size > 0:
+        idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > padlen]
+    
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        col_filtered_diff[seq_f] = signal.filtfilt(b, a, col_filtered_diff[seq_f])
+    col_filtered = col_filtered_diff.cumsum() + col.iloc[0] # integrate filtered derivative
     
     return col_filtered
 
@@ -129,9 +160,19 @@ def loess_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    loess_filter_nb_values = config.get('3d-filtering').get('LOESS').get('nb_values_used')
+    kernel = config.get('3d-filtering').get('LOESS').get('nb_values_used')
 
-    col_filtered = lowess(col, col.index, is_sorted=True, frac=loess_filter_nb_values/len(col), it=0)[:,1]
+    col_filtered = col.copy()
+    mask = np.isnan(col_filtered) 
+    falsemask_indices = np.where(~mask)[0]
+    gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
+    idx_sequences = np.split(falsemask_indices, gaps)
+    if idx_sequences[0].size > 0:
+        idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > kernel]
+    
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        col_filtered[seq_f] = lowess(col_filtered[seq_f], seq_f, is_sorted=True, frac=kernel/len(seq_f), it=0)[:,1]
 
     return col_filtered
     

@@ -81,31 +81,47 @@ def zup2yup(Q):
     return Q
 
 
-def interpolate_nans(col, *kind):
+def interpolate_zeros_nans(col, *args):
     '''
-    Interpolate missing points (of value nan)
+    Interpolate missing points (of value zero),
+    unless more than N contiguous values are missing.
 
     INPUTS:
     - col: pandas column of coordinates
-    - kind: 'linear', 'slinear', 'quadratic', 'cubic'. Default: 'cubic'
+    - args[0] = N: max number of contiguous bad values, above which they won't be interpolated
+    - args[1] = kind: 'linear', 'slinear', 'quadratic', 'cubic'. Default: 'cubic'
 
     OUTPUT:
     - col_interp: interpolated pandas column
     '''
 
-    idx = col.index
-    idx_good = np.where(np.isfinite(col))[0] #index of non zeros
-    if len(idx_good) <= 10: return col
-    # idx_notgood = np.delete(np.arange(len(col)), idx_good)
-
-    if not kind: # 'linear', 'slinear', 'quadratic', 'cubic'
-        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind="cubic", bounds_error=False)
+    if len(args)==2:
+        N, kind = args
+    if len(args)==1:
+        N = np.inf
+        kind = args[0]
+    if not args:
+        N = np.inf
+    
+    # Interpolate nans
+    mask = ~(np.isnan(col) | col.eq(0)) # true where nans or zeros
+    idx_good = np.where(mask)[0]
+    if 'kind' not in locals(): # 'linear', 'slinear', 'quadratic', 'cubic'
+        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind="linear", bounds_error=False)
     else:
-        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind[0], bounds_error=False)
-    col_interp = np.where(np.isfinite(col), col, f_interp(idx)) #replace nans with interpolated values
-    col_interp = np.where(np.isfinite(col_interp), col_interp, np.nanmean(col_interp)) #replace remaining nans
-
-    return col_interp #, idx_notgood
+        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, fill_value='extrapolate', bounds_error=False)
+    col_interp = np.where(mask, col, f_interp(col.index)) #replace at false index with interpolated values
+    
+    # Reintroduce nans if lenght of sequence > N
+    idx_notgood = np.where(~mask)[0]
+    gaps = np.where(np.diff(idx_notgood) > 1)[0] + 1 # where the indices of true are not contiguous
+    sequences = np.split(idx_notgood, gaps)
+    if sequences[0].size>0:
+        for seq in sequences:
+            if len(seq) > N: # values to exclude from interpolation are set to false when they are too long 
+                col_interp[seq] = np.nan
+    
+    return col_interp
 
 
 def make_trc(config, Q, keypoints_names, f_range):
@@ -159,7 +175,7 @@ def make_trc(config, Q, keypoints_names, f_range):
     return trc_path
 
 
-def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excluded_count, interp_frames, trc_path):
+def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, trc_path):
     '''
     Print a message giving statistics on reprojection errors (in pixel and in m)
     as well as the number of cameras that had to be excluded to reach threshold 
@@ -201,11 +217,12 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
         mean_cam_excluded_keypoint = np.around(nb_cams_excluded.iloc[:,idx].mean(), decimals=2)
         logging.info(f'Mean reprojection error for {name} is {mean_error_keypoint_px} px (~ {mean_error_keypoint_m} m), reached with {mean_cam_excluded_keypoint} excluded cameras. ')
         if show_interp_indices:
-            interp_frames_keypoint = interp_frames[1][np.where(interp_frames[0]==idx)[0]]
             if interpolation_kind != 'none':
-                logging.info(f'Frames {list(interp_frames_keypoint)} had to be interpolated. ')
+                logging.info(f'Frames {list(interp_frames[idx])} were interpolated.')
+                if len(list(non_interp_frames[idx]))>0:
+                    logging.info(f'Frames {list(non_interp_frames[idx])} could not be interpolated: consider adjusting thresholds.')
             else:
-                logging.info(f'Frames {list(interp_frames_keypoint)} need to be interpolated, or thresholds need to be adjusted. ')
+                logging.info(f'No frames were interpolated because \'interpolation_kind\' was set to none. ')
     
     mean_error_px = np.around(error['mean'].mean(), decimals=1)
     mean_error_mm = np.around(mean_error_px * Dm / fm *1000, decimals=1)
@@ -390,6 +407,7 @@ def triangulate_all(config):
     frame_range = config.get('project').get('frame_range')
     likelihood_threshold = config.get('3d-triangulation').get('likelihood_threshold')
     interpolation_kind = config.get('3d-triangulation').get('interpolation')
+    interp_gap_smaller_than = config.get('3d-triangulation').get('interp_if_gap_smaller_than')
     show_interp_indices = config.get('3d-triangulation').get('show_interp_indices')
     pose_dir = os.path.join(project_dir, pose_folder_name)
     poseTracked_folder_name = config.get('project').get('poseTracked_folder_name')
@@ -466,16 +484,22 @@ def triangulate_all(config):
 
     # Optionally, for each keypoint, show indices of frames that should be interpolated
     if show_interp_indices:
-        interp_frames = np.where(~np.isfinite(Q_tot.iloc[:,::3].T))
+        zero_nan_frames = np.where( Q_tot.iloc[:,::3].T.eq(0) | ~np.isfinite(Q_tot.iloc[:,::3].T) )
+        zero_nan_frames_per_kpt = [zero_nan_frames[1][np.where(zero_nan_frames[0]==k)[0]] for k in range(keypoints_nb)]
+        gaps = [np.where(np.diff(zero_nan_frames_per_kpt[k]) > 1)[0] + 1 for k in range(keypoints_nb)]
+        sequences = [np.split(zero_nan_frames_per_kpt[k], gaps[k]) for k in range(keypoints_nb)]
+        interp_frames = [[f'{seq[0]}:{seq[-1]}' for seq in seq_kpt if len(seq)<=interp_gap_smaller_than and len(seq)>0] for seq_kpt in sequences]
+        non_interp_frames = [[f'{seq[0]}:{seq[-1]}' for seq in seq_kpt if len(seq)>interp_gap_smaller_than] for seq_kpt in sequences]
     else:
         interp_frames = None
-    
+
     # Interpolate missing values
     if interpolation_kind != 'none':
-        Q_tot = Q_tot.apply(interpolate_nans, axis=0, args = [interpolation_kind])
+        Q_tot = Q_tot.apply(interpolate_zeros_nans, axis=0, args = [interp_gap_smaller_than, interpolation_kind])
+    Q_tot.replace(np.nan, 0, inplace=True)
     
     # Create TRC file
     trc_path = make_trc(config, Q_tot, keypoints_names, f_range)
     
     # Recap message
-    recap_triangulate(config, error_tot, nb_cams_excluded_tot, keypoints_names, cam_excluded_count, interp_frames, trc_path)
+    recap_triangulate(config, error_tot, nb_cams_excluded_tot, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, trc_path)
