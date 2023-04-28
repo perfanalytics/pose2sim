@@ -57,7 +57,7 @@ show_interp_indices = true # true or false (lowercase). For each keypoint, retur
 
 [3d-filtering]
 type = 'butterworth' # butterworth, butterworth_on_speed, gaussian, LOESS, median
-display_figures = true # true or false (lowercase)
+display_figures = false # true or false (lowercase)
 
    [3d-filtering.butterworth]
    type = 'low'
@@ -70,7 +70,7 @@ display_figures = true # true or false (lowercase)
    [3d-filtering.gaussian]
    sigma_kernel = 2 #px
    [3d-filtering.LOESS]
-   nb_values_used = 15 # = fraction of data used * nb frames
+   nb_values_used = 5 # = fraction of data used * nb frames
    [3d-filtering.median]
    kernel_size = 9
 

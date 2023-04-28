@@ -68,7 +68,7 @@ def butterworth_filter_1d(config, col):
     cutoff = int(config.get('3d-filtering').get('butterworth').get('cut_off_frequency'))    
     framerate = config.get('project').get('frame_rate')
 
-    b, a = signal.butter(order/2, cutoff/(framerate/2), type, analog = False) 
+    b, a = signal.butter(order/2, cutoff/(framerate/2), 'low', analog = False) 
     padlen = 3 * max(len(a), len(b))
     
     # split into sequences of not nans
@@ -80,9 +80,9 @@ def butterworth_filter_1d(config, col):
     if idx_sequences[0].size > 0:
         idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > padlen]
     
-    # Filter each of the selected sequences
-    for seq_f in idx_sequences_to_filter:
-        col_filtered[seq_f] = signal.filtfilt(b, a, col_filtered[seq_f])
+        # Filter each of the selected sequences
+        for seq_f in idx_sequences_to_filter:
+            col_filtered[seq_f] = signal.filtfilt(b, a, col_filtered[seq_f])
     
     return col_filtered
     
@@ -120,9 +120,9 @@ def butterworth_on_speed_filter_1d(config, col):
     if idx_sequences[0].size > 0:
         idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > padlen]
     
-    # Filter each of the selected sequences
-    for seq_f in idx_sequences_to_filter:
-        col_filtered_diff[seq_f] = signal.filtfilt(b, a, col_filtered_diff[seq_f])
+        # Filter each of the selected sequences
+        for seq_f in idx_sequences_to_filter:
+            col_filtered_diff[seq_f] = signal.filtfilt(b, a, col_filtered_diff[seq_f])
     col_filtered = col_filtered_diff.cumsum() + col.iloc[0] # integrate filtered derivative
     
     return col_filtered
@@ -170,9 +170,9 @@ def loess_filter_1d(config, col):
     if idx_sequences[0].size > 0:
         idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > kernel]
     
-    # Filter each of the selected sequences
-    for seq_f in idx_sequences_to_filter:
-        col_filtered[seq_f] = lowess(col_filtered[seq_f], seq_f, is_sorted=True, frac=kernel/len(seq_f), it=0)[:,1]
+        # Filter each of the selected sequences
+        for seq_f in idx_sequences_to_filter:
+            col_filtered[seq_f] = lowess(col_filtered[seq_f], seq_f, is_sorted=True, frac=kernel/len(seq_f), it=0)[:,1]
 
     return col_filtered
     
