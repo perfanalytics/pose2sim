@@ -6,7 +6,7 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Upload Python Package to PyPi
+name: Upload Python Package to PyPi upon release
 
 on:
   release:
@@ -26,7 +26,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v3
       with:
-        python-version: 3.10
+        python-version: "3.10"
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
