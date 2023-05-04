@@ -13,10 +13,11 @@
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to the more usual marker-based motion capture methods.\
 Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoints coordinates obtained from multiple videos) and leads to an OpenSim result (full-body 3D joint angles). Other 2D solutions can alternatively be used as inputs.
 
+If you can only use a single camera and don't mind losing some accuracy, please consider using [Sports2D](https://github.com/davidpagnon/Sports2D).
+
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
 
-<figure><img src='Content/Activities_verylow.gif' title='Other more or less challenging tasks and conditions.'>
-<figcaption>Pose2Sim has been tested on various challenging tasks and conditions.</figcaption></figure>
+<img src='Content/Activities_verylow.gif' title='Other more or less challenging tasks and conditions.' width="760">
 
 ## Contents
 1. [Installation and Demonstration](#installation-and-demonstration)
