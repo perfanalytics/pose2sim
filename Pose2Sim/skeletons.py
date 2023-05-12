@@ -421,7 +421,7 @@ COCO = Node("CHip", id=None, children=[
             Node("RAnkle", id=10),
         ]),
     ]),
-    Node("LHipJ", id=11, children=[
+    Node("LHip", id=11, children=[
         Node("LKnee", id=12, children=[
             Node("LAnkle", id=13),
         ]),
@@ -450,7 +450,7 @@ MPII = Node("CHip", id=14, children=[
             Node("RAnkle", id=10),
         ]),
     ]),
-    Node("LHipJ", id=11, children=[
+    Node("LHip", id=11, children=[
         Node("LKnee", id=12, children=[
             Node("LAnkle", id=13),
         ]),
