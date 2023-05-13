@@ -181,7 +181,7 @@ def blazepose_detec_func(**args):
                     mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS, landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style())
                 except:
                     print(f'No person detected by BlazePose on frame {count}')
-                    kpt=[np.nan*3*33]
+                    kpt=[np.nan]*3*33
 
                 # Display images
                 if display: 
