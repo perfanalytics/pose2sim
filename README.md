@@ -2,7 +2,7 @@
 [![PyPI version](https://badge.fury.io/py/Pose2Sim.svg)](https://badge.fury.io/py/Pose2Sim) \
 [![Downloads](https://pepy.tech/badge/pose2sim)](https://pepy.tech/project/pose2sim)
 [![Stars](https://badgen.net/github/stars/perfanalytics/pose2sim)](https://github.com/perfanalytics/pose2sim/stargazers)
-[![GitHub forks](https://badgen.net/github/forks/perfanalytics/pose2sim)](https://GitHub.com/perfanalytics/pose2sim)
+[![GitHub forks](https://badgen.net/github/forks/perfanalytics/pose2sim)](https://GitHub.com/perfanalytics/pose2sim/forks)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 [![GitHub issues](https://img.shields.io/github/issues/perfanalytics/pose2sim)](https://github.com/perfanalytics/pose2sim/issues)
 [![GitHub issues-closed](https://img.shields.io/github/issues-closed/perfanalytics/pose2sim)](https://GitHub.com/perfanalytics/pose2sim/issues?q=is%3Aissue+is%3Aclosed)
