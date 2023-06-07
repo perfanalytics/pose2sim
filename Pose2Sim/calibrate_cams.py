@@ -290,7 +290,7 @@ def calib_checkerboard_fun(config):
         # Calibration
         r, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
                                         None, None, flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_PRINCIPAL_POINT))
-        h, w = [np.float(i) for i in img.shape[:-1]]
+        h, w = [np.float32(i) for i in img.shape[:-1]]
         print(r, repr(mtx), repr(dist))
         print(w,h)
         
