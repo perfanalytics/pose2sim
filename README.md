@@ -227,7 +227,7 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 ### Camera calibration
 > _**Calibrate your cameras.**_
 
-> - Note 1: Calibration is tricky. I plan to make it more user-friendly, but in the meantime, you can refer to [this issue](https://github.com/perfanalytics/pose2sim/issues/23#issuecomment-1493291952) if you struggle.
+> - Note 1: Calibration is tricky. I plan to make it more user-friendly, but in the meantime, you can refer to [this issue](https://github.com/perfanalytics/pose2sim/issues/18) if you struggle.
 > - Note 2: Cameras need to be synchronized. If they are not natively, you can use [this script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).
 
 
