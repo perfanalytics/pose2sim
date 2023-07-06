@@ -233,7 +233,7 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 
 1. If you already have a calibration file (.qca.txt from Qualisys for example):
 - copy it in the `calib-2d` folder
-- set [calibration] type to 'qca' in your `Config.toml` file.
+- set [calibration] type to 'qca' in your `Config.toml` file. Change `binning_factor` to 2 if you film in 540p
 
 or
 
