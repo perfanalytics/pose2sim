@@ -27,7 +27,7 @@ pose_model = 'BODY_25B' #CUSTOM, BODY_25B, BODY_25, BODY_135, BLAZEPOSE,
 [calibration]
 type = 'qca' # 'qca', 'checkerboard', 'arucoboard', or 'charucoboard'
    [calibration.qca]
-   binning_factor = 1 # Usually 1
+   binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
 
    [calibration.checkerboard]
    corners_nb = [7,12] # [H,W] rather than [w,h]
