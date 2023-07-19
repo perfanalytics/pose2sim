@@ -1,0 +1,6 @@
+**/__pycache__/
+*.pyc
+logs.txt*
+*.egg-info/
+dist/
+**/*.avi

@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use Pose2Sim, please cite it as below."
+authors:
+- family-names: "Pagnon"
+  given-names: "David"
+  orcid: "https://orcid.org/0000-0002-6891-8331"
+title: "Pose2Sim - Markerless kinematics, from OpenPose to OpenSim"
+version: 0.3.6
+doi: ''
+date-released: 2023-05-05
+url: "https://github.com/perfanalytics/pose2sim"
+journal: "GitHub repository"
+preferred-citation:
+  type: article
+  authors:
+  - family-names: "Pagnon"
+    given-names: "David"
+    orcid: "https://orcid.org/0000-0002-6891-8331"
+  - family-names: "Domalain"
+    given-names: "Mathieu"
+    orcid: "https://orcid.org/0000-0002-4518-8479"
+  - family-names: "Reveret"
+    given-names: "Lionel"
+    orcid: "https://orcid.org/0000-0002-0810-5187"
+  doi: "10.3390/s21196530"
+  journal: "Journal Title"
+  month: 9
+  start: 6530 # First page number
+  end: 6557 # Last page number
+  title: "Pose2Sim: An End-to-End Workflow for 3D Markerless Sports Kinematics—Part 1: Robustness"
+  issue: 19
+  volume: 11
+  year: 2021
+  

@@ -1,0 +1,113 @@
+###############################################################################
+## PROJECT PARAMETERS                                                        ##
+###############################################################################
+
+# Configure your project parameters here
+
+[project]
+project_dir = 'D:\softs\github_david\pose2sim\Pose2Sim\Demo' # BETWEEN SINGLE QUOTES! # If empty, project dir is current dir
+frame_range = [] #For example [10,300], or [] for all frames
+frame_rate = 60 #Hz
+
+rawImg_folder_name = 'raw'
+calib_folder_name = 'calibration'
+pose_folder_name = 'pose'
+pose_json_folder_extension = 'json'
+pose_img_folder_extension = 'img'
+poseAssociated_folder_name = 'pose-associated'
+pose3d_folder_name = 'triangulation'
+opensim_folder_name = 'opensim'
+
+
+[pose]
+pose_model = 'BODY_25B' #CUSTOM, BODY_25B, BODY_25, BODY_135, BLAZEPOSE, HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII are available,
+# from DeepLabCut, OpenPose, MediaPipe BlazePose, and AlphaPose
+# See Pose2Sim\skeleton.py for their skeleton hierarchy
+
+
+[calibration]
+calibration_type = 'convert' # 'convert' or 'calculate'
+
+   [calibration.convert]
+   convert_from = 'qualisys' # 'qualisys', 'optitrack', or 'vicon' (coming)
+      [calibration.convert.qualisys]
+      binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
+	  
+
+   [calibration.calculate] # coming later: 'points'
+   calculate_method = 'board' # 'board' or 'points'
+      
+	  [calibration.calculate.board.intrinsics] # camera properties, only needs to be done once
+     intrinsics_board_type = 'checkerboard' # 'checkerboard' ('charucoboard' not supported yet)
+
+	  overwrite_intrinsics = false # overwrite (or not) if they have already been calculated?
+     intrinsics_extension = 'avi' # any video or image extension
+     extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
+		 
+     show_detection_intrinsics = true # true or false (lowercase). Close window to proceed to next detection
+     intrinsics_corners_nb = [6,9] 
+     intrinsics_square_size = 80 # mm
+     intrinsics_marker_size = 60 # mm # only checked if charucoboard
+     intrinsics_aruco_dict = 'DICT_6X6_250' # only checked if charucoboard # see https://docs.opencv.org/3.4/dc/df7/dictionary_8hpp.html
+	     
+
+     [calibration.calculate.board.extrinsics] # camera placement, needs to be done every time
+     extrinsics_board_type = 'checkerboard' # 'checkerboard', 'scene'  ('charucoboard' not supported yet)
+     # 'board' should be large enough to be detected when laid on the floor. 
+     # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate
+     
+     calculate_extrinsic = true # true or false (lowercase)
+     extrinsics_extension = 'avi' # any video or image extension
+     
+     # if extrinsics_board_type = 'checkerboard' or 'charucoboard'
+     extrinsics_corners_nb = [6,9] # [H,W] rather than [w,h]
+     extrinsics_square_size = 80 # mm # [h,w] if square is actually a rectangle
+     extrinsics_marker_size = 60 # mm # only checked if 'charucoboard'
+     extrinsics_aruco_dict = 'DICT_6X6_250' # only checked if 'charucoboard' # see https://docs.opencv.org/3.4/dc/df7/dictionary_8hpp.html
+     
+     # if extrinsics_board_type = 'scene'
+     # list of 3D coordinates to be manually labelled on images. Can also be 2 dimensional.
+     object_coords_3d = [[0,0,0],[10,0,0],[10,0,0],[10,10,0],[5,5,5]] 
+	   
+
+   [calibration.calculate.points]
+   calibration_points = 'wand' # 'wand' or 'keypoints'
+   # Not supported yet.
+
+	  
+[personAssociation]
+tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
+# and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
+reproj_error_threshold_association = 20 # px
+
+
+[triangulation]
+reproj_error_threshold_triangulation = 15 # px
+likelihood_threshold = 0.3
+min_cameras_for_triangulation = 2
+interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
+# 'none' if you don't want to interpolate missing points
+show_interp_indices = false # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
+
+
+[filtering]
+type = 'butterworth' # butterworth, butterworth_on_speed, gaussian, LOESS, median
+display_figures = true # true or false (lowercase)
+
+   [filtering.butterworth]
+   type = 'low'
+   order = 4 
+   cut_off_frequency = 6 # Hz
+   [filtering.butterworth_on_speed]
+   type = 'low'
+   order = 4 
+   cut_off_frequency = 10 # Hz
+   [filtering.gaussian]
+   sigma_kernel = 2 #px
+   [filtering.LOESS]
+   nb_values_used = 30 # = fraction of data used * nb frames
+   [filtering.median]
+   kernel_size = 9
+
+[opensim]
+
