@@ -145,7 +145,7 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
     
 ## 2D pose estimation
 > _**Estimate 2D pose from images with Openpose or an other pose estimation solution.**_ \
-N.B.: First film a short static pose that will be used for scaling the OpenSim model (A-pose for example), and then film your motions of interest
+N.B.: First film a short static pose that will be used for scaling the OpenSim model (A-pose for example), and then film your motions of interest.\
 N.B.: Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json'.
 
 ### With OpenPose:
@@ -201,9 +201,6 @@ If you need to detect specific points on a human being, an animal, or an object,
    ```
 * Make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
 
-
-
-
 <img src="Content/Pose2D.png" width="760">
 
 N.B.: Markers are not needed in Pose2Sim and were used here for validation
@@ -236,13 +233,11 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 </details>
 
 ## Camera calibration
-> _**Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ \
-> _Intrinsic parameters:_ camera properties (focal length, optical center, distortion), usually need to be calculated only once in their lifetime\
-> _Extrinsic parameters:_ camera placement in space (position and orientation), need to be calculated every time a camera is moved
+> _**Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ 
 
 ### Convert file
       
-If you already have a calibration file, set `calibration_type` type to 'convert' in your `Config.toml` file.
+If you already have a calibration file, set `calibration_type` type to `convert` in your `Config.toml` file.
 - **From Qualisys:**
   - Export calibration to `.qca.txt` within QTM
   - Copy it in the `calibration` folder
@@ -255,27 +250,35 @@ If you already have a calibration file, set `calibration_type` type to 'convert'
 
 ### Calculate from scratch
 
+> *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` instead of `convert` in `Config.toml`.\
+Then try changing `extrinsics_board_type` from `checkerboard` to `scene`.
+
 - **With a board:**
   - **Calculate intrinsic parameters:**
+
+    > *N.B.:* _Intrinsic parameters:_ camera properties (focal length, optical center, distortion), usually need to be calculated only once in their lifetime\
+    > *N.B.:* If you already calculated intrinsic parameters earlier, you can skip this step. Copy your intrinsic parameters (`size`, `mat`, and `dist`) in a new `Calib*.toml` file, and set `overwrite_intrinsics` to false. Run Demo to obtain an example Calib.toml file.
+
     - Create a folder for each camera in your `calibration\intrinsics` folder.
     - For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
     - Adjust parameters in the `Config.toml` file.
     - Make sure that the board:\
       is filmed from different angles, covers a large part of the video frame, and is in focus.\
-      is flat, without reflections, surrounded by a white border, that it is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
-    
-      *N.B.:* If you already calculated intrinsic parameters earlier, you can skip this step. Create a Calib*.toml file following the same model as earlier, and copy there your intrinsic parameters (extrinsic parameters can be randomly filled).
-    
+      is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
+        
   - **Calculate extrinsic parameters:** 
+
+    > *N.B.:* _Extrinsic parameters:_ camera placement in space (position and orientation), need to be calculated every time a camera is moved
+
     - Create a folder for each camera in your `calibration\extrinsics` folder.
     - Once your cameras are in place, shortly film a board laid on the floor or the raw scene \
-    (only one frame is needed, but do not just take one single photo unless you are sure it does not change the image format).
+    (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format).
     - Adjust parameters in the `Config.toml` file.
     - If you film a board:\
       Make sure that it is seen by all cameras. \
       It should preferably be larger than the one used for intrinsics, as results will not be very accurate out of the covered zone.
-    - If you film the raw scene (potentially more accurate):\
-      Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, treadmill, etc). They should cover as large of a space as possible.\
+    - If you film the raw scene (potentially more accurate if points are spread out):\
+      Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, boxes, treadmill dimensions, etc). These points should be as spread out as possible.\
       Then you will click on the corresponding image points for each view.
 
 - **With points:**
@@ -736,27 +739,72 @@ If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org
 I would happily welcome any proposal for new features, code improvement, and more!\
 If you want to contribute to Pose2Sim, please follow [this guide](https://docs.github.com/en/get-started/quickstart/contributing-to-projects) on how to fork, modify and push code, and submit a pull request. I would appreciate it if you provided as much useful information as possible about how you modified the code, and a rationale for why you're making this pull request. Please also specify on which operating system and on which python version you have tested the code.
 
+- Supervised my PhD: @lreveret (INRIA, Université Grenoble Alpes), and @mdomalai (Université de Poitiers).
+- Provided the Demo data: @aaiaueil from Université Gustave Eiffel.
+
+</br>
+
 *Here is a to-do list, for general guidance purposes only:*
-> <li> <b>pose:</b> Support <a href='https://github.com/google/mediapipe/blob/master/docs/solutions/holistic.md'>Mediapipe holistic</a> for pronation/supination</li>
-> <li> <b>calibration:</b> Calculate calibration with points rather than board. (1) SBA calibration with wand (cf <a href='https://argus.web.unc.edu/'>Argus</a>, see converter <a href='https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py'>here</a>), or (2) with <a href='https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130'>OpenPose keypoints</a>. Set world reference frame in the end.</li>
-> <li> <b>synchronization:</b> Synchronize cameras on 2D keypoint speeds.</li>   
-> <li> <b>personAssociation:</b> Multiple persons association. See <a href="https://arxiv.org/pdf/1901.04111.pdf">Dong 2021</a>. With a neural network instead of brute force?</li>
-> <li> <b>triangulation:</b> Multiple persons kinematics (output multiple .trc coordinates files).</li>
-> <li> <b>GUI:</b> Blender add-on, or webapp (e.g., with <a href="https://napari.org/stable/">Napari</a>). See <a href="https://github.com/davidpagnon/Maya-Mocap">Maya-Mocap</a> and <a href="https://github.com/JonathanCamargo/BlendOsim">BlendOSim</a>.</li>
-> <li> <b>Tutorials:</b> Make video tutorials.</li>
-> <li> <b>Doc:</b> Use <a href="https://www.sphinx-doc.org/en/master/">Sphinx</a> or <a href="https://www.mkdocs.org/">MkDocs</a> for clearer documentation.</li>
-> </br>
-> <li> Catch errors</li>
-> <li> Conda package and Docker image</li>
-> <li> Copy-paste muscles from OpenSim <a href="https://simtk.org/projects/lfbmodel">lifting full-body model</a> for inverse dynamics and more</li>
-> <li> Implement optimal fixed-interval Kalman smoothing for inverse kinematics (<a href='https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp'>Biorbd</a> or <a href='https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp'>OpenSim fork</a>)</li>
-> </br>
-> <li> <a href="https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c">Undistort</a> 2D points before triangulating (and <a href="https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301">distort</a> them before computing reprojection error).</li>
-> <li> Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see <a href="https://github.com/African-Robotics-Unit/AcinoSet">AcinoSet</a>). </li>
-> <li> Implement SLEAP as an other 2D pose estimation solution (converter, skeleton.py, OpenSim model and setup files).</li>
-> <li> Outlier rejection (sliding z-score?) Also solve limb swapping</li>
-> <li> Implement normalized DLT and RANSAC triangulation, as well as a triangulation refinement step (cf DOI:10.1109/TMM.2022.3171102)</li>
-> <li> Utilities: convert Vicon xcp calibration file to toml</li>
-> <li> Run from command line via click or typer</li>
 
+> - [x] **Pose:** Support OpenPose [body_25b](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#body_25b-model---option-2-recommended) for more accuracy, [body_135](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#single-network-whole-body-pose-estimation-model) for pronation/supination.
+> - [x] **Pose:** Support [BlazePose](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker) for faster inference (on mobile device).
+> - [x] **Pose:** Support [DeepLabCut](http://www.mackenziemathislab.org/deeplabcut) for training on custom datasets.
+> - [x] **Pose:** Support [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) as an alternative to OpenPose.
+> - [ ] **Pose:** Support [MediaPipe holistic](https://github.com/google/mediapipe/blob/master/docs/solutions/holistic.md) for pronation/supination (converter, skeleton.py, OpenSim model and setup files). 
+> - [ ] **Pose:** Support [MMPose](https://github.com/open-mmlab/mmpose), [SLEAP](https://sleap.ai/), etc.
 
+</br>
+
+> - [x] **Calibration:** Convert [Qualisys](https://www.qualisys.com) .qca.txt calibration file.
+> - [x] **Calibration:** Easier and clearer calibration procedure: separate intrinsic and extrinsic parameter calculation, edit corner detection if some are wrongly detected (or not visible). 
+> - [x] **Calibration:** Possibility to evaluate extrinsic parameters from cues on scene.
+> - [ ] **Calibration:** Calculate calibration with points rather than board. (1) SBA calibration with wand (cf [Argus](https://argus.web.unc.edu), see converter [here](https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py)). Set world reference frame in the end.
+> - [ ] **Calibration:** Alternatively, calibrate with [OpenPose keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
+> - [ ] **Calibration:** Smoother Optitrack calibration file conversion.
+> - [ ] **Calibration:** Convert Vicon .xcp calibration file.
+
+</br>
+
+> - [ ] **Synchronization:** Synchronize cameras on 2D keypoint speeds. Cf [this draft script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).
+> - [x] **Person Association:** Automatically choose the main person to triangulate.
+> - [ ] **Person Association:** Multiple persons association. See [Dong 2021](https://arxiv.org/pdf/1901.04111.pdf). With a neural network instead of brute force?
+
+</br>
+
+> - [x] **Triangulation:** Triangulation weighted with confidence.
+> - [x] **Triangulation:** Set thresholds for triangulation from a camera on likelihood, reprojection error, and set minimum number of cameras allowed for triangulating a point.
+> - [x] **Triangulation:** Show mean reprojection error in px and in mm for each point.
+> - [x] **Triangulation:** Evaluate which cameras were the least reliable.
+> - [x] **Triangulation:** Show which frames had to be interpolated for each point.
+> - [ ] **Triangulation:** [Undistort](https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c) 2D points before triangulating (and [distort](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301) them before computing reprojection error).
+> - [ ] **Triangulation:** Multiple person kinematics (output multiple .trc coordinates files).
+> - [ ] **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).
+> - [ ] **Triangulation:** Outlier rejection (sliding z-score?) Also solve limb swapping.
+> - [ ] **Triangulation:** Implement normalized DLT and RANSAC triangulation, as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).
+> - [x] **Filtering:** Available filtering methods: Butterworth, Butterworth on speed, LOESS, Gaussian, Median.
+> - [ ] **Filtering:** Add Kalman smoothing filter.
+
+</br>
+
+> - [x] **OpenSim:** Integrate better spine from [lifting fullbody model](https://pubmed.ncbi.nlm.nih.gov/30714401) to the [gait full-body model](https://nmbl.stanford.edu/wp-content/uploads/07505900.pdf), more accurate for the knee.
+> - [x] **OpenSim:** Optimize model marker positions as compared to ground-truth marker-based positions.
+> - [x] **OpenSim:** Add scaling and inverse kinematics setup files.
+> - [ ] **OpenSim:** Add muscles from OpenSim [lifting full-body model](https://simtk.org/projects/lfbmodel), add Hertzian footground contacts, for inverse dynamics and more.
+> - [ ] **OpenSim:** Implement optimal fixed-interval Kalman smoothing for inverse kinematics ([this OpenSim fork](https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp)), or [Biorbd](https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp))
+
+</br>
+
+> - [ ] **GUI:** 3D plot of cameras and of triangulated keypoints.
+> - [ ] **GUI:** Blender add-on, or webapp (e.g., with [Napari](https://napari.org/stable). See my draft project [Maya-Mocap](https://github.com/davidpagnon/Maya-Mocap) and [BlendOsim](https://github.com/JonathanCamargo/BlendOsim).
+
+</br>
+
+> - [x] **Demo:** Provide Demo data for users to test the code.
+> - [ ] **Tutorials:** Make video tutorials.
+> - [ ] **Doc:** Use [Sphinx](https://www.sphinx-doc.org/en/master) or [MkDocs](https://www.mkdocs.org) for clearer documentation.
+
+</br>
+
+> - [ ] **Catch errors**
+> - [ ] **Conda package and Docker image**
+> - [ ] **Run from command line via click or typer**

@@ -293,7 +293,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
     intrinsics_board_type = intrinsics_config_dict.get('intrinsics_board_type')
     intrinsics_extension = intrinsics_config_dict.get('intrinsics_extension')
     extract_every_N_sec = intrinsics_config_dict.get('extract_every_N_sec')
-    overwrite_extraction=False
+    overwrite_extraction = False
     show_detection_intrinsics = intrinsics_config_dict.get('show_detection_intrinsics')
     intrinsics_corners_nb = intrinsics_config_dict.get('intrinsics_corners_nb')
     intrinsics_square_size = intrinsics_config_dict.get('intrinsics_square_size')
@@ -319,7 +319,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
             cap.read()
             if cap.read()[0] == False:
                 raise ValueError('No video in the folder or wrong extension.')
-            ## extract frames from video
+            # extract frames from video
             extract_frames(img_vid_files[0], extract_every_N_sec, overwrite_extraction)
             img_vid_files = glob.glob(os.path.join(calib_dir, 'intrinsics', cam, f'*.png'))
             img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)])
@@ -328,10 +328,16 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
 
         # find corners
         for img_path in img_vid_files:
-            imgp_confirmed, objp_confirmed = findCorners(img_path, intrinsics_corners_nb, show_detection_intrinsics=show_detection_intrinsics, objp=objp)
-            if isinstance(imgp_confirmed, np.ndarray):
-                objpoints.append(objp_confirmed)
-                imgpoints.append(imgp_confirmed)
+            if show_detection_intrinsics == True:
+                imgp_confirmed, objp_confirmed = findCorners(img_path, intrinsics_corners_nb, objp=objp, show=show_detection_intrinsics)
+                if isinstance(imgp_confirmed, np.ndarray):
+                    imgpoints.append(imgp_confirmed)
+                    objpoints.append(objp_confirmed)
+            else:
+                imgp_confirmed = findCorners(img_path, intrinsics_corners_nb, objp=objp, show=show_detection_intrinsics)
+                if isinstance(imgp_confirmed, np.ndarray):
+                    imgpoints.append(imgp_confirmed)
+                    objpoints.append(objp)
         if len(imgpoints) <= 10:
             logging.info(f'Corners were detected only on {len(imgpoints)} images for camera {cam}. Calibration of intrinsic parameters may not be accurate with less than 20 good images of the board.')
 
@@ -388,7 +394,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict):
 
         if extrinsics_board_type == 'checkerboard':
             # find corners
-            imgp = findCorners(img_vid_files[0], extrinsics_corners_nb, show_detection_extrinsics)
+            imgp = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=[], show_detection_intrinsics=show_detection_intrinsics=)
             # CHANGE FINDCORNERS: 'O' for okay and next, 'D' for delete, 'C' for click
             # DEFINE OBJECT POINTS
             
@@ -536,7 +542,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict):
                     imgpoints.append(imgp)
 
         # Calibration
-        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
+        r, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
                                         None, None, flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_PRINCIPAL_POINT))
         h, w = [np.float32(i) for i in img.shape[:-1]]
         print(ret, repr(mtx), repr(dist))
@@ -556,7 +562,6 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict):
     T = [rt[1] for rt in RT]
     R = [np.array(cv2.Rodrigues(r)[0]).flatten() for r in R]
     T = np.array(T)/1000
-
 
     return ret, C, S, D, K, R, T
 
@@ -591,7 +596,7 @@ def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False
                     break
 
 
-def findCorners(img_path, corner_nb, show=True, objp=[]):
+def findCorners(img_path, corner_nb, objp=[], show=True):
     '''
     Find corners in the photo of a checkerboard.
     Press 'Y' to accept detection, 'N' to dismiss this image, 'C' to click points by hand.
@@ -608,11 +613,11 @@ def findCorners(img_path, corner_nb, show=True, objp=[]):
     - img_path: path to image (or video)
     - corner_nb: [H, W] internal corners in checkerboard: list of two integers [9,6]
     - optionnal: show: choose whether to show corner detections
-    - optionnal: objp: array [[3d corner coordinates]]
+    - optionnal: objp: array [3d corner coordinates]
 
     OUTPUTS:
     - imgp_confirmed: array of [[2d corner coordinates]]
-    - only if objp!=[]: objp_confirmed: array of [[3d corner coordinates]]
+    - only if objp!=[]: objp_confirmed: array of [3d corner coordinates]
     '''
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001) # stop refining after 30 iterations or if error less than 0.001px
@@ -641,14 +646,16 @@ def findCorners(img_path, corner_nb, show=True, objp=[]):
             # Add corner index 
             for i, corner in enumerate(imgp):
                 x, y = corner.ravel()
-                cv2.putText(img, str(i), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), 2) 
-                cv2.putText(img, str(i), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1) 
+                cv2.putText(img, str(i+1), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), 2) 
+                cv2.putText(img, str(i+1), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1) 
             
             # Visualizer and key press event handler
             for var_to_delete in ['imgp_confirmed', 'objp_confirmed']:
                 if var_to_delete in globals():
-                    del var_to_delete
+                    del globals()[var_to_delete]
             imgp_objp_confirmed = imgp_objp_visualizer_clicker(img, imgp=imgp, objp=objp, img_path=img_path)
+        else:
+            imgp_objp_confirmed = imgp
 
     # If corners are not found, dismiss or click points by hand
     else:
@@ -656,6 +663,8 @@ def findCorners(img_path, corner_nb, show=True, objp=[]):
         if show:
             # Visualizer and key press event handler
             imgp_objp_confirmed = imgp_objp_visualizer_clicker(img, imgp=[], objp=objp, img_path=img_path)
+        else:
+            imgp_objp_confirmed = []
             
     # if len(imgp_objp_confirmed) == 1:
     #     imgp_confirmed = imgp_objp_confirmed
@@ -684,12 +693,12 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     INPUTS:
     - img: image opened with openCV
     - optional: imgp: detected image points, to be accepted or not. Array of [[2d corner coordinates]]
-    - optionnal: objp: array of [[3d corner coordinates]]
+    - optionnal: objp: array of [3d corner coordinates]
     - optional: img_path: path to image
 
     OUTPUTS:
     - imgp_confirmed: image points that have been correctly identified. array of [[2d corner coordinates]]
-    - only if objp!=[]: objp_confirmed: array of [[3d corner coordinates]]
+    - only if objp!=[]: objp_confirmed: array of [3d corner coordinates]
     '''
 
     def on_key(event):
@@ -707,42 +716,47 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
             # If objp is given, objp_confirmed is returned in addition
             if 'scat' not in globals():
                 imgp_confirmed = imgp
+                objp_confirmed = objp
+            else:
+                imgp_confirmed = [imgp.astype('float32') for imgp in imgp_confirmed]
+                objp_confirmed = np.array(objp_confirmed)
             # close all, del all global variables except imgp_confirmed and objp_confirmed
             plt.close('all')
-            for var_to_delete in ['events', 'count', 'scat', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
-                if var_to_delete in globals():
-                    del var_to_delete
-            if objp == []:
+            if len(objp) == 0:
                 if 'objp_confirmed' in globals():
                     del objp_confirmed
 
         if event.key == 'n' or event.key == 'q':
             # If 'n', close all and return nothing
             plt.close('all')
-            for var_to_delete in ['events', 'count', 'scat', 'fig_3d', 'ax_3d', 'objp_confirmed_notok', 'imgp_confirmed', 'objp_confirmed']:
-                if var_to_delete in globals():
-                    del var_to_delete
+            imgp_confirmed = []
+            if len(objp) == 0:
+                objp_confirmed = []
 
         if event.key == 'c':
             # If 'c', allows retrieving imgp_confirmed by clicking them on the image
-            scat = ax.scatter([],[],marker='+',color='g')
+            scat = ax.scatter([],[],s=100,marker='+',color='g')
             plt.connect('button_press_event', on_click)
             # If objp is given, display 3D object points in black
-            if objp != [] and not plt.fignum_exists(2):
+            if len(objp) != 0 and not plt.fignum_exists(2):
                 fig_3d = plt.figure()
                 fig_3d.tight_layout()
                 fig_3d.canvas.manager.set_window_title('Object points to be clicked')
                 ax_3d = fig_3d.add_subplot(projection='3d')
+                plt.rc('xtick', labelsize=5)
+                plt.rc('ytick', labelsize=5)
                 for i, (xs,ys,zs) in enumerate(np.float32(objp)):
                     ax_3d.scatter(xs,ys,zs, marker='.', color='k')
                     ax_3d.text(xs,ys,zs,  f'{str(i+1)}', size=10, zorder=1, color='k') 
                 set_axes_equal(ax_3d)
+                if np.all(objp[:,2] == 0):
+                    ax_3d.view_init(elev=90, azim=-90)
                 fig_3d.show()
 
         if event.key == 'h':
             # If 'h', indicates that one of the objp is not visible on image
             # Displays it in red on 3D plot
-            if objp != []  and 'ax_3d' in globals():
+            if len(objp) != 0  and 'ax_3d' in globals():
                 count = [0 if 'count' not in globals() else count+1][0]
                 if 'events' not in globals():
                     # retrieve first objp_confirmed_notok and plot 3D
@@ -752,10 +766,11 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     fig_3d.canvas.draw()
                 elif count == len(objp)-1:
                     # if all objp have been clicked or indicated as not visible, close all
+                    imgp_confirmed = [imgp.astype('float32') for imgp in imgp_confirmed]
                     plt.close('all')
                     for var_to_delete in ['events', 'count', 'scat', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
                         if var_to_delete in globals():
-                            del var_to_delete
+                            del globals()[var_to_delete]
                 else:
                     # retrieve other objp_confirmed_notok and plot 3D
                     events.append(event)
@@ -791,7 +806,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
             plt.draw()
 
             # Add clicked point to 3D object points if given
-            if objp != []:
+            if len(objp) != 0:
                 count = [0 if 'count' not in globals() else count+1][0]
                 if count==0:
                     # retrieve objp_confirmed and plot 3D
@@ -801,11 +816,12 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                 elif count == len(objp)-1:
                     # retrieve objp_confirmed
                     objp_confirmed = [[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0]
+                    imgp_confirmed = [imgp.astype('float32') for imgp in imgp_confirmed]
                     # close all, delete all
                     plt.close('all')
                     for var_to_delete in ['events', 'count', 'scat', 'scat_3d', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
                         if var_to_delete in globals():
-                            del var_to_delete
+                            del globals()[var_to_delete]
                 else:
                     # retrieve objp_confirmed and plot 3D
                     objp_confirmed = [[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0]
@@ -825,7 +841,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     plt.draw()
                     # Remove last point from imgp_confirmed
                     imgp_confirmed = imgp_confirmed[:-1]
-                    if objp != []:
+                    if len(objp) != 0:
                         if count >= 1: count -= 1
                         # Remove last point from objp_confirmed
                         objp_confirmed = objp_confirmed[:-1]
@@ -836,7 +852,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                         
             # If last event was 'h' key
             elif events[-1].key == 'h':
-                if objp != []:
+                if len(objp) != 0:
                     if count >= 1: count -= 1
                     # Remove last point from objp_confirmed_notok
                     objp_confirmed_notok = objp_confirmed_notok[:-1]
@@ -899,7 +915,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     ax.axis("off")
     for corner in imgp:
         x, y = corner.ravel()
-        cv2.drawMarker(img, (int(x),int(y)), (0,255,0), cv2.MARKER_CROSS, 15, 2)
+        cv2.drawMarker(img, (int(x),int(y)), (128,128,128), cv2.MARKER_CROSS, 10, 2)
     ax.imshow(img)
     figManager = plt.get_current_fig_manager()
     figManager.window.showMaximized()
@@ -908,7 +924,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     # Allow for zoom and pan in image
     zoom_factory(ax)
     ph = panhandler(fig, button=2)
-    
+
     # Handles key presses to Accept, dismiss, or click points by hand
     cid = fig.canvas.mpl_connect('key_press_event', on_key)
     
@@ -917,6 +933,10 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         plt.rcParams['toolbar'] = 'toolmanager'
+
+    for var_to_delete in ['events', 'count', 'scat', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
+        if var_to_delete in globals():
+            del globals()[var_to_delete]
 
     if 'imgp_confirmed' in globals() and 'objp_confirmed' in globals():
         return imgp_confirmed, objp_confirmed
@@ -927,6 +947,9 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
 
 
 def calib_points_fun(config):
+    '''
+    Not implemented yet
+    '''
     pass
 
 

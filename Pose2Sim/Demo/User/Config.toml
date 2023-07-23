@@ -54,7 +54,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
      [calibration.calculate.board.extrinsics] # camera placement, needs to be done every time
      extrinsics_board_type = 'checkerboard' # 'checkerboard', 'scene'  ('charucoboard' not supported yet)
      # 'board' should be large enough to be detected when laid on the floor. 
-     # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate
+     # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out
      
      calculate_extrinsic = true # true or false (lowercase)
      extrinsics_extension = 'avi' # any video or image extension
@@ -62,7 +62,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
      # if extrinsics_board_type = 'checkerboard' or 'charucoboard'
      extrinsics_corners_nb = [6,9] # [H,W] rather than [w,h]
      extrinsics_square_size = 80 # mm # [h,w] if square is actually a rectangle
-     extrinsics_marker_size = 60 # mm # only checked if 'charucoboard'
+     extrinsics_marker_size = 60 # mm # only checked if 'charucoboard' (not supported yet)
      extrinsics_aruco_dict = 'DICT_6X6_250' # only checked if 'charucoboard' # see https://docs.opencv.org/3.4/dc/df7/dictionary_8hpp.html
      
      # if extrinsics_board_type = 'scene'
