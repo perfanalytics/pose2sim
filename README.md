@@ -231,9 +231,9 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 > - Note 2: Cameras need to be synchronized. If they are not natively, you can use [this script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).
 
 
-1. If you already have a calibration file (.qca.txt from Qualisys for example):
+1. If you already have a calibration file (.qca.txt from Qualisys or .xcp from Vicon for example):
 - copy it in the `calib-2d` folder
-- set [calibration] type to 'qca' in your `Config.toml` file. Change `binning_factor` to 2 if you film in 540p
+- set [calibration] type to 'qca' or to 'vicon' in your `Config.toml` file. Change `binning_factor` to 2 if you film in 540p
 
 or
 
