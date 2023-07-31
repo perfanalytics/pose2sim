@@ -5,7 +5,7 @@
 # Configure your project parameters here
 
 [project]
-project_dir = '' # BETWEEN SINGLE QUOTES! # If empty, project dir is current dir
+project_dir = 'D:\softs\github_david\pose2sim\Pose2Sim\Demo' # BETWEEN SINGLE QUOTES! # If empty, project dir is current dir
 frame_range = [] #For example [10,300], or [] for all frames
 frame_rate = 60 #Hz
 
@@ -25,9 +25,11 @@ pose_model = 'BODY_25B' #CUSTOM, BODY_25B, BODY_25, BODY_135, BLAZEPOSE,
 # See Pose2Sim\skeleton.py for their skeleton hierarchy
 
 [calibration]
-type = 'qca' # 'qca', 'checkerboard', 'arucoboard', or 'charucoboard'
+type = 'vicon' # 'qca', 'vicon', 'checkerboard', 'arucoboard', or 'charucoboard'
    [calibration.qca]
    binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
+
+   [calibration.vicon]
 
    [calibration.checkerboard]
    corners_nb = [7,12] # [H,W] rather than [w,h]
