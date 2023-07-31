@@ -40,7 +40,7 @@ To upgrade, type `pip install pose2sim --upgrade`. You will need to update your 
       3. [With DeepLabCut](#with-deeplabcut)
       4. [With AlphaPose](#with-alphapose)
    3. [Camera calibration](#camera-calibration)
-      1. [Convert file](#convert-file)
+      1. [Convert from Qualisys, Optitrack, or Vicon](#convert-from-qualisys-optitrack-or-vicon)
       2. [Calculate from scratch](#calculate-from-scratch)
    4. [Camera synchronization](#camera-synchronization)
    5. [Tracking, Triangulating, Filtering](#tracking-triangulating-filtering)
@@ -235,7 +235,7 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 ## Camera calibration
 > _**Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ 
 
-### Convert file
+### Convert from Qualisys, Optitrack, or Vicon
       
 If you already have a calibration file, set `calibration_type` type to `convert` in your `Config.toml` file.
 - **From Qualisys:**
@@ -244,7 +244,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
   - set `convert_from` to 'qualisys' in your `Config.toml` file. Change `binning_factor` to 2 if you film in 540p
 - **From Optitrack:** Exporting calibration will be available in Motive 3.2. In the meantime:
   - Calculate intrinsics with a board (see next section)
-  - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV.
+  - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28)
 - **From Vicon:**  
   - Not possible yet. [Want to contribute?](#how-to-contribute)
 
@@ -342,7 +342,7 @@ Output:\
 
 ## Camera synchronization
 
-> _**Cameras need to be synchronized, so that 2D points correspond to the same position across cameras.**_\ 
+> _**Cameras need to be synchronized, so that 2D points correspond to the same position across cameras.**_\
 *N.B.: Skip this step if your cameras are already synchronized.*
 
 If your cameras are not natively synchronized, you can use [this script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).
@@ -741,6 +741,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 
 - Supervised my PhD: @lreveret (INRIA, Université Grenoble Alpes), and @mdomalai (Université de Poitiers).
 - Provided the Demo data: @aaiaueil from Université Gustave Eiffel.
+- Provided a code snippet for Optitrack calibration: @claraaudap (Université Bretagne Sud).
 
 </br>
 
@@ -756,18 +757,22 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 </br>
 
 > - [x] **Calibration:** Convert [Qualisys](https://www.qualisys.com) .qca.txt calibration file.
+> - [x] **Calibration:** Convert Optitrack extrinsic calibration file.
+> - [x] **Calibration:** Convert Vicon [.xcp calibration file](https://montrealrobotics.ca/diffcvgp/assets/papers/7.pdf).
 > - [x] **Calibration:** Easier and clearer calibration procedure: separate intrinsic and extrinsic parameter calculation, edit corner detection if some are wrongly detected (or not visible). 
 > - [x] **Calibration:** Possibility to evaluate extrinsic parameters from cues on scene.
+> - [ ] **Calibration:** Support ChArUco board detection (see [there](https://mecaruco2.readthedocs.io/en/latest/notebooks_rst/Aruco/sandbox/ludovic/aruco_calibration_rotation.html)).
 > - [ ] **Calibration:** Calculate calibration with points rather than board. (1) SBA calibration with wand (cf [Argus](https://argus.web.unc.edu), see converter [here](https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py)). Set world reference frame in the end.
-> - [ ] **Calibration:** Alternatively, calibrate with [OpenPose keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
-> - [ ] **Calibration:** Smoother Optitrack calibration file conversion.
-> - [ ] **Calibration:** Convert Vicon .xcp calibration file.
+> - [ ] **Calibration:** Alternatively, self-calibrate with [OpenPose keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
 
 </br>
 
 > - [ ] **Synchronization:** Synchronize cameras on 2D keypoint speeds. Cf [this draft script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).
+
+</br>
+
 > - [x] **Person Association:** Automatically choose the main person to triangulate.
-> - [ ] **Person Association:** Multiple persons association. See [Dong 2021](https://arxiv.org/pdf/1901.04111.pdf). With a neural network instead of brute force?
+> - [ ] **Person Association:** Multiple persons association. 1. Triangulate all the persons whose reprojection error is below a certain threshold (instead of only the one with minimum error), and then track in time with speed cf [Slembrouck 2020](https://link.springer.com/chapter/10.1007/978-3-030-40605-9_15)? or 2. Based on affinity matrices [Dong 2021](https://arxiv.org/pdf/1901.04111.pdf)? or 3. Based on occupancy maps [Yildiz 2012](https://link.springer.com/chapter/10.1007/978-3-642-35749-7_10)? or 4. With a neural network [Huang 2023](https://arxiv.org/pdf/2304.09471.pdf)?
 
 </br>
 
@@ -781,6 +786,9 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > - [ ] **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).
 > - [ ] **Triangulation:** Outlier rejection (sliding z-score?) Also solve limb swapping.
 > - [ ] **Triangulation:** Implement normalized DLT and RANSAC triangulation, as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).
+
+</br>
+
 > - [x] **Filtering:** Available filtering methods: Butterworth, Butterworth on speed, LOESS, Gaussian, Median.
 > - [ ] **Filtering:** Add Kalman smoothing filter.
 
@@ -795,6 +803,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 </br>
 
 > - [ ] **GUI:** 3D plot of cameras and of triangulated keypoints.
+> - [ ] **GUI:** Demo on Google Colab (see [Sports2D](https://bit.ly/Sports2D_Colab) for OpenPose and Python package installation on Google Drive).
 > - [ ] **GUI:** Blender add-on, or webapp (e.g., with [Napari](https://napari.org/stable). See my draft project [Maya-Mocap](https://github.com/davidpagnon/Maya-Mocap) and [BlendOsim](https://github.com/JonathanCamargo/BlendOsim).
 
 </br>

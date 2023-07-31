@@ -29,7 +29,7 @@ pose_model = 'BODY_25B' #CUSTOM, BODY_25B, BODY_25, BODY_135, BLAZEPOSE, HALPE_2
 calibration_type = 'convert' # 'convert' or 'calculate'
 
    [calibration.convert]
-   convert_from = 'qualisys' # 'qualisys', 'optitrack', or 'vicon' (coming)
+   convert_from = 'qualisys' # 'qualisys', 'optitrack', or 'vicon'
       [calibration.convert.qualisys]
       binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
 	  

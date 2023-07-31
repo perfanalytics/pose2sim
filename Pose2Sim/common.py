@@ -180,6 +180,66 @@ def rotate_cam(r, t, ang_x=0, ang_y=0, ang_z=0):
     return r, t
 
 
+def quat2rod(quat, scalar_idx=0):
+    '''
+    Converts quaternion to Rodrigues vector
+
+    INPUT:
+    - quat: quaternion. np.array of size 4
+    - scalar_idx: index of scalar part of quaternion. Default: 0, sometimes 3
+
+    OUTPUT:
+    - rod: Rodrigues vector. np.array of size 3
+    '''
+
+    if scalar_idx == 0:
+        w, qx, qy, qz = np.array(quat)
+    if scalar_idx == 3:
+        qx, qy, qz, w = np.array(quat)
+    else:
+        print('Error: scalar_idx should be 0 or 3')
+
+    rodx = qx * np.tan(w/2)
+    rody = qy * np.tan(w/2)
+    rodz = qz * np.tan(w/2)
+    rod = np.array([rodx, rody, rodz])
+
+    return rod
+
+
+def quat2mat(quat, scalar_idx=0):
+    '''
+    Converts quaternion to rotation matrix
+
+    INPUT:
+    - quat: quaternion. np.array of size 4
+    - scalar_idx: index of scalar part of quaternion. Default: 0, sometimes 3
+
+    OUTPUT:
+    - mat: 3x3 rotation matrix
+    '''
+
+    if scalar_idx == 0:
+        w, qx, qy, qz = np.array(quat)
+    elif scalar_idx == 3:
+        qx, qy, qz, w = np.array(quat)
+    else:
+        print('Error: scalar_idx should be 0 or 3')
+
+    r11 = 1 - 2 * (qy**2 + qz**2)
+    r12 = 2 * (qx*qy - qz*w)
+    r13 = 2 * (qx*qz + qy*w)
+    r21 = 2 * (qx*qy + qz*w)
+    r22 = 1 - 2 * (qx**2 + qz**2)
+    r23 = 2 * (qy*qz - qx*w)
+    r31 = 2 * (qx*qz - qy*w)
+    r32 = 2 * (qy*qz + qx*w)
+    r33 = 1 - 2 * (qx**2 + qy**2)
+    mat = np.array([r11, r12, r13, r21, r22, r23, r31, r32, r33]).reshape(3,3).T
+
+    return mat
+
+
 def natural_sort(list): 
     '''
     Sorts list of strings with numbers in natural order

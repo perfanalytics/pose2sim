@@ -42,7 +42,7 @@ import warnings
 import matplotlib.pyplot as plt
 from mpl_interactions import zoom_factory, panhandler
 
-from Pose2Sim.common import RT_qca2cv, rotate_cam, euclidean_distance, natural_sort
+from Pose2Sim.common import RT_qca2cv, rotate_cam, quat2mat, euclidean_distance, natural_sort
 
 
 ## AUTHORSHIP INFORMATION
@@ -162,7 +162,7 @@ def read_qca(qca_path, binning_factor):
         r33 = float(tag.get('r33'))
 
         # Rotation (by-column to by-line)
-        R += [np.array([r11, r21, r31, r12, r22, r32, r13, r23, r33]).reshape(3,3)]
+        R += [np.array([r11, r12, r13, r21, r22, r23, r31, r32, r33]).reshape(3,3).T]
         T += [np.array([tx, ty, tz])]
    
     # Cameras names by natural order
@@ -201,12 +201,15 @@ def calib_optitrack_fun(config):
     pass
 
 
-def calib_vicon_fun(config):
+def calib_vicon_fun(file_to_convert_path, binning_factor=1):
     '''
-    Convert a Vicon calibration file 
+    Convert a Vicon .xcp calibration file 
+    Converts from camera view to object view, 
+    and converts rotation with Rodrigues formula
 
     INPUTS:
-    - a Config.toml file
+    - file_to_convert_path: path of the .qca.text file to convert
+    - binning_factor: always 1 with Vicon calibration
 
     OUTPUTS:
     - ret: residual reprojection error in _mm_: list of floats
@@ -218,8 +221,85 @@ def calib_vicon_fun(config):
     - T: extrinsic translation: list of arrays of floats
 
     '''
+   
+    ret, C, S, D, K, R, T = read_vicon(file_to_convert_path)
+    
+    RT = [RT_qca2cv(r,t) for r, t in zip(R, T)]
+    R = [rt[0] for rt in RT]
+    T = [rt[1] for rt in RT]
 
-    pass
+    R = [np.array(cv2.Rodrigues(r)[0]).flatten() for r in R]
+    T = np.array(T)
+    
+    return ret, C, S, D, K, R, T
+
+
+def read_vicon(vicon_path):
+    '''
+    Reads a Vicon .xcp calibration file 
+    Returns 6 lists of size N (N=number of cameras)
+    
+    INPUTS: 
+    - vicon_path: path to .xcp calibration file: string
+
+    OUTPUTS:
+    - ret: residual reprojection error in _mm_: list of floats
+    - C: camera name: list of strings
+    - S: image size: list of list of floats
+    - D: distorsion: list of arrays of floats
+    - K: intrinsic parameters: list of 3x3 arrays of floats
+    - R: extrinsic rotation: list of 3x3 arrays of floats
+    - T: extrinsic translation: list of arrays of floats
+    '''
+
+    root = etree.parse(vicon_path).getroot()
+    ret, C, S, D, K, R, T = [], [], [], [], [], [], []
+    vid_id = []
+    
+    # Camera name and image size
+    for i, tag in enumerate(root.findall('Camera')):
+        C += [tag.attrib.get('DEVICEID')]
+        S += [[float(t) for t in tag.attrib.get('SENSOR_SIZE').split()]]
+        ret += [float(tag.findall('KeyFrames/KeyFrame')[0].attrib.get('WORLD_ERROR'))]
+        # if tag.attrib.get('model') in ('Miqus Video', 'Miqus Video UnderWater', 'none'):
+        vid_id += [i]
+
+    # Intrinsic parameters: distorsion and intrinsic matrix
+    for cam_elem in root.findall('Camera'):
+        try:
+            dist = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('VICON_RADIAL2').split()[3:5]
+        except:
+            dist = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('VICON_RADIAL').split()
+        D += [[float(d) for d in dist] + [0.0, 0.0]]
+
+        fu = float(cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('FOCAL_LENGTH'))
+        fv = fu / float(cam_elem.attrib.get('PIXEL_ASPECT_RATIO'))
+        cam_center = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('PRINCIPAL_POINT').split()
+        cu, cv = [float(c) for c in cam_center]
+        K += [np.array([fu, 0., cu, 0., fv, cv, 0., 0., 1.]).reshape(3,3)]
+
+    # Extrinsic parameters: rotation matrix and translation vector
+    for cam_elem in root.findall('Camera'):
+        rot = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('ORIENTATION').split()
+        R_quat = [float(r) for r in rot]
+        R_mat = quat2mat(R_quat, scalar_idx=3)
+        R += [R_mat]
+
+        trans = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('POSITION').split()
+        T += [[float(t)/1000 for t in trans]]
+   
+    # Cameras names by natural order
+    C_vid = [C[v] for v in vid_id]
+    C_vid_id = [C_vid.index(c) for c in natural_sort(C_vid)]
+    C_id = [vid_id[c] for c in C_vid_id]
+    C = [C[c] for c in C_id]
+    S = [S[c] for c in C_id]
+    D = [D[c] for c in C_id]
+    K = [K[c] for c in C_id]
+    R = [R[c] for c in C_id]
+    T = [T[c] for c in C_id]
+   
+    return ret, C, S, D, K, R, T
 
 
 def calib_board_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
@@ -998,16 +1078,16 @@ def recap_calibrate(ret, calib_path, calib_full_type):
     ret_m, ret_px = [], []
     for c, cam in enumerate(calib.keys()):
         if cam != 'metadata':
-            fm = calib[cam]['matrix'][0][0]
+            f_px = calib[cam]['matrix'][0][0]
             Dm = euclidean_distance(calib[cam]['translation'], [0,0,0])
-            if calib_full_type=='convert_qualisys':
-                ret_m.append( np.around(ret[c]*1000, decimals=3) )
-                ret_px.append( np.around(ret[c] / Dm * fm, decimals=3) )
+            if calib_full_type=='convert_qualisys' or calib_full_type=='convert_vicon':
+                ret_m.append( np.around(ret[c], decimals=3) )
+                ret_px.append( np.around(ret[c] / (Dm*1000) * f_px, decimals=3) )
             elif calib_full_type=='calculate_board':
                 ret_px.append( np.around(ret[c], decimals=3) )
-                ret_m.append( np.around(ret[c]*1000 * Dm / fm, decimals=3) )
+                ret_m.append( np.around(ret[c]*(Dm*1000) / f_px, decimals=3) )
 
-    logging.info(f'\n--> Residual (RMS) calibration errors for each camera are respectively {ret_px} px, which corresponds to {ret_m} mm.\n')
+    logging.info(f'\n--> Residual (RMS) calibration errors for each camera are respectively {ret_px} px, \nwhich corresponds to {ret_m} mm.\n')
     logging.info(f'Calibration file is stored at {calib_path}.')
 
 
@@ -1040,6 +1120,8 @@ def calibrate_cams_all(config):
         elif convert_filetype=='optitrack':
             print('See Readme.md to retrieve calibration values.')
         elif convert_filetype=='vicon':
+            convert_ext = '.xcp'
+            binning_factor = 1
             print('Not supported yet')
 
         file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
