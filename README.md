@@ -737,11 +737,13 @@ If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org
 ### How to contribute
 
 I would happily welcome any proposal for new features, code improvement, and more!\
-If you want to contribute to Pose2Sim, please follow [this guide](https://docs.github.com/en/get-started/quickstart/contributing-to-projects) on how to fork, modify and push code, and submit a pull request. I would appreciate it if you provided as much useful information as possible about how you modified the code, and a rationale for why you're making this pull request. Please also specify on which operating system and on which python version you have tested the code.
+If you want to contribute to Pose2Sim, please follow [this guide](https://docs.github.com/en/get-started/quickstart/contributing-to-projects) on how to fork, modify and push code, and submit a pull request. I would appreciate it if you provided as much useful information as possible about how you modified the code, and a rationale for why you're making this pull request. Please also specify on which operating system and on which Python version you have tested the code.
 
 - Supervised my PhD: @lreveret (INRIA, Université Grenoble Alpes), and @mdomalai (Université de Poitiers).
 - Provided the Demo data: @aaiaueil from Université Gustave Eiffel.
+- Tested the code and provided feedback: @simonozan
 - Provided a code snippet for Optitrack calibration: @claraaudap (Université Bretagne Sud).
+- Issued MPP2SOS, a (non-free) Blender extension based on Pose2Sim: @carlosedubarreto
 
 </br>
 
@@ -777,19 +779,19 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 </br>
 
 > - [x] **Triangulation:** Triangulation weighted with confidence.
-> - [x] **Triangulation:** Set thresholds for triangulation from a camera on likelihood, reprojection error, and set minimum number of cameras allowed for triangulating a point.
+> - [x] **Triangulation:** Set likelihood threshold below which a camera should not be used, reprojection error threshold, and set minimum number of cameras allowed for triangulating a point.
 > - [x] **Triangulation:** Show mean reprojection error in px and in mm for each point.
 > - [x] **Triangulation:** Evaluate which cameras were the least reliable.
 > - [x] **Triangulation:** Show which frames had to be interpolated for each point.
 > - [ ] **Triangulation:** [Undistort](https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c) 2D points before triangulating (and [distort](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301) them before computing reprojection error).
 > - [ ] **Triangulation:** Multiple person kinematics (output multiple .trc coordinates files).
 > - [ ] **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).
-> - [ ] **Triangulation:** Outlier rejection (sliding z-score?) Also solve limb swapping.
-> - [ ] **Triangulation:** Implement normalized DLT and RANSAC triangulation, as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).
+> - [ ] **Triangulation:** Solve limb swapping (although not really an issue with Body_25b) by using RANSAC or SDS triangulation ignoring right and left, and then decide which side points are by majority voting + giving more confidence to cameras whose plane is the most coplanar to the right/left line.
+> - [ ] **Triangulation:** Implement normalized DLT and RANSAC triangulation, Outlier rejection (sliding z-score?), as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).
 
 </br>
 
-> - [x] **Filtering:** Available filtering methods: Butterworth, Butterworth on speed, LOESS, Gaussian, Median.
+> - [x] **Filtering:** Available filtering methods: Butterworth, Butterworth on speed, Gaussian, Median, LOESS (polynomial smoothing).
 > - [ ] **Filtering:** Add Kalman smoothing filter.
 
 </br>
@@ -804,7 +806,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 
 > - [ ] **GUI:** 3D plot of cameras and of triangulated keypoints.
 > - [ ] **GUI:** Demo on Google Colab (see [Sports2D](https://bit.ly/Sports2D_Colab) for OpenPose and Python package installation on Google Drive).
-> - [ ] **GUI:** Blender add-on, or webapp (e.g., with [Napari](https://napari.org/stable). See my draft project [Maya-Mocap](https://github.com/davidpagnon/Maya-Mocap) and [BlendOsim](https://github.com/JonathanCamargo/BlendOsim).
+> - [ ] **GUI:** Blender add-on (cf [MPP2SOS](https://blendermarket.com/products/mocap-mpp2soss)), or webapp (e.g., with [Napari](https://napari.org/stable). See my draft project [Maya-Mocap](https://github.com/davidpagnon/Maya-Mocap) and [BlendOsim](https://github.com/JonathanCamargo/BlendOsim).
 
 </br>
 
