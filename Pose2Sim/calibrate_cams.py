@@ -554,6 +554,7 @@ def calibrate_cams_all(config):
     if project_dir == '': project_dir = os.getcwd()
     calib_folder_name = config.get('project').get('calib_folder_name')
     calib_dir = os.path.join(project_dir, calib_folder_name)
+    print(calib_dir)
     calib_type = config.get('calibration').get('type')
     if calib_type=='vicon':
         vicon_path = glob.glob(os.path.join(calib_dir, '*.xcp'))[0]
