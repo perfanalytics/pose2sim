@@ -42,11 +42,6 @@ import os
 import time
 import logging, logging.handlers
 
-if not os.path.exists('User'): os.mkdir('User')
-with open(os.path.join('User', 'logs.txt'), 'a+') as log_f: pass
-logging.basicConfig(format='%(message)s', level=logging.INFO, 
-    handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join('User', 'logs.txt'), when='D', interval=7), logging.StreamHandler()]) 
-
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -79,6 +74,10 @@ def base_params(config_dict):
     frame_range = config_dict.get('project').get('frame_range')
     seq_name = os.path.basename(project_dir)
     frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+
+    with open(os.path.join(project_dir, 'User', 'logs.txt'), 'a+') as log_f: pass
+    logging.basicConfig(format='%(message)s', level=logging.INFO, 
+        handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(project_dir, 'User', 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
 
     return project_dir, seq_name, frames
 
