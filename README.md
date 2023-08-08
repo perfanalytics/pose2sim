@@ -12,15 +12,16 @@
 
 
 # Pose2Sim
+
+> **_News_: Version 0.4 released:** \
+**Calibration used to be the main stumbling block for users, it should be easier and better now!**\
+To upgrade, type `pip install pose2sim --upgrade`. You will need to update your Config.toml file.\
+*N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
+
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to the more usual marker-based motion capture methods.\
 Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoints coordinates obtained from multiple videos) and leads to an OpenSim result (full-body 3D joint angles). Other 2D solutions can alternatively be used as inputs.
 
 If you can only use a single camera and don't mind losing some accuracy, please consider using [Sports2D](https://github.com/davidpagnon/Sports2D).
-
-> **__*News*__:\
-Version 0.4 released:** Easier and better calibration procedure.\
-To upgrade, type `pip install pose2sim --upgrade`. You will need to update your Config.toml file.\
-*N.B.:* Still looking for contributors (see [How to contribute](#how-to-contribute))
 
 
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
@@ -784,7 +785,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > - [x] **Triangulation:** Evaluate which cameras were the least reliable.
 > - [x] **Triangulation:** Show which frames had to be interpolated for each point.
 > - [ ] **Triangulation:** [Undistort](https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c) 2D points before triangulating (and [distort](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301) them before computing reprojection error).
-> - [ ] **Triangulation:** Multiple person kinematics (output multiple .trc coordinates files).
+> - [ ] **Triangulation:** Multiple person kinematics (output multiple .trc coordinates files). Triangulate all persons with reprojection error above threshold, and identify them by minimizing their displacement across frames.
 > - [ ] **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).
 > - [ ] **Triangulation:** Solve limb swapping (although not really an issue with Body_25b) by using RANSAC or SDS triangulation ignoring right and left, and then decide which side points are by majority voting + giving more confidence to cameras whose plane is the most coplanar to the right/left line.
 > - [ ] **Triangulation:** Implement normalized DLT and RANSAC triangulation, Outlier rejection (sliding z-score?), as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).

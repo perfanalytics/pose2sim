@@ -37,10 +37,10 @@ calibration_type = 'convert' # 'convert' or 'calculate'
    [calibration.calculate] # coming later: 'points'
    calculate_method = 'board' # 'board' or 'points'
       
-	  [calibration.calculate.board.intrinsics] # camera properties, only needs to be done once
+	 [calibration.calculate.board.intrinsics] # camera properties, only needs to be done once
      intrinsics_board_type = 'checkerboard' # 'checkerboard' ('charucoboard' not supported yet)
 
-	  overwrite_intrinsics = false # overwrite (or not) if they have already been calculated?
+	 overwrite_intrinsics = false # overwrite (or not) if they have already been calculated?
      intrinsics_extension = 'avi' # any video or image extension
      extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
 		 
