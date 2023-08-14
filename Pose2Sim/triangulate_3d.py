@@ -218,11 +218,14 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
         logging.info(f'Mean reprojection error for {name} is {mean_error_keypoint_px} px (~ {mean_error_keypoint_m} m), reached with {mean_cam_excluded_keypoint} excluded cameras. ')
         if show_interp_indices:
             if interpolation_kind != 'none':
-                logging.info(f'Frames {list(interp_frames[idx])} were interpolated.')
+                if len(list(interp_frames[idx])) ==0:
+                    logging.info(f'  No frames needed to be interpolated.')
+                else: 
+                    logging.info(f'  Frames {list(interp_frames[idx])} were interpolated.')
                 if len(list(non_interp_frames[idx]))>0:
-                    logging.info(f'Frames {list(non_interp_frames[idx])} could not be interpolated: consider adjusting thresholds.')
+                    logging.info(f'  Frames {list(non_interp_frames[idx])} could not be interpolated: consider adjusting thresholds.')
             else:
-                logging.info(f'No frames were interpolated because \'interpolation_kind\' was set to none. ')
+                logging.info(f'  No frames were interpolated because \'interpolation_kind\' was set to none. ')
     
     mean_error_px = np.around(error['mean'].mean(), decimals=1)
     mean_error_mm = np.around(mean_error_px * Dm / fm *1000, decimals=1)
@@ -488,8 +491,8 @@ def triangulate_all(config):
         zero_nan_frames_per_kpt = [zero_nan_frames[1][np.where(zero_nan_frames[0]==k)[0]] for k in range(keypoints_nb)]
         gaps = [np.where(np.diff(zero_nan_frames_per_kpt[k]) > 1)[0] + 1 for k in range(keypoints_nb)]
         sequences = [np.split(zero_nan_frames_per_kpt[k], gaps[k]) for k in range(keypoints_nb)]
-        interp_frames = [[f'{seq[0]}:{seq[-1]}' for seq in seq_kpt if len(seq)<=interp_gap_smaller_than and len(seq)>0] for seq_kpt in sequences]
-        non_interp_frames = [[f'{seq[0]}:{seq[-1]}' for seq in seq_kpt if len(seq)>interp_gap_smaller_than] for seq_kpt in sequences]
+        interp_frames = [[f'{seq[0]}:{seq[-1]+1}' for seq in seq_kpt if len(seq)<=interp_gap_smaller_than and len(seq)>0] for seq_kpt in sequences]
+        non_interp_frames = [[f'{seq[0]}:{seq[-1]+1}' for seq in seq_kpt if len(seq)>interp_gap_smaller_than] for seq_kpt in sequences]
     else:
         interp_frames = None
 
