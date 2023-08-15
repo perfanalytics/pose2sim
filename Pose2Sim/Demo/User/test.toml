@@ -56,23 +56,25 @@ interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
 show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 
 [3d-filtering]
-type = 'butterworth' # butterworth, butterworth_on_speed, gaussian, LOESS, median
+type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
 display_figures = false # true or false (lowercase)
 
    [3d-filtering.butterworth]
-   type = 'low'
-   order = 4 
    cut_off_frequency = 6 # Hz
-   [3d-filtering.butterworth_on_speed]
-   type = 'low'
    order = 4 
-   cut_off_frequency = 10 # Hz
+   [3d-filtering.kalman]
+   # How much more do you trust triangulation results (measurements), than previous data (process assuming constant acceleration)?
+   trust_ratio = 100 # = measurement_trust/process_trust ~= process_noise/measurement_noise
+   smooth = true # should be true, unless you need real-time filtering
    [3d-filtering.gaussian]
    sigma_kernel = 2 #px
    [3d-filtering.LOESS]
    nb_values_used = 5 # = fraction of data used * nb frames
    [3d-filtering.median]
    kernel_size = 9
+   [3d-filtering.butterworth_on_speed]
+   cut_off_frequency = 10 # Hz
+   order = 4
 
 [opensim]
 
