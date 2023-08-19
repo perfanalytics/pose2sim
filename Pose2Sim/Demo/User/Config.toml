@@ -15,7 +15,7 @@ pose_folder_name = 'pose'
 pose_json_folder_extension = 'json'
 pose_img_folder_extension = 'img'
 poseAssociated_folder_name = 'pose-associated'
-pose3d_folder_name = 'triangulation'
+pose3d_folder_name = 'pose-3d'
 opensim_folder_name = 'opensim'
 
 
@@ -26,53 +26,53 @@ pose_model = 'BODY_25B' #CUSTOM, BODY_25B, BODY_25, BODY_135, BLAZEPOSE, HALPE_2
 
 
 [calibration]
-calibration_type = 'convert' # 'convert' or 'calculate'
+calibration_type = 'calculate' # 'convert' or 'calculate'
 
    [calibration.convert]
    convert_from = 'qualisys' # 'qualisys', 'optitrack', or 'vicon'
       [calibration.convert.qualisys]
       binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
-	  
+  
 
-   [calibration.calculate] # coming later: 'points'
+   [calibration.calculate] 
    calculate_method = 'board' # 'board' or 'points'
       
-	 [calibration.calculate.board.intrinsics] # camera properties, only needs to be done once
-     intrinsics_board_type = 'checkerboard' # 'checkerboard' ('charucoboard' not supported yet)
+      [calibration.calculate.board.intrinsics] # camera properties, only needs to be done once
+      intrinsics_board_type = 'checkerboard' # 'checkerboard' ('charucoboard' not supported yet)
+      overwrite_intrinsics = false # overwrite (or not) if they have already been calculated?
+      show_detection_intrinsics = true # true or false (lowercase)
 
-	 overwrite_intrinsics = false # overwrite (or not) if they have already been calculated?
-     intrinsics_extension = 'avi' # any video or image extension
-     extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
-		 
-     show_detection_intrinsics = true # true or false (lowercase). Close window to proceed to next detection
-     intrinsics_corners_nb = [6,9] 
-     intrinsics_square_size = 80 # mm
-     intrinsics_marker_size = 60 # mm # only checked if charucoboard
-     intrinsics_aruco_dict = 'DICT_6X6_250' # only checked if charucoboard # see https://docs.opencv.org/3.4/dc/df7/dictionary_8hpp.html
-	     
+      intrinsics_extension = 'jpg' # any video or image extension
+      extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
 
-     [calibration.calculate.board.extrinsics] # camera placement, needs to be done every time
-     extrinsics_board_type = 'checkerboard' # 'checkerboard', 'scene'  ('charucoboard' not supported yet)
-     # 'board' should be large enough to be detected when laid on the floor. 
-     # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out
-     
-     calculate_extrinsic = true # true or false (lowercase)
-     extrinsics_extension = 'avi' # any video or image extension
-     
-     # if extrinsics_board_type = 'checkerboard' or 'charucoboard'
-     extrinsics_corners_nb = [6,9] # [H,W] rather than [w,h]
-     extrinsics_square_size = 80 # mm # [h,w] if square is actually a rectangle
-     extrinsics_marker_size = 60 # mm # only checked if 'charucoboard' (not supported yet)
-     extrinsics_aruco_dict = 'DICT_6X6_250' # only checked if 'charucoboard' # see https://docs.opencv.org/3.4/dc/df7/dictionary_8hpp.html
-     
-     # if extrinsics_board_type = 'scene'
-     # list of 3D coordinates to be manually labelled on images. Can also be 2 dimensional.
-     object_coords_3d = [[0,0,0],[10,0,0],[10,0,0],[10,10,0],[5,5,5]] 
-	   
-
-   [calibration.calculate.points]
-   calibration_points = 'wand' # 'wand' or 'keypoints'
-   # Not supported yet.
+      intrinsics_corners_nb = [4,7] 
+      intrinsics_square_size = 60 # mm
+      intrinsics_marker_size = 40 # mm # only checked if charucoboard
+      intrinsics_aruco_dict = 'DICT_6X6_250' # only checked if charucoboard # see https://docs.opencv.org/3.4/dc/df7/dictionary_8hpp.html
+   
+      [calibration.calculate.board.extrinsics] # camera placement, needs to be done every time
+      extrinsics_board_type = 'scene' # 'checkerboard', 'scene'  ('charucoboard' not supported yet)
+      # 'board' should be large enough to be detected when laid on the floor. 
+      # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out
+      calculate_extrinsics = true # true or false (lowercase)
+      show_reprojection_error = true # true or false (lowercase)
+      
+      extrinsics_extension = 'png' # any video or image extension
+      
+      # if extrinsics_board_type = 'checkerboard' or 'charucoboard'
+      extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
+      extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
+      extrinsics_marker_size = 40 # mm # only checked if 'charucoboard' (not supported yet)
+      extrinsics_aruco_dict = 'DICT_6X6_250' # only checked if 'charucoboard' # see https://docs.opencv.org/3.4/dc/df7/dictionary_8hpp.html
+      
+      # if extrinsics_board_type = 'scene'
+      # list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. # in m
+      object_coords_3d = [[-2.0,  0.3,  0.0], [-2.0 , 0.0,  0.0], [-2.0, 0.0,  0.05], [-2.0, -0.3 ,  0.0], [0.0,  0.3,  0.0], [0.0, 0.0,  0.0], [0.0, 0.0,  0.05], [0.0, -0.3,  0.0]] # in meters -> Not in mm! <-
+      
+  
+      [calibration.calculate.points]
+      calibration_points = 'wand' # 'wand' or 'keypoints'
+      # Not supported yet.
 
 	  
 [personAssociation]
@@ -91,15 +91,17 @@ show_interp_indices = false # true or false (lowercase). For each keypoint, retu
 
 
 [filtering]
-type = 'butterworth' # butterworth, butterworth_on_speed, gaussian, LOESS, median
+type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
 display_figures = true # true or false (lowercase)
 
    [filtering.butterworth]
-   type = 'low'
    order = 4 
    cut_off_frequency = 6 # Hz
+   [filtering.kalman]
+   # How much more do you trust triangulation results (measurements), than previous data (process assuming constant acceleration)?
+   trust_ratio = 100 # = measurement_trust/process_trust ~= process_noise/measurement_noise
+   smooth = true # should be true, unless you need real-time filtering
    [filtering.butterworth_on_speed]
-   type = 'low'
    order = 4 
    cut_off_frequency = 10 # Hz
    [filtering.gaussian]

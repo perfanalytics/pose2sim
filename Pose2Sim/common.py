@@ -36,6 +36,7 @@ __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
+
 ## FUNCTIONS
 def computeP(calib_file):
     '''
@@ -251,6 +252,7 @@ def natural_sort(list):
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)] 
     
     return sorted(list, key=alphanum_key)
+
 
 ## CLASSES
 class plotWindow():

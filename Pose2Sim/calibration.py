@@ -41,6 +41,9 @@ from lxml import etree
 import warnings
 import matplotlib.pyplot as plt
 from mpl_interactions import zoom_factory, panhandler
+from PIL import Image
+from contextlib import contextmanager,redirect_stderr,redirect_stdout
+from os import devnull
 
 from Pose2Sim.common import RT_qca2cv, rotate_cam, quat2mat, euclidean_distance, natural_sort
 
@@ -57,6 +60,19 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+@contextmanager
+def suppress_stdout_stderr():
+    '''
+    A context manager that redirects stdout and stderr to devnull
+    Supresses error message from a compiled C/Fortran sub-function
+    (namely FFMPEG, called by OpenCV).
+    '''
+
+    with open(devnull, 'w') as fnull:
+        with redirect_stderr(fnull) as err, redirect_stdout(fnull) as out:
+            yield (err, out)
+
+
 def calib_qca_fun(file_to_convert_path, binning_factor=1):
     '''
     Convert a Qualisys .qca.txt calibration file
@@ -78,6 +94,7 @@ def calib_qca_fun(file_to_convert_path, binning_factor=1):
 
     '''
     
+    logging.info(f'Converting {file_to_convert_path} to .toml calibration file...')
     ret, C, S, D, K, R, T = read_qca(file_to_convert_path, binning_factor)
     
     RT = [RT_qca2cv(r,t) for r, t in zip(R, T)]
@@ -222,6 +239,7 @@ def calib_vicon_fun(file_to_convert_path, binning_factor=1):
 
     '''
    
+    logging.info(f'Converting {file_to_convert_path} to .toml calibration file...')
     ret, C, S, D, K, R, T = read_vicon(file_to_convert_path)
     
     RT = [RT_qca2cv(r,t) for r, t in zip(R, T)]
@@ -323,32 +341,44 @@ def calib_board_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
     - T: extrinsic translation: list of arrays of floats
     '''
     
-    ret, C, S, D, K, R, T = [], [], [], [], [], [], []
+    overwrite_intrinsics = intrinsics_config_dict.get('overwrite_intrinsics')
+    calculate_extrinsics = extrinsics_config_dict.get('calculate_extrinsics')
+
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
-    overwrite_intrinsics = extrinsics_config_dict.get('overwrite_intrinsics')
     try:
         calib_file = glob.glob(os.path.join(calib_dir, f'Calib*.toml'))[0]
     except:
         pass
     if not overwrite_intrinsics and 'calib_file' in locals():
-        logging.info(f'Preexisting intrinsics file found: {calib_file}. Retrieving intrinsics.')
+        logging.info(f'\nPreexisting calibration file found: \'{calib_file}\'.')
+        logging.info(f'\nRetrieving intrinsic parameters from file. Set "overwrite_intrinsics" to true in Config.toml to overwrite.')
         calib_file = glob.glob(os.path.join(calib_dir, f'Calib*.toml'))[0]
         calib_data = toml.load(calib_file)
-        K, D = [], []
+
+        ret, C, S, D, K, R, T = [], [], [], [], [], [], []
         for cam in calib_data:
             if cam != 'metadata':
-                K += calib_data[cam]['matrix']
-                D += calib_data[cam]['distortions']
+                ret += [0.0]
+                C += [calib_data[cam]['name']]
+                S += [calib_data[cam]['size']]
+                K += [np.array(calib_data[cam]['matrix'])]
+                D += [calib_data[cam]['distortions']]
+                R += [[0.0, 0.0, 0.0]]
+                T += [[0.0, 0.0, 0.0]]
     
     # calculate intrinsics otherwise
     else:
-        logging.info(f'Calculating intrinsics.')
-        K, D = calibrate_intrinsics(calib_dir, intrinsics_config_dict)
+        logging.info(f'\nCalculating intrinsic parameters...')
+        ret, C, S, D, K, R, T = calibrate_intrinsics(calib_dir, intrinsics_config_dict)
 
     # calculate extrinsics
-    calculate_extrinsic = extrinsics_config_dict.get('calculate_extrinsics')
-    if calculate_extrinsic:
-        R, T = calibrate_extrinsics(calib_dir, extrinsics_config_dict)
+    if calculate_extrinsics:
+        logging.info(f'\nCalculating extrinsic parameters...')
+        ret, C, S, D, K, R, T = calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D)
+    else:
+        logging.info(f'\nExtrinsic parameters won\'t be calculated. Set "calculate_extrinsics" to true in Config.toml to calculate them.')
+
+    return ret, C, S, D, K, R, T
 
 
 def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
@@ -369,15 +399,15 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
     try:
         intrinsics_cam_listdirs_names = next(os.walk(os.path.join(calib_dir, 'intrinsics')))[1]
     except StopIteration:
+        logging.exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
         raise Exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
-    intrinsics_board_type = intrinsics_config_dict.get('intrinsics_board_type')
     intrinsics_extension = intrinsics_config_dict.get('intrinsics_extension')
     extract_every_N_sec = intrinsics_config_dict.get('extract_every_N_sec')
     overwrite_extraction = False
     show_detection_intrinsics = intrinsics_config_dict.get('show_detection_intrinsics')
     intrinsics_corners_nb = intrinsics_config_dict.get('intrinsics_corners_nb')
     intrinsics_square_size = intrinsics_config_dict.get('intrinsics_square_size')
-    C, S, D, K, R, T = [], [], [], [], [], []
+    ret, C, S, D, K, R, T = [], [], [], [], [], [], []
 
     for i,cam in enumerate(intrinsics_cam_listdirs_names):
         # Prepare object points
@@ -390,6 +420,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
         logging.info(f'\nCamera {cam}:')
         img_vid_files = glob.glob(os.path.join(calib_dir, 'intrinsics', cam, f'*.{intrinsics_extension}'))
         if img_vid_files == []:
+            logging.exception(f'The folder {os.path.join(calib_dir, "intrinsics", cam)} does not exist or does not contain any files with extension .{intrinsics_extension}.')
             raise ValueError(f'The folder {os.path.join(calib_dir, "intrinsics", cam)} does not exist or does not contain any files with extension .{intrinsics_extension}.')
         img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
         # extract frames from video if video
@@ -398,6 +429,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
             cap = cv2.VideoCapture(img_vid_files[0])
             cap.read()
             if cap.read()[0] == False:
+                logging.exception('No video in the folder or wrong extension.')
                 raise ValueError('No video in the folder or wrong extension.')
             # extract frames from video
             extract_frames(img_vid_files[0], extract_every_N_sec, overwrite_extraction)
@@ -418,29 +450,26 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
                 if isinstance(imgp_confirmed, np.ndarray):
                     imgpoints.append(imgp_confirmed)
                     objpoints.append(objp)
-        if len(imgpoints) <= 10:
-            logging.info(f'Corners were detected only on {len(imgpoints)} images for camera {cam}. Calibration of intrinsic parameters may not be accurate with less than 20 good images of the board.')
+        if len(imgpoints) < 10:
+            logging.info(f'Corners were detected only on {len(imgpoints)} images for camera {cam}. Calibration of intrinsic parameters may not be accurate with less than 10 good images of the board.')
 
         # calculate intrinsics
         img = cv2.imread(str(img_path))
-        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
+        ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
                                     None, None, flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_PRINCIPAL_POINT))
         h, w = [np.float32(i) for i in img.shape[:-1]]
+        ret.append(ret_cam)
         C.append(f'cam_{str(i+1).zfill(2)}')   
         S.append([w, h])
         D.append(dist[0])
         K.append(mtx)
-        R.append([0,0,0])
-        T.append([0,0,0])
+        R.append([0.0, 0.0, 0.0])
+        T.append([0.0, 0.0, 0.0])
 
-    # Write calibration file with calculated intrinsic parameters and random extrinsicc parameters
-    calib_file = os.path.join(calib_dir, f'Calib_int{intrinsics_board_type}_extrandom.toml')
-    toml_write(calib_file, C, S, D, K, R, T)
-
-    return K, D
+    return ret, C, S, D, K, R, T
 
 
-def calibrate_extrinsics(calib_dir, extrinsics_config_dict):
+def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
     '''
     Calibrates extrinsic parameters
     from an image or the first frame of a video
@@ -458,222 +487,76 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict):
     try:
         extrinsics_cam_listdirs_names = next(os.walk(os.path.join(calib_dir, 'extrinsics')))[1]
     except StopIteration:
+        logging.exception(f'Error: No {os.path.join(calib_dir, "extrinsics")} folder found.')
         raise Exception(f'Error: No {os.path.join(calib_dir, "extrinsics")} folder found.')
     extrinsics_extension = extrinsics_config_dict.get('extrinsics_extension')
     extrinsics_board_type = extrinsics_config_dict.get('extrinsics_board_type')
     extrinsics_corners_nb = extrinsics_config_dict.get('extrinsics_corners_nb')
-    show_detection_extrinsics = True
+    extrinsics_square_size = extrinsics_config_dict.get('extrinsics_square_size')
+    object_coords_3d = np.array(extrinsics_config_dict.get('object_coords_3d'), np.float32)
+    show_reprojection_error = extrinsics_config_dict.get('show_reprojection_error')
 
-    for i,cam in enumerate(extrinsics_cam_listdirs_names):
+    ret, R, T = [], [], []
+    for i, cam in enumerate(extrinsics_cam_listdirs_names):
         logging.info(f'\nCamera {cam}:')
+        # Read images or video
         img_vid_files = glob.glob(os.path.join(calib_dir, 'extrinsics', cam, f'*.{extrinsics_extension}'))
         if img_vid_files == []:
+            logging.exception(f'The folder {os.path.join(calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
             raise ValueError(f'The folder {os.path.join(calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
         img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
+        img = cv2.imread(img_vid_files[0])
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-
+        # Find corners or label by hand
         if extrinsics_board_type == 'checkerboard':
-            # find corners
-            imgp = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=[], show_detection_intrinsics=show_detection_intrinsics=)
-            # CHANGE FINDCORNERS: 'O' for okay and next, 'D' for delete, 'C' for click
-            # DEFINE OBJECT POINTS
-            
-            # IF CORNERS NOT FOUND: RAISE ERROR: 'set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"'
-            
-            if isinstance(imgp, np.ndarray):
-                objpoints.append(objp)
-                imgpoints.append(imgp)
-            
-
-
+            imgp = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=[], show=show_reprojection_error)
+            if imgp == []:
+                logging.exception('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
+                raise ValueError('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
+            objp = np.zeros((extrinsics_corners_nb[0]*extrinsics_corners_nb[1],3), np.float32) 
+            objp[:,:2] = np.mgrid[0:extrinsics_corners_nb[0],0:extrinsics_corners_nb[1]].T.reshape(-1,2)
+            objp[:,:2] = objp[:,0:2]*extrinsics_square_size
 
         elif extrinsics_board_type == 'scene':
-            
-            
-            if len(objp) <= 10:
-                logging.info(f'Only {len(objp)} reference points for camera {cam}. Calibration of extrinsic parameters may not be accurate with less than 10 refeence points.')
+            imgp, objp = imgp_objp_visualizer_clicker(img, imgp=[], objp=object_coords_3d, img_path=img_vid_files[0])
+            if imgp == []:
+                logging.exception('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
+                raise ValueError('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
+            if len(objp) < 10:
+                logging.info(f'Only {len(objp)} reference points for camera {cam}. Calibration of extrinsic parameters may not be accurate with less than 10 reference points, as spread out as possible.')
 
+        # Calculate extrinsics
+        mtx, dist = np.array(K[i]), np.array(D[i])
+        _, r, t = cv2.solvePnP(objp, imgp, mtx, dist)
 
-    # try:
-    #     intrinsics_cam_listdirs_names = next(os.walk(os.path.join(calib_dir, 'intrinsics')))[1]
-    # except StopIteration:
-    #     raise Exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
-    # intrinsics_board_type = intrinsics_config_dict.get('intrinsics_board_type')
-    # intrinsics_extension = intrinsics_config_dict.get('intrinsics_extension')
-    # extract_every_N_sec = intrinsics_config_dict.get('extract_every_N_sec')
-    # overwrite_extraction=False
-    # show_detection_intrinsics = intrinsics_config_dict.get('show_detection_intrinsics')
-    # intrinsics_corners_nb = intrinsics_config_dict.get('intrinsics_corners_nb')
-    # intrinsics_square_size = intrinsics_config_dict.get('intrinsics_square_size')
-    # C, S, D, K, R, T = [], [], [], [], [], []
+        # Projection of object points to image plane
+        Kh_cam = np.block([mtx, np.zeros(3).reshape(3,1)])
+        r_mat, _ = cv2.Rodrigues(r)
+        H_cam = np.block([[r_mat,t.reshape(3,1)], [np.zeros(3), 1 ]])
+        P_cam = Kh_cam.dot(H_cam)
+        proj_obj = [ ( P_cam[0].dot(np.append(o, 1)) /  P_cam[2].dot(np.append(o, 1)),  P_cam[1].dot(np.append(o, 1)) /  P_cam[2].dot(np.append(o, 1)) ) for o in objp]
 
-    # for i,cam in enumerate(intrinsics_cam_listdirs_names):
-    #     # Prepare object points
-    #     objp = np.zeros((intrinsics_corners_nb[0]*intrinsics_corners_nb[1],3), np.float32) 
-    #     objp[:,:2] = np.mgrid[0:intrinsics_corners_nb[0],0:intrinsics_corners_nb[1]].T.reshape(-1,2)
-    #     objp[:,:2] = objp[:,0:2]*intrinsics_square_size
-    #     objpoints = [] # 3d points in world space
-    #     imgpoints = [] # 2d points in image plane
+        # Check calibration results
+        if show_reprojection_error:
+            img = cv2.imread(img_vid_files[0])
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            for o in proj_obj:
+                cv2.circle(img, (int(o[0]), int(o[1])), 8, (0,0,255), -1) 
+            for i in imgp:
+                cv2.drawMarker(img, (int(i[0][0]), int(i[0][1])), (0,255,0), cv2.MARKER_CROSS, 15, 2)
+            im_pil = Image.fromarray(img)
+            print(img_vid_files[0])
+            im_pil.show(title = img_vid_files[0])
 
-    #     print(f'\nCamera {cam}:')
-    #     img_vid_files = glob.glob(os.path.join(calib_dir, 'intrinsics', cam, f'*.{intrinsics_extension}'))
-    #     if img_vid_files == []:
-    #         raise ValueError(f'The folder {os.path.join(calib_dir, "intrinsics", cam)} does not exist or does not contain any files with extension .{intrinsics_extension}.')
-    #     img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
-    #     # extract frames from video if video
-    #     try:
-    #         # check if file is a video rather than an image
-    #         cap = cv2.VideoCapture(img_vid_files[0])
-    #         cap.read()
-    #         if cap.read()[0] == False:
-    #             raise ValueError('No video in the folder or wrong extension.')
-    #         ## extract frames from video
-    #         extract_frames(img_vid_files[0], extract_every_N_sec, overwrite_extraction)
-    #         img_vid_files = glob.glob(os.path.join(calib_dir, 'intrinsics', cam, f'*.png'))
-    #         img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)])
-    #     except:
-    #         pass
-
-    #     # find corners
-    #     for img_path in img_vid_files:
-    #         imgp = findCorners(img_path, intrinsics_corners_nb, show_detection_intrinsics)
-    #         if isinstance(imgp, np.ndarray):
-    #             objpoints.append(objp)
-    #             imgpoints.append(imgp)
-    #     if len(imgpoints) <= 10:
-    #         print(f'Corners were detected only on {len(imgpoints)} images for camera {cam}. Calibration of intrinsic parameters may not be accurate with less than 20 good images of the board.')
-
-    #     # calculate intrinsics
-    #     img = cv2.imread(str(img_path))
-    #     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
-    #                                 None, None, flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_PRINCIPAL_POINT))
-    #     h, w = [np.float32(i) for i in img.shape[:-1]]
-    #     C.append(f'cam_{str(i+1).zfill(2)}')   
-    #     S.append([w, h])
-    #     D.append(dist[0])
-    #     K.append(mtx)
-    #     R.append([0,0,0])
-    #     T.append([0,0,0])
-
-    # # Write calibration file with calculated intrinsic parameters and random extrinsicc parameters
-    # calib_file = os.path.join(calib_dir, f'Calib_int{intrinsics_board_type}_extrandom.toml')
-    # toml_write(calib_file, C, S, D, K, R, T)
-
-    # return K, D
-
-
-
-
-    project_dir = config.get('project').get('project_dir')
-    if project_dir == '': project_dir = os.getcwd()
-    calib_folder_name = config.get('project').get('calib_folder_name')
-    calib_dir = os.path.join(project_dir, calib_folder_name)
-    cam_listdirs_names = next(os.walk(calib_dir))[1]
-        
-    corners_nb = config.get('calibration').get('checkerboard').get('corners_nb')
-    square_size = config.get('calibration').get('checkerboard').get('square_size')
-    square_size = [square_size, square_size] if isinstance(square_size, int)==True else square_size
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001) # stop refining after 30 iterations or if error less than 0.001px
-
-    frame_for_origin = config.get('calibration').get('checkerboard').get('frame_for_origin')
-    show = config.get('calibration').get('checkerboard').get('show_corner_detection')
-    from_vid_or_img = config.get('calibration').get('checkerboard').get('from_vid_or_img')
-    vid_snapshot_every_N_frames = config.get('calibration').get('checkerboard').get('vid_snapshot_every_N_frames')
-    vid_extension = config.get('calibration').get('checkerboard').get('vid_extension')
-    img_extension = config.get('calibration').get('checkerboard').get('img_extension')
- 
-    ret, C, S, D, K, R, T = [], [], [], [], [], [], []
-    for cam in cam_listdirs_names:
-        print(f'\nCamera {cam}:')
-         # Prepare object points
-        objp = np.zeros((corners_nb[0]*corners_nb[1],3), np.float32) 
-        objp[:,:2] = np.mgrid[0:corners_nb[0],0:corners_nb[1]].T.reshape(-1,2)
-        objp[:,0] = objp[:,0]*square_size[0]
-        objp[:,1] = objp[:,1]*square_size[1]
-        objpoints = [] # 3d points in world space
-        imgpoints = [] # 2d points in image plane
-    
-        # Find corners in vid
-        # Try videocapture
-        if from_vid_or_img=='vid':
-            video = glob.glob(os.path.join(calib_dir, cam, '*.'+ vid_extension))[0]
-            cap = cv2.VideoCapture(video)
-            ret_vid, img = cap.read()
-            while ret_vid:
-                count = int(round(cap.get(1)))
-                ret_vid, img_vid = cap.read()
-                if count % vid_snapshot_every_N_frames == 0:
-                    img = img_vid
-                    imgp = findCorners(img, corners_nb, criteria, show)
-                    if isinstance(imgp, np.ndarray):
-                        objpoints.append(objp)
-                        imgpoints.append(imgp)
-            cap.release()
-
-        # Find corners in images
-        elif from_vid_or_img=='img':
-            images = glob.glob(os.path.join(calib_dir, cam, '*.'+ img_extension))
-            images_sorted = sorted(images, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
-            for image_f in images_sorted:
-                img = cv2.imread(image_f)
-                imgp = findCorners(img, corners_nb, criteria, show)
-                if isinstance(imgp, np.ndarray):
-                    objpoints.append(objp)
-                    imgpoints.append(imgp)
-
-        # Calibration
-        r, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
-                                        None, None, flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_PRINCIPAL_POINT))
-        h, w = [np.float32(i) for i in img.shape[:-1]]
-        print(ret, repr(mtx), repr(dist))
-        print(w,h)
-        
-        ret.append(r)
-        C.append(cam)
-        S.append([w, h])
-        D.append(dist[0])
-        K.append(mtx)
-        R.append(rvecs[frame_for_origin].squeeze())
-        T.append(tvecs[frame_for_origin].squeeze())
-
-    # Object view to camera view
-    RT = [rotate_cam(r, t, ang_x=np.pi, ang_y=0, ang_z=0) for r, t in zip(R, T)]
-    R = [rt[0] for rt in RT]
-    T = [rt[1] for rt in RT]
-    R = [np.array(cv2.Rodrigues(r)[0]).flatten() for r in R]
-    T = np.array(T)/1000
+        # Calculate reprojection error
+        imgp_to_objreproj_dist = [euclidean_distance(proj_obj[n], imgp[n]) for n in range(len(proj_obj))]
+        rms_px = np.sqrt(np.sum([d**2 for d in imgp_to_objreproj_dist]))
+        ret.append(rms_px)
+        R.append(r)
+        T.append(t)
 
     return ret, C, S, D, K, R, T
-
-
-def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False):
-    '''
-    Extract frames if don't exist yet or if overwrite==True
-    
-    INPUT:
-    - video_path: path to video whose frames need to be extracted
-    - extract_every_N_sec: extract one frame every N seconds (can be <1)
-    - overwrite_extraction: if True, overwrite even if frames have already been extracted
-    
-    OUTPUT:
-    - extracted frames in folder
-    '''
-    
-    if not os.path.exists(os.path.splitext(video_path)[0] + '_00000.png') or overwrite_extraction:
-        cap = cv2.VideoCapture(str(video_path))
-        if cap.isOpened():
-            fps = round(cap.get(cv2.CAP_PROP_FPS))
-            frame_nb = 0
-            logging.info(f'Extracting frames...')
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if ret == True:
-                    if frame_nb % (fps*extract_every_N_sec) == 0:
-                        img_path = (os.path.splitext(video_path)[0] + '_' +str(frame_nb).zfill(5)+'.png')
-                        cv2.imwrite(str(img_path), frame)
-                    frame_nb+=1
-                else:
-                    break
 
 
 def findCorners(img_path, corner_nb, objp=[], show=True):
@@ -706,8 +589,9 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
     try:
         img = cv2.imread(img_path)
     except:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with suppress_stdout_stderr():
+        # with warnings.catch_warnings():
+        #     warnings.simplefilter("ignore")
             cap = cv2.VideoCapture(img_path)
             ret, img = cap.read()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -739,18 +623,13 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
 
     # If corners are not found, dismiss or click points by hand
     else:
-        logging.info(f'{os.path.basename(img_path)}: Corners not found.')
+        logging.info(f'{os.path.basename(img_path)}: Corners not found. To label them by hand, set "show_detection_intrinsics" to true in the Config.toml file.')
         if show:
             # Visualizer and key press event handler
             imgp_objp_confirmed = imgp_objp_visualizer_clicker(img, imgp=[], objp=objp, img_path=img_path)
         else:
             imgp_objp_confirmed = []
-            
-    # if len(imgp_objp_confirmed) == 1:
-    #     imgp_confirmed = imgp_objp_confirmed
-    #     objp_confirmed = objp
-    # else:
-    #     imgp_confirmed, objp_confirmed = imgp_objp_confirmed
+
     return imgp_objp_confirmed
 
 
@@ -794,12 +673,16 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
             # If 'y', close all
             # If points have been clicked, imgp_confirmed is returned, else imgp
             # If objp is given, objp_confirmed is returned in addition
-            if 'scat' not in globals():
+            if 'scat' not in globals() or 'imgp_confirmed' not in globals():
                 imgp_confirmed = imgp
                 objp_confirmed = objp
             else:
-                imgp_confirmed = [imgp.astype('float32') for imgp in imgp_confirmed]
+                imgp_confirmed = np.array([imgp.astype('float32') for imgp in imgp_confirmed])
                 objp_confirmed = np.array(objp_confirmed)
+            # OpenCV needs at leas 4 correspondance points to calibrate
+            if len(imgp_confirmed) < 6:
+                objp_confirmed = []
+                imgp_confirmed = []
             # close all, del all global variables except imgp_confirmed and objp_confirmed
             plt.close('all')
             if len(objp) == 0:
@@ -810,8 +693,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
             # If 'n', close all and return nothing
             plt.close('all')
             imgp_confirmed = []
-            if len(objp) == 0:
-                objp_confirmed = []
+            objp_confirmed = []
 
         if event.key == 'c':
             # If 'c', allows retrieving imgp_confirmed by clicking them on the image
@@ -829,8 +711,11 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     ax_3d.scatter(xs,ys,zs, marker='.', color='k')
                     ax_3d.text(xs,ys,zs,  f'{str(i+1)}', size=10, zorder=1, color='k') 
                 set_axes_equal(ax_3d)
+                ax_3d.set_xlabel('X')
+                ax_3d.set_ylabel('Y')
+                ax_3d.set_zlabel('Z')
                 if np.all(objp[:,2] == 0):
-                    ax_3d.view_init(elev=90, azim=-90)
+                    ax_3d.view_init(elev=-90, azim=0)
                 fig_3d.show()
 
         if event.key == 'h':
@@ -846,7 +731,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     fig_3d.canvas.draw()
                 elif count == len(objp)-1:
                     # if all objp have been clicked or indicated as not visible, close all
-                    imgp_confirmed = [imgp.astype('float32') for imgp in imgp_confirmed]
+                    imgp_confirmed = np.array(imgp)
                     plt.close('all')
                     for var_to_delete in ['events', 'count', 'scat', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
                         if var_to_delete in globals():
@@ -895,8 +780,8 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     fig_3d.canvas.draw()
                 elif count == len(objp)-1:
                     # retrieve objp_confirmed
-                    objp_confirmed = [[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0]
-                    imgp_confirmed = [imgp.astype('float32') for imgp in imgp_confirmed]
+                    objp_confirmed = np.array([[objp[count].tolist()] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])
+                    imgp_confirmed = np.array(imgp_confirmed)
                     # close all, delete all
                     plt.close('all')
                     for var_to_delete in ['events', 'count', 'scat', 'scat_3d', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
@@ -913,44 +798,45 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
         # If last event was 'H' and objp given, remove last point from objp_confirmed_notok
         elif event.button == 3: # right click
             # If last event was left click: 
-            if 'button' in dir(events[-1]):
-                if events[-1].button == 1: 
-                    # Remove lastpoint from image
-                    new_xydata = scat.get_offsets()[:-1]
-                    scat.set_offsets(new_xydata)
-                    plt.draw()
-                    # Remove last point from imgp_confirmed
-                    imgp_confirmed = imgp_confirmed[:-1]
+            if 'events' in globals():
+                if 'button' in dir(events[-1]):
+                    if events[-1].button == 1: 
+                        # Remove lastpoint from image
+                        new_xydata = scat.get_offsets()[:-1]
+                        scat.set_offsets(new_xydata)
+                        plt.draw()
+                        # Remove last point from imgp_confirmed
+                        imgp_confirmed = imgp_confirmed[:-1]
+                        if len(objp) != 0:
+                            if count >= 1: count -= 1
+                            # Remove last point from objp_confirmed
+                            objp_confirmed = objp_confirmed[:-1]
+                            # remove from plot 
+                            if len(ax_3d.collections) > len(objp):
+                                ax_3d.collections[-1].remove()
+                                fig_3d.canvas.draw()
+                            
+                # If last event was 'h' key
+                elif events[-1].key == 'h':
                     if len(objp) != 0:
                         if count >= 1: count -= 1
-                        # Remove last point from objp_confirmed
-                        objp_confirmed = objp_confirmed[:-1]
-                        # remove from plot 
+                        # Remove last point from objp_confirmed_notok
+                        objp_confirmed_notok = objp_confirmed_notok[:-1]
+                        # remove from plot  
                         if len(ax_3d.collections) > len(objp):
                             ax_3d.collections[-1].remove()
-                            fig_3d.canvas.draw()
-                        
-            # If last event was 'h' key
-            elif events[-1].key == 'h':
-                if len(objp) != 0:
-                    if count >= 1: count -= 1
-                    # Remove last point from objp_confirmed_notok
-                    objp_confirmed_notok = objp_confirmed_notok[:-1]
-                    # remove from plot  
-                    if len(ax_3d.collections) > len(objp):
-                        ax_3d.collections[-1].remove()
-                        fig_3d.canvas.draw()                
+                            fig_3d.canvas.draw()                
     
 
     def set_axes_equal(ax):
-        """
+        '''
         Make axes of 3D plot have equal scale so that spheres appear as spheres,
         cubes as cubes, etc.
         From https://stackoverflow.com/questions/13685386/how-to-set-the-equal-aspect-ratio-for-all-axes-x-y-z
 
         Input
         ax: a matplotlib axis, e.g., as output from plt.gca().
-        """
+        '''
 
         x_limits = ax.get_xlim3d()
         y_limits = ax.get_ylim3d()
@@ -1033,6 +919,37 @@ def calib_points_fun(config):
     pass
 
 
+def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False):
+    '''
+    Extract frames from video 
+    if has not been done yet or if overwrite==True
+    
+    INPUT:
+    - video_path: path to video whose frames need to be extracted
+    - extract_every_N_sec: extract one frame every N seconds (can be <1)
+    - overwrite_extraction: if True, overwrite even if frames have already been extracted
+    
+    OUTPUT:
+    - extracted frames in folder
+    '''
+    
+    if not os.path.exists(os.path.splitext(video_path)[0] + '_00000.png') or overwrite_extraction:
+        cap = cv2.VideoCapture(str(video_path))
+        if cap.isOpened():
+            fps = round(cap.get(cv2.CAP_PROP_FPS))
+            frame_nb = 0
+            logging.info(f'Extracting frames...')
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if ret == True:
+                    if frame_nb % (fps*extract_every_N_sec) == 0:
+                        img_path = (os.path.splitext(video_path)[0] + '_' +str(frame_nb).zfill(5)+'.png')
+                        cv2.imwrite(str(img_path), frame)
+                    frame_nb+=1
+                else:
+                    break
+
+
 def toml_write(calib_path, C, S, D, K, R, T):
     '''
     Writes calibration parameters to a .toml file
@@ -1052,7 +969,7 @@ def toml_write(calib_path, C, S, D, K, R, T):
 
     with open(os.path.join(calib_path), 'w+') as cal_f:
         for c in range(len(C)):
-            cam=f'[cam_{c+1}]\n'
+            cam=f'[cam_{(c+1):02d}]\n'
             name = f'name = "{C[c]}"\n'
             size = f'size = [ {S[c][0]}, {S[c][1]}]\n' 
             mat = f'matrix = [ [ {K[c][0,0]}, 0.0, {K[c][0,2]}], [ 0.0, {K[c][1,1]}, {K[c][1,2]}], [ 0.0, 0.0, 1.0]]\n'
@@ -1080,14 +997,15 @@ def recap_calibrate(ret, calib_path, calib_full_type):
         if cam != 'metadata':
             f_px = calib[cam]['matrix'][0][0]
             Dm = euclidean_distance(calib[cam]['translation'], [0,0,0])
+            print(ret[c])
             if calib_full_type=='convert_qualisys' or calib_full_type=='convert_vicon':
-                ret_m.append( np.around(ret[c], decimals=3) )
-                ret_px.append( np.around(ret[c] / (Dm*1000) * f_px, decimals=3) )
+                ret_m.append( np.around(ret[c]*1000, decimals=3) )
+                ret_px.append( np.around(ret[c] / Dm * f_px, decimals=3) )
             elif calib_full_type=='calculate_board':
                 ret_px.append( np.around(ret[c], decimals=3) )
-                ret_m.append( np.around(ret[c]*(Dm*1000) / f_px, decimals=3) )
+                ret_m.append( np.around(ret[c]*Dm / f_px, decimals=3) )
 
-    logging.info(f'\n--> Residual (RMS) calibration errors for each camera are respectively {ret_px} px, \nwhich corresponds to {ret_m} mm.\n')
+    logging.info(f'\n--> Residual (RMS) calibration errors for each camera are respectively {ret_px} px, \nwhich corresponds to {ret_m} m.\n')
     logging.info(f'Calibration file is stored at {calib_path}.')
 
 
@@ -1118,11 +1036,10 @@ def calibrate_cams_all(config):
             convert_ext = '.qca.txt'
             binning_factor = config.get('calibration').get('convert').get('qualisys').get('binning_factor')
         elif convert_filetype=='optitrack':
-            print('See Readme.md to retrieve calibration values.')
+            logging.info('See Readme.md to retrieve Optitrack calibration values.')
         elif convert_filetype=='vicon':
             convert_ext = '.xcp'
             binning_factor = 1
-            print('Not supported yet')
 
         file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
         calib_output_path = os.path.join(calib_dir, f'Calib_{convert_filetype}.toml')
@@ -1143,13 +1060,13 @@ def calibrate_cams_all(config):
             args_calib_fun = [calib_dir, intrinsics_config_dict, extrinsics_config_dict]
 
         elif calculate_method=='points':
-            print('Not supported yet')
+            logging.info('Calibration from wand or from keypoint detection not supported yet. See Readme.md if you want to contribute.')
 
         else:
-            print('Wrong calculate_method in Config.toml')
+            logging.info('Wrong calculate_method in Config.toml')
 
     else:
-        print('Wrong calibration_type in Config.toml')
+        logging.info('Wrong calibration_type in Config.toml')
     
     # Map calib function
     calib_mapping = {
@@ -1166,6 +1083,6 @@ def calibrate_cams_all(config):
 
     # Write calibration file
     toml_write(calib_output_path, C, S, D, K, R, T)
-
+    
     # Recap message
     recap_calibrate(ret, calib_output_path, calib_full_type)

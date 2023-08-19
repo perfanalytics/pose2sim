@@ -45,9 +45,9 @@ If you can only use a single camera and don't mind losing some accuracy, please 
       2. [Calculate from scratch](#calculate-from-scratch)
    4. [Camera synchronization](#camera-synchronization)
    5. [Tracking, Triangulating, Filtering](#tracking-triangulating-filtering)
-      1. [Tracking the person of interest](#tracking-the-person-of-interest)
+      1. [Associate persons across cameras](#associate-persons-across-cameras)
       2. [Triangulating keypoints](#triangulating-keypoints)
-      3. [Filtering 3D coordinates](#filtering-3D-coordinates)
+      3. [Filtering 3D coordinates](#filtering-3d-coordinates)
    6. [OpenSim kinematics](#opensim-kinematics)
 3. [Utilities](#utilities)
 4. [How to cite and how to contribute](#how-to-cite-and-how-to-contribute)
@@ -234,7 +234,8 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 </details>
 
 ## Camera calibration
-> _**Convert a preexisting calibration file, or calculate calibration parameters from scratch.**_ 
+> _**Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ \
+> _**N.B.:**_ You can visualize your resulting camera calibration with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
 ### Convert from Qualisys, Optitrack, or Vicon
       
@@ -416,7 +417,8 @@ Output:\
    
 
 ### Triangulating keypoints
-> _**Triangulate your 2D coordinates in a robust way.**_
+> _**Triangulate your 2D coordinates in a robust way.**_ \
+> _**N.B.:**_ You can visualize your resulting 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
 Open an Anaconda prompt or a terminal, type `ipython`.\
 By default, `triangulation()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.triangulation(r'path_to_config.toml')`.
@@ -480,7 +482,8 @@ Output:\
 
 
 ### Filtering 3D coordinates
-> _**Filter your 3D coordinates.**_
+> _**Filter your 3D coordinates.**_\
+> _**N.B.:**_ You can visualize your resulting filtered 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
 Open an Anaconda prompt or a terminal, type `ipython`.\
 By default, `filtering()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.filtering(r'path_to_config.toml')`.
@@ -781,10 +784,11 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 </br>
 
 > - [x] **Triangulation:** Triangulation weighted with confidence.
-> - [x] **Triangulation:** Set likelihood threshold below which a camera should not be used, reprojection error threshold, and set minimum number of cameras allowed for triangulating a point.
-> - [x] **Triangulation:** Show mean reprojection error in px and in mm for each point.
+> - [x] **Triangulation:** Set a likelihood threshold below which a camera should not be used, a reprojection error threshold, and a minimum number of remaining cameras below which triangulation is skipped for this frame.
+> - [x] **Triangulation:** Show mean reprojection error in px and in mm for each keypoint.
+> - [x] **Triangulation:** Show how many cameras on average had to be excluded for each keypoint.
 > - [x] **Triangulation:** Evaluate which cameras were the least reliable.
-> - [x] **Triangulation:** Show which frames had to be interpolated for each point.
+> - [x] **Triangulation:** Show which frames had to be interpolated for each keypoint.
 > - [ ] **Triangulation:** [Undistort](https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c) 2D points before triangulating (and [distort](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301) them before computing reprojection error).
 > - [ ] **Triangulation:** Multiple person kinematics (output multiple .trc coordinates files). Triangulate all persons with reprojection error above threshold, and identify them by minimizing their displacement across frames.
 > - [ ] **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).

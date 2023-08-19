@@ -33,6 +33,8 @@ import logging
 from scipy import signal
 from scipy.ndimage import gaussian_filter1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
+from filterpy.kalman import KalmanFilter, rts_smoother
+from filterpy.common import Q_discrete_white_noise
 
 from Pose2Sim.common import plotWindow
 
@@ -48,6 +50,128 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def kalman_filter(coords, frame_rate, measurement_noise, process_noise, nb_dimensions=3, nb_derivatives=3, smooth=True):
+    '''
+    Filters coordinates with a Kalman filter or a Kalman smoother
+    
+    INPUTS:
+    - coords: array of shape (nframes, ndims)
+    - frame_rate: integer
+    - measurement_noise: integer
+    - process_noise: integer
+    - nb_dimensions: integer, number of dimensions (3 if 3D coordinates)
+    - nb_derivatives: integer, number of derivatives (3 if constant acceleration model)
+    - smooth: boolean. True if souble pass (recommended), False if single pass (if real-time)
+    
+    OUTPUTS:
+    - kpt_coords_filt: filtered coords
+    '''
+
+    # Variables
+    dim_x = nb_dimensions * nb_derivatives # 9 state variables 
+    dt = 1/frame_rate
+    
+    # Filter definition
+    f = KalmanFilter(dim_x=dim_x, dim_z=nb_dimensions)
+
+    # States: initial position, velocity, accel, in 3D
+    def derivate_array(arr, dt=1):
+        return np.diff(arr, axis=0)/dt
+    def repeat(func, arg_func, nb_reps):
+        for i in range(nb_reps):
+            arg_func = func(arg_func)
+        return arg_func
+    x_init = []
+    for n_der in range(nb_derivatives):
+        x_init += [repeat(derivate_array, coords, n_der)[0]] # pose*3D, vel*3D, accel*3D
+    f.x = np.array(x_init).reshape(nb_dimensions,nb_derivatives).T.flatten() # pose, vel, accel *3D
+    
+    # State transition matrix
+    F_per_coord = np.zeros((int(dim_x/nb_dimensions), int(dim_x/nb_dimensions)))
+    for i in range(nb_derivatives):
+        for j in range(min(i+1, nb_derivatives)):
+            F_per_coord[j,i] = dt**(i-j) / np.math.factorial(i - j)
+    f.F = np.kron(np.eye(nb_dimensions),F_per_coord) 
+    # F_per_coord= [[1, dt, dt**2/2], 
+                 # [ 0, 1,  dt     ],
+                 # [ 0, 0,  1      ]])
+
+    # No control input
+    f.B = None 
+
+    # Measurement matrix (only positions)
+    H = np.zeros((nb_dimensions, dim_x)) 
+    for i in range(min(nb_dimensions,dim_x)):
+        H[i, int(i*(dim_x/nb_dimensions))] = 1
+    f.H = H
+    # H = [[1., 0., 0., 0., 0., 0., 0., 0., 0.],
+        # [0., 0., 0., 1., 0., 0., 0., 0., 0.],
+        # [0., 0., 0., 0., 0., 0., 1., 0., 0.]]
+
+    # Covariance matrix
+    f.P *= measurement_noise 
+
+    # Measurement noise
+    f.R = np.diag([measurement_noise**2]*nb_dimensions) 
+
+    # Process noise
+    f.Q = Q_discrete_white_noise(nb_derivatives, dt=dt, var=process_noise**2, block_size=nb_dimensions) 
+
+    # Run filter: predict and update for each frame
+    mu, cov, _, _ = f.batch_filter(coords) # equivalent to below
+    # mu = []
+    # for kpt_coord_frame in coords:
+        # f.predict()
+        # f.update(kpt_coord_frame)
+        # mu.append(f.x.copy())
+    ind_of_position = [int(d*(dim_x/nb_dimensions)) for d in range(nb_dimensions)]
+    coords_filt = np.array(mu)[:,ind_of_position]
+
+    # RTS smoother
+    if smooth == True:
+        mu2, P, C, _ = f.rts_smoother(mu, cov)
+        coords_filt = np.array(mu2)[:,ind_of_position]
+
+    return coords_filt
+
+
+def kalman_filter_1d(config, col):
+    '''
+    1D Kalman filter
+    Deals with nans
+    
+    INPUT:
+    - col: Pandas dataframe column
+    - trustratio: int, ratio process_noise/measurement_noise
+    - framerate: int
+    - smooth: boolean, True if double pass (recommended), False if single pass (if real-time)
+
+    OUTPUT:
+    - col_filtered: Filtered pandas dataframe column
+    '''
+
+    trustratio = int(config.get('3d-filtering').get('kalman').get('trust_ratio'))
+    smooth = int(config.get('3d-filtering').get('kalman').get('smooth'))
+    framerate = config.get('project').get('frame_rate')
+    measurement_noise = 20
+    process_noise = measurement_noise * trustratio
+
+    # split into sequences of not nans
+    col_filtered = col.copy()
+    mask = np.isnan(col_filtered)  | col_filtered.eq(0)
+    falsemask_indices = np.where(~mask)[0]
+    gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
+    idx_sequences = np.split(falsemask_indices, gaps)
+    if idx_sequences[0].size > 0:
+        idx_sequences_to_filter = [seq for seq in idx_sequences]
+    
+        # Filter each of the selected sequences
+        for seq_f in idx_sequences_to_filter:
+            col_filtered[seq_f] = kalman_filter(col_filtered[seq_f], framerate, measurement_noise, process_noise, nb_dimensions=1, nb_derivatives=3, smooth=smooth).flatten()
+
+    return col_filtered
+
+
 def butterworth_filter_1d(config, col):
     '''
     1D Zero-phase Butterworth filter (dual pass)
@@ -59,16 +183,16 @@ def butterworth_filter_1d(config, col):
     - cutoff: int
     - framerate: int
 
-    OUTPUT
+    OUTPUT:
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    type = config.get('3d-filtering').get('butterworth').get('type')
+    type = 'low' #config.get('3d-filtering').get('butterworth').get('type')
     order = int(config.get('3d-filtering').get('butterworth').get('order'))
     cutoff = int(config.get('3d-filtering').get('butterworth').get('cut_off_frequency'))    
     framerate = config.get('project').get('frame_rate')
 
-    b, a = signal.butter(order/2, cutoff/(framerate/2), 'low', analog = False) 
+    b, a = signal.butter(order/2, cutoff/(framerate/2), type, analog = False) 
     padlen = 3 * max(len(a), len(b))
     
     # split into sequences of not nans
@@ -95,11 +219,11 @@ def butterworth_on_speed_filter_1d(config, col):
     - col: Pandas dataframe column
     - frame rate, order, cut-off frequency, type (from Config.toml)
 
-    OUTPUT
+    OUTPUT:
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    type = config.get('3d-filtering').get('butterworth_on_speed').get('type')
+    type = 'low' # config.get('3d-filtering').get('butterworth_on_speed').get('type')
     order = int(config.get('3d-filtering').get('butterworth_on_speed').get('order'))
     cutoff = int(config.get('3d-filtering').get('butterworth_on_speed').get('cut_off_frequency'))
     framerate = config.get('project').get('frame_rate')
@@ -136,7 +260,7 @@ def gaussian_filter_1d(config, col):
     - col: Pandas dataframe column
     - gaussian_filter_sigma_kernel: kernel size from Config.toml
 
-    OUTPUT
+    OUTPUT:
     - col_filtered: Filtered pandas dataframe column
     '''
 
@@ -156,7 +280,7 @@ def loess_filter_1d(config, col):
     - loess_filter_nb_values: window used for smoothing from Config.toml
     frac = loess_filter_nb_values * frames_number
 
-    OUTPUT
+    OUTPUT:
     - col_filtered: Filtered pandas dataframe column
     '''
 
@@ -185,7 +309,7 @@ def median_filter_1d(config, col):
     - col: Pandas dataframe column
     - median_filter_kernel_size: kernel size from Config.toml
     
-    OUTPUT
+    OUTPUT:
     - col_filtered: Filtered pandas dataframe column
     '''
     
@@ -248,12 +372,13 @@ def filter1d(col, config, filter_type):
     - col: Pandas dataframe column
     - filter_type: filter type from Config.toml
     
-    OUTPUT
+    OUTPUT:
     - col_filtered: Filtered pandas dataframe column
     '''
 
     # Choose filter
     filter_mapping = {
+        'kalman': kalman_filter_1d,
         'butterworth': butterworth_filter_1d, 
         'butterworth_on_speed': butterworth_on_speed_filter_1d, 
         'gaussian': gaussian_filter_1d, 
@@ -278,10 +403,13 @@ def recap_filter3d(config, trc_path):
 
     # Read Config
     filter_type = config.get('3d-filtering').get('type')
-    butterworth_filter_type = config.get('3d-filtering').get('butterworth').get('type')
+    kalman_filter_trustratio = int(config.get('3d-filtering').get('kalman').get('trust_ratio'))
+    kalman_filter_smooth = int(config.get('3d-filtering').get('kalman').get('smooth'))
+    kalman_filter_smooth_str = 'smoother' if kalman_filter_smooth else 'filter'
+    butterworth_filter_type = 'low' # config.get('3d-filtering').get('butterworth').get('type')
     butterworth_filter_order = int(config.get('3d-filtering').get('butterworth').get('order'))
     butterworth_filter_cutoff = int(config.get('3d-filtering').get('butterworth').get('cut_off_frequency'))
-    butter_speed_filter_type = config.get('3d-filtering').get('butterworth_on_speed').get('type')
+    butter_speed_filter_type = 'low' # config.get('3d-filtering').get('butterworth_on_speed').get('type')
     butter_speed_filter_order = int(config.get('3d-filtering').get('butterworth_on_speed').get('order'))
     butter_speed_filter_cutoff = int(config.get('3d-filtering').get('butterworth_on_speed').get('cut_off_frequency'))
     gaussian_filter_sigma_kernel = int(config.get('3d-filtering').get('gaussian').get('sigma_kernel'))
@@ -290,6 +418,7 @@ def recap_filter3d(config, trc_path):
 
     # Recap
     filter_mapping_recap = {
+        'kalman': f'--> Filter type: Kalman {kalman_filter_smooth_str}. Measurements trusted {kalman_filter_trustratio} times as much as previous data, assuming a constant acceleration process.', 
         'butterworth': f'--> Filter type: Butterworth {butterworth_filter_type}-pass. Order {butterworth_filter_order}, Cut-off frequency {butterworth_filter_cutoff} Hz.', 
         'butterworth_on_speed': f'--> Filter type: Butterworth on speed {butter_speed_filter_type}-pass. Order {butter_speed_filter_order}, Cut-off frequency {butter_speed_filter_cutoff} Hz.', 
         'gaussian': f'--> Filter type: Gaussian. Standard deviation kernel: {gaussian_filter_sigma_kernel}', 
@@ -316,10 +445,10 @@ def filter_all(config):
     # Read config
     project_dir = config.get('project').get('project_dir')
     if project_dir == '': project_dir = os.getcwd()
-    pose_tracked_folder_name = config.get('project').get('poseTracked_folder_name')
+    pose_tracked_folder_name = config.get('project').get('poseAssociated_folder_name')
     pose_folder_name = config.get('project').get('pose_folder_name')
     try:
-        pose_tracked_dir = os.path.join(project_dir, pose_folder_name)
+        pose_tracked_dir = os.path.join(project_dir, pose_tracked_folder_name)
         os.path.isdir(pose_tracked_dir)
         pose_dir = pose_tracked_dir
     except:
@@ -329,8 +458,8 @@ def filter_all(config):
     seq_name = os.path.basename(project_dir)
     pose3d_folder_name = config.get('project').get('pose3d_folder_name')
     pose3d_dir = os.path.join(project_dir, pose3d_folder_name)
-    display_figures = config.get('3d-filtering').get('display_figures')
-    filter_type = config.get('3d-filtering').get('type')
+    display_figures = config.get('filtering').get('display_figures')
+    filter_type = config.get('filtering').get('type')
 
     # Frames range
     pose_listdirs_names = next(os.walk(pose_dir))[1]

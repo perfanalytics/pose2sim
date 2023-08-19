@@ -28,10 +28,13 @@
     # - conda install Pose2Sim
 
     Usage: 
+    # First run Pose estimation and organize your directories (see Readme.md)
     from Pose2Sim import Pose2Sim
-    Pose2Sim.track2D()
-    Pose2Sim.triangulate3D()
-    Pose2Sim.filter3D()
+    Pose2Sim.calibration()
+    Pose2Sim.personAssociation()
+    Pose2Sim.triangulation()
+    Pose2Sim.filtering()
+    # Then run OpenSim (see Readme.md)
     
 '''
 
@@ -75,6 +78,7 @@ def base_params(config_dict):
     seq_name = os.path.basename(project_dir)
     frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
+    if not os.path.exists('User'): os.mkdir('User')
     with open(os.path.join(project_dir, 'User', 'logs.txt'), 'a+') as log_f: pass
     logging.basicConfig(format='%(message)s', level=logging.INFO, 
         handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(project_dir, 'User', 'logs.txt'), when='D', interval=7), logging.StreamHandler()])

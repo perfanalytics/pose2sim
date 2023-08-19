@@ -44,10 +44,6 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
-'''
-SKELETONS
-'''
-
 '''CUSTOM SKELETON (e.g., from DeepLabCut detection)'''
 CUSTOM = Node("Root", id=0, children=[
     Node("Child1", id=1),
