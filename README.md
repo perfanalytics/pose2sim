@@ -234,7 +234,7 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 </details>
 
 ## Camera calibration
-> _**Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ 
+> _**Convert a preexisting calibration file, or calculate calibration parameters from scratch.**_ 
 
 ### Convert from Qualisys, Optitrack, or Vicon
       
@@ -251,14 +251,15 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 ### Calculate from scratch
 
-> *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` instead of `convert` in `Config.toml`.\
-Then try changing `extrinsics_board_type` from `checkerboard` to `scene`.
+> Calculate calibration parameters with a board, or with points (such as detected on a wand or a human body).
 
 - **With a board:**
+  > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` instead of `convert` in `Config.toml`.\
+  
   - **Calculate intrinsic parameters:**
 
-    > *N.B.:* _Intrinsic parameters:_ camera properties (focal length, optical center, distortion), usually need to be calculated only once in their lifetime\
-    > *N.B.:* If you already calculated intrinsic parameters earlier, you can skip this step. Copy your intrinsic parameters (`size`, `mat`, and `dist`) in a new `Calib*.toml` file, and set `overwrite_intrinsics` to false. Run Demo to obtain an example Calib.toml file.
+    > *N.B.:* _Intrinsic parameters:_ camera properties (focal length, optical center, distortion), usually need to be calculated only once in their lifetime. In theory, cameras with same model and same settings will have identical intrinsic parameters.\
+    > *N.B.:* If you already calculated intrinsic parameters earlier, you can skip this step. Copy your intrinsic parameters (`size`, `mat`, and `dist`) in a new `Calib*.toml` file, and set `overwrite_intrinsics` to false. Run Demo to obtain an example `Calib.toml` file.
 
     - Create a folder for each camera in your `calibration\intrinsics` folder.
     - For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
@@ -269,7 +270,7 @@ Then try changing `extrinsics_board_type` from `checkerboard` to `scene`.
         
   - **Calculate extrinsic parameters:** 
 
-    > *N.B.:* _Extrinsic parameters:_ camera placement in space (position and orientation), need to be calculated every time a camera is moved
+    > *N.B.:* _Extrinsic parameters:_ camera placement in space (position and orientation), need to be calculated every time a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates.
 
     - Create a folder for each camera in your `calibration\extrinsics` folder.
     - Once your cameras are in place, shortly film a board laid on the floor or the raw scene \
@@ -793,7 +794,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 </br>
 
 > - [x] **Filtering:** Available filtering methods: Butterworth, Butterworth on speed, Gaussian, Median, LOESS (polynomial smoothing).
-> - [ ] **Filtering:** Add Kalman smoothing filter.
+> - [x] **Filtering:** Implement Kalman filter and Kalman smoother.
 
 </br>
 
