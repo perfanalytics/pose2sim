@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint on several OS with a several versions of Python
 # See: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Build on Win-MacOS-Ubuntu with Python 3.7-3.10
+name: Build on Win-MacOS-Ubuntu with Python 3.7-3.11
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: [3.7, 3.8, 3.9, "3.10"]
+        python-version: [3.7, 3.8, 3.9, "3.10", "3.11"]
         include:
           - os: ubuntu-latest
             path: ~/.cache/pip
