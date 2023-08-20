@@ -98,7 +98,7 @@ You should obtain a plot of all the 3D coordinates trajectories. You can check t
 Results are stored as .trc files in the `Demo/pose-3d` directory.
 
 *N.B.:* Default parameters have been provided in `Demo\Users\Config.toml` but can be edited.\
-**Try calibration tool by changing `calibration_type` to `calculate` instead of `convert` (more info [there](#calculate-from-scratch)).**
+*N.B.:* *Try calibration tool by changing `calibration_type` to `calculate` instead of `convert` (more info [there](#calculate-from-scratch)).*
 <br/>
 
 ## Demonstration Part-2: Obtain 3D joint angles with OpenSim  
@@ -256,6 +256,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 - **With a board:**
   > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` instead of `convert` in `Config.toml`.\
+  For the sake of practicality, there are voluntarily few images for intrinsics, and few clicked points for extrinsics. *You should use more of them.* In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm).
   
   - **Calculate intrinsic parameters:**
 

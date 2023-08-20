@@ -5,7 +5,7 @@
 # Configure your project parameters here
 
 [project]
-project_dir = 'D:\softs\github_david\pose2sim\Pose2Sim\Demo' # BETWEEN SINGLE QUOTES! # If empty, project dir is current dir
+project_dir = '' # BETWEEN SINGLE QUOTES! # If empty, project dir is current dir
 frame_range = [] #For example [10,300], or [] for all frames
 frame_rate = 60 #Hz
 
@@ -26,7 +26,7 @@ pose_model = 'BODY_25B' #CUSTOM, BODY_25B, BODY_25, BODY_135, BLAZEPOSE, HALPE_2
 
 
 [calibration]
-calibration_type = 'calculate' # 'convert' or 'calculate'
+calibration_type = 'convert' # 'convert' or 'calculate'
 
    [calibration.convert]
    convert_from = 'qualisys' # 'qualisys', 'optitrack', or 'vicon'
@@ -41,10 +41,9 @@ calibration_type = 'calculate' # 'convert' or 'calculate'
       intrinsics_board_type = 'checkerboard' # 'checkerboard' ('charucoboard' not supported yet)
       overwrite_intrinsics = false # overwrite (or not) if they have already been calculated?
       show_detection_intrinsics = true # true or false (lowercase)
-
       intrinsics_extension = 'jpg' # any video or image extension
-      extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
 
+      extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
       intrinsics_corners_nb = [4,7] 
       intrinsics_square_size = 60 # mm
       intrinsics_marker_size = 40 # mm # only checked if charucoboard
@@ -56,7 +55,6 @@ calibration_type = 'calculate' # 'convert' or 'calculate'
       # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out
       calculate_extrinsics = true # true or false (lowercase)
       show_reprojection_error = true # true or false (lowercase)
-      
       extrinsics_extension = 'png' # any video or image extension
       
       # if extrinsics_board_type = 'checkerboard' or 'charucoboard'
@@ -87,7 +85,8 @@ likelihood_threshold = 0.3
 min_cameras_for_triangulation = 2
 interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
 # 'none' if you don't want to interpolate missing points
-show_interp_indices = false # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
+interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
+show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 
 
 [filtering]

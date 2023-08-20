@@ -136,7 +136,7 @@ def read_qca(qca_path, binning_factor):
     
     # Camera name
     for i, tag in enumerate(root.findall('cameras/camera')):
-        ret += [float(tag.attrib.get('avg-residual'))/1000]
+        ret += [float(tag.attrib.get('avg-residual'))]
         C += [tag.attrib.get('serial')]
         if tag.attrib.get('model') in ('Miqus Video', 'Miqus Video UnderWater', 'none'):
             vid_id += [i]
@@ -423,15 +423,13 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
             logging.exception(f'The folder {os.path.join(calib_dir, "intrinsics", cam)} does not exist or does not contain any files with extension .{intrinsics_extension}.')
             raise ValueError(f'The folder {os.path.join(calib_dir, "intrinsics", cam)} does not exist or does not contain any files with extension .{intrinsics_extension}.')
         img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
+        
         # extract frames from video if video
         try:
-            # check if file is a video rather than an image
             cap = cv2.VideoCapture(img_vid_files[0])
             cap.read()
             if cap.read()[0] == False:
-                logging.exception('No video in the folder or wrong extension.')
-                raise ValueError('No video in the folder or wrong extension.')
-            # extract frames from video
+                raise
             extract_frames(img_vid_files[0], extract_every_N_sec, overwrite_extraction)
             img_vid_files = glob.glob(os.path.join(calib_dir, 'intrinsics', cam, f'*.png'))
             img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)])
@@ -442,16 +440,18 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
         for img_path in img_vid_files:
             if show_detection_intrinsics == True:
                 imgp_confirmed, objp_confirmed = findCorners(img_path, intrinsics_corners_nb, objp=objp, show=show_detection_intrinsics)
+                print(len(imgp_confirmed), len(objp_confirmed))
                 if isinstance(imgp_confirmed, np.ndarray):
                     imgpoints.append(imgp_confirmed)
                     objpoints.append(objp_confirmed)
+
             else:
                 imgp_confirmed = findCorners(img_path, intrinsics_corners_nb, objp=objp, show=show_detection_intrinsics)
                 if isinstance(imgp_confirmed, np.ndarray):
                     imgpoints.append(imgp_confirmed)
                     objpoints.append(objp)
         if len(imgpoints) < 10:
-            logging.info(f'Corners were detected only on {len(imgpoints)} images for camera {cam}. Calibration of intrinsic parameters may not be accurate with less than 10 good images of the board.')
+            logging.info(f'Corners were detected only on {len(imgpoints)} images for camera {cam}. Calibration of intrinsic parameters may not be accurate with fewer than 10 good images of the board.')
 
         # calculate intrinsics
         img = cv2.imread(str(img_path))
@@ -524,11 +524,12 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
                 logging.exception('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
                 raise ValueError('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
             if len(objp) < 10:
-                logging.info(f'Only {len(objp)} reference points for camera {cam}. Calibration of extrinsic parameters may not be accurate with less than 10 reference points, as spread out as possible.')
+                logging.info(f'Only {len(objp)} reference points for camera {cam}. Calibration of extrinsic parameters may not be accurate with fewer than 10 reference points, as spread out as possible.')
 
         # Calculate extrinsics
         mtx, dist = np.array(K[i]), np.array(D[i])
         _, r, t = cv2.solvePnP(objp, imgp, mtx, dist)
+        r, t = r.flatten(), t.flatten()
 
         # Projection of object points to image plane
         Kh_cam = np.block([mtx, np.zeros(3).reshape(3,1)])
@@ -545,9 +546,16 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
                 cv2.circle(img, (int(o[0]), int(o[1])), 8, (0,0,255), -1) 
             for i in imgp:
                 cv2.drawMarker(img, (int(i[0][0]), int(i[0][1])), (0,255,0), cv2.MARKER_CROSS, 15, 2)
+            cv2.putText(img, 'Verify calibration results, then close window.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .5, (255,255,255), 2, lineType = cv2.LINE_AA)
+            cv2.putText(img, 'Verify calibration results, then close window.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1, lineType = cv2.LINE_AA) 
+            cv2.drawMarker(img, (20,40), (0,255,0), cv2.MARKER_CROSS, 15, 2)
+            cv2.putText(img, '    Clicked points', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, .5, (255,255,255), 2, lineType = cv2.LINE_AA)
+            cv2.putText(img, '    Clicked points', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1, lineType = cv2.LINE_AA)    
+            cv2.circle(img, (20,60), 8, (0,0,255), -1)    
+            cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .5, (255,255,255), 2, lineType = cv2.LINE_AA)
+            cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1, lineType = cv2.LINE_AA)    
             im_pil = Image.fromarray(img)
-            print(img_vid_files[0])
-            im_pil.show(title = img_vid_files[0])
+            im_pil.show(title = os.path.basename(img_vid_files[0]))
 
         # Calculate reprojection error
         imgp_to_objreproj_dist = [euclidean_distance(proj_obj[n], imgp[n]) for n in range(len(proj_obj))]
@@ -574,7 +582,7 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
     
     INPUTS:
     - img_path: path to image (or video)
-    - corner_nb: [H, W] internal corners in checkerboard: list of two integers [9,6]
+    - corner_nb: [H, W] internal corners in checkerboard: list of two integers [4,7]
     - optionnal: show: choose whether to show corner detections
     - optionnal: objp: array [3d corner coordinates]
 
@@ -678,7 +686,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                 objp_confirmed = objp
             else:
                 imgp_confirmed = np.array([imgp.astype('float32') for imgp in imgp_confirmed])
-                objp_confirmed = np.array(objp_confirmed)
+                objp_confirmed = objp_confirmed
             # OpenCV needs at leas 4 correspondance points to calibrate
             if len(imgp_confirmed) < 6:
                 objp_confirmed = []
@@ -696,6 +704,9 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
             objp_confirmed = []
 
         if event.key == 'c':
+            # TODO: RIGHT NOW, IF 'C' IS PRESSED ANOTHER TIME, OBJP_CONFIRMED AND IMGP_CONFIRMED ARE RESET TO []
+            if 'objp_confirmed' in globals():
+                del objp_confirmed
             # If 'c', allows retrieving imgp_confirmed by clicking them on the image
             scat = ax.scatter([],[],s=100,marker='+',color='g')
             plt.connect('button_press_event', on_click)
@@ -731,7 +742,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     fig_3d.canvas.draw()
                 elif count == len(objp)-1:
                     # if all objp have been clicked or indicated as not visible, close all
-                    imgp_confirmed = np.array(imgp)
+                    imgp_confirmed = np.array(imgp, np.float32)
                     plt.close('all')
                     for var_to_delete in ['events', 'count', 'scat', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
                         if var_to_delete in globals():
@@ -780,8 +791,8 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     fig_3d.canvas.draw()
                 elif count == len(objp)-1:
                     # retrieve objp_confirmed
-                    objp_confirmed = np.array([[objp[count].tolist()] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])
-                    imgp_confirmed = np.array(imgp_confirmed)
+                    objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])
+                    imgp_confirmed = np.array(imgp_confirmed, np.float32)
                     # close all, delete all
                     plt.close('all')
                     for var_to_delete in ['events', 'count', 'scat', 'scat_3d', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
@@ -792,6 +803,8 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     objp_confirmed = [[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0]
                     ax_3d.scatter(*objp[count], marker='o', color='g')
                     fig_3d.canvas.draw()
+                print(objp_confirmed)
+                
 
         # Right click: 
         # If last event was left click, remove last point and if objp given, from objp_confirmed
@@ -858,20 +871,20 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
         ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
 
     # Write instructions
-    cv2.putText(img, 'Type "Y" to accept point detection.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .5, (255,255,255), 2, lineType = cv2.LINE_AA)
-    cv2.putText(img, 'Type "Y" to accept point detection.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1, lineType = cv2.LINE_AA)    
-    cv2.putText(img, 'If points are wrongfully (or not) detected:', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, .5, (255,255,255), 2, lineType = cv2.LINE_AA)
-    cv2.putText(img, 'If points are wrongfully (or not) detected:', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1, lineType = cv2.LINE_AA)    
-    cv2.putText(img, '- type "N" to dismiss this image,', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .5, (255,255,255), 2, lineType = cv2.LINE_AA)
-    cv2.putText(img, '- type "N" to dismiss this image,', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1, lineType = cv2.LINE_AA)    
-    cv2.putText(img, '- type "C" to click points by hand (beware of their order).', (20, 80), cv2.FONT_HERSHEY_SIMPLEX, .5, (255,255,255), 2, lineType = cv2.LINE_AA)
-    cv2.putText(img, '- type "C" to click points by hand (beware of their order).', (20, 80), cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1, lineType = cv2.LINE_AA)    
-    cv2.putText(img, '   left click to add a point, right click to remove it, "H" to indicate it is not visible. ', (20, 100), cv2.FONT_HERSHEY_SIMPLEX, .5, (255,255,255), 2, lineType = cv2.LINE_AA)
-    cv2.putText(img, '   left click to add a point, right click to remove it, "H" to indicate it is not visible. ', (20, 100), cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1, lineType = cv2.LINE_AA)    
-    cv2.putText(img, '   Confirm with "Y", cancel with "N".', (20, 120), cv2.FONT_HERSHEY_SIMPLEX, .5, (255,255,255), 2, lineType = cv2.LINE_AA)
-    cv2.putText(img, '   Confirm with "Y", cancel with "N".', (20, 120), cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1, lineType = cv2.LINE_AA)    
-    cv2.putText(img, 'Use mouse wheel to zoom in and out and to pan', (20, 140), cv2.FONT_HERSHEY_SIMPLEX, .5, (255,255,255), 2, lineType = cv2.LINE_AA)
-    cv2.putText(img, 'Use mouse wheel to zoom in and out and to pan', (20, 140), cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1, lineType = cv2.LINE_AA)    
+    cv2.putText(img, 'Type "Y" to accept point detection.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 3, lineType = cv2.LINE_AA)
+    cv2.putText(img, 'Type "Y" to accept point detection.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
+    cv2.putText(img, 'If points are wrongfully (or not) detected:', (20, 43), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 3, lineType = cv2.LINE_AA)
+    cv2.putText(img, 'If points are wrongfully (or not) detected:', (20, 43), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
+    cv2.putText(img, '- type "N" to dismiss this image,', (20, 66), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 3, lineType = cv2.LINE_AA)
+    cv2.putText(img, '- type "N" to dismiss this image,', (20, 66), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
+    cv2.putText(img, '- type "C" to click points by hand (beware of their order).', (20, 89), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 3, lineType = cv2.LINE_AA)
+    cv2.putText(img, '- type "C" to click points by hand (beware of their order).', (20, 89), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
+    cv2.putText(img, '   left click to add a point, right click to remove it, "H" to indicate it is not visible. ', (20, 112), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 3, lineType = cv2.LINE_AA)
+    cv2.putText(img, '   left click to add a point, right click to remove it, "H" to indicate it is not visible. ', (20, 112), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
+    cv2.putText(img, '   Confirm with "Y", cancel with "N".', (20, 135), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 3, lineType = cv2.LINE_AA)
+    cv2.putText(img, '   Confirm with "Y", cancel with "N".', (20, 135), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
+    cv2.putText(img, 'Use mouse wheel to zoom in and out and to pan', (20, 158), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 3, lineType = cv2.LINE_AA)
+    cv2.putText(img, 'Use mouse wheel to zoom in and out and to pan', (20, 158), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
     
     # Put image in a matplotlib figure for more controls
     plt.rcParams['toolbar'] = 'None'
@@ -997,15 +1010,14 @@ def recap_calibrate(ret, calib_path, calib_full_type):
         if cam != 'metadata':
             f_px = calib[cam]['matrix'][0][0]
             Dm = euclidean_distance(calib[cam]['translation'], [0,0,0])
-            print(ret[c])
             if calib_full_type=='convert_qualisys' or calib_full_type=='convert_vicon':
-                ret_m.append( np.around(ret[c]*1000, decimals=3) )
-                ret_px.append( np.around(ret[c] / Dm * f_px, decimals=3) )
+                ret_m.append( np.around(ret[c], decimals=3) )
+                ret_px.append( np.around(ret[c] / (Dm*1000) * f_px, decimals=3) )
             elif calib_full_type=='calculate_board':
                 ret_px.append( np.around(ret[c], decimals=3) )
-                ret_m.append( np.around(ret[c]*Dm / f_px, decimals=3) )
+                ret_m.append( np.around(ret[c]*Dm*1000 / f_px, decimals=3) )
 
-    logging.info(f'\n--> Residual (RMS) calibration errors for each camera are respectively {ret_px} px, \nwhich corresponds to {ret_m} m.\n')
+    logging.info(f'\n--> Residual (RMS) calibration errors for each camera are respectively {ret_px} px, \nwhich corresponds to {ret_m} mm.\n')
     logging.info(f'Calibration file is stored at {calib_path}.')
 
 

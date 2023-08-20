@@ -150,8 +150,8 @@ def kalman_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    trustratio = int(config.get('3d-filtering').get('kalman').get('trust_ratio'))
-    smooth = int(config.get('3d-filtering').get('kalman').get('smooth'))
+    trustratio = int(config.get('filtering').get('kalman').get('trust_ratio'))
+    smooth = int(config.get('filtering').get('kalman').get('smooth'))
     framerate = config.get('project').get('frame_rate')
     measurement_noise = 20
     process_noise = measurement_noise * trustratio
@@ -187,9 +187,9 @@ def butterworth_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    type = 'low' #config.get('3d-filtering').get('butterworth').get('type')
-    order = int(config.get('3d-filtering').get('butterworth').get('order'))
-    cutoff = int(config.get('3d-filtering').get('butterworth').get('cut_off_frequency'))    
+    type = 'low' #config.get('filtering').get('butterworth').get('type')
+    order = int(config.get('filtering').get('butterworth').get('order'))
+    cutoff = int(config.get('filtering').get('butterworth').get('cut_off_frequency'))    
     framerate = config.get('project').get('frame_rate')
 
     b, a = signal.butter(order/2, cutoff/(framerate/2), type, analog = False) 
@@ -223,9 +223,9 @@ def butterworth_on_speed_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    type = 'low' # config.get('3d-filtering').get('butterworth_on_speed').get('type')
-    order = int(config.get('3d-filtering').get('butterworth_on_speed').get('order'))
-    cutoff = int(config.get('3d-filtering').get('butterworth_on_speed').get('cut_off_frequency'))
+    type = 'low' # config.get('filtering').get('butterworth_on_speed').get('type')
+    order = int(config.get('filtering').get('butterworth_on_speed').get('order'))
+    cutoff = int(config.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
     framerate = config.get('project').get('frame_rate')
 
     b, a = signal.butter(order/2, cutoff/(framerate/2), type, analog = False)
@@ -264,7 +264,7 @@ def gaussian_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    gaussian_filter_sigma_kernel = int(config.get('3d-filtering').get('gaussian').get('sigma_kernel'))
+    gaussian_filter_sigma_kernel = int(config.get('filtering').get('gaussian').get('sigma_kernel'))
 
     col_filtered = gaussian_filter1d(col, gaussian_filter_sigma_kernel)
 
@@ -284,7 +284,7 @@ def loess_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    kernel = config.get('3d-filtering').get('LOESS').get('nb_values_used')
+    kernel = config.get('filtering').get('LOESS').get('nb_values_used')
 
     col_filtered = col.copy()
     mask = np.isnan(col_filtered) 
@@ -313,7 +313,7 @@ def median_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
     
-    median_filter_kernel_size = config.get('3d-filtering').get('median').get('kernel_size')
+    median_filter_kernel_size = config.get('filtering').get('median').get('kernel_size')
     
     col_filtered = signal.medfilt(col, kernel_size=median_filter_kernel_size)
 
@@ -402,19 +402,19 @@ def recap_filter3d(config, trc_path):
     '''
 
     # Read Config
-    filter_type = config.get('3d-filtering').get('type')
-    kalman_filter_trustratio = int(config.get('3d-filtering').get('kalman').get('trust_ratio'))
-    kalman_filter_smooth = int(config.get('3d-filtering').get('kalman').get('smooth'))
+    filter_type = config.get('filtering').get('type')
+    kalman_filter_trustratio = int(config.get('filtering').get('kalman').get('trust_ratio'))
+    kalman_filter_smooth = int(config.get('filtering').get('kalman').get('smooth'))
     kalman_filter_smooth_str = 'smoother' if kalman_filter_smooth else 'filter'
-    butterworth_filter_type = 'low' # config.get('3d-filtering').get('butterworth').get('type')
-    butterworth_filter_order = int(config.get('3d-filtering').get('butterworth').get('order'))
-    butterworth_filter_cutoff = int(config.get('3d-filtering').get('butterworth').get('cut_off_frequency'))
-    butter_speed_filter_type = 'low' # config.get('3d-filtering').get('butterworth_on_speed').get('type')
-    butter_speed_filter_order = int(config.get('3d-filtering').get('butterworth_on_speed').get('order'))
-    butter_speed_filter_cutoff = int(config.get('3d-filtering').get('butterworth_on_speed').get('cut_off_frequency'))
-    gaussian_filter_sigma_kernel = int(config.get('3d-filtering').get('gaussian').get('sigma_kernel'))
-    loess_filter_nb_values = config.get('3d-filtering').get('LOESS').get('nb_values_used')
-    median_filter_kernel_size = config.get('3d-filtering').get('median').get('kernel_size')
+    butterworth_filter_type = 'low' # config.get('filtering').get('butterworth').get('type')
+    butterworth_filter_order = int(config.get('filtering').get('butterworth').get('order'))
+    butterworth_filter_cutoff = int(config.get('filtering').get('butterworth').get('cut_off_frequency'))
+    butter_speed_filter_type = 'low' # config.get('filtering').get('butterworth_on_speed').get('type')
+    butter_speed_filter_order = int(config.get('filtering').get('butterworth_on_speed').get('order'))
+    butter_speed_filter_cutoff = int(config.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
+    gaussian_filter_sigma_kernel = int(config.get('filtering').get('gaussian').get('sigma_kernel'))
+    loess_filter_nb_values = config.get('filtering').get('LOESS').get('nb_values_used')
+    median_filter_kernel_size = config.get('filtering').get('median').get('kernel_size')
 
     # Recap
     filter_mapping_recap = {

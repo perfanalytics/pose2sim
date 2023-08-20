@@ -192,7 +192,7 @@ def recap_tracking(config, error, nb_cams_excluded):
     # Read config
     project_dir = config.get('project').get('project_dir')
     if project_dir == '': project_dir = os.getcwd()
-    poseTracked_folder_name = config.get('project').get('poseTracked_folder_name')
+    poseTracked_folder_name = config.get('project').get('poseAssociated_folder_name')
     calib_folder_name = config.get('project').get('calib_folder_name')
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
     error_threshold_tracking = config.get('personAssociation').get('error_threshold_tracking')

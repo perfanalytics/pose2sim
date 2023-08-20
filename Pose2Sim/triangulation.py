@@ -413,7 +413,7 @@ def triangulate_all(config):
     interp_gap_smaller_than = config.get('triangulation').get('interp_if_gap_smaller_than')
     show_interp_indices = config.get('triangulation').get('show_interp_indices')
     pose_dir = os.path.join(project_dir, pose_folder_name)
-    poseTracked_folder_name = config.get('project').get('poseTracked_folder_name')
+    poseTracked_folder_name = config.get('project').get('poseAssociated_folder_name')
     calib_dir = os.path.join(project_dir, calib_folder_name)
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
     poseTracked_dir = os.path.join(project_dir, poseTracked_folder_name)
@@ -495,6 +495,7 @@ def triangulate_all(config):
         non_interp_frames = [[f'{seq[0]}:{seq[-1]+1}' for seq in seq_kpt if len(seq)>interp_gap_smaller_than] for seq_kpt in sequences]
     else:
         interp_frames = None
+        non_interp_frames = []
 
     # Interpolate missing values
     if interpolation_kind != 'none':

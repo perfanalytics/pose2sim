@@ -1,5 +1,5 @@
 ###############################################################################
-## POSE2SIM PROJECT PARAMETERS                                               ##
+## PROJECT PARAMETERS                                                        ##
 ###############################################################################
 
 # Configure your project parameters here
@@ -9,45 +9,78 @@ project_dir = '' # BETWEEN SINGLE QUOTES! # If empty, project dir is current dir
 frame_range = [] #For example [10,300], or [] for all frames
 frame_rate = 60 #Hz
 
-rawImg_folder_name = 'raw-2d'
+rawImg_folder_name = 'raw'
 calib_folder_name = 'calibration'
 pose_folder_name = 'pose'
 pose_json_folder_extension = 'json'
 pose_img_folder_extension = 'img'
-poseTracked_folder_name = 'pose-2d-tracked'
-pose3d_folder_name = 'triangulation'
+poseAssociated_folder_name = 'pose-associated'
+pose3d_folder_name = 'pose-3d'
 opensim_folder_name = 'opensim'
 
+
 [pose]
-pose_model = 'BODY_25B' #CUSTOM, BODY_25B, BODY_25, BODY_135, BLAZEPOSE, 
-# HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII are available,
+pose_model = 'BODY_25B' #CUSTOM, BODY_25B, BODY_25, BODY_135, BLAZEPOSE, HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII are available,
 # from DeepLabCut, OpenPose, MediaPipe BlazePose, and AlphaPose
 # See Pose2Sim\skeleton.py for their skeleton hierarchy
 
+
 [calibration]
-type = 'qca' # 'qca', 'checkerboard', 'arucoboard', or 'charucoboard'
-   [calibration.qca]
-   binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
+calibration_type = 'convert' # 'convert' or 'calculate'
 
-   [calibration.checkerboard]
-   corners_nb = [7,12] # [H,W] rather than [w,h]
-   square_size = 80 # mm # [h,w] if square is actually a rectangle
-   frame_for_origin = -1 # starting from zero. -1 if board is at origin on last frame
-   # /!\ Beware that corners must be detected on all view at frame_for_origin, or else 
-   # extrinsic parameters will be wrong. Set show_corner_detection to true to check it.
-   show_corner_detection = false # true or false (lowercase)
-   from_vid_or_img = 'img' # 'vid' or 'img'
-   vid_snapshot_every_N_frames = 20
-   vid_extension = 'mp4'
-   img_extension = 'jpg' # 'png', 'jpg', etc
+   [calibration.convert]
+   convert_from = 'qualisys' # 'qualisys', 'optitrack', or 'vicon'
+      [calibration.convert.qualisys]
+      binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
+  
 
-[2d-tracking]
+   [calibration.calculate] 
+   calculate_method = 'board' # 'board' or 'points'
+      
+      [calibration.calculate.board.intrinsics] # camera properties, only needs to be done once
+      intrinsics_board_type = 'checkerboard' # 'checkerboard' ('charucoboard' not supported yet)
+      overwrite_intrinsics = false # overwrite (or not) if they have already been calculated?
+      show_detection_intrinsics = true # true or false (lowercase)
+      intrinsics_extension = 'jpg' # any video or image extension
+
+      extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
+      intrinsics_corners_nb = [4,7] 
+      intrinsics_square_size = 60 # mm
+      intrinsics_marker_size = 40 # mm # only checked if charucoboard
+      intrinsics_aruco_dict = 'DICT_6X6_250' # only checked if charucoboard # see https://docs.opencv.org/3.4/dc/df7/dictionary_8hpp.html
+   
+      [calibration.calculate.board.extrinsics] # camera placement, needs to be done every time
+      extrinsics_board_type = 'scene' # 'checkerboard', 'scene'  ('charucoboard' not supported yet)
+      # 'board' should be large enough to be detected when laid on the floor. 
+      # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out
+      calculate_extrinsics = true # true or false (lowercase)
+      show_reprojection_error = true # true or false (lowercase)
+      extrinsics_extension = 'png' # any video or image extension
+      
+      # if extrinsics_board_type = 'checkerboard' or 'charucoboard'
+      extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
+      extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
+      extrinsics_marker_size = 40 # mm # only checked if 'charucoboard' (not supported yet)
+      extrinsics_aruco_dict = 'DICT_6X6_250' # only checked if 'charucoboard' # see https://docs.opencv.org/3.4/dc/df7/dictionary_8hpp.html
+      
+      # if extrinsics_board_type = 'scene'
+      # list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. # in m
+      object_coords_3d = [[-2.0,  0.3,  0.0], [-2.0 , 0.0,  0.0], [-2.0, 0.0,  0.05], [-2.0, -0.3 ,  0.0], [0.0,  0.3,  0.0], [0.0, 0.0,  0.0], [0.0, 0.0,  0.05], [0.0, -0.3,  0.0]] # in meters -> Not in mm! <-
+      
+  
+      [calibration.calculate.points]
+      calibration_points = 'wand' # 'wand' or 'keypoints'
+      # Not supported yet.
+
+	  
+[personAssociation]
 tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
 # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
-error_threshold_tracking = 20 # px
+reproj_error_threshold_association = 20 # px
 
-[3d-triangulation]
-error_threshold_triangulation = 15 # px
+
+[triangulation]
+reproj_error_threshold_triangulation = 15 # px
 likelihood_threshold = 0.3
 min_cameras_for_triangulation = 2
 interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
@@ -55,23 +88,26 @@ interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
 interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
 show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 
-[3d-filtering]
-type = 'butterworth' # butterworth, butterworth_on_speed, gaussian, LOESS, median
+
+[filtering]
+type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
 display_figures = true # true or false (lowercase)
 
-   [3d-filtering.butterworth]
-   type = 'low'
+   [filtering.butterworth]
    order = 4 
    cut_off_frequency = 6 # Hz
-   [3d-filtering.butterworth_on_speed]
-   type = 'low'
+   [filtering.kalman]
+   # How much more do you trust triangulation results (measurements), than previous data (process assuming constant acceleration)?
+   trust_ratio = 100 # = measurement_trust/process_trust ~= process_noise/measurement_noise
+   smooth = true # should be true, unless you need real-time filtering
+   [filtering.butterworth_on_speed]
    order = 4 
    cut_off_frequency = 10 # Hz
-   [3d-filtering.gaussian]
+   [filtering.gaussian]
    sigma_kernel = 2 #px
-   [3d-filtering.LOESS]
-   nb_values_used = 5 # = fraction of data used * nb frames
-   [3d-filtering.median]
+   [filtering.LOESS]
+   nb_values_used = 30 # = fraction of data used * nb frames
+   [filtering.median]
    kernel_size = 9
 
 [opensim]
