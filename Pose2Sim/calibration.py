@@ -440,7 +440,6 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
         for img_path in img_vid_files:
             if show_detection_intrinsics == True:
                 imgp_confirmed, objp_confirmed = findCorners(img_path, intrinsics_corners_nb, objp=objp, show=show_detection_intrinsics)
-                print(len(imgp_confirmed), len(objp_confirmed))
                 if isinstance(imgp_confirmed, np.ndarray):
                     imgpoints.append(imgp_confirmed)
                     objpoints.append(objp_confirmed)
@@ -803,7 +802,6 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     objp_confirmed = [[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0]
                     ax_3d.scatter(*objp[count], marker='o', color='g')
                     fig_3d.canvas.draw()
-                print(objp_confirmed)
                 
 
         # Right click: 
