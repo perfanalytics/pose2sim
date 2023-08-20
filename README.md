@@ -250,13 +250,14 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 - **From Vicon:**  
   - Not possible yet. [Want to contribute?](#how-to-contribute)
 
+
 ### Calculate from scratch
 
 > Calculate calibration parameters with a board, or with points (such as detected on a wand or a human body).
 
 - **With a board:**
-  > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` instead of `convert` in `Config.toml`.\
-  For the sake of practicality, there are voluntarily few images for intrinsics, and few clicked points for extrinsics. *You should use more of them.* In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm).
+  > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in `Config.toml`.\
+  For the sake of practicality, there are voluntarily few board images for intrinsics, and few points to click for extrinsics. *You should use more of them.* In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm).
   
   - **Calculate intrinsic parameters:**
 
@@ -269,6 +270,8 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     - Make sure that the board:\
       is filmed from different angles, covers a large part of the video frame, and is in focus.\
       is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
+    
+    <img src="Content/Calib_int.png" width="600">
         
   - **Calculate extrinsic parameters:** 
 
@@ -284,6 +287,8 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     - If you film the raw scene (potentially more accurate if points are spread out):\
       Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, boxes, treadmill dimensions, etc). These points should be as spread out as possible.\
       Then you will click on the corresponding image points for each view.
+    
+    <img src="Content/Calib_ext.png" width="920">
 
 - **With points:**
   - Points can be detected from a wand.\
@@ -302,7 +307,6 @@ Pose2Sim.calibration()
 
 Output:\
 <img src="Content/Calib2D.png" width="760">
-
 <img src="Content/CalibFile.png" width="760">
 
 
@@ -753,7 +757,12 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 
 </br>
 
-*Here is a to-do list, for general guidance purposes only:*
+**Here is a to-do list, for general guidance purposes only:**\
+*The main projects are (see details below):*\
+*- Graphical User Interface*\
+*- Multiple person triangulation*\
+*- Synchronization*\
+*- Self-calibration based on keypoint detection*\
 
 > - [x] **Pose:** Support OpenPose [body_25b](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#body_25b-model---option-2-recommended) for more accuracy, [body_135](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#single-network-whole-body-pose-estimation-model) for pronation/supination.
 > - [x] **Pose:** Support [BlazePose](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker) for faster inference (on mobile device).
