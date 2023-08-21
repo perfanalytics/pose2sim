@@ -29,6 +29,7 @@
 
 
 ## INIT
+from Pose2Sim.common import RT_qca2cv, rotate_cam, quat2mat, euclidean_distance, natural_sort
 import os
 import logging
 import numpy as np
@@ -45,15 +46,13 @@ from PIL import Image
 from contextlib import contextmanager,redirect_stderr,redirect_stdout
 from os import devnull
 
-from Pose2Sim.common import RT_qca2cv, rotate_cam, quat2mat, euclidean_distance, natural_sort
-
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.3"
+__version__ = "0.4"
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
