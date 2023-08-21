@@ -278,7 +278,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     > *N.B.:* _Extrinsic parameters:_ camera placement in space (position and orientation), need to be calculated every time a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates.
 
     - Create a folder for each camera in your `calibration\extrinsics` folder.
-    - Once your cameras are in place, shortly film a board laid on the floor or the raw scene \
+    - Once your cameras are in place, shortly film either a board laid on the floor, or the raw scene\
     (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format).
     - Adjust parameters in the `Config.toml` file.
     - If you film a board:\
