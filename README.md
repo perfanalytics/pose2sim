@@ -145,7 +145,7 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
        </b>
     
 ## 2D pose estimation
-> _**Estimate 2D pose from images with Openpose or an other pose estimation solution.**_ \
+> _**Estimate 2D pose from images with Openpose or another pose estimation solution.**_ \
 N.B.: First film a short static pose that will be used for scaling the OpenSim model (A-pose for example), and then film your motions of interest.\
 N.B.: Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json'.
 
@@ -257,7 +257,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 - **With a board:**
   > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in `Config.toml`.\
-  For the sake of practicality, there are voluntarily few board images for intrinsics, and few points to click for extrinsics. *You should use more of them.* In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm).
+  For the sake of practicality, there are voluntarily few board images for intrinsic calibration, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm).
   
   - **Calculate intrinsic parameters:**
 
@@ -281,12 +281,13 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     - Once your cameras are in place, shortly film either a board laid on the floor, or the raw scene\
     (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format).
     - Adjust parameters in the `Config.toml` file.
-    - If you film a board:\
-      Make sure that it is seen by all cameras. \
-      It should preferably be larger than the one used for intrinsics, as results will not be very accurate out of the covered zone.
-    - If you film the raw scene (potentially more accurate if points are spread out):\
-      Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, boxes, treadmill dimensions, etc). These points should be as spread out as possible.\
-      Then you will click on the corresponding image points for each view.
+    - Then,
+      - **If you film a board:**\
+        Make sure that it is seen by all cameras. \
+        It should preferably be larger than the one used for intrinsics, as results will not be very accurate out of the covered zone.
+      - **If you film the raw scene** (more flexible and potentially more accurate if points are spread out):\
+        Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, boxes, treadmill dimensions, etc). These points should be as spread out as possible.\
+        Then you will click on the corresponding image points for each view.
     
     <img src="Content/Calib_ext.png" width="920">
 
