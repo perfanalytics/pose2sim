@@ -763,7 +763,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 *- Graphical User Interface*\
 *- Multiple person triangulation*\
 *- Synchronization*\
-*- Self-calibration based on keypoint detection*\
+*- Self-calibration based on keypoint detection*
 
 > - [x] **Pose:** Support OpenPose [body_25b](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#body_25b-model---option-2-recommended) for more accuracy, [body_135](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#single-network-whole-body-pose-estimation-model) for pronation/supination.
 > - [x] **Pose:** Support [BlazePose](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker) for faster inference (on mobile device).
