@@ -18,7 +18,6 @@ import re
 import cv2
 
 import matplotlib as mpl
-mpl.use('qt5agg')
 mpl.rc('figure', max_open_warning=0)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -269,6 +268,8 @@ class plotWindow():
     plt.plot(x2, y2)
     pw.addPlot("2", f)
     '''
+
+    mpl.use('qt5agg')
 
     def __init__(self, parent=None):
         self.app = QApplication(sys.argv)
