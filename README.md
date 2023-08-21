@@ -76,7 +76,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.6
    - OPTION 2: **Build from source and test the last changes:**
      Open a terminal in the directory of your choice and Clone the Pose2Sim repository.
        ```
-       git clone https://github.com/perfanalytics/pose2sim.git
+       git clone --depth 1 https://github.com/perfanalytics/pose2sim.git
        cd pose2sim
        pip install .
        ```
