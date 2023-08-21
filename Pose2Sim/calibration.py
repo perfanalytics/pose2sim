@@ -667,6 +667,15 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     - only if objp!=[]: objp_confirmed: array of [3d corner coordinates]
     '''
 
+
+    def on_close(event):
+        # If close window, close all and return nothing
+        global imgp_confirmed, objp_confirmed
+        plt.close('all')
+        imgp_confirmed = []
+        objp_confirmed = []
+
+
     def on_key(event):
         '''
         Handles key press events:
@@ -677,7 +686,6 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
         global imgp_confirmed, objp_confirmed, objp_confirmed_notok, scat, ax_3d, fig_3d, events, count
         
         if event.key == 'y':
-            # TODO: DETECT WHEN WINDOW IS CLOSED
             # If 'y', close all
             # If points have been clicked, imgp_confirmed is returned, else imgp
             # If objp is given, objp_confirmed is returned in addition
@@ -905,6 +913,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
 
     # Handles key presses to Accept, dismiss, or click points by hand
     cid = fig.canvas.mpl_connect('key_press_event', on_key)
+    fig.canvas.mpl_connect('close_event', on_close)
     
     plt.draw()
     plt.show(block=True)
