@@ -261,7 +261,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 - **With a board:**
   > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in `Config.toml`.\
-  For the sake of practicality, there are voluntarily few board images for intrinsic calibration, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm).
+  For the sake of practicality, there are voluntarily few board images for intrinsic calibration, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm#:~:text=Angle%20results%20were,Table%203).).
   
   - **Calculate intrinsic parameters:**
 
@@ -358,8 +358,8 @@ Output:\
 > _**Cameras need to be synchronized, so that 2D points correspond to the same position across cameras.**_\
 *N.B.: Skip this step if your cameras are already synchronized.*
 
-If your cameras are not natively synchronized, you can use [this script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).
-
+If your cameras are not natively synchronized, you can use [this script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).\
+Alternatively, use a clap, a flash, or a beep noise to synchronize them.
 
 
 ## Tracking, Triangulating, Filtering
@@ -599,8 +599,14 @@ Alternatively, you can use command-line tools:
 - Or take advantage of the full the OpenSim Python API. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python) for installation instructions (conda install may take a while). 
   ```
   conda install -c opensim-org opensim 
+  ipython
   ```
-  And then run python, type `import opensim`, and run your API commands. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Common+Scripting+Commands#CommonScriptingCommands-UsingtheTools) for more instructions on how to use the API.
+  ```
+  import opensim
+  opensim.ScaleTool("<PATH TO YOUR SCALING OR IK SETUP FILE>.xml").run()
+  opensim.InverseKinematicsTool("<PATH TO YOUR SCALING OR IK SETUP FILE>.xml").run()
+  ```
+  You can also run other API commands. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Common+Scripting+Commands#CommonScriptingCommands-UsingtheTools) for more instructions on how to use it.
 
 <details>
   <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
@@ -786,6 +792,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > - [x] **Calibration:** Convert Vicon [.xcp calibration file](https://montrealrobotics.ca/diffcvgp/assets/papers/7.pdf).
 > - [x] **Calibration:** Easier and clearer calibration procedure: separate intrinsic and extrinsic parameter calculation, edit corner detection if some are wrongly detected (or not visible). 
 > - [x] **Calibration:** Possibility to evaluate extrinsic parameters from cues on scene.
+> - [ ] **Calibration:** Fine-tune calibration with bundle adjustment.
 > - [ ] **Calibration:** Support ChArUco board detection (see [there](https://mecaruco2.readthedocs.io/en/latest/notebooks_rst/Aruco/sandbox/ludovic/aruco_calibration_rotation.html)).
 > - [ ] **Calibration:** Calculate calibration with points rather than board. (1) SBA calibration with wand (cf [Argus](https://argus.web.unc.edu), see converter [here](https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py)). Set world reference frame in the end.
 > - [ ] **Calibration:** Alternatively, self-calibrate with [OpenPose keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
