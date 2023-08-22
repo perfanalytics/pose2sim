@@ -242,13 +242,14 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 If you already have a calibration file, set `calibration_type` type to `convert` in your `Config.toml` file.
 - **From Qualisys:**
   - Export calibration to `.qca.txt` within QTM
-  - Copy it in the `calibration` folder
+  - Copy it in the `calibration` Pose2Sim folder
   - set `convert_from` to 'qualisys' in your `Config.toml` file. Change `binning_factor` to 2 if you film in 540p
 - **From Optitrack:** Exporting calibration will be available in Motive 3.2. In the meantime:
   - Calculate intrinsics with a board (see next section)
   - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28)
 - **From Vicon:**  
-  - Not possible yet. [Want to contribute?](#how-to-contribute)
+  - Copy your `.xcp` Vicon calibration file to the Pose2Sim `calibration` folder
+  - set `convert_from` to 'vicon' in your `Config.toml` file. No other setting is needed.
 
 
 ### Calculate from scratch
