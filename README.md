@@ -596,8 +596,11 @@ Alternatively, you can use command-line tools:
   subprocess.call(["opensim-cmd", "run-tool", r"<PATH TO YOUR SCALING OR IK SETUP FILE>.xml"])
   ```
 
-- Or take advantage of the full the OpenSim Python API. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python) for installation instructions. \
-Note that it is easier to install on Python 3.7 and with OpenSim 4.2. 
+- Or take advantage of the full the OpenSim Python API. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python) for installation instructions (conda install may take a while). 
+  ```
+  conda install -c opensim-org opensim 
+  ```
+  And then run python, type `import opensim`, and run your API commands. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Common+Scripting+Commands#CommonScriptingCommands-UsingtheTools) for more instructions on how to use the API.
 
 <details>
   <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
