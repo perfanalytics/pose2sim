@@ -148,7 +148,7 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
        </b>
     
 ## 2D pose estimation
-> _**Estimate 2D pose from images with Openpose or an other pose estimation solution.**_ \
+> _**Estimate 2D pose from images with Openpose or another pose estimation solution.**_ \
 N.B.: First film a short static pose that will be used for scaling the OpenSim model (A-pose for example), and then film your motions of interest.\
 N.B.: Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json'.
 
@@ -245,13 +245,14 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 If you already have a calibration file, set `calibration_type` type to `convert` in your `Config.toml` file.
 - **From Qualisys:**
   - Export calibration to `.qca.txt` within QTM
-  - Copy it in the `calibration` folder
+  - Copy it in the `calibration` Pose2Sim folder
   - set `convert_from` to 'qualisys' in your `Config.toml` file. Change `binning_factor` to 2 if you film in 540p
 - **From Optitrack:** Exporting calibration will be available in Motive 3.2. In the meantime:
   - Calculate intrinsics with a board (see next section)
   - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28)
 - **From Vicon:**  
-  - Not possible yet. [Want to contribute?](#how-to-contribute)
+  - Copy your `.xcp` Vicon calibration file to the Pose2Sim `calibration` folder
+  - set `convert_from` to 'vicon' in your `Config.toml` file. No other setting is needed.
 
 
 ### Calculate from scratch
@@ -260,7 +261,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 - **With a board:**
   > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in `Config.toml`.\
-  For the sake of practicality, there are voluntarily few board images for intrinsics, and few points to click for extrinsics. *You should use more of them.* In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm).
+  For the sake of practicality, there are voluntarily few board images for intrinsic calibration, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm).
   
   - **Calculate intrinsic parameters:**
 
@@ -284,12 +285,13 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     - Once your cameras are in place, shortly film either a board laid on the floor, or the raw scene\
     (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format).
     - Adjust parameters in the `Config.toml` file.
-    - If you film a board:\
-      Make sure that it is seen by all cameras. \
-      It should preferably be larger than the one used for intrinsics, as results will not be very accurate out of the covered zone.
-    - If you film the raw scene (potentially more accurate if points are spread out):\
-      Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, boxes, treadmill dimensions, etc). These points should be as spread out as possible.\
-      Then you will click on the corresponding image points for each view.
+    - Then,
+      - **If you film a board:**\
+        Make sure that it is seen by all cameras. \
+        It should preferably be larger than the one used for intrinsics, as results will not be very accurate out of the covered zone.
+      - **If you film the raw scene** (more flexible and potentially more accurate if points are spread out):\
+        Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, boxes, treadmill dimensions, etc). These points should be as spread out as possible.\
+        Then you will click on the corresponding image points for each view.
     
     <img src="Content/Calib_ext.png" width="920">
 
@@ -765,7 +767,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 *- Graphical User Interface*\
 *- Multiple person triangulation*\
 *- Synchronization*\
-*- Self-calibration based on keypoint detection*\
+*- Self-calibration based on keypoint detection*
 
 > - [x] **Pose:** Support OpenPose [body_25b](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#body_25b-model---option-2-recommended) for more accuracy, [body_135](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#single-network-whole-body-pose-estimation-model) for pronation/supination.
 > - [x] **Pose:** Support [BlazePose](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker) for faster inference (on mobile device).
