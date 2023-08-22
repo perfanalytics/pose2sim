@@ -49,6 +49,9 @@ If you can only use a single camera and don't mind losing some accuracy, please 
       2. [Triangulating keypoints](#triangulating-keypoints)
       3. [Filtering 3D coordinates](#filtering-3d-coordinates)
    6. [OpenSim kinematics](#opensim-kinematics)
+      1. [OpenSim Scaling](#opensim-scaling)
+      2. [OpenSim Inverse kinematics](#opensim-inverse-kinematics)
+      3. [Command Line](#command-line)
 3. [Utilities](#utilities)
 4. [How to cite and how to contribute](#how-to-cite-and-how-to-contribute)
    1. [How to cite](#how-to-cite)
@@ -556,7 +559,7 @@ Output:\
 ## OpenSim kinematics
 > _**Obtain 3D joint angles.**_
 
-### Scaling
+### OpenSim Scaling
 1. Use the previous steps to capture a static pose, typically an A-pose or a T-pose.
 2. Open OpenSim.
 3. Open the provided `Model_Pose2Sim_Body25b.osim` model from `pose2sim/Empty_project/opensim`. *(File -> Open Model)*
@@ -565,7 +568,7 @@ Output:\
 6. Run
 7. Save the new scaled OpenSim model.
 
-### Inverse kinematics
+### OpenSim Inverse kinematics
 1. Use Pose2Sim to generate 3D trajectories.
 2. Open OpenSim.
 3. Load the provided `IK_Setup_Pose2Sim_Body25b.xml` scaling file from `pose2sim/Empty_project/opensim`. *(Tools -> Inverse kinematics -> Load)*
