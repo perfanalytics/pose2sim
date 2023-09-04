@@ -14,14 +14,14 @@
 # Pose2Sim
 
 > **_News_: Version 0.4 released:** \
-**Calibration used to be the main stumbling block for users, it should be easier and better now!**\
+**Calibration used to be the main stumbling block for users: it should be easier and better now!**\
 To upgrade, type `pip install pose2sim --upgrade`. You will need to update your Config.toml file.\
 *N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to the more usual marker-based motion capture methods.\
 Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoints coordinates obtained from multiple videos) and leads to an OpenSim result (full-body 3D joint angles). Other 2D solutions can alternatively be used as inputs.
 
-If you can only use a single camera and don't mind losing some accuracy, please consider using [Sports2D](https://github.com/davidpagnon/Sports2D).
+If you can only use one single camera and don't mind losing some accuracy, please consider using [Sports2D](https://github.com/davidpagnon/Sports2D).
 
 
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
@@ -66,7 +66,7 @@ If you can only use a single camera and don't mind losing some accuracy, please 
 *Tested up to v4.4-beta on Windows. Has to be compiled from source on Linux (see [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Linux+Support)).*
 3. ***Optional.*** *Install Anaconda or [Miniconda](https://docs.conda.io/en/latest/miniconda.html). \
    Open an Anaconda terminal and create a virtual environment with typing:*
-   <pre><i>conda create -n Pose2Sim python=3.7 
+   <pre><i>conda create -n Pose2Sim python=3.8 -y 
    conda activate Pose2Sim</i></pre>
    
 3. **Install Pose2Sim**:\
@@ -238,7 +238,7 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 
 ## Camera calibration
 > _**Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ \
-> _**N.B.:**_ You can visualize your resulting camera calibration with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
+> _**N.B.:**_ You can visualize camera calibration in 3D with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
 ### Convert from Qualisys, Optitrack, or Vicon
       
@@ -596,12 +596,15 @@ Alternatively, you can use command-line tools:
   subprocess.call(["opensim-cmd", "run-tool", r"<PATH TO YOUR SCALING OR IK SETUP FILE>.xml"])
   ```
 
-- Or take advantage of the full the OpenSim Python API. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python) for installation instructions (conda install may take a while). 
+- Or take advantage of the full the OpenSim Python API. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python) for installation instructions (conda install may take a while).\
+Make sure to replace `38` in `py38np120` with your Python version (3.8 in this case).
   ```
-  conda install -c opensim-org opensim 
+  conda install -c opensim-org opensim-moco=4.4=py38np120 -y
+  ```
+  If you run into a DLL error while importing opensim, open the file `<Pose2Sim-env>\Lib\opensim\__init__.py` and replace `conda`by `conda-meta` line 4. `<Pose2Sim-env>` location can be found with `conda env list`.\
+  Then run: 
+  ```
   ipython
-  ```
-  ```
   import opensim
   opensim.ScaleTool("<PATH TO YOUR SCALING OR IK SETUP FILE>.xml").run()
   opensim.InverseKinematicsTool("<PATH TO YOUR SCALING OR IK SETUP FILE>.xml").run()
@@ -792,6 +795,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > - [x] **Calibration:** Convert Vicon [.xcp calibration file](https://montrealrobotics.ca/diffcvgp/assets/papers/7.pdf).
 > - [x] **Calibration:** Easier and clearer calibration procedure: separate intrinsic and extrinsic parameter calculation, edit corner detection if some are wrongly detected (or not visible). 
 > - [x] **Calibration:** Possibility to evaluate extrinsic parameters from cues on scene.
+> - [ ] **Calibration:** Track extrinsics reference points frame by frame for calibration of moving cameras.
 > - [ ] **Calibration:** Fine-tune calibration with bundle adjustment.
 > - [ ] **Calibration:** Support ChArUco board detection (see [there](https://mecaruco2.readthedocs.io/en/latest/notebooks_rst/Aruco/sandbox/ludovic/aruco_calibration_rotation.html)).
 > - [ ] **Calibration:** Calculate calibration with points rather than board. (1) SBA calibration with wand (cf [Argus](https://argus.web.unc.edu), see converter [here](https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py)). Set world reference frame in the end.
