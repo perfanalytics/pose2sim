@@ -852,5 +852,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 </br>
 
 > - [ ] **Catch errors**
-> - [ ] **Conda package and Docker image**
+> - [x] **Pip package**
+> - [ ] **Conda package** 
+> - [ ] **Docker image**
 > - [ ] **Run from command line via click or typer**
