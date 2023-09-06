@@ -235,9 +235,10 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     logging.info(f'Cameras were excluded if likelihood was below {likelihood_threshold} and if the reprojection error was above {error_threshold_triangulation} px.')
     logging.info(f'In average, {mean_cam_excluded} cameras had to be excluded to reach these thresholds.')
     cam_excluded_count = {i: v for i, v in zip(cam_names, cam_excluded_count.values())}
+    str_cam_excluded_count = ''
     for i, (k, v) in enumerate(cam_excluded_count.items()):
         if i ==0:
-             str_cam_excluded_count = f'Camera {k} was excluded {int(np.round(v*100))}% of the time, '
+             str_cam_excluded_count += f'Camera {k} was excluded {int(np.round(v*100))}% of the time, '
         elif i == len(cam_excluded_count)-1:
             str_cam_excluded_count += f'and Camera {k}: {int(np.round(v*100))}%.'
         else:
