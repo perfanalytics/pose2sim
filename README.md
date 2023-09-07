@@ -15,7 +15,7 @@
 
 > **_News_: Version 0.4 released:** \
 **Calibration used to be the main stumbling block for users: it should be easier and better now!**\
-To upgrade, type `pip install pose2sim --upgrade`. You will need to update your Config.toml file.\
+To upgrade, type `pip install pose2sim --upgrade`. You will need to update your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.\
 *N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to the more usual marker-based motion capture methods.\
@@ -100,7 +100,7 @@ Pose2Sim.filtering()
 You should obtain a plot of all the 3D coordinates trajectories. You can check the logs in`Demo\Users\logs.txt`.\
 Results are stored as .trc files in the `Demo/pose-3d` directory.
 
-*N.B.:* Default parameters have been provided in `Demo\Users\Config.toml` but can be edited.\
+*N.B.:* Default parameters have been provided in [Demo\User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/User/Config.toml) but can be edited.\
 *N.B.:* *Try calibration tool by changing `calibration_type` to `calculate` instead of `convert` (more info [there](#calculate-from-scratch)).*
 <br/>
 
@@ -126,7 +126,7 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
   > _**Get ready.**_
   
   1. Find your `Pose2Sim\Empty_project`, copy-paste it where you like and give it the name of your choice.
-  2. Edit the `User\Config.toml` file as needed, **especially regarding the path to your project**. 
+  2. Edit the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file as needed, **especially regarding the path to your project**. 
   3. Populate the `raw-2d`folder with your videos.
   
        <pre>
@@ -162,12 +162,12 @@ The accuracy and robustness of Pose2Sim have been thoroughly assessed only with 
 * The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results than the standard BODY_25 one and has been extensively tested for Pose2Sim. \
 You can also use the [BODY_135 model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models), which allows for the evaluation of pronation/supination, wrist flexion, and wrist deviation.\
 All other OpenPose models (BODY_25, COCO, MPII) are also supported.\
-Make sure you modify the `User\Config.toml` file accordingly.
+Make sure you modify the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file accordingly.
 * Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
 
 **N.B.:** *OpenPose BODY_25B is the default 2D pose estimation model used in Pose2Sim. However, other skeleton models from other 2D pose estimation solutions can be used alternatively.* \
     - You will first need to convert your 2D detection files to the OpenPose format (see [Utilities](#utilities)). \
-    - Then, change the `pose_model` in the `User\Config.toml` file. You may also need to choose a different `tracked_keypoint` if the Neck is not detected by the chosen model. \
+    - Then, change the `pose_model` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. You may also need to choose a different `tracked_keypoint` if the Neck is not detected by the chosen model. \
     - Finally, use the corresponding OpenSim model and setup files, which are provided in the `Empty_project\opensim` folder. 
   
  Available models are:    
@@ -184,7 +184,7 @@ However, it is less robust and accurate than OpenPose, and can only detect a sin
   python -m Blazepose_runsave -i r"<input_file>" -dJs
   ```
   Type in `python -m Blazepose_runsave -h` for explanation on parameters and for additional ones.
-* Make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
+* Make sure you change the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 
 ### With DeepLabCut:
 If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut).
@@ -193,7 +193,7 @@ If you need to detect specific points on a human being, an animal, or an object,
    ```
    python -m DLC_to_OpenPose -i r"<input_h5_file>"
    ```
-3. Report the model keypoints in the 'skeleton.py' file, and make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
+3. Report the model keypoints in the [skeleton.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/skeletons.py) file, and make sure you change the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 4. Create an OpenSim model if you need 3D joint angles.
 
 ### With AlphaPose:
@@ -203,7 +203,7 @@ If you need to detect specific points on a human being, an animal, or an object,
    ```
    python -m AlphaPose_to_OpenPose -i r"<input_alphapose_json_file>"
    ```
-* Make sure you change the `pose_model` and the `tracked_keypoint` in the `User\Config.toml` file.
+* Make sure you change the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 
 <img src="Content/Pose2D.png" width="760">
 
@@ -242,17 +242,17 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 
 ### Convert from Qualisys, Optitrack, or Vicon
       
-If you already have a calibration file, set `calibration_type` type to `convert` in your `Config.toml` file.
+If you already have a calibration file, set `calibration_type` type to `convert` in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 - **From Qualisys:**
   - Export calibration to `.qca.txt` within QTM
   - Copy it in the `calibration` Pose2Sim folder
-  - set `convert_from` to 'qualisys' in your `Config.toml` file. Change `binning_factor` to 2 if you film in 540p
+  - set `convert_from` to 'qualisys' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. Change `binning_factor` to 2 if you film in 540p
 - **From Optitrack:** Exporting calibration will be available in Motive 3.2. In the meantime:
   - Calculate intrinsics with a board (see next section)
   - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28)
 - **From Vicon:**  
   - Copy your `.xcp` Vicon calibration file to the Pose2Sim `calibration` folder
-  - set `convert_from` to 'vicon' in your `Config.toml` file. No other setting is needed.
+  - set `convert_from` to 'vicon' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
 
 
 ### Calculate from scratch
@@ -260,7 +260,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 > Calculate calibration parameters with a board, or with points (such as detected on a wand or a human body).
 
 - **With a board:**
-  > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in `Config.toml`.\
+  > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml).\
   For the sake of practicality, there are voluntarily few board images for intrinsic calibration, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm#:~:text=Angle%20results%20were,Table%203).).
   
   - **Calculate intrinsic parameters:**
@@ -270,7 +270,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
     - Create a folder for each camera in your `calibration\intrinsics` folder.
     - For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
-    - Adjust parameters in the `Config.toml` file.
+    - Adjust parameters in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
     - Make sure that the board:\
       is filmed from different angles, covers a large part of the video frame, and is in focus.\
       is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
@@ -284,7 +284,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     - Create a folder for each camera in your `calibration\extrinsics` folder.
     - Once your cameras are in place, shortly film either a board laid on the floor, or the raw scene\
     (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format).
-    - Adjust parameters in the `Config.toml` file.
+    - Adjust parameters in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
     - Then,
       - **If you film a board:**\
         Make sure that it is seen by all cameras. \
@@ -378,7 +378,7 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.personAssociation()
 ```
 
-Check printed output. If results are not satisfying, try and release the constraints in the `Config.toml` file.
+Check printed output. If results are not satisfying, try and release the constraints in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 
 Output:\
 <img src="Content/Track2D.png" width="760">
@@ -666,28 +666,33 @@ A list of standalone tools (see [Utilities](https://github.com/perfanalytics/pos
 <details>
   <summary><b>Converting files and Calibrating</b> (CLICK TO SHOW)</summary>
     <pre>
-`Blazepose_runsave.py`
+
+[Blazepose_runsave.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/Blazepose_runsave.py)
 Runs BlazePose on a video, and saves coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format.
 
-`DLC_to_OpenPose.py`
+[DLC_to_OpenPose.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/DLC_to_OpenPose.py)
 Converts a DeepLabCut (h5) 2D pose estimation file into OpenPose (json) files.
 
-`c3d_to_trc.py`
+[AlphaPose_to_OpenPose.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/AlphaPose_to_OpenPose.py)
+Converts AlphaPose single json file to OpenPose frame-by-frame files.
+
+[c3d_to_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/c3d_to_trc.py)
 Converts 3D point data of a .c3d file to a .trc file compatible with OpenSim. No analog data (force plates, emg) nor computed data (angles, powers, etc) are retrieved.
 
-`calib_from_checkerboard.py`
+[calib_from_checkerboard.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_from_checkerboard.py)
 Calibrates cameras with images or a video of a checkerboard, saves calibration in a Pose2Sim .toml calibration file.
+You should probably use Pose2Sim.calibration() instead, which is much easier and better.
 
-`calib_qca_to_toml.py`
+[calib_qca_to_toml.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_qca_to_toml.py)
 Converts a Qualisys .qca.txt calibration file to the Pose2Sim .toml calibration file (similar to what is used in [AniPose](https://anipose.readthedocs.io/en/latest/)).
 
-`calib_toml_to_qca.py`
+[calib_toml_to_qca.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_qca.py)
 Converts a Pose2Sim .toml calibration file (e.g., from a checkerboard) to a Qualisys .qca.txt calibration file.
 
-`calib_yml_to_toml.py`
+[calib_yml_to_toml.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_yml_to_toml.py)
 Converts OpenCV intrinsic and extrinsic .yml calibration files to an OpenCV .toml calibration file.
 
-`calib_toml_to_yml.py`
+[calib_toml_to_yml.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_yml.py)
 Converts an OpenCV .toml calibration file to OpenCV intrinsic and extrinsic .yml calibration files.
    </pre>
 </details>
@@ -696,13 +701,13 @@ Converts an OpenCV .toml calibration file to OpenCV intrinsic and extrinsic .yml
   <summary><b>Plotting tools</b> (CLICK TO SHOW)</summary>
     <pre>
 
-`json_display_with_img.py` 
+[json_display_with_img.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/json_display_with_img.py)
 Overlays 2D detected json coordinates on original raw images. High confidence keypoints are green, low confidence ones are red.
 
-`json_display_without_img.py`
+[json_display_without_img.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/json_display_without_img.py)
 Plots an animation of 2D detected json coordinates. 
 
-`trc_plot.py`
+[trc_plot.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_plot.py)
 Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different matplotlib tab.
    </pre>
 </details>
@@ -711,19 +716,19 @@ Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different ma
   <summary><b>Other trc tools</b> (CLICK TO SHOW)</summary>
     <pre>
     
-`trc_desample.py`
+[trc_desample.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_desample.py)
 Undersamples a trc file.
 
-`trc_Zup_to_Yup.py`
+[trc_Zup_to_Yup.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_Zup_to_Yup.py)
 Changes Z-up system coordinates to Y-up system coordinates.
 
-`trc_filter.py`
+[trc_filter.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_filter.py)
 Filters trc files. Available filters: Butterworth, Butterworth on speed, Gaussian, LOESS, Median.
 
-`trc_gaitevents.py`
+[trc_gaitevents.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_gaitevents.py)
 Detects gait events from point coordinates according to [Zeni et al. (2008)](https://www.sciencedirect.com/science/article/abs/pii/S0966636207001804?via%3Dihub).
 
-`trc_combine.py`
+[trc_combine.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_combine.py)
 Combine two trc files, for example a triangulated DeepLabCut trc file and a triangulated OpenPose trc file.
    </pre>
 </details>
