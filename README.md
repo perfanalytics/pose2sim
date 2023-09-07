@@ -861,3 +861,4 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > - [ ] **Conda package** 
 > - [ ] **Docker image**
 > - [ ] **Run from command line via click or typer**
+> - [ ] **Utilities**: Export other data from c3d files into .mot or .sto files (angles, powers, forces, moments, GRF, EMG...)
