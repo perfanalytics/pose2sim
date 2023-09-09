@@ -800,7 +800,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > - [x] **Calibration:** Convert Vicon [.xcp calibration file](https://montrealrobotics.ca/diffcvgp/assets/papers/7.pdf).
 > - [x] **Calibration:** Easier and clearer calibration procedure: separate intrinsic and extrinsic parameter calculation, edit corner detection if some are wrongly detected (or not visible). 
 > - [x] **Calibration:** Possibility to evaluate extrinsic parameters from cues on scene.
-> - [ ] **Calibration:** Track extrinsics reference points frame by frame for calibration of moving cameras.
+> - [ ] **Calibration:** Once object points have been detected or clicked once, track them for live calibration of moving cameras. Propose to click again when they are lost.
 > - [ ] **Calibration:** Fine-tune calibration with bundle adjustment.
 > - [ ] **Calibration:** Support ChArUco board detection (see [there](https://mecaruco2.readthedocs.io/en/latest/notebooks_rst/Aruco/sandbox/ludovic/aruco_calibration_rotation.html)).
 > - [ ] **Calibration:** Calculate calibration with points rather than board. (1) SBA calibration with wand (cf [Argus](https://argus.web.unc.edu), see converter [here](https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py)). Set world reference frame in the end.

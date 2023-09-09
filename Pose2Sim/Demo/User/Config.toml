@@ -53,6 +53,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
       extrinsics_board_type = 'scene' # 'checkerboard', 'scene'  ('charucoboard' not supported yet)
       # 'board' should be large enough to be detected when laid on the floor. 
       # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out
+      moving_camera = false # Not implemented yet
       calculate_extrinsics = true # true or false (lowercase)
       show_reprojection_error = true # true or false (lowercase)
       extrinsics_extension = 'png' # any video or image extension
