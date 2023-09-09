@@ -443,7 +443,6 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
                 if isinstance(imgp_confirmed, np.ndarray):
                     imgpoints.append(imgp_confirmed)
                     objpoints.append(objp_confirmed)
-
             else:
                 imgp_confirmed = findCorners(img_path, intrinsics_corners_nb, objp=objp, show=show_detection_intrinsics)
                 if isinstance(imgp_confirmed, np.ndarray):
@@ -504,7 +503,15 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             logging.exception(f'The folder {os.path.join(calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
             raise ValueError(f'The folder {os.path.join(calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
         img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
-        img = cv2.imread(img_vid_files[0])
+
+        # extract frames from video if video
+        try:
+            cap = cv2.VideoCapture(img_vid_files[0])
+            res, img = cap.read()
+            if res == False:
+                raise
+        except:
+            img = cv2.imread(img_vid_files[0])
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         # Find corners or label by hand
@@ -539,8 +546,6 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
 
         # Check calibration results
         if show_reprojection_error:
-            img = cv2.imread(img_vid_files[0])
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             for o in proj_obj:
                 cv2.circle(img, (int(o[0]), int(o[1])), 8, (0,0,255), -1) 
             for i in imgp:
