@@ -803,6 +803,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > - [ ] **Calibration:** Once object points have been detected or clicked once, track them for live calibration of moving cameras. Propose to click again when they are lost.
 > - [ ] **Calibration:** Fine-tune calibration with bundle adjustment.
 > - [ ] **Calibration:** Support ChArUco board detection (see [there](https://mecaruco2.readthedocs.io/en/latest/notebooks_rst/Aruco/sandbox/ludovic/aruco_calibration_rotation.html)).
+> - [ ] **Calibration:** Convert bioCV (University of Bath) and OpenCap calibrations.
 > - [ ] **Calibration:** Calculate calibration with points rather than board. (1) SBA calibration with wand (cf [Argus](https://argus.web.unc.edu), see converter [here](https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py)). Set world reference frame in the end.
 > - [ ] **Calibration:** Alternatively, self-calibrate with [OpenPose keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
 
