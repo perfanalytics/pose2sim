@@ -27,6 +27,10 @@
 
 '''
 
+# TODO: DETECT WHEN WINDOW IS CLOSED
+# TODO: WHEN 'Y', CATCH IF NUMBER OF IMAGE POINTS CLICKED NOT EQUAL TO NB OBJ POINTS
+# REMOVE OPENCV ERROR (FROM FFMPEG C CODE)
+
 
 ## INIT
 from Pose2Sim.common import RT_qca2cv, rotate_cam, quat2mat, euclidean_distance, natural_sort
@@ -503,7 +507,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             logging.exception(f'The folder {os.path.join(calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
             raise ValueError(f'The folder {os.path.join(calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
         img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
-
+        
         # extract frames from video if video
         try:
             cap = cv2.VideoCapture(img_vid_files[0])
@@ -546,6 +550,16 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
 
         # Check calibration results
         if show_reprojection_error:
+            # Reopen image, otherwise 2 sets of text are overlaid
+            try:
+                cap = cv2.VideoCapture(img_vid_files[0])
+                res, img = cap.read()
+                if res == False:
+                    raise
+            except:
+                img = cv2.imread(img_vid_files[0])
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
             for o in proj_obj:
                 cv2.circle(img, (int(o[0]), int(o[1])), 8, (0,0,255), -1) 
             for i in imgp:
@@ -672,15 +686,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     - only if objp!=[]: objp_confirmed: array of [3d corner coordinates]
     '''
 
-
-    def on_close(event):
-        # If close window, close all and return nothing
-        global imgp_confirmed, objp_confirmed
-        plt.close('all')
-        imgp_confirmed = []
-        objp_confirmed = []
-
-
+                                 
     def on_key(event):
         '''
         Handles key press events:
@@ -803,11 +809,12 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     ax_3d.scatter(*objp[count], marker='o', color='g')
                     fig_3d.canvas.draw()
                 elif count == len(objp)-1:
+                    # close all
+                    plt.close('all')
                     # retrieve objp_confirmed
                     objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])
                     imgp_confirmed = np.array(imgp_confirmed, np.float32)
-                    # close all, delete all
-                    plt.close('all')
+                    # delete all
                     for var_to_delete in ['events', 'count', 'scat', 'scat_3d', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
                         if var_to_delete in globals():
                             del globals()[var_to_delete]
@@ -918,7 +925,6 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
 
     # Handles key presses to Accept, dismiss, or click points by hand
     cid = fig.canvas.mpl_connect('key_press_event', on_key)
-    fig.canvas.mpl_connect('close_event', on_close)
     
     plt.draw()
     plt.show(block=True)
