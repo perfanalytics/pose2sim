@@ -730,6 +730,9 @@ Detects gait events from point coordinates according to [Zeni et al. (2008)](htt
 
 [trc_combine.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_combine.py)
 Combine two trc files, for example a triangulated DeepLabCut trc file and a triangulated OpenPose trc file.
+
+[trc_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_mot_osim.py)
+Build a trc file from a .mot motion file and a .osim model file.
    </pre>
 </details>
 
