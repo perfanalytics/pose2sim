@@ -20,9 +20,15 @@ opensim_folder_name = 'opensim'
 
 
 [pose]
-pose_model = 'BODY_25B' #CUSTOM, BODY_25B, BODY_25, BODY_135, BLAZEPOSE, HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII are available,
-# from DeepLabCut, OpenPose, MediaPipe BlazePose, and AlphaPose
-# See Pose2Sim\skeleton.py for their skeleton hierarchy
+pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII. 
+						#With mediapipe: BLAZEPOSE. 
+						#With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
+						#With deeplabcut: CUSTOM
+						# See Pose2Sim\skeleton.py for their skeleton hierarchy
+# What follows has not been implemented yet
+pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
+overwrite_pose = false
+openpose_path = '' # only checked if OpenPose is used
 
 
 [calibration]
@@ -53,6 +59,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
       extrinsics_board_type = 'scene' # 'checkerboard', 'scene'  ('charucoboard' not supported yet)
       # 'board' should be large enough to be detected when laid on the floor. 
       # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out
+      moving_camera = false # Not implemented yet
       calculate_extrinsics = true # true or false (lowercase)
       show_reprojection_error = true # true or false (lowercase)
       extrinsics_extension = 'png' # any video or image extension
