@@ -86,6 +86,28 @@ def base_params(config_dict):
     return project_dir, seq_name, frames
 
 
+def poseEstimation(config=os.path.join('User', 'Config.toml')):
+    '''
+    Estimate pose using BlazePose, OpenPose, AlphaPose, or DeepLabCut
+    '''
+
+    from Pose2Sim.poseEstimation import pose_estimation_all
+    
+    config_dict = read_config_file(config)
+    project_dir, seq_name, frames = base_params(config_dict)
+    
+    logging.info("\n\n---------------------------------------------------------------------")
+    logging.info("Pose estimation")
+    logging.info("---------------------------------------------------------------------")
+    logging.info(f"\nProject directory: {project_dir}")
+    start = time.time()
+    
+    pose_estimation_all(config_dict)
+    
+    end = time.time()
+    logging.info(f'Pose estimation took {end-start:.2f} s.')
+
+
 def calibration(config=os.path.join('User', 'Config.toml')):
     '''
     Cameras calibration from checkerboards or from qualisys files.
@@ -110,10 +132,25 @@ def calibration(config=os.path.join('User', 'Config.toml')):
 
 def synchronization(config=os.path.join('User', 'Config.toml')):
     '''
-    Synchronize if needed
+    Synchronize cameras if needed
     '''   
-    pass
-
+    
+    from Pose2Sim.synchronization import synchronize_cams_all
+    
+    config_dict = read_config_file(config)
+    project_dir, seq_name, frames = base_params(config_dict)
+    
+    logging.info("\n\n---------------------------------------------------------------------")
+    logging.info("Camera synchronization")
+    logging.info("---------------------------------------------------------------------")
+    logging.info(f"\nProject directory: {project_dir}")
+    start = time.time()
+    
+    synchronize_cams_all(config_dict)
+    
+    end = time.time()
+    logging.info(f'Synchronization took {end-start:.2f} s.')    
+    
     
 def personAssociation(config=os.path.join('User', 'Config.toml')):
     '''

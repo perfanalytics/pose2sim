@@ -855,6 +855,9 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 </br>
 
 > - [x] **Demo:** Provide Demo data for users to test the code.
+> - [ ] **Demo:** Add videos for users to experiment with other pose detecction frameworks
+> - [ ] **Demo:** Time shift videos and json to demonstrate synchronization
+> - [ ] **Demo:** Add another virtual person to demonstrate personAssociation
 > - [ ] **Tutorials:** Make video tutorials.
 > - [ ] **Doc:** Use [Sphinx](https://www.sphinx-doc.org/en/master) or [MkDocs](https://www.mkdocs.org) for clearer documentation.
 
@@ -864,5 +867,6 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > - [x] **Pip package**
 > - [ ] **Conda package** 
 > - [ ] **Docker image**
+> - [ ] **** Run pose estimation and OpenSim from within Pose2Sim
 > - [ ] **Run from command line via click or typer**
 > - [ ] **Utilities**: Export other data from c3d files into .mot or .sto files (angles, powers, forces, moments, GRF, EMG...)
