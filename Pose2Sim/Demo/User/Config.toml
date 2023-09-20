@@ -38,6 +38,10 @@ calibration_type = 'convert' # 'convert' or 'calculate'
    convert_from = 'qualisys' # 'qualisys', 'optitrack', or 'vicon'
       [calibration.convert.qualisys]
       binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
+      [calibration.convert.optitrack]  # See readme for instructions
+      [calibration.convert.vicon]      # No parameters needed
+      [calibration.convert.opencap]    # No parameters needed
+      [calibration.convert.biocv]      # No parameters needed
   
 
    [calibration.calculate] 

@@ -88,12 +88,20 @@ def base_params(config_dict):
 
 def poseEstimation(config=os.path.join('User', 'Config.toml')):
     '''
-    Estimate pose using BlazePose, OpenPose, AlphaPose, or DeepLabCut
+    Estimate pose using BlazePose, OpenPose, AlphaPose, or DeepLabCut.
+    
+    config can either be a path or a dictionary (for batch processing)
     '''
-
+    
+    raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
+    
+    # TODO
     from Pose2Sim.poseEstimation import pose_estimation_all
     
-    config_dict = read_config_file(config)
+    if type(config)==dict:
+        config_dict = config
+    else:
+        config_dict = read_config_file(config)
     project_dir, seq_name, frames = base_params(config_dict)
     
     logging.info("\n\n---------------------------------------------------------------------")
@@ -111,11 +119,16 @@ def poseEstimation(config=os.path.join('User', 'Config.toml')):
 def calibration(config=os.path.join('User', 'Config.toml')):
     '''
     Cameras calibration from checkerboards or from qualisys files.
+    
+    config can either be a path or a dictionary (for batch processing)
     '''
 
     from Pose2Sim.calibration import calibrate_cams_all
     
-    config_dict = read_config_file(config)
+    if type(config)==dict:
+        config_dict = config
+    else:
+        config_dict = read_config_file(config)
     project_dir, seq_name, frames = base_params(config_dict)
     
     logging.info("\n\n---------------------------------------------------------------------")
@@ -132,12 +145,20 @@ def calibration(config=os.path.join('User', 'Config.toml')):
 
 def synchronization(config=os.path.join('User', 'Config.toml')):
     '''
-    Synchronize cameras if needed
-    '''   
+    Synchronize cameras if needed.
     
+    config can either be a path or a dictionary (for batch processing)
+    '''   
+
+    raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
+    
+    #TODO
     from Pose2Sim.synchronization import synchronize_cams_all
     
-    config_dict = read_config_file(config)
+    if type(config)==dict:
+        config_dict = config
+    else:
+        config_dict = read_config_file(config)
     project_dir, seq_name, frames = base_params(config_dict)
     
     logging.info("\n\n---------------------------------------------------------------------")
@@ -156,11 +177,16 @@ def personAssociation(config=os.path.join('User', 'Config.toml')):
     '''
     Tracking of the person of interest in case of multiple persons detection.
     Needs a calibration file.
+    
+    config can either be a path or a dictionary (for batch processing)
     '''
     
     from Pose2Sim.personAssociation import track_2d_all
     
-    config_dict = read_config_file(config)
+    if type(config)==dict:
+        config_dict = config
+    else:
+        config_dict = read_config_file(config)
     project_dir, seq_name, frames = base_params(config_dict)
     
     logging.info("\n\n---------------------------------------------------------------------")
@@ -178,11 +204,16 @@ def personAssociation(config=os.path.join('User', 'Config.toml')):
 def triangulation(config=os.path.join('User', 'Config.toml')):
     '''
     Robust triangulation of 2D points coordinates.
+    
+    config can either be a path or a dictionary (for batch processing)
     '''
 
     from Pose2Sim.triangulation import triangulate_all
 
-    config_dict = read_config_file(config)
+    if type(config)==dict:
+        config_dict = config
+    else:
+        config_dict = read_config_file(config)
     project_dir, seq_name, frames = base_params(config_dict)
 
     logging.info("\n\n---------------------------------------------------------------------")
@@ -200,11 +231,16 @@ def triangulation(config=os.path.join('User', 'Config.toml')):
 def filtering(config=os.path.join('User', 'Config.toml')):
     '''
     Filter trc 3D coordinates.
+    
+    config can either be a path or a dictionary (for batch processing)
     '''
 
     from Pose2Sim.filtering import filter_all
 
-    config_dict = read_config_file(config)
+    if type(config)==dict:
+        config_dict = config
+    else:
+        config_dict = read_config_file(config)
     project_dir, seq_name, frames = base_params(config_dict)
     
     logging.info("\n\n---------------------------------------------------------------------")
@@ -213,3 +249,63 @@ def filtering(config=os.path.join('User', 'Config.toml')):
     logging.info(f"\nProject directory: {project_dir}")
     
     filter_all(config_dict)
+
+
+def scalingModel(config=os.path.join('User', 'Config.toml')):
+    '''
+    Uses OpenSim to scale a model based on a static 3D pose.
+    
+    config can either be a path or a dictionary (for batch processing)
+    '''
+    
+    raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
+    
+    # TODO
+    from Pose2Sim.scalingModel import scale_model_all
+    
+    if type(config)==dict:
+        config_dict = config
+    else:
+        config_dict = read_config_file(config)
+    project_dir, seq_name, frames = base_params(config_dict)
+    
+    logging.info("\n\n---------------------------------------------------------------------")
+    logging.info("Scaling model")
+    logging.info("---------------------------------------------------------------------")
+    logging.info(f"\nProject directory: {project_dir}")
+    start = time.time()
+    
+    scale_model_all(config_dict)
+    
+    end = time.time()
+    logging.info(f'Model scaling took {end-start:.2f} s.')
+    
+    
+def inverseKinematics(config=os.path.join('User', 'Config.toml')):
+    '''
+    Uses OpenSim to perform inverse kinematics.
+    
+    config can either be a path or a dictionary (for batch processing)
+    '''
+    
+    raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
+    
+    # TODO
+    from Pose2Sim.inverseKinematics import inverse_kinematics_all
+    
+    if type(config)==dict:
+        config_dict = config
+    else:
+        config_dict = read_config_file(config)
+    project_dir, seq_name, frames = base_params(config_dict)
+    
+    logging.info("\n\n---------------------------------------------------------------------")
+    logging.info("Inverse kinematics")
+    logging.info("---------------------------------------------------------------------")
+    logging.info(f"\nProject directory: {project_dir}")
+    start = time.time()
+    
+    inverse_kinematics_all(config_dict)
+    
+    end = time.time()
+    logging.info(f'Inverse kinematics took {end-start:.2f} s.')

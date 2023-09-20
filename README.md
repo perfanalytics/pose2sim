@@ -52,6 +52,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
       1. [OpenSim Scaling](#opensim-scaling)
       2. [OpenSim Inverse kinematics](#opensim-inverse-kinematics)
       3. [Command Line](#command-line)
+   7. [Batch processing](#batch-processing)
 3. [Utilities](#utilities)
 4. [How to cite and how to contribute](#how-to-cite-and-how-to-contribute)
    1. [How to cite](#how-to-cite)
@@ -659,6 +660,38 @@ Make sure to replace `38` in `py38np120` with your Python version (3.8 in this c
    </pre>
 </details>
 
+
+## Batch processing
+If you need to batch process multiple data or with multiple different parameters, you can run any Pose2Sim function with a `config` dictionary instead of a file. For example:
+```
+from Pose2Sim import Pose2Sim
+import toml
+
+config_dict = toml.load('User/Config.toml')
+config_dict['project']['pose_folder_name'] = new_project_path
+Pose2Sim.triangulate(config_dict)
+```
+Or into a loop:
+```
+from Pose2Sim import Pose2Sim
+import toml
+config_dict = toml.load('User/Config.toml')
+
+# Change project_path
+for new_project_path in new_project_paths:
+  config_dict['project']['project_dir'] = new_project_path
+  config_dict['filtering']['display_figures'] = False
+
+  # Run any Pose2Sim function with config_dict instead of a path
+  Pose2Sim.triangulation(config_dict)
+  
+  # Now change filtering type
+  for new_filter in ['butterworth', 'kalman', 'gaussian']:
+    config_dict['filtering']['type'] = new_filter
+    Pose2Sim.filtering(config_dict)
+```
+
+
 # Utilities
 A list of standalone tools (see [Utilities](https://github.com/perfanalytics/pose2sim/tree/main/Pose2Sim/Utilities)), which can be either run as scripts, or imported as functions. Check usage in the docstrings of each Python file. The figure below shows how some of these toolscan be used to further extend Pose2Sim usage.
 
@@ -793,7 +826,6 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > - [x] **Pose:** Support [BlazePose](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker) for faster inference (on mobile device).
 > - [x] **Pose:** Support [DeepLabCut](http://www.mackenziemathislab.org/deeplabcut) for training on custom datasets.
 > - [x] **Pose:** Support [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) as an alternative to OpenPose.
-> - [ ] **Pose:** Support [MediaPipe holistic](https://github.com/google/mediapipe/blob/master/docs/solutions/holistic.md) for pronation/supination (converter, skeleton.py, OpenSim model and setup files). 
 > - [ ] **Pose:** Support [MMPose](https://github.com/open-mmlab/mmpose), [SLEAP](https://sleap.ai/), etc.
 
 </br>
@@ -870,3 +902,20 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 > - [ ] **** Run pose estimation and OpenSim from within Pose2Sim
 > - [ ] **Run from command line via click or typer**
 > - [ ] **Utilities**: Export other data from c3d files into .mot or .sto files (angles, powers, forces, moments, GRF, EMG...)
+
+</br>
+
+> - [ ] **Bug:** common.py, class plotWindow(). Python crashes after a few runs of `Pose2Sim.filtering()` when `display_figures=true`. See [there](https://github.com/superjax/plotWindow/issues/7).
+> - [ ] **Bug:** calibration.py. FFMPEG error message when calibration files are images. See [there](https://github.com/perfanalytics/pose2sim/issues/33#:~:text=In%20order%20to%20check,filter%20this%20message%20yet.).
+
+</br>
+
+**Pose2Sim releases:**
+> - v0.1: Published online
+> - v0.2: Published associated paper
+> - v0.3: Supported other pose estimation algorithms
+> - v0.4: New calibration tool
+<!-- - v0.5: Supports multi-person analysis
+- v0.6: New synchronization tool
+- v0.7: Graphical User Interface
+- v1.0: -->

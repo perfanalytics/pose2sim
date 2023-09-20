@@ -449,7 +449,7 @@ def filter_all(config):
     pose_folder_name = config.get('project').get('pose_folder_name')
     try:
         pose_tracked_dir = os.path.join(project_dir, pose_tracked_folder_name)
-        os.path.isdir(pose_tracked_dir)
+        os.listdir(pose_tracked_dir)
         pose_dir = pose_tracked_dir
     except:
         pose_dir = os.path.join(project_dir, pose_folder_name)
@@ -469,7 +469,7 @@ def filter_all(config):
     
     # Trc paths
     trc_f_in = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
-    trc_f_out = f'{seq_name}_filt_{f_range[0]}-{f_range[1]}.trc'
+    trc_f_out = f'{seq_name}_filt_{filter_type}_{f_range[0]}-{f_range[1]}.trc'
     trc_path_in = os.path.join(pose3d_dir, trc_f_in)
     trc_path_out = os.path.join(pose3d_dir, trc_f_out)
     
