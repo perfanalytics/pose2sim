@@ -761,7 +761,8 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     fig_3d.canvas.draw()
                 elif count == len(objp)-1:
                     # if all objp have been clicked or indicated as not visible, close all
-                    imgp_confirmed = np.array(imgp, np.float32)
+                    objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])[:-1]
+                    imgp_confirmed = np.expand_dims(scat.get_offsets(), axis=1) 
                     plt.close('all')
                     for var_to_delete in ['events', 'count', 'scat', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
                         if var_to_delete in globals():
