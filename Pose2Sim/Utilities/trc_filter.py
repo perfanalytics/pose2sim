@@ -12,18 +12,18 @@
 
     Usage examples: 
     Butterworth filter, low-pass, 4th order, cut off frequency 6 Hz:
-        from Pose2Sim.Utilities import trc_filter; trc_filter.trc_filter_func(input_file = r"<input_trc_file>", output_file = r"<output_trc_file>", 
+        from Pose2Sim.Utilities import trc_filter; trc_filter.trc_filter_func(input_file = input_trc_file, output_file = output_trc_file, 
             display=True, type='butterworth', pass_type = 'low', order=4, cut_off_frequency=6)
-        OR python -m trc_filter -i "<input_trc_file>" -o "<output_trc_file>" -d True -t butterworth -p low -n 4 -f 6
-        OR python -m trc_filter -i "<input_trc_file>" -t butterworth -p low -n 4 -f 6
+        OR python -m trc_filter -i input_trc_file -o output_trc_file -d True -t butterworth -p low -n 4 -f 6
+        OR python -m trc_filter -i input_trc_file -t butterworth -p low -n 4 -f 6
     Butterworth filter on speed, low-pass, 4th order, cut off frequency 6 Hz:
-        python -m trc_filter -i "<input_trc_file>" -t butterworth_on_speed -p low -n 4 -f 6
+        python -m trc_filter -i input_trc_file -t butterworth_on_speed -p low -n 4 -f 6
     Gaussian filter, kernel 5:
-        python -m trc_filter -i "<input_trc_file>" -t gaussian, -k 5
+        python -m trc_filter -i input_trc_file -t gaussian, -k 5
     LOESS filter, kernel 5: NB: frac = kernel * frames_number
-        python -m trc_filter -i "<input_trc_file>" -t loess, -k 5
+        python -m trc_filter -i input_trc_file -t loess, -k 5
     Median filter, kernel 5:
-        python -m trc_filter -i "<input_trc_file>" -t gaussian, -k 5
+        python -m trc_filter -i input_trc_file -t gaussian, -k 5
 '''
 
 
@@ -298,18 +298,18 @@ def trc_filter_func(**args):
 
     Usage examples: 
     Butterworth filter, low-pass, 4th order, cut off frequency 6 Hz:
-        import trc_filter; trc_filter.trc_filter_func(input_file = r"<input_trc_file>", output_file = r"<output_trc_file>", 
+        import trc_filter; trc_filter.trc_filter_func(input_file = input_trc_file, output_file = output_trc_file, 
             display=True, type='butterworth', pass_type = 'low', order=4, cut_off_frequency=6)
-        OR python -m trc_filter -i "<input_trc_file>" -o "<output_trc_file>" -d True -t butterworth -p low -n 4 -f 6
-        OR python -m trc_filter -i "<input_trc_file>" -t butterworth, -p low -n 4 -f 6
+        OR python -m trc_filter -i input_trc_file -o output_trc_file -d True -t butterworth -p low -n 4 -f 6
+        OR python -m trc_filter -i input_trc_file -t butterworth, -p low -n 4 -f 6
     Butterworth filter on speed, low-pass, 4th order, cut off frequency 6 Hz:
-        python -m trc_filter -i "<input_trc_file>" -t butterworth_on_speed, -p low -n 4 -f 6
+        python -m trc_filter -i input_trc_file -t butterworth_on_speed, -p low -n 4 -f 6
     Gaussian filter, kernel 5:
-        python -m trc_filter -i "<input_trc_file>" -t gaussian, -k 5
+        python -m trc_filter -i input_trc_file -t gaussian, -k 5
     LOESS filter, kernel 5: NB: frac = kernel * frames_number
-        python -m trc_filter -i "<input_trc_file>" -t loess, -k 5
+        python -m trc_filter -i input_trc_file -t loess, -k 5
     Median filter, kernel 5:
-        python -m trc_filter -i "<input_trc_file>" -t gaussian, -k 5
+        python -m trc_filter -i input_trc_file -t gaussian, -k 5
     '''
 
     # Read trc header

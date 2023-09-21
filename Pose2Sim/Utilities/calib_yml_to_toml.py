@@ -15,8 +15,8 @@
     
     Usage: 
         import calib_yml_to_toml; calib_yml_to_toml.calib_yml_to_toml_func(r'<intrinsic_yml_file>', r'<extrinsic_yml_file>')
-        OR python -m calib_yml_to_toml -i <intrinsic_yml_file> -e <extrinsic_yml_file>
-        OR python -m calib_yml_to_toml -i <intrinsic_yml_file> -e <extrinsic_yml_file> -o "<output_toml_file>"
+        OR python -m calib_yml_to_toml -i intrinsic_yml_file -e extrinsic_yml_file
+        OR python -m calib_yml_to_toml -i intrinsic_yml_file -e extrinsic_yml_file -o output_toml_file
 '''
 
 
@@ -123,8 +123,8 @@ def calib_yml_to_toml_func(*args):
     
     Usage: 
         import calib_yml_to_toml; calib_yml_to_toml.calib_yml_to_toml_func(r'<intrinsic_yml_file>', r'<extrinsic_yml_file>')
-        OR python -m calib_yml_to_toml -i <intrinsic_yml_file> -e <extrinsic_yml_file>
-        OR python -m calib_yml_to_toml -i <intrinsic_yml_file> -e <extrinsic_yml_file> -o "<output_toml_file>"
+        OR python -m calib_yml_to_toml -i intrinsic_yml_file -e extrinsic_yml_file
+        OR python -m calib_yml_to_toml -i intrinsic_yml_file -e extrinsic_yml_file -o output_toml_file
     '''
     try:
         intrinsic_path = os.path.realpath(args[0].get('intrinsic_file')) # invoked with argparse

@@ -24,8 +24,8 @@
         eg -d=-Z or --gait_direction=-Z
         
         from Pose2Sim.Utilities import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(r'<input_trc_file>', '<gait_direction>')
-        OR python -m trc_gaitevents -i "<input_trc_file>"
-        OR python -m trc_gaitevents -i "<input_trc_file>" --gait_direction=-Z
+        OR python -m trc_gaitevents -i input_trc_file
+        OR python -m trc_gaitevents -i input_trc_file --gait_direction=-Z
 '''
 
 
@@ -142,8 +142,8 @@ def trc_gaitevents_func(*args):
         eg -d=-Z or --gait_direction=-Z
         
         import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(r'<input_trc_file>', '<gait_direction>')
-        OR trc_gaitevents -i "<input_trc_file>" --gait_direction Z
-        OR trc_gaitevents -i "<input_trc_file>" --gait_direction=-Z
+        OR trc_gaitevents -i input_trc_file --gait_direction Z
+        OR trc_gaitevents -i input_trc_file --gait_direction=-Z
     '''
 
     try:

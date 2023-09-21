@@ -14,8 +14,8 @@
     
     Usage: 
     from Pose2Sim.Utilities import c3d_to_trc; c3d_to_trc.c3d_to_trc_func(r'<input_c3d_file>')
-    python -m c3d_to_trc -i "<input_c3d_file>"
-    python -m c3d_to_trc -i "<input_c3d_file>" -o "<output_c3d_file>"
+    python -m c3d_to_trc -i input_c3d_file
+    python -m c3d_to_trc -i input_c3d_file -o output_c3d_file
 '''
 
 
@@ -45,8 +45,8 @@ def c3d_to_trc_func(*args):
     
     Usage: 
     import c3d_to_trc; c3d_to_trc.c3d_to_trc_func(r'<input_c3d_file>')
-    c3d_to_trc -i "<input_c3d_file>"
-    c3d_to_trc -i "<input_c3d_file>" -o "<output_c3d_file>"
+    c3d_to_trc -i input_c3d_file
+    c3d_to_trc -i input_c3d_file -o output_c3d_file
     '''
     
     try:

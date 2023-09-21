@@ -17,8 +17,8 @@
     images.
     
     Usage: 
-    python -m json_display_with_img -j "<json_folder>" -i "<raw_img_folder>"
-    python -m json_display_with_img -j "<json_folder>" -i "<raw_img_folder>" -o "<output_img_folder>" -d True -s True
+    python -m json_display_with_img -j json_folder -i raw_img_folder
+    python -m json_display_with_img -j json_folder -i raw_img_folder -o output_img_folder -d True -s True
     from Pose2Sim.Utilities import json_display_with_img; json_display_with_img.json_display_with_img_func(json_folder=r'<json_folder>', raw_img_folder=r'<raw_img_folder>')
 '''
 
@@ -54,8 +54,8 @@ def json_display_with_img_func(**args):
     images.
     
     Usage: 
-    json_display_with_img -j "<json_folder>" -i "<raw_img_folder>"
-    json_display_with_img -j "<json_folder>" -i "<raw_img_folder>" -o "<output_img_folder>" -d True -s True
+    json_display_with_img -j json_folder -i raw_img_folder
+    json_display_with_img -j json_folder -i raw_img_folder -o output_img_folder -d True -s True
     import json_display_with_img; json_display_with_img.json_display_with_img_func(json_folder=r'<json_folder>', raw_img_folder=r'<raw_img_folder>')
     '''
 

@@ -14,8 +14,8 @@
     
     Usage:
     from Pose2Sim.Utilities import trc_combine; trc_combine.trc_combine_func(r'<first_path>', r'<second_path>', r'<output_path>')
-    OR python -m trc_combine -i "<first_path>" -j "<second_path>" -o "<output_path>"
-    OR python -m trc_combine -i "<first_path>" -j "<second_path>"
+    OR python -m trc_combine -i first_path -j second_path -o output_path
+    OR python -m trc_combine -i first_path -j second_path
 '''
 
 
@@ -133,8 +133,8 @@ def trc_combine_func(*args):
 
     Usage:
     from Pose2Sim.Utilities import trc_combine; trc_combine.trc_combine_func(r'<first_path>', r'<second_path>', r'<output_path>')
-    OR python -m trc_combine -i "<first_path>" -j "<second_path>" -o "<output_path>"
-    OR python -m trc_combine -i "<first_path>" -j "<second_path>"
+    OR python -m trc_combine -i first_path -j second_path -o output_path
+    OR python -m trc_combine -i first_path -j second_path
     '''
 
     try:

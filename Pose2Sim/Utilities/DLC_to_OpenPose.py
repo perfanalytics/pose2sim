@@ -11,8 +11,8 @@
     You may need to install tables: 'pip install tables' or 'conda install pytables'
         
     Usage: 
-    python -m DLC_to_OpenPose -i "<input_h5_file>" -o "<output_json_folder>"
-    OR python -m DLC_to_OpenPose -i "<input_h5_file>"
+    python -m DLC_to_OpenPose -i input_h5_file -o output_json_folder
+    OR python -m DLC_to_OpenPose -i input_h5_file
     OR from Pose2Sim.Utilities import DLC_to_OpenPose; DLC_to_OpenPose.DLC_to_OpenPose_func(r'input_h5_file', r'output_json_folder')
 '''
 
@@ -43,8 +43,8 @@ def DLC_to_OpenPose_func(*args):
     Translates DeepLabCut (h5) 2D pose estimation files into OpenPose (json) files.
 
     Usage: 
-    DLC_to_OpenPose -i "<input_h5_file>" -o "<output_json_folder>"
-    OR DLC_to_OpenPose -i "<input_h5_file>"
+    DLC_to_OpenPose -i input_h5_file -o output_json_folder
+    OR DLC_to_OpenPose -i input_h5_file
     OR import DLC_to_OpenPose; DLC_to_OpenPose.DLC_to_OpenPose_func(r'input_h5_file', r'output_json_folder')
     '''
 

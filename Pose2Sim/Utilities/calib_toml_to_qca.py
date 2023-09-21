@@ -12,8 +12,8 @@
 
     Usage: 
         from Pose2Sim.Utilities import calib_toml_to_qca; calib_toml_to_qca.calib_toml_to_qca_func(r'<input_toml_file>')
-        OR python -m calib_toml_to_qca -i "<input_toml_file>"
-        OR python -m calib_toml_to_qca -i "<input_toml_file>" --binning_factor 2 --pixel_size 5.54e-3 -o "<output_qca_file>"
+        OR python -m calib_toml_to_qca -i input_toml_file
+        OR python -m calib_toml_to_qca -i input_toml_file --binning_factor 2 --pixel_size 5.54e-3 -o output_qca_file
 '''
 
 
@@ -152,8 +152,8 @@ def calib_toml_to_qca_func(**args):
 
     Usage: 
         import calib_toml_to_qca; calib_toml_to_qca.calib_toml_to_qca_func(input_file=r'<input_toml_file>')
-        OR calib_toml_to_qca -i "<input_toml_file>"
-        OR calib_toml_to_qca -i "<input_toml_file>" --binning_factor 2 --pixel_size 5.54e-3 -o "<output_qca_file>"
+        OR calib_toml_to_qca -i input_toml_file
+        OR calib_toml_to_qca -i input_toml_file --binning_factor 2 --pixel_size 5.54e-3 -o output_qca_file
     '''
     
     toml_path = args.get('input_file')

@@ -14,8 +14,8 @@
     coordinates on the original images.
     
     Usage: 
-    python -m json_display_without_img -j "<json_folder>"
-    python -m json_display_without_img -j "<json_folder>" -o "<output_img_folder>" -d True -s True
+    python -m json_display_without_img -j json_folder
+    python -m json_display_without_img -j json_folder -o output_img_folder -d True -s True
     from Pose2Sim.Utilities import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>')
 '''
 
@@ -80,8 +80,8 @@ def json_display_without_img_func(**args):
     coordinates on the original images.
     
     Usage: 
-    json_display_without_img -j "<json_folder>"
-    json_display_without_img -j "<json_folder>" -o "<output_img_folder>" -d True -s True
+    json_display_without_img -j json_folder
+    json_display_without_img -j json_folder -o output_img_folder -d True -s True
     import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>')
     '''
 

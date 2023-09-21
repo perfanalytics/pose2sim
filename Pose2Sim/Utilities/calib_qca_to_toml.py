@@ -12,8 +12,8 @@
 
     Usage: 
         from Pose2Sim.Utilities import calib_qca_to_toml; calib_qca_to_toml.calib_qca_to_toml_func(r'<input_qca_file>')
-        OR python -m calib_qca_to_toml -i "<input_qca_file>"
-        OR python -m calib_qca_to_toml -i "<input_qca_file>" --binning_factor 2 -o "<output_toml_file>"
+        OR python -m calib_qca_to_toml -i input_qca_file
+        OR python -m calib_qca_to_toml -i input_qca_file --binning_factor 2 -o output_toml_file
 '''
 
 
@@ -195,8 +195,8 @@ def calib_qca_to_toml_func(*args):
 
     Usage: 
         import calib_qca_to_toml; calib_qca_to_toml.calib_qca_to_toml_func(r'<input_qca_file>')
-        OR calib_qca_to_toml -i "<input_qca_file>"
-        OR calib_qca_to_toml -i "<input_qca_file>" --binning_factor 2 -o "<output_toml_file>"
+        OR calib_qca_to_toml -i input_qca_file
+        OR calib_qca_to_toml -i input_qca_file --binning_factor 2 -o output_toml_file
     '''
     
     try:

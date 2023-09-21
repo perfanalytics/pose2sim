@@ -12,8 +12,8 @@
     
     Usage: 
     from Pose2Sim.Utilities import trc_from_mot_osim; trc_from_mot_osim.trc_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_trc_file>')
-    python -m trc_from_mot_osim -m "<input_mot_file>" -o "<input_osim_file>"
-    python -m trc_from_mot_osim -m "<input_mot_file>" -o "<input_osim_file>" -t "<output_trc_file>"
+    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file
+    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file -t output_trc_file
 '''
 
 
@@ -86,8 +86,8 @@ def trc_from_mot_osim_func(*args):
     
     Usage: 
     from Pose2Sim.Utilities import trc_from_mot_osim; trc_from_mot_osim.trc_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<trc_output_file>')
-    python -m trc_from_mot_osim -m "<input_mot_file>" -o "<input_osim_file>"
-    python -m trc_from_mot_osim -m "<input_mot_file>" -o "<input_osim_file>" -t "<trc_output_file>"
+    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file
+    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file -t trc_output_file
     '''
 
     try:

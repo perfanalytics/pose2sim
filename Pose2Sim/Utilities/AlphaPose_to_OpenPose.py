@@ -10,8 +10,8 @@
     Converts AlphaPose single json file to OpenPose frame-by-frame files.
         
     Usage: 
-    python -m AlphaPose_to_OpenPose -i "<input_alphapose_json_file>" -o "<output_openpose_json_folder>"
-    OR python -m AlphaPose_to_OpenPose -i "<input_alphapose_json_file>"
+    python -m AlphaPose_to_OpenPose -i input_alphapose_json_file -o output_openpose_json_folder
+    OR python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
     OR from Pose2Sim.Utilities import AlphaPose_to_OpenPose; AlphaPose_to_OpenPose.AlphaPose_to_OpenPose_func(r'input_alphapose_json_file', r'output_openpose_json_folder')
 '''
 
@@ -39,8 +39,8 @@ def AlphaPose_to_OpenPose_func(*args):
     Converts AlphaPose single json file to OpenPose frame-by-frame files.
         
     Usage: 
-    python -m AlphaPose_to_OpenPose -i "<input_alphapose_json_file>" -o "<output_openpose_json_folder>"
-    OR python -m AlphaPose_to_OpenPose -i "<input_alphapose_json_file>"
+    python -m AlphaPose_to_OpenPose -i input_alphapose_json_file -o output_openpose_json_folder
+    OR python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
     OR from Pose2Sim.Utilities import AlphaPose_to_OpenPose; AlphaPose_to_OpenPose.AlphaPose_to_OpenPose_func(r'input_alphapose_json_file', r'output_openpose_json_folder')
     '''
 

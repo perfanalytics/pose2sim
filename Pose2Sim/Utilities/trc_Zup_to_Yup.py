@@ -11,8 +11,8 @@
     
     Usage: 
     from Pose2Sim.Utilities import trc_Zup_to_Yup; trc_Zup_to_Yup.trc_Zup_to_Yup_func(r'<input_trc_file>', r'<output_trc_file>')
-    python -m trc_Zup_to_Yup -i "<input_trc_file>"
-    python -m trc_Zup_to_Yup -i "<input_trc_file>" -o "<output_trc_file>"
+    python -m trc_Zup_to_Yup -i input_trc_file
+    python -m trc_Zup_to_Yup -i input_trc_file -o output_trc_file
 '''
 
 
@@ -40,8 +40,8 @@ def trc_Zup_to_Yup_func(*args):
 
     Usage: 
     import trc_Zup_to_Yup; trc_Zup_to_Yup.trc_Zup_to_Yup_func(r'<input_trc_file>', r'<output_trc_file>')
-    trcZup_to_Yup -i "<input_trc_file>"
-    trcZup_to_Yup -i "<input_trc_file>" -o "<output_trc_file>"
+    trcZup_to_Yup -i input_trc_file
+    trcZup_to_Yup -i input_trc_file -o output_trc_file
     '''
 
     try:

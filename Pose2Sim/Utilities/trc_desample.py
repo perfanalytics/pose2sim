@@ -10,8 +10,8 @@
     Undersample a trc file
     
     Usage: 
-    python -m trc_desample -i "<input_trc_file>" -f <output_frequency>
-    python -m trc_desample -i "<input_trc_file>" -f <output_frequency> -o "<output_trc_file>"
+    python -m trc_desample -i input_trc_file -f <output_frequency>
+    python -m trc_desample -i input_trc_file -f <output_frequency> -o output_trc_file
     from Pose2Sim.Utilities import trc_desample; trc_desample.trc_desample_func(r'input_trc_file', output_frequency, r'output_trc_file')
 '''
 
@@ -39,8 +39,8 @@ def trc_desample_func(*args):
     Undersample a trc file
 
     Usage: 
-    trc_desample -i "<input_trc_file>" -f <output_frequency>
-    trc_desample -i "<input_trc_file>" -f <output_frequency> -o "<output_trc_file>"
+    trc_desample -i input_trc_file -f <output_frequency>
+    trc_desample -i input_trc_file -f <output_frequency> -o output_trc_file
     import trc_desample; trc_desample.trc_desample_func(r'input_trc_file', output_frequency, r'output_trc_file')
     '''
     

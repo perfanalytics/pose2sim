@@ -182,7 +182,7 @@ Make sure you modify the [User\Config.toml](https://github.com/perfanalytics/pos
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 * Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
   ```
-  python -m Blazepose_runsave -i r"<input_file>" -dJs
+  python -m Blazepose_runsave -i rinput_file -dJs
   ```
   Type in `python -m Blazepose_runsave -h` for explanation on parameters and for additional ones.
 * Make sure you change the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
@@ -192,7 +192,7 @@ If you need to detect specific points on a human being, an animal, or an object,
 1. Train your DeepLabCut model and run it on your images or videos (more instruction on their repository)
 2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
    ```
-   python -m DLC_to_OpenPose -i r"<input_h5_file>"
+   python -m DLC_to_OpenPose -i rinput_h5_file
    ```
 3. Report the model keypoints in the [skeleton.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/skeletons.py) file, and make sure you change the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 4. Create an OpenSim model if you need 3D joint angles.
@@ -202,7 +202,7 @@ If you need to detect specific points on a human being, an animal, or an object,
 * Install and run AlphaPose on your videos (more instruction on their repository)
 * Translate the AlphaPose single json file to OpenPose frame-by-frame files (with `AlphaPose_to_OpenPose.py` script, see [Utilities](#utilities)): 
    ```
-   python -m AlphaPose_to_OpenPose -i r"<input_alphapose_json_file>"
+   python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
    ```
 * Make sure you change the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 

@@ -11,7 +11,7 @@
     
     Usage: 
         from Pose2Sim.Utilities import trc_plot; trc_plot.trc_plot_func(r'<input_trc_file>')
-        OR python -m trc_plot -i "<input_trc_file>"
+        OR python -m trc_plot -i input_trc_file
 '''
 
 
@@ -139,7 +139,7 @@ def trc_plot_func(*args):
     
     Usage: 
         import trc_plot; trc_plot.trc_plot_func(r'<input_trc_file>')
-        OR trc_plot -i "<input_trc_file>"
+        OR trc_plot -i input_trc_file
     '''
     
     try:
