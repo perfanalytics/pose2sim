@@ -809,7 +809,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 
 - Supervised my PhD: @lreveret (INRIA, Université Grenoble Alpes), and @mdomalai (Université de Poitiers).
 - Provided the Demo data: @aaiaueil from Université Gustave Eiffel.
-- Tested the code and provided feedback: @simonozan
+- Tested the code and provided feedback: @simonozan, @daeyongyang, @ANaaim, @rlagnsals
 - Provided a code snippet for Optitrack calibration: @claraaudap (Université Bretagne Sud).
 - Issued MPP2SOS, a (non-free) Blender extension based on Pose2Sim: @carlosedubarreto
 

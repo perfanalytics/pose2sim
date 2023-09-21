@@ -24,7 +24,6 @@
     
     OUTPUTS: 
     - a calibration file in the 'calibration' folder (.toml extension)
-
 '''
 
 # TODO: DETECT WHEN WINDOW IS CLOSED
@@ -37,6 +36,7 @@ from Pose2Sim.common import RT_qca2cv, rotate_cam, quat2mat, euclidean_distance,
 
 import os
 import logging
+import pickle
 import numpy as np
 os.environ["OPENCV_LOG_LEVEL"]="FATAL"
 import cv2
@@ -95,7 +95,6 @@ def calib_qca_fun(file_to_convert_path, binning_factor=1):
     - K: intrinsic parameters: list of 3x3 arrays of floats
     - R: extrinsic rotation: list of arrays of floats
     - T: extrinsic translation: list of arrays of floats
-
     '''
     
     logging.info(f'Converting {file_to_convert_path} to .toml calibration file...')
@@ -111,7 +110,7 @@ def calib_qca_fun(file_to_convert_path, binning_factor=1):
 
     R = [np.array(cv2.Rodrigues(r)[0]).flatten() for r in R]
     T = np.array(T)
-    
+      
     return ret, C, S, D, K, R, T
 
     
@@ -216,7 +215,6 @@ def calib_optitrack_fun(config):
     - K: intrinsic parameters: list of 3x3 arrays of floats
     - R: extrinsic rotation: list of arrays of floats
     - T: extrinsic translation: list of arrays of floats
-
     '''
 
     pass
@@ -240,7 +238,6 @@ def calib_vicon_fun(file_to_convert_path, binning_factor=1):
     - K: intrinsic parameters: list of 3x3 arrays of floats
     - R: extrinsic rotation: list of arrays of floats
     - T: extrinsic translation: list of arrays of floats
-
     '''
    
     logging.info(f'Converting {file_to_convert_path} to .toml calibration file...')
@@ -323,6 +320,92 @@ def read_vicon(vicon_path):
    
     return ret, C, S, D, K, R, T
 
+
+def calib_biocv_fun(file_to_convert_paths, binning_factor=1):
+    '''
+    Convert bioCV calibration files.
+
+    INPUTS:
+    - file_to_convert_path: path of the calibration files to convert (no extension)
+    - binning_factor: always 1 with biocv calibration
+
+    OUTPUTS:
+    - ret: residual reprojection error in _mm_: list of floats
+    - C: camera name: list of strings
+    - S: image size: list of list of floats
+    - D: distorsion: list of arrays of floats
+    - K: intrinsic parameters: list of 3x3 arrays of floats
+    - R: extrinsic rotation: list of arrays of floats
+    - T: extrinsic translation: list of arrays of floats
+    '''
+    
+    logging.info(f'Converting {[os.path.basename(f) for f in file_to_convert_paths]} to .toml calibration file...')
+
+    ret, C, S, D, K, R, T = [], [], [], [], [], [], []
+    for i, f_path in enumerate(file_to_convert_paths):
+        with open(f_path) as f:
+            calib_data = f.read().split('\n')
+            ret += [np.nan]
+            C += [f'cam_{str(i+1).zfill(2)}']
+            S += [[int(calib_data[0]), int(calib_data[1])]]
+            D += [[float(d) for d in calib_data[-2].split(' ')[:4]]]
+            K += [np.array([k.strip().split(' ') for k in calib_data[2:5]], np.float32)]
+            RT = np.array([k.strip().split(' ') for k in calib_data[6:9]], np.float32)
+            R += [cv2.Rodrigues(RT[:,:3])[0].squeeze()]
+            T += [RT[:,3]/1000]
+                        
+    return ret, C, S, D, K, R, T
+
+
+def calib_opencap_fun(file_to_convert_paths, binning_factor=1):
+    '''
+    Convert OpenCap calibration files.
+    
+    Extrinsics in OpenCap are calculated with a vertical board for the world frame.
+    As we want the world frame to be horizontal, we need to rotate cameras by -Pi/2 around x in the world frame. 
+    T is good the way it is.
+
+    INPUTS:
+    - file_to_convert_path: path of the .pickle calibration files to convert
+    - binning_factor: always 1 with biocv calibration
+
+    OUTPUTS:
+    - ret: residual reprojection error in _mm_: list of floats
+    - C: camera name: list of strings
+    - S: image size: list of list of floats
+    - D: distorsion: list of arrays of floats
+    - K: intrinsic parameters: list of 3x3 arrays of floats
+    - R: extrinsic rotation: list of arrays of floats
+    - T: extrinsic translation: list of arrays of floats
+    '''
+    
+    logging.info(f'Converting {[os.path.basename(f) for f in file_to_convert_paths]} to .toml calibration file...')
+    
+    ret, C, S, D, K, R, T = [], [], [], [], [], [], []
+    for i, f_path in enumerate(file_to_convert_paths):
+        with open(f_path, 'rb') as f_pickle:
+            calib_data = pickle.load(f_pickle)
+            ret += [np.nan]
+            C += [f'cam_{str(i+1).zfill(2)}']
+            S += [list(calib_data['imageSize'].squeeze()[::-1])]
+            D += [list(calib_data['distortion'][0][:-1])]
+            K += [calib_data['intrinsicMat']]
+            R_cam = calib_data['rotation']
+            T_cam = calib_data['translation'].squeeze()
+            
+            # Rotate cameras by Pi/2 around x in world frame
+            # camera frame to world frame
+            R_w, T_w = RT_qca2cv(R_cam, T_cam)
+            # x_rotate -Pi/2 and z_rotate Pi
+            R_w_90, T_w_90 = rotate_cam(R_w, T_w, ang_x=-np.pi/2, ang_y=0, ang_z=np.pi)
+            # world frame to camera frame
+            R_c_90, T_c_90 = RT_qca2cv(R_w_90, T_w_90)
+            # store in R and T
+            R+=[cv2.Rodrigues(R_c_90)[0].squeeze()]
+            T+=[T_cam/1000]
+
+    return ret, C, S, D, K, R, T
+    
 
 def calib_board_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
     '''
@@ -762,7 +845,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                 elif count == len(objp)-1:
                     # if all objp have been clicked or indicated as not visible, close all
                     objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])[:-1]
-                    imgp_confirmed = np.expand_dims(scat.get_offsets(), axis=1) 
+                    imgp_confirmed = np.array(np.expand_dims(scat.get_offsets(), axis=1), np.float32) 
                     plt.close('all')
                     for var_to_delete in ['events', 'count', 'scat', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
                         if var_to_delete in globals():
@@ -830,8 +913,8 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
         # If last event was left click, remove last point and if objp given, from objp_confirmed
         # If last event was 'H' and objp given, remove last point from objp_confirmed_notok
         elif event.button == 3: # right click
-            # If last event was left click: 
             if 'events' in globals():
+                # If last event was left click: 
                 if 'button' in dir(events[-1]):
                     if events[-1].button == 1: 
                         # Remove lastpoint from image
@@ -841,7 +924,8 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                         # Remove last point from imgp_confirmed
                         imgp_confirmed = imgp_confirmed[:-1]
                         if len(objp) != 0:
-                            if count >= 1: count -= 1
+                            if count >= 0: 
+                                count -= 1
                             # Remove last point from objp_confirmed
                             objp_confirmed = objp_confirmed[:-1]
                             # remove from plot 
@@ -1030,13 +1114,13 @@ def recap_calibrate(ret, calib_path, calib_full_type):
         if cam != 'metadata':
             f_px = calib[cam]['matrix'][0][0]
             Dm = euclidean_distance(calib[cam]['translation'], [0,0,0])
-            if calib_full_type=='convert_qualisys' or calib_full_type=='convert_vicon':
+            if calib_full_type in ['convert_qualisys', 'convert_vicon','convert_opencap', 'convert_biocv']:
                 ret_m.append( np.around(ret[c], decimals=3) )
                 ret_px.append( np.around(ret[c] / (Dm*1000) * f_px, decimals=3) )
             elif calib_full_type=='calculate_board':
                 ret_px.append( np.around(ret[c], decimals=3) )
                 ret_m.append( np.around(ret[c]*Dm*1000 / f_px, decimals=3) )
-
+                
     logging.info(f'\n--> Residual (RMS) calibration errors for each camera are respectively {ret_px} px, \nwhich corresponds to {ret_m} mm.\n')
     logging.info(f'Calibration file is stored at {calib_path}.')
 
@@ -1066,16 +1150,24 @@ def calibrate_cams_all(config):
         convert_filetype = config.get('calibration').get('convert').get('convert_from')
         if convert_filetype=='qualisys':
             convert_ext = '.qca.txt'
+            file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
             binning_factor = config.get('calibration').get('convert').get('qualisys').get('binning_factor')
         elif convert_filetype=='optitrack':
             logging.info('See Readme.md to retrieve Optitrack calibration values.')
         elif convert_filetype=='vicon':
             convert_ext = '.xcp'
+            file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
             binning_factor = 1
-
-        file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
+        elif convert_filetype=='opencap': # all files with .pickle extension
+            file_to_convert_path = glob.glob(os.path.join(calib_dir, '*.pickle'))
+            binning_factor = 1
+        elif convert_filetype=='biocv': # all files without extension
+            list_dir = os.listdir(calib_dir)
+            list_dir_noext = [os.path.splitext(f)[0] for f in list_dir if os.path.splitext(f)[1]=='']	
+            file_to_convert_path = [os.path.join(calib_dir,f) for f in list_dir_noext if os.path.isfile(os.path.join(calib_dir, f))]
+            binning_factor = 1
+        
         calib_output_path = os.path.join(calib_dir, f'Calib_{convert_filetype}.toml')
-
         calib_full_type = '_'.join([calib_type, convert_filetype])
         args_calib_fun = [file_to_convert_path, binning_factor]
         
@@ -1105,6 +1197,8 @@ def calibrate_cams_all(config):
         'convert_qualisys': calib_qca_fun,
         'convert_optitrack': calib_optitrack_fun,
         'convert_vicon': calib_vicon_fun,
+        'convert_opencap': calib_opencap_fun,
+        'convert_biocv': calib_biocv_fun,
         'calculate_board': calib_board_fun,
         'calculate_points': calib_points_fun
         }
