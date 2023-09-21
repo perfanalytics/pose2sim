@@ -41,7 +41,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
       3. [With DeepLabCut](#with-deeplabcut)
       4. [With AlphaPose](#with-alphapose)
    3. [Camera calibration](#camera-calibration)
-      1. [Convert from Qualisys, Optitrack, or Vicon](#convert-from-qualisys-optitrack-or-vicon)
+      1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
    4. [Camera synchronization](#camera-synchronization)
    5. [Tracking, Triangulating, Filtering](#tracking-triangulating-filtering)
@@ -241,19 +241,25 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 > _**Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ \
 > _**N.B.:**_ You can visualize camera calibration in 3D with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
-### Convert from Qualisys, Optitrack, or Vicon
+### Convert from Qualisys, Optitrack, Vicon, OpenCap, or bioCV
       
 If you already have a calibration file, set `calibration_type` type to `convert` in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 - **From Qualisys:**
-  - Export calibration to `.qca.txt` within QTM
-  - Copy it in the `calibration` Pose2Sim folder
-  - set `convert_from` to 'qualisys' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. Change `binning_factor` to 2 if you film in 540p
+  - Export calibration to `.qca.txt` within QTM.
+  - Copy it in the `calibration` Pose2Sim folder.
+  - set `convert_from` to 'qualisys' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
 - **From Optitrack:** Exporting calibration will be available in Motive 3.2. In the meantime:
-  - Calculate intrinsics with a board (see next section)
-  - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28)
+  - Calculate intrinsics with a board (see next section).
+  - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28).
 - **From Vicon:**  
-  - Copy your `.xcp` Vicon calibration file to the Pose2Sim `calibration` folder
+  - Copy your `.xcp` Vicon calibration file to the Pose2Sim `calibration` folder.
   - set `convert_from` to 'vicon' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
+- **From OpenCap:**  
+  - Copy your `.pickle` OpenCap calibration files to the Pose2Sim `calibration` folder.
+  - set `convert_from` to 'opencap' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
+- **From bioCV:**  
+  - Copy your bioCV calibration files (no extension) to the Pose2Sim `calibration` folder.
+  - set `convert_from` to 'biocv' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
 
 
 ### Calculate from scratch
@@ -831,8 +837,10 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 </br>
 
 > - [x] **Calibration:** Convert [Qualisys](https://www.qualisys.com) .qca.txt calibration file.
-> - [x] **Calibration:** Convert Optitrack extrinsic calibration file.
-> - [x] **Calibration:** Convert Vicon [.xcp calibration file](https://montrealrobotics.ca/diffcvgp/assets/papers/7.pdf).
+> - [x] **Calibration:** Convert [Optitrack](https://optitrack.com/) extrinsic calibration file.
+> - [x] **Calibration:** Convert [Vicon](http://www.vicon.com/Software/Nexus) .xcp calibration file.
+> - [x] **Calibration:** Convert [OpenCap](https://www.opencap.ai/) .pickle calibration files.
+> - [x] **Calibration:** Convert [bioCV](https://github.com/camera-mc-dev/.github/blob/main/profile/mocapPipe.md) calibration files.
 > - [x] **Calibration:** Easier and clearer calibration procedure: separate intrinsic and extrinsic parameter calculation, edit corner detection if some are wrongly detected (or not visible). 
 > - [x] **Calibration:** Possibility to evaluate extrinsic parameters from cues on scene.
 > - [ ] **Calibration:** Once object points have been detected or clicked once, track them for live calibration of moving cameras. Propose to click again when they are lost.
