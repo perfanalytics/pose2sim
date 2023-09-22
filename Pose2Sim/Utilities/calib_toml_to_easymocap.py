@@ -4,16 +4,16 @@
 
 '''
     ##################################################
-    ## YML CALIBRATION TO TOML CALIBRATION          ##
+    ## EASYMOCAP CALIBRATION TO TOML CALIBRATION    ##
     ##################################################
     
-    Convert an OpenCV .toml calibration file 
-    to OpenCV intrinsic and extrinsic .yml calibration files 
+    Convert a Pose2Sim .toml calibration file 
+    to EasyMocap intrinsic and extrinsic .yml calibration files 
 
     Usage: 
-        from Pose2Sim.Utilities import calib_toml_to_yml; calib_toml_to_yml.calib_toml_to_yml_func(r'<input_toml_file>')
-        OR python -m calib_yml_to_toml -t input_toml_file
-        OR python -m calib_yml_to_toml -t input_toml_file -i intrinsic_yml_file -e extrinsic_yml_file
+        from Pose2Sim.Utilities import calib_toml_to_easymocap; calib_toml_to_easymocap.calib_toml_to_easymocap_func(r'<input_toml_file>')
+        OR python -m calib_easymocap_to_toml -t input_toml_file
+        OR python -m calib_easymocap_to_toml -t input_toml_file -i intrinsic_yml_file -e extrinsic_yml_file
 '''
 
 ## INIT
@@ -60,6 +60,7 @@ def read_toml(toml_path):
             T += [np.array(calib[cam]['translation'])]
 
     return C, S, D, K, R, T
+
 
 def write_intrinsic_yml(intrinsic_yml_path, C, D, K):
     '''
@@ -109,15 +110,16 @@ def write_extrinsic_yml(extrinsic_yml_path, C, R, T):
         
     extrinsic_file.release()
 
-def calib_toml_to_yml_func(*args):
+
+def calib_toml_to_easymocap_func(*args):
     '''
-    Convert an OpenCV .toml calibration file 
-    to OpenCV intrinsic and extrinsic .yml calibration files 
+    Convert a Pose2Sim .toml calibration file 
+    to EasyMocap intrinsic and extrinsic .yml calibration files 
 
     Usage: 
-        import calib_toml_to_yml; calib_toml_to_yml.calib_toml_to_yml_func(r'<input_toml_file>')
-        OR python -m calib_toml_to_yml -t input_toml_file
-        OR python -m calib_toml_to_yml -t input_toml_file -i intrinsic_yml_file -e extrinsic_yml_file
+        from Pose2Sim.Utilities import calib_toml_to_easymocap; calib_toml_to_easymocap.calib_toml_to_easymocap_func(r'<input_toml_file>')
+        OR python -m calib_easymocap_to_toml -t input_toml_file
+        OR python -m calib_easymocap_to_toml -t input_toml_file -i intrinsic_yml_file -e extrinsic_yml_file
     '''
     
     try:
@@ -147,5 +149,5 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--extrinsic_yml_file', required = False, help='OpenCV extrinsic .yml calibration file')
     args = vars(parser.parse_args())
     
-    calib_toml_to_yml_func(args)
+    calib_toml_to_easymocap_func(args)
 

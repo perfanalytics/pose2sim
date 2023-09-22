@@ -321,12 +321,77 @@ def read_vicon(vicon_path):
     return ret, C, S, D, K, R, T
 
 
-def calib_biocv_fun(file_to_convert_paths, binning_factor=1):
+def read_intrinsic_yml(intrinsic_path):
+    '''
+    Reads an intrinsic .yml calibration file
+    Returns 3 lists of size N (N=number of cameras):
+    - S (image size)
+    - K (intrinsic parameters)
+    - D (distorsion)
+
+    N.B. : Size is calculated as twice the position of the optical center. Please correct in the .toml file if needed.
+    '''
+    intrinsic_yml = cv2.FileStorage(intrinsic_path, cv2.FILE_STORAGE_READ)
+    N = intrinsic_yml.getNode('names').size()
+    S, D, K = [], [], []
+    for i in range(N):
+        name = intrinsic_yml.getNode('names').at(i).string()
+        K.append(intrinsic_yml.getNode(f'K_{name}').mat())
+        D.append(intrinsic_yml.getNode(f'dist_{name}').mat().flatten()[:-1])
+        S.append([K[i][0,2]*2, K[i][1,2]*2])
+    return S, K, D
+    
+
+def read_extrinsic_yml(extrinsic_path):
+    '''
+    Reads an intrinsic .yml calibration file
+    Returns 3 lists of size N (N=number of cameras):
+    - R (extrinsic rotation, Rodrigues vector)
+    - T (extrinsic translation)
+    '''
+    extrinsic_yml = cv2.FileStorage(extrinsic_path, cv2.FILE_STORAGE_READ)
+    N = extrinsic_yml.getNode('names').size()
+    R, T = [], []
+    for i in range(N):
+        name = extrinsic_yml.getNode('names').at(i).string()
+        R.append(extrinsic_yml.getNode(f'R_{name}').mat().flatten()) # R_1 pour Rodrigues, Rot_1 pour matrice
+        T.append(extrinsic_yml.getNode(f'T_{name}').mat().flatten())
+    return R, T
+
+
+def calib_easymocap_fun(files_to_convert_paths, binning_factor=1):
+    '''
+    Reads EasyMocap .yml calibration files
+
+    INPUTS:
+    - files_to_convert_paths: paths of the intri.yml and extri.yml calibration files to convert
+    - binning_factor: always 1 with easymocap calibration
+
+    OUTPUTS:
+    - ret: residual reprojection error in _mm_: list of floats
+    - C: camera name: list of strings
+    - S: image size: list of list of floats
+    - D: distorsion: list of arrays of floats
+    - K: intrinsic parameters: list of 3x3 arrays of floats
+    - R: extrinsic rotation: list of arrays of floats
+    - T: extrinsic translation: list of arrays of floats
+    '''
+
+    extrinsic_path, intrinsic_path = files_to_convert_paths
+    S, K, D = read_intrinsic_yml(intrinsic_path)
+    R, T = read_extrinsic_yml(extrinsic_path)
+    C = np.array(range(len(S)))+1
+    ret = [np.nan]*len(C)
+    
+    return ret, C, S, D, K, R, T
+
+
+def calib_biocv_fun(files_to_convert_paths, binning_factor=1):
     '''
     Convert bioCV calibration files.
 
     INPUTS:
-    - file_to_convert_path: path of the calibration files to convert (no extension)
+    - files_to_convert_paths: paths of the calibration files to convert (no extension)
     - binning_factor: always 1 with biocv calibration
 
     OUTPUTS:
@@ -339,10 +404,10 @@ def calib_biocv_fun(file_to_convert_paths, binning_factor=1):
     - T: extrinsic translation: list of arrays of floats
     '''
     
-    logging.info(f'Converting {[os.path.basename(f) for f in file_to_convert_paths]} to .toml calibration file...')
+    logging.info(f'Converting {[os.path.basename(f) for f in files_to_convert_paths]} to .toml calibration file...')
 
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
-    for i, f_path in enumerate(file_to_convert_paths):
+    for i, f_path in enumerate(files_to_convert_paths):
         with open(f_path) as f:
             calib_data = f.read().split('\n')
             ret += [np.nan]
@@ -357,7 +422,7 @@ def calib_biocv_fun(file_to_convert_paths, binning_factor=1):
     return ret, C, S, D, K, R, T
 
 
-def calib_opencap_fun(file_to_convert_paths, binning_factor=1):
+def calib_opencap_fun(files_to_convert_paths, binning_factor=1):
     '''
     Convert OpenCap calibration files.
     
@@ -366,8 +431,8 @@ def calib_opencap_fun(file_to_convert_paths, binning_factor=1):
     T is good the way it is.
 
     INPUTS:
-    - file_to_convert_path: path of the .pickle calibration files to convert
-    - binning_factor: always 1 with biocv calibration
+    - files_to_convert_paths: paths of the .pickle calibration files to convert
+    - binning_factor: always 1 with opencap calibration
 
     OUTPUTS:
     - ret: residual reprojection error in _mm_: list of floats
@@ -379,10 +444,10 @@ def calib_opencap_fun(file_to_convert_paths, binning_factor=1):
     - T: extrinsic translation: list of arrays of floats
     '''
     
-    logging.info(f'Converting {[os.path.basename(f) for f in file_to_convert_paths]} to .toml calibration file...')
+    logging.info(f'Converting {[os.path.basename(f) for f in files_to_convert_paths]} to .toml calibration file...')
     
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
-    for i, f_path in enumerate(file_to_convert_paths):
+    for i, f_path in enumerate(files_to_convert_paths):
         with open(f_path, 'rb') as f_pickle:
             calib_data = pickle.load(f_pickle)
             ret += [np.nan]
@@ -393,7 +458,7 @@ def calib_opencap_fun(file_to_convert_paths, binning_factor=1):
             R_cam = calib_data['rotation']
             T_cam = calib_data['translation'].squeeze()
             
-            # Rotate cameras by Pi/2 around x in world frame
+            # Rotate cameras by Pi/2 around x in world frame -> could have just switched some columns in matrix
             # camera frame to world frame
             R_w, T_w = RT_qca2cv(R_cam, T_cam)
             # x_rotate -Pi/2 and z_rotate Pi
@@ -1161,6 +1226,9 @@ def calibrate_cams_all(config):
         elif convert_filetype=='opencap': # all files with .pickle extension
             file_to_convert_path = glob.glob(os.path.join(calib_dir, '*.pickle'))
             binning_factor = 1
+        elif convert_filetype=='easymocap': #intri.yml and intri.yml
+            file_to_convert_path = glob.glob(os.path.join(calib_dir, '*.yml'))
+            binning_factor = 1
         elif convert_filetype=='biocv': # all files without extension
             list_dir = os.listdir(calib_dir)
             list_dir_noext = [os.path.splitext(f)[0] for f in list_dir if os.path.splitext(f)[1]=='']	
@@ -1198,6 +1266,7 @@ def calibrate_cams_all(config):
         'convert_optitrack': calib_optitrack_fun,
         'convert_vicon': calib_vicon_fun,
         'convert_opencap': calib_opencap_fun,
+        'convert_easymocap': calib_easymocap_fun,
         'convert_biocv': calib_biocv_fun,
         'calculate_board': calib_board_fun,
         'calculate_points': calib_points_fun

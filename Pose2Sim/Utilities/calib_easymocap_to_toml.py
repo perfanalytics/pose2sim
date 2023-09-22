@@ -4,7 +4,7 @@
 
 '''
     ##################################################
-    ## YML CALIBRATION TO TOML CALIBRATION          ##
+    ## EASYMOCAP CALIBRATION TO TOML CALIBRATION    ##
     ##################################################
     
     Converts OpenCV intrinsic and extrinsic .yml calibration files 
@@ -14,9 +14,9 @@
     Please correct in the resulting .toml file if needed. Take your image size as a reference.
     
     Usage: 
-        import calib_yml_to_toml; calib_yml_to_toml.calib_yml_to_toml_func(r'<intrinsic_yml_file>', r'<extrinsic_yml_file>')
-        OR python -m calib_yml_to_toml -i intrinsic_yml_file -e extrinsic_yml_file
-        OR python -m calib_yml_to_toml -i intrinsic_yml_file -e extrinsic_yml_file -o output_toml_file
+        import calib_easymocap_to_toml; calib_yml_to_toml.calib_easymocap_to_toml_func(r'<intrinsic_yml_file>', r'<extrinsic_yml_file>')
+        OR python -m calib_easymocap_to_toml -i intrinsic_yml_file -e extrinsic_yml_file
+        OR python -m calib_easymocap_to_toml -i intrinsic_yml_file -e extrinsic_yml_file -o output_toml_file
 '''
 
 
@@ -113,7 +113,7 @@ def toml_write(toml_path, C, S, D, K, R, T):
         cal_f.write(meta)
 
 
-def calib_yml_to_toml_func(*args):
+def calib_easymocap_to_toml_func(*args):
     '''
     Converts OpenCV intrinsic and extrinsic .yml calibration files 
     to an OpenCV .toml calibration file
@@ -146,10 +146,10 @@ def calib_yml_to_toml_func(*args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--intrinsic_file', required = True, help='OpenCV intrinsic .yml calibration file')
-    parser.add_argument('-e', '--extrinsic_file', required = True, help='OpenCV extrinsic .yml calibration file')
+    parser.add_argument('-i', '--intrinsic_file', required = True, help='EasyMocap intrinsic .yml calibration file')
+    parser.add_argument('-e', '--extrinsic_file', required = True, help='EasyMocap extrinsic .yml calibration file')
     parser.add_argument('-t', '--toml_file', required=False, help='OpenCV .toml output calibration file')
     args = vars(parser.parse_args())
     
-    calib_yml_to_toml_func(args)
+    calib_easymocap_to_toml_func(args)
     

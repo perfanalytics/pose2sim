@@ -35,12 +35,13 @@ openpose_path = '' # only checked if OpenPose is used
 calibration_type = 'convert' # 'convert' or 'calculate'
 
    [calibration.convert]
-   convert_from = 'qualisys' # 'qualisys', 'optitrack', vicon', 'opencap', or 'biocv'
+   convert_from = 'qualisys' # 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', or 'biocv'
       [calibration.convert.qualisys]
       binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
       [calibration.convert.optitrack]  # See readme for instructions
       [calibration.convert.vicon]      # No parameters needed
       [calibration.convert.opencap]    # No parameters needed
+      [calibration.convert.easymocap]    # No parameters needed
       [calibration.convert.biocv]      # No parameters needed
   
 
