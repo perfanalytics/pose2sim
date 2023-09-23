@@ -41,7 +41,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
       3. [With DeepLabCut](#with-deeplabcut)
       4. [With AlphaPose](#with-alphapose)
    3. [Camera calibration](#camera-calibration)
-      1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap--or-biocv)
+      1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
    4. [Camera synchronization](#camera-synchronization)
    5. [Tracking, Triangulating, Filtering](#tracking-triangulating-filtering)
@@ -56,7 +56,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 3. [Utilities](#utilities)
 4. [How to cite and how to contribute](#how-to-cite-and-how-to-contribute)
    1. [How to cite](#how-to-cite)
-   2. [How to contribute](#how-to-contribute)
+   2. [How to contribute and to-do list](#how-to-contribute-and-to-do-list)
 
 # Installation and Demonstration
 
@@ -811,11 +811,97 @@ If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org
       URL = {https://www.mdpi.com/1424-8220/21/19/6530}
     }
 
-### How to contribute
+### How to contribute and to-do list
 
 I would happily welcome any proposal for new features, code improvement, and more!\
 If you want to contribute to Pose2Sim, please follow [this guide](https://docs.github.com/en/get-started/quickstart/contributing-to-projects) on how to fork, modify and push code, and submit a pull request. I would appreciate it if you provided as much useful information as possible about how you modified the code, and a rationale for why you're making this pull request. Please also specify on which operating system and on which Python version you have tested the code.
 
+</br>
+
+**Main to-do list**
+- Graphical User Interface
+- Multiple person triangulation
+- Synchronization
+- Self-calibration based on keypoint detection
+
+<details>
+  <summary><b>Detailed to-do list</b> (CLICK TO SHOW)</summary>
+    <pre>
+       
+&#10004; **Pose:** Support OpenPose [body_25b](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#body_25b-model---option-2-recommended) for more accuracy, [body_135](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#single-network-whole-body-pose-estimation-model) for pronation/supination.
+&#10004; **Pose:** Support [BlazePose](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker) for faster inference (on mobile device).
+&#10004; **Pose:** Support [DeepLabCut](http://www.mackenziemathislab.org/deeplabcut) for training on custom datasets.
+&#10004; **Pose:** Support [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) as an alternative to OpenPose.
+&#9634; **Pose:** Support [MMPose](https://github.com/open-mmlab/mmpose), [SLEAP](https://sleap.ai/), etc.
+
+&#10004; **Calibration:** Convert [Qualisys](https://www.qualisys.com) .qca.txt calibration file.
+&#10004; **Calibration:** Convert [Optitrack](https://optitrack.com/) extrinsic calibration file.
+&#10004; **Calibration:** Convert [Vicon](http://www.vicon.com/Software/Nexus) .xcp calibration file.
+&#10004; **Calibration:** Convert [OpenCap](https://www.opencap.ai/) .pickle calibration files.
+&#10004; **Calibration:** Convert [EasyMocap](https://github.com/zju3dv/EasyMocap/) .yml calibration files.
+&#10004; **Calibration:** Convert [bioCV](https://github.com/camera-mc-dev/.github/blob/main/profile/mocapPipe.md) calibration files.
+&#10004; **Calibration:** Easier and clearer calibration procedure: separate intrinsic and extrinsic parameter calculation, edit corner detection if some are wrongly detected (or not visible). 
+&#10004; **Calibration:** Possibility to evaluate extrinsic parameters from cues on scene.
+&#9634; **Calibration:** Once object points have been detected or clicked once, track them for live calibration of moving cameras. Propose to click again when they are lost.
+&#9634; **Calibration:** Fine-tune calibration with bundle adjustment.
+&#9634; **Calibration:** Support ChArUco board detection (see [there](https://mecaruco2.readthedocs.io/en/latest/notebooks_rst/Aruco/sandbox/ludovic/aruco_calibration_rotation.html)).
+&#9634; **Calibration:** Calculate calibration with points rather than board. (1) SBA calibration with wand (cf [Argus](https://argus.web.unc.edu), see converter [here](https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py)). Set world reference frame in the end.
+&#9634; **Calibration:** Alternatively, self-calibrate with [OpenPose keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
+
+&#9634; **Synchronization:** Synchronize cameras on 2D keypoint speeds. Cf [this draft script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).
+
+&#10004; **Person Association:** Automatically choose the main person to triangulate.
+&#9634; **Person Association:** Multiple persons association. 1. Triangulate all the persons whose reprojection error is below a certain threshold (instead of only the one with minimum error), and then track in time with speed cf [Slembrouck 2020](https://link.springer.com/chapter/10.1007/978-3-030-40605-9_15)? or 2. Based on affinity matrices [Dong 2021](https://arxiv.org/pdf/1901.04111.pdf)? or 3. Based on occupancy maps [Yildiz 2012](https://link.springer.com/chapter/10.1007/978-3-642-35749-7_10)? or 4. With a neural network [Huang 2023](https://arxiv.org/pdf/2304.09471.pdf)?
+
+&#10004; **Triangulation:** Triangulation weighted with confidence.
+&#10004; **Triangulation:** Set a likelihood threshold below which a camera should not be used, a reprojection error threshold, and a minimum number of remaining cameras below which triangulation is skipped for this frame.
+&#10004; **Triangulation:** Show mean reprojection error in px and in mm for each keypoint.
+&#10004; **Triangulation:** Show how many cameras on average had to be excluded for each keypoint.
+&#10004; **Triangulation:** Evaluate which cameras were the least reliable.
+&#10004; **Triangulation:** Show which frames had to be interpolated for each keypoint.
+&#9634; **Triangulation:** [Undistort](https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c) 2D points before triangulating (and [distort](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301) them before computing reprojection error).
+&#9634; **Triangulation:** Multiple person kinematics (output multiple .trc coordinates files). Triangulate all persons with reprojection error above threshold, and identify them by minimizing their displacement across frames.
+&#9634; **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).
+&#9634; **Triangulation:** Solve limb swapping (although not really an issue with Body_25b) by using RANSAC or SDS triangulation ignoring right and left, and then decide which side points are by majority voting + giving more confidence to cameras whose plane is the most coplanar to the right/left line.
+&#9634; **Triangulation:** Implement normalized DLT and RANSAC triangulation, Outlier rejection (sliding z-score?), as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).
+
+&#10004; **Filtering:** Available filtering methods: Butterworth, Butterworth on speed, Gaussian, Median, LOESS (polynomial smoothing).
+&#10004; **Filtering:** Implement Kalman filter and Kalman smoother.
+
+&#10004; **OpenSim:** Integrate better spine from [lifting fullbody model](https://pubmed.ncbi.nlm.nih.gov/30714401) to the [gait full-body model](https://nmbl.stanford.edu/wp-content/uploads/07505900.pdf), more accurate for the knee.
+&#10004; **OpenSim:** Optimize model marker positions as compared to ground-truth marker-based positions.
+&#10004; **OpenSim:** Add scaling and inverse kinematics setup files.
+&#9634; **OpenSim:** Add muscles from OpenSim [lifting full-body model](https://simtk.org/projects/lfbmodel), add Hertzian footground contacts, for inverse dynamics and more.
+&#9634; **OpenSim:** Implement optimal fixed-interval Kalman smoothing for inverse kinematics ([this OpenSim fork](https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp)), or [Biorbd](https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp))
+
+&#9634; **GUI:** 3D plot of cameras and of triangulated keypoints.
+&#9634; **GUI:** Demo on Google Colab (see [Sports2D](https://bit.ly/Sports2D_Colab) for OpenPose and Python package installation on Google Drive).
+&#9634; **GUI:** Blender add-on (cf [MPP2SOS](https://blendermarket.com/products/mocap-mpp2soss)), or webapp (e.g., with [Napari](https://napari.org/stable). See my draft project [Maya-Mocap](https://github.com/davidpagnon/Maya-Mocap) and [BlendOsim](https://github.com/JonathanCamargo/BlendOsim).
+
+&#10004; **Demo:** Provide Demo data for users to test the code.
+&#9634; **Demo:** Add videos for users to experiment with other pose detection frameworks
+&#9634; **Demo:** Time shift videos and json to demonstrate synchronization
+&#9634; **Demo:** Add another virtual person to demonstrate personAssociation
+&#9634; **Tutorials:** Make video tutorials.
+&#9634; **Doc:** Use [Sphinx](https://www.sphinx-doc.org/en/master) or [MkDocs](https://www.mkdocs.org) for clearer documentation.
+
+&#9634; **Catch errors**
+&#10004; **Pip package**
+&#9634; **Conda package** 
+&#9634; **Docker image**
+&#9634; Run pose estimation and OpenSim from within Pose2Sim
+&#9634; **Run from command line via click or typer**
+&#9634; **Utilities**: Export other data from c3d files into .mot or .sto files (angles, powers, forces, moments, GRF, EMG...)
+
+&#9634; **Bug:** common.py, class plotWindow(). Python crashes after a few runs of `Pose2Sim.filtering()` when `display_figures=true`. See [there](https://github.com/superjax/plotWindow/issues/7).
+&#9634; **Bug:** calibration.py. FFMPEG error message when calibration files are images. See [there](https://github.com/perfanalytics/pose2sim/issues/33#:~:text=In%20order%20to%20check,filter%20this%20message%20yet.).
+
+</pre>
+</details>
+
+</br>
+
+**Acknowledgements:**
 - Supervised my PhD: @lreveret (INRIA, Université Grenoble Alpes), and @mdomalai (Université de Poitiers).
 - Provided the Demo data: @aaiaueil from Université Gustave Eiffel.
 - Tested the code and provided feedback: @simonozan, @daeyongyang, @ANaaim, @rlagnsals
@@ -824,109 +910,12 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 
 </br>
 
-**Here is a to-do list, for general guidance purposes only:**\
-*The main projects are (see details below):*\
-*- Graphical User Interface*\
-*- Multiple person triangulation*\
-*- Synchronization*\
-*- Self-calibration based on keypoint detection*
-
-> - [x] **Pose:** Support OpenPose [body_25b](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#body_25b-model---option-2-recommended) for more accuracy, [body_135](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#single-network-whole-body-pose-estimation-model) for pronation/supination.
-> - [x] **Pose:** Support [BlazePose](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker) for faster inference (on mobile device).
-> - [x] **Pose:** Support [DeepLabCut](http://www.mackenziemathislab.org/deeplabcut) for training on custom datasets.
-> - [x] **Pose:** Support [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) as an alternative to OpenPose.
-> - [ ] **Pose:** Support [MMPose](https://github.com/open-mmlab/mmpose), [SLEAP](https://sleap.ai/), etc.
-
-</br>
-
-> - [x] **Calibration:** Convert [Qualisys](https://www.qualisys.com) .qca.txt calibration file.
-> - [x] **Calibration:** Convert [Optitrack](https://optitrack.com/) extrinsic calibration file.
-> - [x] **Calibration:** Convert [Vicon](http://www.vicon.com/Software/Nexus) .xcp calibration file.
-> - [x] **Calibration:** Convert [OpenCap](https://www.opencap.ai/) .pickle calibration files.
-> - [x] **Calibration:** Convert [EasyMocap](https://github.com/zju3dv/EasyMocap/) .yml calibration files.
-> - [x] **Calibration:** Convert [bioCV](https://github.com/camera-mc-dev/.github/blob/main/profile/mocapPipe.md) calibration files.
-> - [x] **Calibration:** Easier and clearer calibration procedure: separate intrinsic and extrinsic parameter calculation, edit corner detection if some are wrongly detected (or not visible). 
-> - [x] **Calibration:** Possibility to evaluate extrinsic parameters from cues on scene.
-> - [ ] **Calibration:** Once object points have been detected or clicked once, track them for live calibration of moving cameras. Propose to click again when they are lost.
-> - [ ] **Calibration:** Fine-tune calibration with bundle adjustment.
-> - [ ] **Calibration:** Support ChArUco board detection (see [there](https://mecaruco2.readthedocs.io/en/latest/notebooks_rst/Aruco/sandbox/ludovic/aruco_calibration_rotation.html)).
-> - [ ] **Calibration:** Calculate calibration with points rather than board. (1) SBA calibration with wand (cf [Argus](https://argus.web.unc.edu), see converter [here](https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py)). Set world reference frame in the end.
-> - [ ] **Calibration:** Alternatively, self-calibrate with [OpenPose keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
-
-</br>
-
-> - [ ] **Synchronization:** Synchronize cameras on 2D keypoint speeds. Cf [this draft script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).
-
-</br>
-
-> - [x] **Person Association:** Automatically choose the main person to triangulate.
-> - [ ] **Person Association:** Multiple persons association. 1. Triangulate all the persons whose reprojection error is below a certain threshold (instead of only the one with minimum error), and then track in time with speed cf [Slembrouck 2020](https://link.springer.com/chapter/10.1007/978-3-030-40605-9_15)? or 2. Based on affinity matrices [Dong 2021](https://arxiv.org/pdf/1901.04111.pdf)? or 3. Based on occupancy maps [Yildiz 2012](https://link.springer.com/chapter/10.1007/978-3-642-35749-7_10)? or 4. With a neural network [Huang 2023](https://arxiv.org/pdf/2304.09471.pdf)?
-
-</br>
-
-> - [x] **Triangulation:** Triangulation weighted with confidence.
-> - [x] **Triangulation:** Set a likelihood threshold below which a camera should not be used, a reprojection error threshold, and a minimum number of remaining cameras below which triangulation is skipped for this frame.
-> - [x] **Triangulation:** Show mean reprojection error in px and in mm for each keypoint.
-> - [x] **Triangulation:** Show how many cameras on average had to be excluded for each keypoint.
-> - [x] **Triangulation:** Evaluate which cameras were the least reliable.
-> - [x] **Triangulation:** Show which frames had to be interpolated for each keypoint.
-> - [ ] **Triangulation:** [Undistort](https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c) 2D points before triangulating (and [distort](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301) them before computing reprojection error).
-> - [ ] **Triangulation:** Multiple person kinematics (output multiple .trc coordinates files). Triangulate all persons with reprojection error above threshold, and identify them by minimizing their displacement across frames.
-> - [ ] **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).
-> - [ ] **Triangulation:** Solve limb swapping (although not really an issue with Body_25b) by using RANSAC or SDS triangulation ignoring right and left, and then decide which side points are by majority voting + giving more confidence to cameras whose plane is the most coplanar to the right/left line.
-> - [ ] **Triangulation:** Implement normalized DLT and RANSAC triangulation, Outlier rejection (sliding z-score?), as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).
-
-</br>
-
-> - [x] **Filtering:** Available filtering methods: Butterworth, Butterworth on speed, Gaussian, Median, LOESS (polynomial smoothing).
-> - [x] **Filtering:** Implement Kalman filter and Kalman smoother.
-
-</br>
-
-> - [x] **OpenSim:** Integrate better spine from [lifting fullbody model](https://pubmed.ncbi.nlm.nih.gov/30714401) to the [gait full-body model](https://nmbl.stanford.edu/wp-content/uploads/07505900.pdf), more accurate for the knee.
-> - [x] **OpenSim:** Optimize model marker positions as compared to ground-truth marker-based positions.
-> - [x] **OpenSim:** Add scaling and inverse kinematics setup files.
-> - [ ] **OpenSim:** Add muscles from OpenSim [lifting full-body model](https://simtk.org/projects/lfbmodel), add Hertzian footground contacts, for inverse dynamics and more.
-> - [ ] **OpenSim:** Implement optimal fixed-interval Kalman smoothing for inverse kinematics ([this OpenSim fork](https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp)), or [Biorbd](https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp))
-
-</br>
-
-> - [ ] **GUI:** 3D plot of cameras and of triangulated keypoints.
-> - [ ] **GUI:** Demo on Google Colab (see [Sports2D](https://bit.ly/Sports2D_Colab) for OpenPose and Python package installation on Google Drive).
-> - [ ] **GUI:** Blender add-on (cf [MPP2SOS](https://blendermarket.com/products/mocap-mpp2soss)), or webapp (e.g., with [Napari](https://napari.org/stable). See my draft project [Maya-Mocap](https://github.com/davidpagnon/Maya-Mocap) and [BlendOsim](https://github.com/JonathanCamargo/BlendOsim).
-
-</br>
-
-> - [x] **Demo:** Provide Demo data for users to test the code.
-> - [ ] **Demo:** Add videos for users to experiment with other pose detecction frameworks
-> - [ ] **Demo:** Time shift videos and json to demonstrate synchronization
-> - [ ] **Demo:** Add another virtual person to demonstrate personAssociation
-> - [ ] **Tutorials:** Make video tutorials.
-> - [ ] **Doc:** Use [Sphinx](https://www.sphinx-doc.org/en/master) or [MkDocs](https://www.mkdocs.org) for clearer documentation.
-
-</br>
-
-> - [ ] **Catch errors**
-> - [x] **Pip package**
-> - [ ] **Conda package** 
-> - [ ] **Docker image**
-> - [ ] **** Run pose estimation and OpenSim from within Pose2Sim
-> - [ ] **Run from command line via click or typer**
-> - [ ] **Utilities**: Export other data from c3d files into .mot or .sto files (angles, powers, forces, moments, GRF, EMG...)
-
-</br>
-
-> - [ ] **Bug:** common.py, class plotWindow(). Python crashes after a few runs of `Pose2Sim.filtering()` when `display_figures=true`. See [there](https://github.com/superjax/plotWindow/issues/7).
-> - [ ] **Bug:** calibration.py. FFMPEG error message when calibration files are images. See [there](https://github.com/perfanalytics/pose2sim/issues/33#:~:text=In%20order%20to%20check,filter%20this%20message%20yet.).
-
-</br>
-
 **Pose2Sim releases:**
-> - v0.1: Published online
-> - v0.2: Published associated paper
-> - v0.3: Supported other pose estimation algorithms
-> - v0.4: New calibration tool
-<!-- - v0.5: Supports multi-person analysis
-- v0.6: New synchronization tool
-- v0.7: Graphical User Interface
-- v1.0: -->
+- [x] v0.1: Published online
+- [x] v0.2: Published associated paper
+- [x] v0.3: Supported other pose estimation algorithms
+- [x] v0.4: New calibration tool
+- [ ] v0.5: Supports multi-person analysis
+- [ ] v0.6: New synchronization tool
+- [ ] v0.7: Graphical User Interface
+- [ ] v1.0: First accomplished release
