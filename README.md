@@ -241,6 +241,18 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 > _**Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ \
 > _**N.B.:**_ You can visualize camera calibration in 3D with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
+Open an Anaconda prompt or a terminal, type `ipython`.\
+By default, `calibration()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.calibration(r'path_to_config.toml')`.
+
+```
+from Pose2Sim import Pose2Sim
+Pose2Sim.calibration()
+```
+
+Output:\
+<img src="Content/Calib2D.png" width="760">
+<img src="Content/CalibFile.png" width="760">
+
 ### Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
       
 If you already have a calibration file, set `calibration_type` type to `convert` in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
@@ -310,20 +322,6 @@ If you already have a calibration file, set `calibration_type` type to `convert`
   [Want to contribute?](#how-to-contribute)
   - For a more automatic calibration, OpenPose keypoints could also be used for calibration.\
   [Want to contribute?](#how-to-contribute) 
-
-
-Open an Anaconda prompt or a terminal, type `ipython`.\
-By default, `calibration()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.calibration(r'path_to_config.toml')`.
-
-```
-from Pose2Sim import Pose2Sim
-Pose2Sim.calibration()
-```
-
-Output:\
-<img src="Content/Calib2D.png" width="760">
-<img src="Content/CalibFile.png" width="760">
-
 
 <details>
   <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
