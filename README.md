@@ -865,6 +865,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 
 &#10004; **Filtering:** Available filtering methods: Butterworth, Butterworth on speed, Gaussian, Median, LOESS (polynomial smoothing).
 &#10004; **Filtering:** Implement Kalman filter and Kalman smoother.
+&#9634; **Filtering:** Implement [smoothNet](https://github.com/perfanalytics/pose2sim/issues/29)
 
 &#10004; **OpenSim:** Integrate better spine from [lifting fullbody model](https://pubmed.ncbi.nlm.nih.gov/30714401) to the [gait full-body model](https://nmbl.stanford.edu/wp-content/uploads/07505900.pdf), more accurate for the knee.
 &#10004; **OpenSim:** Optimize model marker positions as compared to ground-truth marker-based positions.
