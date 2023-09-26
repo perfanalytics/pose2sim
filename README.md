@@ -901,11 +901,11 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 </br>
 
 **Acknowledgements:**
-- Supervised my PhD: @lreveret (INRIA, Université Grenoble Alpes), and @mdomalai (Université de Poitiers).
-- Provided the Demo data: @aaiaueil from Université Gustave Eiffel.
-- Tested the code and provided feedback: @simonozan, @daeyongyang, @ANaaim, @rlagnsals
-- Provided a code snippet for Optitrack calibration: @claraaudap (Université Bretagne Sud).
-- Issued MPP2SOS, a (non-free) Blender extension based on Pose2Sim: @carlosedubarreto
+- Supervised my PhD: [@lreveret](https://github.com/lreveret) (INRIA, Université Grenoble Alpes), and [@mdomalai](https://github.com/mdomalai) (Université de Poitiers).
+- Provided the Demo data: [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
+- Tested the code and provided feedback: [@simonozan](https://github.com/simonozan), [@daeyongyang](https://github.com/daeyongyang), [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals)
+- Provided a code snippet for Optitrack calibration: [@claraaudap](https://github.com/claraaudap) (Université Bretagne Sud).
+- Issued MPP2SOS, a (non-free) Blender extension based on Pose2Sim: [@carlosedubarreto](https://github.com/carlosedubarreto)
 
 </br>
 
