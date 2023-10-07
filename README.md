@@ -860,7 +860,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 &#9634; **Triangulation:** [Undistort](https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c) 2D points before triangulating (and [distort](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301) them before computing reprojection error).
 &#9634; **Triangulation:** Multiple person kinematics (output multiple .trc coordinates files). Triangulate all persons with reprojection error above threshold, and identify them by minimizing their displacement across frames.
 &#9634; **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).
-&#9634; **Triangulation:** Solve limb swapping (although not really an issue with Body_25b) by using RANSAC or SDS triangulation ignoring right and left, and then decide which side points are by majority voting + giving more confidence to cameras whose plane is the most coplanar to the right/left line.
+&#9634; **Triangulation:** Solve limb swapping (although not really an issue with Body_25b). Try triangulating with opposite side if reprojection error too large. Alternatively, ignore right and left sides, use RANSAC or SDS triangulation, and then choose right or left by majority voting. More confidence can be given to cameras whose plane is the most coplanar to the right/left line.
 &#9634; **Triangulation:** Implement normalized DLT and RANSAC triangulation, Outlier rejection (sliding z-score?), as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).
 
 &#10004; **Filtering:** Available filtering methods: Butterworth, Butterworth on speed, Gaussian, Median, LOESS (polynomial smoothing).
@@ -870,7 +870,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 &#10004; **OpenSim:** Integrate better spine from [lifting fullbody model](https://pubmed.ncbi.nlm.nih.gov/30714401) to the [gait full-body model](https://nmbl.stanford.edu/wp-content/uploads/07505900.pdf), more accurate for the knee.
 &#10004; **OpenSim:** Optimize model marker positions as compared to ground-truth marker-based positions.
 &#10004; **OpenSim:** Add scaling and inverse kinematics setup files.
-&#9634; **OpenSim:** Add muscles from OpenSim [lifting full-body model](https://simtk.org/projects/lfbmodel), add Hertzian footground contacts, for inverse dynamics and more.
+&#10004; **OpenSim:** Add full model with contact spheres ([SmoothSphereHalfSpaceForce](https://simtk.org/api_docs/opensim/api_docs/classOpenSim_1_1SmoothSphereHalfSpaceForce.html#details)) and full-body muscles ([DeGrooteFregly2016Muscle](https://simtk.org/api_docs/opensim/api_docs/classOpenSim_1_1DeGrooteFregly2016Muscle.html#details)), for [Moco](https://opensim-org.github.io/opensim-moco-site/) for example.
 &#9634; **OpenSim:** Implement optimal fixed-interval Kalman smoothing for inverse kinematics ([this OpenSim fork](https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp)), or [Biorbd](https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp))
 
 &#9634; **GUI:** 3D plot of cameras and of triangulated keypoints.
@@ -901,11 +901,11 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 </br>
 
 **Acknowledgements:**
-- Supervised my PhD: @lreveret (INRIA, Université Grenoble Alpes), and @mdomalai (Université de Poitiers).
-- Provided the Demo data: @aaiaueil from Université Gustave Eiffel.
-- Tested the code and provided feedback: @simonozan, @daeyongyang, @ANaaim, @rlagnsals
-- Provided a code snippet for Optitrack calibration: @claraaudap (Université Bretagne Sud).
-- Issued MPP2SOS, a (non-free) Blender extension based on Pose2Sim: @carlosedubarreto
+- Supervised my PhD: [@lreveret](https://github.com/lreveret) (INRIA, Université Grenoble Alpes), and [@mdomalai](https://github.com/mdomalai) (Université de Poitiers).
+- Provided the Demo data: [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
+- Tested the code and provided feedback: [@simonozan](https://github.com/simonozan), [@daeyongyang](https://github.com/daeyongyang), [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals)
+- Provided a code snippet for Optitrack calibration: [@claraaudap](https://github.com/claraaudap) (Université Bretagne Sud).
+- Issued MPP2SOS, a (non-free) Blender extension based on Pose2Sim: [@carlosedubarreto](https://github.com/carlosedubarreto)
 
 </br>
 
