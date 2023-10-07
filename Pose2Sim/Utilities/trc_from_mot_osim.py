@@ -57,7 +57,8 @@ def get_marker_positions(motion_data, model):
     # Data
     times = motion_data.getIndependentColumn()
     joint_angle_set_names = motion_data.getColumnLabels() # or [c.getName() for c in model.getCoordinateSet()]
-    motion_data_pd = pd.DataFrame(motion_data.getMatrix().to_numpy(), columns=joint_angle_set_names)
+    joint_angle_set_names = [j for j in joint_angle_set_names if not j.endswith('activation')]
+    motion_data_pd = pd.DataFrame(motion_data.getMatrix().to_numpy()[:,:len(joint_angle_set_names)], columns=joint_angle_set_names)
 
     # Get marker positions at each state
     state = model.initSystem()
