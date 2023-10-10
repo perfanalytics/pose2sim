@@ -615,6 +615,8 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
         K.append(mtx)
         R.append([0.0, 0.0, 0.0])
         T.append([0.0, 0.0, 0.0])
+        
+        logging.info(f'Intrinsics error: {np.around(ret_cam, decimals=3)} px for each cameras.')
 
     return ret, C, S, D, K, R, T
 
@@ -686,7 +688,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
 
         # Calculate extrinsics
         mtx, dist = np.array(K[i]), np.array(D[i])
-        _, r, t = cv2.solvePnP(objp, imgp, mtx, dist)
+        _, r, t = cv2.solvePnP(np.array(objp), imgp, mtx, dist)
         r, t = r.flatten(), t.flatten()
 
         # Projection of object points to image plane
