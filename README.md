@@ -298,6 +298,8 @@ If you already have a calibration file, set `calibration_type` type to `convert`
       is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
     
     <img src="Content/Calib_int.png" width="600">
+
+    Intrinsic calibration error should be below 0.5 px.
         
   - **Calculate extrinsic parameters:** 
 
@@ -316,6 +318,8 @@ If you already have a calibration file, set `calibration_type` type to `convert`
         Then you will click on the corresponding image points for each view.
     
     <img src="Content/Calib_ext.png" width="920">
+
+    Intrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.
 
 - **With points:**
   - Points can be detected from a wand.\
