@@ -73,13 +73,13 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 3. **Install Pose2Sim**:\
 If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.6 is installed.
    - OPTION 1: **Quick install:** Open a terminal. 
-       ```
+       ``` cmd
        pip install pose2sim
        ```
      
    - OPTION 2: **Build from source and test the last changes:**
      Open a terminal in the directory of your choice and Clone the Pose2Sim repository.
-       ```
+       ``` cmd
        git clone --depth 1 https://github.com/perfanalytics/pose2sim.git
        cd pose2sim
        pip install .
@@ -91,7 +91,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.6
 Open a terminal, enter `pip show pose2sim`, report package location. \
 Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo`. \
 Type `ipython`, and test the following code:
-```
+``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.calibration()
 Pose2Sim.personAssociation()
@@ -157,7 +157,7 @@ N.B.: Note that the names of your camera folders must follow the same order as i
 The accuracy and robustness of Pose2Sim have been thoroughly assessed only with OpenPose, and especially with the BODY_25B model. Consequently, we recommend using this 2D pose estimation solution. See [OpenPose repository](https://github.com/CMU-Perceptual-Computing-Lab/openpose) for installation and running.
 * Open a command prompt in your **OpenPose** directory. \
   Launch OpenPose for each raw image folder: 
-  ```
+  ``` cmd
   bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_PROJECT_DIR>\raw-2d\vid_cam1.mp4 --write_json <PATH_TO_PROJECT_DIR>\pose-2d\pose_cam1_json
   ```
 * The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results than the standard BODY_25 one and has been extensively tested for Pose2Sim. \
@@ -181,7 +181,7 @@ Make sure you modify the [User\Config.toml](https://github.com/perfanalytics/pos
 [Mediapipe BlazePose](https://google.github.io/mediapipe/solutions/pose.html) is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 * Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
-  ```
+  ``` cmd
   python -m Blazepose_runsave -i rinput_file -dJs
   ```
   Type in `python -m Blazepose_runsave -h` for explanation on parameters and for additional ones.
@@ -191,7 +191,7 @@ However, it is less robust and accurate than OpenPose, and can only detect a sin
 If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut).
 1. Train your DeepLabCut model and run it on your images or videos (more instruction on their repository)
 2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
-   ```
+   ``` cmd
    python -m DLC_to_OpenPose -i rinput_h5_file
    ```
 3. Report the model keypoints in the [skeleton.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/skeletons.py) file, and make sure you change the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
@@ -201,7 +201,7 @@ If you need to detect specific points on a human being, an animal, or an object,
 [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) is one of the main competitors of OpenPose, and its accuracy is comparable. As a top-down approach (unlike OpenPose which is bottom-up), it is faster on single-person detection, but slower on multi-person detection.
 * Install and run AlphaPose on your videos (more instruction on their repository)
 * Translate the AlphaPose single json file to OpenPose frame-by-frame files (with `AlphaPose_to_OpenPose.py` script, see [Utilities](#utilities)): 
-   ```
+   ``` cmd
    python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
    ```
 * Make sure you change the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
@@ -244,7 +244,7 @@ N.B.: Markers are not needed in Pose2Sim and were used here for validation
 Open an Anaconda prompt or a terminal, type `ipython`.\
 By default, `calibration()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.calibration(r'path_to_config.toml')`.
 
-```
+``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.calibration()
 ```
@@ -298,6 +298,9 @@ If you already have a calibration file, set `calibration_type` type to `convert`
       is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
     
     <img src="Content/Calib_int.png" width="600">
+
+    Intrinsic calibration error should be below 0.5 px.
+
         
   - **Calculate extrinsic parameters:** 
 
@@ -316,6 +319,8 @@ If you already have a calibration file, set `calibration_type` type to `convert`
         Then you will click on the corresponding image points for each view.
     
     <img src="Content/Calib_ext.png" width="920">
+    
+    Intrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.
 
 - **With points:**
   - Points can be detected from a wand.\
@@ -381,7 +386,7 @@ Alternatively, use a clap, a flash, or a beep noise to synchronize them.
 
 Open an Anaconda prompt or a terminal, type `ipython`.\
 By default, `personAssociation()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.personAssociation(r'path_to_config.toml')`.
-```
+``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.personAssociation()
 ```
@@ -441,7 +446,7 @@ Output:\
 Open an Anaconda prompt or a terminal, type `ipython`.\
 By default, `triangulation()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.triangulation(r'path_to_config.toml')`.
 
-```
+``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.triangulation()
 ```
@@ -506,7 +511,7 @@ Output:\
 Open an Anaconda prompt or a terminal, type `ipython`.\
 By default, `filtering()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.filtering(r'path_to_config.toml')`.
 
-```
+``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.filtering()
 ```
@@ -594,25 +599,25 @@ Alternatively, you can use command-line tools:
 
 - Open an Anaconda terminal in your OpenSim/bin directory, typically `C:\OpenSim <Version>\bin`.\
   You'll need to adjust the `time_range`, `output_motion_file`, and enter the full paths to the input and output `.osim`, `.trc`, and `.mot` files in your setup file.
-  ```
+  ``` cmd
   opensim-cmd run-tool <PATH TO YOUR SCALING OR IK SETUP FILE>.xml
   ```
 
 - You can also run OpenSim directly in Python:
-  ```
+  ``` python
   import subprocess
   subprocess.call(["opensim-cmd", "run-tool", r"<PATH TO YOUR SCALING OR IK SETUP FILE>.xml"])
   ```
 
 - Or take advantage of the full the OpenSim Python API. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python) for installation instructions (conda install may take a while).\
-Make sure to replace `38` in `py38np120` with your Python version (3.8 in this case).
-  ```
+Make sure to replace `py38np120` with your Python version (3.8 in this case) and with your numpy version (1.20 here).
+  ``` cmd
   conda install -c opensim-org opensim-moco=4.4=py38np120 -y
   ```
   If you run into a DLL error while importing opensim, open the file `<Pose2Sim-env>\Lib\opensim\__init__.py` and replace `conda`by `conda-meta` line 4. `<Pose2Sim-env>` location can be found with `conda env list`.\
   Then run: 
-  ```
-  ipython
+  `ipython`
+  ``` python
   import opensim
   opensim.ScaleTool("<PATH TO YOUR SCALING OR IK SETUP FILE>.xml").run()
   opensim.InverseKinematicsTool("<PATH TO YOUR SCALING OR IK SETUP FILE>.xml").run()
@@ -670,7 +675,7 @@ Make sure to replace `38` in `py38np120` with your Python version (3.8 in this c
 
 ## Batch processing
 If you need to batch process multiple data or with multiple different parameters, you can run any Pose2Sim function with a `config` dictionary instead of a file. For example:
-```
+``` python
 from Pose2Sim import Pose2Sim
 import toml
 
@@ -679,7 +684,7 @@ config_dict['project']['pose_folder_name'] = new_project_path
 Pose2Sim.triangulate(config_dict)
 ```
 Or into a loop:
-```
+``` python
 from Pose2Sim import Pose2Sim
 import toml
 config_dict = toml.load('User/Config.toml')
