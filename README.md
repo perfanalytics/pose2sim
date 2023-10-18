@@ -708,7 +708,7 @@ A list of standalone tools (see [Utilities](https://github.com/perfanalytics/pos
 
 
 <details>
-  <summary><b>Converting files and Calibrating</b> (CLICK TO SHOW)</summary>
+  <summary><b>Converting calibration files</b> (CLICK TO SHOW)</summary>
     <pre>
 
 [Blazepose_runsave.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/Blazepose_runsave.py)
@@ -719,9 +719,6 @@ Converts a DeepLabCut (h5) 2D pose estimation file into OpenPose (json) files.
 
 [AlphaPose_to_OpenPose.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/AlphaPose_to_OpenPose.py)
 Converts AlphaPose single json file to OpenPose frame-by-frame files.
-
-[c3d_to_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/c3d_to_trc.py)
-Converts 3D point data of a .c3d file to a .trc file compatible with OpenSim. No analog data (force plates, emg) nor computed data (angles, powers, etc) are retrieved.
 
 [calib_from_checkerboard.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_from_checkerboard.py)
 Calibrates cameras with images or a video of a checkerboard, saves calibration in a Pose2Sim .toml calibration file.
@@ -736,8 +733,14 @@ Converts a Pose2Sim .toml calibration file (e.g., from a checkerboard) to a Qual
 [calib_easymocap_to_toml.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_easymocap_to_toml.py)
 Converts EasyMocap intrinsic and extrinsic .yml calibration files to an OpenCV .toml calibration file.
 
-[calib_easymocap_to_yml.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_easymocap.py)
+[calib_toml_to_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_easymocap.py)
 Converts an OpenCV .toml calibration file to EasyMocap intrinsic and extrinsic .yml calibration files.
+
+[calib_toml_to_opencap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_opencap.py)
+Converts an OpenCV .toml calibration file to OpenCap .pickle calibration files.
+
+[calib_toml_to_opencap.py]( )
+To convert OpenCap calibration tiles to a .toml file, please use Pose2Sim.calibration() and set convert_from = 'opencap' in Config.toml.
    </pre>
 </details>
 
@@ -759,7 +762,10 @@ Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different ma
 <details>
   <summary><b>Other trc tools</b> (CLICK TO SHOW)</summary>
     <pre>
-    
+
+[c3d_to_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/c3d_to_trc.py)
+Converts 3D point data of a .c3d file to a .trc file compatible with OpenSim. No analog data (force plates, emg) nor computed data (angles, powers, etc) are retrieved.
+
 [trc_desample.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_desample.py)
 Undersamples a trc file.
 
@@ -767,7 +773,7 @@ Undersamples a trc file.
 Changes Z-up system coordinates to Y-up system coordinates.
 
 [trc_filter.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_filter.py)
-Filters trc files. Available filters: Butterworth, Butterworth on speed, Gaussian, LOESS, Median.
+Filters trc files. Available filters: Butterworth, Kalman, Butterworth on speed, Gaussian, LOESS, Median.
 
 [trc_gaitevents.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_gaitevents.py)
 Detects gait events from point coordinates according to [Zeni et al. (2008)](https://www.sciencedirect.com/science/article/abs/pii/S0966636207001804?via%3Dihub).
@@ -777,6 +783,10 @@ Combine two trc files, for example a triangulated DeepLabCut trc file and a tria
 
 [trc_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_mot_osim.py)
 Build a trc file from a .mot motion file and a .osim model file.
+
+[csv_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/csv_from_mot_osim.py)
+Converts a mot file to a .csv file with rotation and orientation of all segments.
+
    </pre>
 </details>
 
