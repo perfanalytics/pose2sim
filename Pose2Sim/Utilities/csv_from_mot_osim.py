@@ -13,7 +13,7 @@
     Equivalent to OpenSim Analysis -> BodyKinematics but without the bugs in 
     orientations due to their use of Euler angle instead of homography matrices
 
-    Transforms from OpenSim's zup to Blender's yup
+    Transforms from OpenSim's yup to Blender's zup unless you set direction = 'yup'
     
     Usage: 
     from Pose2Sim.Utilities import csv_from_mot_osim; csv_from_mot_osim.csv_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_csv_file>')
@@ -28,7 +28,7 @@ import numpy as np
 import opensim as osim
 import argparse
 
-direction = 'zup'
+direction = 'zup' # 'zup' or 'yup'
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon, Jonathan Camargo"
