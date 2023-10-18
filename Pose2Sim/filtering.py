@@ -496,7 +496,7 @@ def filter_all(config):
         [trc_o.write(line) for line in header]
         Q_filt.insert(0, 'Frame#', frames_col)
         Q_filt.insert(1, 'Time', time_col)
-        Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, line_terminator='\n')
+        Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
 
     # Recap
     recap_filter3d(config, trc_path_out)

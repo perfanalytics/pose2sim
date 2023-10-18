@@ -73,7 +73,7 @@ def trc_Zup_to_Yup_func(*args):
         [trc_o.write(line) for line in header]
         Q_Yup.insert(0, 'Frame#', frames_col)
         Q_Yup.insert(1, 'Time', time_col)
-        Q_Yup.to_csv(trc_o, sep='\t', index=False, header=None, line_terminator='\n')
+        Q_Yup.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
