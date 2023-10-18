@@ -72,8 +72,8 @@ def csv_from_mot_osim_func(*args):
     
     
     # Read model and motion files
-    model = osim.Model(input_osim_file)
-    motion_data = osim.TimeSeriesTable(input_mot_file)
+    model = osim.Model(osim_path)
+    motion_data = osim.TimeSeriesTable(motion_path)
 
     # Model: get model coordinates and bodies
     model_coordSet = model.getCoordinateSet()
