@@ -71,7 +71,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
    conda activate Pose2Sim</i></pre>
    
 3. **Install Pose2Sim**:\
-If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.6 is installed.
+If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.8 is installed.
    - OPTION 1: **Quick install:** Open a terminal. 
        ``` cmd
        pip install pose2sim
