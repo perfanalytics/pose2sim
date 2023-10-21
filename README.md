@@ -297,7 +297,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     - Make sure that the board:\
       is filmed from different angles, covers a large part of the video frame, and is in focus.\
       is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
-      - A common error is to specify the external, instead of the internal number of corners. This may be one less than you would intuitively think. 
+    - A common error is to specify the external, instead of the internal number of corners. This may be one less than you would intuitively think. 
     
     <img src="Content/Calib_int.png" width="600">
 
