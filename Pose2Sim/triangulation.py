@@ -221,9 +221,11 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
                 if len(list(interp_frames[idx])) ==0:
                     logging.info(f'  No frames needed to be interpolated.')
                 else: 
-                    logging.info(f'  Frames {list(interp_frames[idx])} were interpolated.')
+                    interp_str = str(interp_frames[idx]).replace(":", " to ").replace("'", "").replace("]", "").replace("[", "")
+                    logging.info(f'  Frames {interp_str} were interpolated.')
                 if len(list(non_interp_frames[idx]))>0:
-                    logging.info(f'  Frames {list(non_interp_frames[idx])} could not be interpolated: consider adjusting thresholds.')
+                    noninterp_str = str(non_interp_frames[idx]).replace(":", " to ").replace("'", "").replace("]", "").replace("[", "")
+                    logging.info(f'  Frames {non_interp_frames[idx]} could not be interpolated: consider adjusting thresholds.')
             else:
                 logging.info(f'  No frames were interpolated because \'interpolation_kind\' was set to none. ')
     
