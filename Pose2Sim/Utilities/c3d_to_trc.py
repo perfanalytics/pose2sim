@@ -67,6 +67,18 @@ def c3d_to_trc_func(*args):
     value_item = [item[1] for item in items_header_list]
     header_c3d = dict(zip(label_item, value_item))
     
+    # unit
+    for k1 in reader.group_items():
+        if k1[0]=='POINT':
+            for k2 in k1[1].param_items():
+                if k2[0]=='UNITS':
+                    if 'mm' in k2[1].bytes[:].decode('utf-8'):
+                        unit = 'mm'
+                        unit_scale= 0.001
+                    else:
+                        unit = 'm'
+                        unit_scale= 1 # mm
+    
     # c3d data: reads 3D points (no analog data) and takes off computed data
     labels = reader.point_labels
     index_labels_markers = [i for i, s in enumerate(labels) if 'Angle' not in s and 'Power' not in s and 'Force' not in s and 'Moment' not in s and 'GRF' not in s]
@@ -80,7 +92,7 @@ def c3d_to_trc_func(*args):
     header1['CameraRate'] = header1['DataRate']
     header1['NumFrames'] = str(int(header_c3d['last_frame']) - int(header_c3d['first_frame']) + 1)
     header1['NumMarkers'] = str(len(labels_markers))
-    header1['Units'] = 'm'
+    header1['Units'] = unit
     header1['OrigDataRate'] = header1['DataRate']
     header1['OrigDataStartFrame'] = header_c3d['first_frame']
     header1['OrigNumFrames'] = header1['NumFrames']
@@ -101,7 +113,7 @@ def c3d_to_trc_func(*args):
         tf = int(float(header_c3d['last_frame'])) / int(float(header_c3d['frame_rate']))
         trc_time = np.linspace(t0, tf, num=(int(header_c3d['last_frame']) - int(header_c3d['first_frame']) + 1))
         for n, (i, points, _) in enumerate(list(reader.read_frames())):
-            c3d_line = np.concatenate([item[:3] for item in points])
+            c3d_line = np.concatenate([item[:3] for item in points])*unit_scale
             c3d_line_markers = c3d_line[index_data_markers]
             trc_line = '{i}\t{t}\t'.format(i=i, t=trc_time[n]) + '\t'.join(map(str,c3d_line_markers))
             trc_o.write(trc_line+'\n')

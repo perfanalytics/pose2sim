@@ -63,17 +63,19 @@ def trc_Zup_to_Yup_func(*args):
     frames_col, time_col = trc_df.iloc[:,0], trc_df.iloc[:,1]
     Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
 
-    # X->Y, Y->Z, Z->X
+    # Y->Z, Z->-Y
     cols = list(Q_coord.columns)
-    cols = np.array([[cols[i*3+1],cols[i*3+2],cols[i*3]] for i in range(int(len(cols)/3))]).flatten()
+    # cols = np.array([[cols[i*3+1],cols[i*3+2],cols[i*3]] for i in range(int(len(cols)/3))]).flatten() # X->Y, Y->Z, Z->X
+    cols = np.array([[cols[i*3],cols[i*3+2],cols[i*3+1]] for i in range(int(len(cols)/3))]).flatten() # Y->Z, Z->-Y
     Q_Yup = Q_coord[cols]
+    Q_Yup.iloc[:,2::3] = - Q_Yup.iloc[:,2::3]
 
     # write file
     with open(trc_yup_path, 'w') as trc_o:
         [trc_o.write(line) for line in header]
         Q_Yup.insert(0, 'Frame#', frames_col)
         Q_Yup.insert(1, 'Time', time_col)
-        Q_Yup.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+        Q_Yup.to_csv(trc_o, sep='\t', index=False, header=None, line_terminator='\n')
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
