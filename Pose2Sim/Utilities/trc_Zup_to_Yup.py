@@ -63,12 +63,12 @@ def trc_Zup_to_Yup_func(*args):
     frames_col, time_col = trc_df.iloc[:,0], trc_df.iloc[:,1]
     Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
 
-    # Y->Z, Z->-Y
+    # Y->Z, Z->Y
     cols = list(Q_coord.columns)
     # cols = np.array([[cols[i*3+1],cols[i*3+2],cols[i*3]] for i in range(int(len(cols)/3))]).flatten() # X->Y, Y->Z, Z->X
     cols = np.array([[cols[i*3],cols[i*3+2],cols[i*3+1]] for i in range(int(len(cols)/3))]).flatten() # Y->Z, Z->-Y
     Q_Yup = Q_coord[cols]
-    Q_Yup.iloc[:,2::3] = - Q_Yup.iloc[:,2::3]
+    # Q_Yup.iloc[:,2::3] = - Q_Yup.iloc[:,2::3]
 
     # write file
     with open(trc_yup_path, 'w') as trc_o:
