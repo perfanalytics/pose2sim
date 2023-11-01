@@ -850,6 +850,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 &#10004; **Pose:** Support [DeepLabCut](http://www.mackenziemathislab.org/deeplabcut) for training on custom datasets.
 &#10004; **Pose:** Support [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) as an alternative to OpenPose.
 &#9634; **Pose:** Support [MMPose](https://github.com/open-mmlab/mmpose), [SLEAP](https://sleap.ai/), etc.
+&#9634; **Pose:** Access skeletons more easily by storing them in skeletons.toml.
 
 &#10004; **Calibration:** Convert [Qualisys](https://www.qualisys.com) .qca.txt calibration file.
 &#10004; **Calibration:** Convert [Optitrack](https://optitrack.com/) extrinsic calibration file.
@@ -872,7 +873,8 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 &#9634; **Person Association:** Multiple persons association. 1. Triangulate all the persons whose reprojection error is below a certain threshold (instead of only the one with minimum error), and then track in time with speed cf [Slembrouck 2020](https://link.springer.com/chapter/10.1007/978-3-030-40605-9_15)? or 2. Based on affinity matrices [Dong 2021](https://arxiv.org/pdf/1901.04111.pdf)? or 3. Based on occupancy maps [Yildiz 2012](https://link.springer.com/chapter/10.1007/978-3-642-35749-7_10)? or 4. With a neural network [Huang 2023](https://arxiv.org/pdf/2304.09471.pdf)?
 
 &#10004; **Triangulation:** Triangulation weighted with confidence.
-&#10004; **Triangulation:** Set a likelihood threshold below which a camera should not be used, a reprojection error threshold, and a minimum number of remaining cameras below which triangulation is skipped for this frame.
+&#10004; **Triangulation:** Set a likelihood threshold below which a camera should not be used, a reprojection error threshold, and a minimum number of remaining cameras below which triangulation is skipped for this frame. 
+&#10004; **Triangulation:** Interpolate missing frames (cubic, bezier, linear, slinear, quadratic)
 &#10004; **Triangulation:** Show mean reprojection error in px and in mm for each keypoint.
 &#10004; **Triangulation:** Show how many cameras on average had to be excluded for each keypoint.
 &#10004; **Triangulation:** Evaluate which cameras were the least reliable.
@@ -904,7 +906,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 &#9634; **Demo:** Time shift videos and json to demonstrate synchronization
 &#9634; **Demo:** Add another virtual person to demonstrate personAssociation
 &#9634; **Tutorials:** Make video tutorials.
-&#9634; **Doc:** Use [Sphinx](https://www.sphinx-doc.org/en/master) or [MkDocs](https://www.mkdocs.org) for clearer documentation.
+&#9634; **Doc:** Use [Sphinx](https://www.sphinx-doc.org/en/master), [MkDocs](https://www.mkdocs.org), or (maybe better), [github.io](https://docs.github.com/fr/pages/quickstart) for clearer documentation.
 
 &#9634; **Catch errors**
 &#10004; **Pip package**
