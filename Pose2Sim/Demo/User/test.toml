@@ -126,9 +126,8 @@ display_figures = false # true or false (lowercase)
 
 # CUSTOM skeleton, for DeepLabCut for example (others are in skeletons.py)
 # In this example, CUSTOM reproduces the BODY_25B skeleton.
-# You can create as many custom skeletons as you want, 
-# just add them further down the file and replace CUSTOM by the name of your choice.
-# Make sure the node ids correspond to the column numbers, starting from zero.
+# You can create as many custom skeletons as you want, just add them further down and rename them.
+# Make sure the node ids correspond to the column numbers of the 2D pose file, starting from zero.
 [pose.CUSTOM]
 name = "CHip"
 id = "None"

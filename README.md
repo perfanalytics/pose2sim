@@ -167,16 +167,9 @@ All other OpenPose models (BODY_25, COCO, MPII) are also supported.\
 Make sure you modify the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file accordingly.
 * Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
 
-**N.B.:** *OpenPose BODY_25B is the default 2D pose estimation model used in Pose2Sim. However, other skeleton models from other 2D pose estimation solutions can be used alternatively.* \
-    - You will first need to convert your 2D detection files to the OpenPose format (see [Utilities](#utilities)). \
-    - Then, change the `pose_model` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. You may also need to choose a different `tracked_keypoint` if the Neck is not detected by the chosen model. \
-    - Finally, use the corresponding OpenSim model and setup files, which are provided in the `Empty_project\opensim` folder. 
-  
- Available models are:    
-    - OpenPose BODY_25B, BODY_25, BODY_135, COCO, MPII \
-    - Mediapipe BLAZEPOSE \
-    - DEEPLABCUT \
-    - AlphaPose HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII
+**N.B.:** *OpenPose BODY_25B is the default 2D pose estimation model used in Pose2Sim. However, other skeleton models from other 2D pose estimation solutions can be used alternatively.* 
+
+<img src="Content/Pose2D.png" width="760">
 
 ### With MediaPipe:
 [Mediapipe BlazePose](https://google.github.io/mediapipe/solutions/pose.html) is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
@@ -185,32 +178,38 @@ However, it is less robust and accurate than OpenPose, and can only detect a sin
   ``` cmd
   python -m Blazepose_runsave -i rinput_file -dJs
   ```
-  Type in `python -m Blazepose_runsave -h` for explanation on parameters and for additional ones.
-* Make sure you change the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
+  Type in `python -m Blazepose_runsave -h` for explanation on parameters.
+* Make sure you changed the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 
 ### With DeepLabCut:
 If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut).
 1. Train your DeepLabCut model and run it on your images or videos (more instruction on their repository)
 2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
    ``` cmd
-   python -m DLC_to_OpenPose -i rinput_h5_file
+   python -m DLC_to_OpenPose -i input_h5_file
    ```
-3. Report the model keypoints in the [skeleton.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/skeletons.py) file, and make sure you change the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
-4. Create an OpenSim model if you need 3D joint angles.
+3. Edit `pose.CUSTOM` in [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml), and edit the node ids so that they correspond to the column numbers of the 2D pose file, starting from zero. Make sure you also changed the `pose_model` and the `tracked_keypoint`.\
+   You can visualize your skeleton's hierarchy by changing pose_model to CUSTOM and writing these lines: 
+   ``` python
+    config_path = r'path_to_Config.toml'
+    import toml, anytree
+    config = toml.load(config_path)
+    pose_model = config.get('pose').get('pose_model')
+    model = DictImporter().import_(config.get('pose').get(pose_model))
+    for pre, _, node in RenderTree(model): 
+        print(f'{pre}{node.name} id={node.id}')
+   ```
+4. Create an OpenSim model if you need inverse kinematics.
 
 ### With AlphaPose:
-[AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) is one of the main competitors of OpenPose, and its accuracy is comparable. As a top-down approach (unlike OpenPose which is bottom-up), it is faster on single-person detection, but slower on multi-person detection.
+[AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) is one of the main competitors of OpenPose, and its accuracy is comparable. As a top-down approach (unlike OpenPose which is bottom-up), it is faster on single-person detection, but slower on multi-person detection.\
+All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII).
 * Install and run AlphaPose on your videos (more instruction on their repository)
 * Translate the AlphaPose single json file to OpenPose frame-by-frame files (with `AlphaPose_to_OpenPose.py` script, see [Utilities](#utilities)): 
    ``` cmd
    python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
    ```
-* Make sure you change the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
-
-<img src="Content/Pose2D.png" width="760">
-
-N.B.: Markers are not needed in Pose2Sim and were used here for validation
-
+* Make sure you changed the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 
 <details>
   <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
@@ -267,6 +266,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 - **From [Optitrack](https://optitrack.com/):** Exporting calibration will be available in Motive 3.2. In the meantime:
   - Calculate intrinsics with a board (see next section).
   - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28).
+  - Use the `Calib.toml` file as is and do not run Pose2Sim.calibration()
 - **From [Vicon](http://www.vicon.com/Software/Nexus):**  
   - Copy your `.xcp` Vicon calibration file to the Pose2Sim `calibration` folder.
   - set `convert_from` to 'vicon' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
