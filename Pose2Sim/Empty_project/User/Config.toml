@@ -21,10 +21,9 @@ opensim_folder_name = 'opensim'
 
 [pose]
 pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII. 
-						#With mediapipe: BLAZEPOSE. 
-						#With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
-						#With deeplabcut: CUSTOM
-						# See Pose2Sim\skeleton.py for their skeleton hierarchy
+                        #With mediapipe: BLAZEPOSE. 
+                        #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
+                        #With deeplabcut: CUSTOM. See example at the end of the file.
 # What follows has not been implemented yet
 pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
 overwrite_pose = false
@@ -84,7 +83,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
       calibration_points = 'wand' # 'wand' or 'keypoints'
       # Not supported yet.
 
-	  
+      
 [personAssociation]
 tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
 # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
@@ -124,3 +123,75 @@ display_figures = true # true or false (lowercase)
 
 [opensim]
 
+
+# CUSTOM skeleton, for DeepLabCut for example (others are in skeletons.py)
+# In this example, CUSTOM reproduces the BODY_25B skeleton.
+# You can create as many custom skeletons as you want, 
+# just add them further down the file and replace CUSTOM by the name of your choice.
+# Make sure the node ids correspond to the column numbers, starting from zero.
+[pose.CUSTOM]
+name = "CHip"
+id = "None"
+  [[pose.CUSTOM.children]]
+  id = 12
+  name = "RHip"
+     [[pose.CUSTOM.children.children]]
+     id = 14
+     name = "RKnee"
+        [[pose.CUSTOM.children.children.children]]
+        id = 16
+        name = "RAnkle"
+           [[pose.CUSTOM.children.children.children.children]]
+           id = 22
+           name = "RBigToe"
+              [[pose.CUSTOM.children.children.children.children.children]]
+              id = 23
+              name = "RSmallToe"
+           [[pose.CUSTOM.children.children.children.children]]
+           id = 24
+           name = "RHeel"
+  [[pose.CUSTOM.children]]
+  id = 11
+  name = "LHip"
+     [[pose.CUSTOM.children.children]]
+     id = 13
+     name = "LKnee"
+        [[pose.CUSTOM.children.children.children]]
+        id = 15
+        name = "LAnkle"
+           [[pose.CUSTOM.children.children.children.children]]
+           id = 19
+           name = "LBigToe"
+              [[pose.CUSTOM.children.children.children.children.children]]
+              id = 20
+              name = "LSmallToe"
+           [[pose.CUSTOM.children.children.children.children]]
+           id = 21
+           name = "LHeel"
+  [[pose.CUSTOM.children]]
+  id = 17
+  name = "Neck"
+     [[pose.CUSTOM.children.children]]
+     id = 18
+     name = "Head"
+        [[pose.CUSTOM.children.children.children]]
+        id = 0
+        name = "Nose"
+     [[pose.CUSTOM.children.children]]
+     id = 6
+     name = "RShoulder"
+        [[pose.CUSTOM.children.children.children]]
+        id = 8
+        name = "RElbow"
+           [[pose.CUSTOM.children.children.children.children]]
+           id = 10
+           name = "RWrist"
+     [[pose.CUSTOM.children.children]]
+     id = 5
+     name = "LShoulder"
+        [[pose.CUSTOM.children.children.children]]
+        id = 7
+        name = "LElbow"
+           [[pose.CUSTOM.children.children.children.children]]
+           id = 9
+           name = "LWrist"

@@ -8,11 +8,11 @@
     ###########################################################################
     
     The definition and hierarchy of the following skeletons are available: 
-    - CUSTOM (e.g.., from DeepLabCut),
     - OpenPose BODY_25B, BODY_25, BODY_135, COCO, MPII
     - Mediapipe BLAZEPOSE
     - AlphaPose HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII 
     (for COCO and MPII, AlphaPose must be run with the flag "--format cmu")
+    - DeepLabCut CUSTOM: the skeleton will be defined in Config.toml
     
     N.B.: Not all face and hand keypoints are reported in the skeleton architecture, 
     since some are redundant for the orientation of some bodies.
@@ -20,17 +20,10 @@
     N.B.: The corresponding OpenSim model files are provided in the "Pose2Sim\Empty project" folder.
     If you wish to use any other, you will need to adjust the markerset in the .osim model file, 
     as well as in the scaling and IK setup files.
-    
-    N.B.: In case you built a custom skeleton, you can check its structure by typing: 
-    from anytree import Node, RenderTree
-    for pre, _, node in RenderTree(CUSTOM): 
-            print(f'{pre}{node.name} id={node.id}')
-    If you build it from a DeepLabCut model, make sure the node ids 
-    correspond to the column numbers, starting from zero.
 '''
 
 ## INIT
-from anytree import Node, RenderTree
+from anytree import Node
 
 
 ## AUTHORSHIP INFORMATION
@@ -42,13 +35,6 @@ __version__ = '0.4'
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
-
-
-'''CUSTOM SKELETON (e.g., from DeepLabCut detection)'''
-CUSTOM = Node("Root", id=0, children=[
-    Node("Child1", id=1),
-    Node("Child2", id=2),
-    ])
 
 
 '''BODY_25B (full-body without hands, experimental, from OpenPose)

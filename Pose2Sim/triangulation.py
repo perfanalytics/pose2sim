@@ -41,6 +41,8 @@ import toml
 from tqdm import tqdm
 from scipy import interpolate
 from collections import Counter
+from anytree import RenderTree
+from anytree.importer import DictImporter
 import logging
 
 from Pose2Sim.common import computeP, weighted_triangulation, reprojection, \
@@ -425,7 +427,15 @@ def triangulate_all(config):
     P = computeP(calib_file)
     
     # Retrieve keypoints from model
-    model = eval(pose_model)
+    try: # from skeletons.py
+        model = eval(pose_model)
+    except:
+        try: # from Config.toml
+            model = DictImporter().import_(config.get('pose').get(pose_model))
+            if model.id == 'None':
+                model.id = None
+        except:
+            raise NameError('Model not found in skeletons.py nor in Config.toml')
     keypoints_ids = [node.id for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_idx = list(range(len(keypoints_ids)))
