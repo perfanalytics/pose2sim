@@ -873,7 +873,8 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 &#9634; **Person Association:** Multiple persons association. 1. Triangulate all the persons whose reprojection error is below a certain threshold (instead of only the one with minimum error), and then track in time with speed cf [Slembrouck 2020](https://link.springer.com/chapter/10.1007/978-3-030-40605-9_15)? or 2. Based on affinity matrices [Dong 2021](https://arxiv.org/pdf/1901.04111.pdf)? or 3. Based on occupancy maps [Yildiz 2012](https://link.springer.com/chapter/10.1007/978-3-642-35749-7_10)? or 4. With a neural network [Huang 2023](https://arxiv.org/pdf/2304.09471.pdf)?
 
 &#10004; **Triangulation:** Triangulation weighted with confidence.
-&#10004; **Triangulation:** Set a likelihood threshold below which a camera should not be used, a reprojection error threshold, and a minimum number of remaining cameras below which triangulation is skipped for this frame.
+&#10004; **Triangulation:** Set a likelihood threshold below which a camera should not be used, a reprojection error threshold, and a minimum number of remaining cameras below which triangulation is skipped for this frame. 
+&#10004; **Triangulation:** Interpolate missing frames (cubic, bezier, linear, slinear, quadratic)
 &#10004; **Triangulation:** Show mean reprojection error in px and in mm for each keypoint.
 &#10004; **Triangulation:** Show how many cameras on average had to be excluded for each keypoint.
 &#10004; **Triangulation:** Evaluate which cameras were the least reliable.
