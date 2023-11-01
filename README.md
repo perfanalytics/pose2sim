@@ -850,6 +850,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 &#10004; **Pose:** Support [DeepLabCut](http://www.mackenziemathislab.org/deeplabcut) for training on custom datasets.
 &#10004; **Pose:** Support [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) as an alternative to OpenPose.
 &#9634; **Pose:** Support [MMPose](https://github.com/open-mmlab/mmpose), [SLEAP](https://sleap.ai/), etc.
+&#9634; **Pose:** Access skeletons more easily by storing them in skeletons.toml.
 
 &#10004; **Calibration:** Convert [Qualisys](https://www.qualisys.com) .qca.txt calibration file.
 &#10004; **Calibration:** Convert [Optitrack](https://optitrack.com/) extrinsic calibration file.
@@ -904,7 +905,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 &#9634; **Demo:** Time shift videos and json to demonstrate synchronization
 &#9634; **Demo:** Add another virtual person to demonstrate personAssociation
 &#9634; **Tutorials:** Make video tutorials.
-&#9634; **Doc:** Use [Sphinx](https://www.sphinx-doc.org/en/master) or [MkDocs](https://www.mkdocs.org) for clearer documentation.
+&#9634; **Doc:** Use [Sphinx](https://www.sphinx-doc.org/en/master), [MkDocs](https://www.mkdocs.org), or (maybe better), [github.io](https://docs.github.com/fr/pages/quickstart) for clearer documentation.
 
 &#9634; **Catch errors**
 &#10004; **Pip package**
