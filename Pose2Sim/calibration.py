@@ -200,7 +200,7 @@ def read_qca(qca_path, binning_factor):
     return ret, C, S, D, K, R, T
 
 
-def calib_optitrack_fun(config):
+def calib_optitrack_fun(config, binning_factor=1):
     '''
     Convert an Optitrack calibration file 
 
@@ -216,8 +216,10 @@ def calib_optitrack_fun(config):
     - R: extrinsic rotation: list of arrays of floats
     - T: extrinsic translation: list of arrays of floats
     '''
-
-    pass
+    
+    logging.warning('See Readme.md to retrieve Optitrack calibration values.')
+    logging.warning("Once done, do not run Pose2Sim.calibration() or the same error message will be risen.")
+    raise NameError("See Readme.md to retrieve Optitrack calibration values.\nOnce done, do not run Pose2Sim.calibration() or the same error message will be risen.")
 
 
 def calib_vicon_fun(file_to_convert_path, binning_factor=1):
@@ -1215,27 +1217,40 @@ def calibrate_cams_all(config):
 
     if calib_type=='convert':
         convert_filetype = config.get('calibration').get('convert').get('convert_from')
-        if convert_filetype=='qualisys':
-            convert_ext = '.qca.txt'
-            file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
-            binning_factor = config.get('calibration').get('convert').get('qualisys').get('binning_factor')
-        elif convert_filetype=='optitrack':
-            logging.info('See Readme.md to retrieve Optitrack calibration values.')
-        elif convert_filetype=='vicon':
-            convert_ext = '.xcp'
-            file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
-            binning_factor = 1
-        elif convert_filetype=='opencap': # all files with .pickle extension
-            file_to_convert_path = glob.glob(os.path.join(calib_dir, '*.pickle'))
-            binning_factor = 1
-        elif convert_filetype=='easymocap': #intri.yml and intri.yml
-            file_to_convert_path = glob.glob(os.path.join(calib_dir, '*.yml'))
-            binning_factor = 1
-        elif convert_filetype=='biocv': # all files without extension
-            list_dir = os.listdir(calib_dir)
-            list_dir_noext = [os.path.splitext(f)[0] for f in list_dir if os.path.splitext(f)[1]=='']	
-            file_to_convert_path = [os.path.join(calib_dir,f) for f in list_dir_noext if os.path.isfile(os.path.join(calib_dir, f))]
-            binning_factor = 1
+        try:
+            if convert_filetype=='qualisys':
+                convert_ext = '.qca.txt'
+                file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
+                binning_factor = config.get('calibration').get('convert').get('qualisys').get('binning_factor')
+            elif convert_filetype=='optitrack':
+                file_to_convert_path = ['']
+                binning_factor = 1
+            elif convert_filetype=='vicon':
+                convert_ext = '.xcp'
+                file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}'))[0]
+                binning_factor = 1
+            elif convert_filetype=='opencap': # all files with .pickle extension
+                convert_ext = '.pickle'
+                file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}'))
+                binning_factor = 1
+            elif convert_filetype=='easymocap': #intri.yml and intri.yml
+                convert_ext = '.yml'
+                file_to_convert_path = glob.glob(os.path.join(calib_dir, '*.yml'))
+                binning_factor = 1
+            elif convert_filetype=='biocv': # all files without extension
+                convert_ext = 'no'
+                list_dir = os.listdir(calib_dir)
+                list_dir_noext = [os.path.splitext(f)[0] for f in list_dir if os.path.splitext(f)[1]=='']	
+                file_to_convert_path = [os.path.join(calib_dir,f) for f in list_dir_noext if os.path.isfile(os.path.join(calib_dir, f))]
+                binning_factor = 1
+            else:
+                convert_ext = '???'
+                file_to_convert_path = ['']
+                raise NameError(f'Calibration conversion from {convert_filetype} is not supported.') from None
+            assert file_to_convert_path!=[]
+        except:
+            raise NameError(f'No file with {convert_ext} extension found in {calib_dir}.')
+
         
         calib_output_path = os.path.join(calib_dir, f'Calib_{convert_filetype}.toml')
         calib_full_type = '_'.join([calib_type, convert_filetype])
