@@ -789,7 +789,7 @@ Combine two trc files, for example a triangulated DeepLabCut trc file and a tria
 [trc_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_mot_osim.py)
 Build a trc file from a .mot motion file and a .osim model file.
 
-[csv_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/csv_from_mot_osim.py)
+[bodykin_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/bodykin_from_mot_osim.py)
 Converts a mot file to a .csv file with rotation and orientation of all segments.
 
    </pre>
