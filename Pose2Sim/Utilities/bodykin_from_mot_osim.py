@@ -16,9 +16,9 @@
     Transforms from OpenSim's yup to Blender's zup unless you set direction = 'yup'
     
     Usage: 
-    from Pose2Sim.Utilities import csv_from_mot_osim; csv_from_mot_osim.csv_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_csv_file>')
-    python -m csv_from_mot_osim -m input_mot_file -o input_osim_file
-    python -m csv_from_mot_osim -m input_mot_file -o input_osim_file -c output_csv_file
+    from Pose2Sim.Utilities import bodykin_from_mot_osim; bodykin_from_mot_osim.bodykin_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_csv_file>')
+    python -m bodykin_from_mot_osim -m input_mot_file -o input_osim_file
+    python -m bodykin_from_mot_osim -m input_mot_file -o input_osim_file -c output_csv_file
 '''
 
 
@@ -41,7 +41,7 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
-def csv_from_mot_osim_func(*args):
+def bodykin_from_mot_osim_func(*args):
     '''
     Build a csv file which stores locations and orientations of all bodies
     calculated from a .mot motion file and a .osim model file.
@@ -50,9 +50,9 @@ def csv_from_mot_osim_func(*args):
     orientations due to their use of Euler angle instead of homography matrices
     
     Usage: 
-    from Pose2Sim.Utilities import csv_from_mot_osim; csv_from_mot_osim.csv_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_csv_file>')
-    python -m csv_from_mot_osim -m input_mot_file -o input_osim_file
-    python -m csv_from_mot_osim -m input_mot_file -o input_osim_file -t output_csv_file
+    from Pose2Sim.Utilities import bodykin_from_mot_osim; bodykin_from_mot_osim.bodykin_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_csv_file>')
+    python -m bodykin_from_mot_osim -m input_mot_file -o input_osim_file
+    python -m bodykin_from_mot_osim -m input_mot_file -o input_osim_file -t output_csv_file
     '''
     
     try:
@@ -145,4 +145,4 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--csv_output_file', required=False, help='csv output file')
     args = vars(parser.parse_args())
     
-    csv_from_mot_osim_func(args)
+    bodykin_from_mot_osim_func(args)
