@@ -764,9 +764,9 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001) # stop refining after 30 iterations or if error less than 0.001px
     
     # reads image if image, or first frame if video
-    try:
-        img = cv2.imread(img_path)
-    except:
+    # if imread can't read image, img will be None.
+    img = cv2.imread(img_path)
+    if img is None:
         with suppress_stdout_stderr():
         # with warnings.catch_warnings():
         #     warnings.simplefilter("ignore")
