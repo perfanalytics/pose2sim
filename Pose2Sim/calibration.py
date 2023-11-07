@@ -28,7 +28,6 @@
 
 # TODO: DETECT WHEN WINDOW IS CLOSED
 # TODO: WHEN 'Y', CATCH IF NUMBER OF IMAGE POINTS CLICKED NOT EQUAL TO NB OBJ POINTS
-# REMOVE OPENCV ERROR (FROM FFMPEG C CODE)
 
 
 ## INIT
@@ -64,19 +63,6 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-@contextmanager
-def suppress_stdout_stderr():
-    '''
-    A context manager that redirects stdout and stderr to devnull
-    Supresses error message from a compiled C/Fortran sub-function
-    (namely FFMPEG, called by OpenCV).
-    '''
-
-    with open(devnull, 'w') as fnull:
-        with redirect_stderr(fnull) as err, redirect_stdout(fnull) as out:
-            yield (err, out)
-
-
 def calib_qca_fun(file_to_convert_path, binning_factor=1):
     '''
     Convert a Qualisys .qca.txt calibration file
@@ -660,14 +646,13 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             raise ValueError(f'The folder {os.path.join(calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
         img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
         
-        # extract frames from video if video
-        try:
+        # extract frames from image, or from video if imread is None
+        img = cv2.imread(img_vid_files[0])
+        if img is None:
             cap = cv2.VideoCapture(img_vid_files[0])
             res, img = cap.read()
             if res == False:
                 raise
-        except:
-            img = cv2.imread(img_vid_files[0])
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         # Find corners or label by hand
@@ -703,13 +688,12 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
         # Check calibration results
         if show_reprojection_error:
             # Reopen image, otherwise 2 sets of text are overlaid
-            try:
+            img = cv2.imread(img_vid_files[0])
+            if img is None:
                 cap = cv2.VideoCapture(img_vid_files[0])
                 res, img = cap.read()
                 if res == False:
                     raise
-            except:
-                img = cv2.imread(img_vid_files[0])
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
             for o in proj_obj:
@@ -763,13 +747,10 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001) # stop refining after 30 iterations or if error less than 0.001px
     
-    # reads image if image, or first frame if video
-    # if imread can't read image, img will be None.
     img = cv2.imread(img_path)
+    print('eh', img is None)
     if img is None:
         with suppress_stdout_stderr():
-        # with warnings.catch_warnings():
-        #     warnings.simplefilter("ignore")
             cap = cv2.VideoCapture(img_path)
             ret, img = cap.read()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
