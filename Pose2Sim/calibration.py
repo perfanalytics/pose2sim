@@ -748,11 +748,9 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001) # stop refining after 30 iterations or if error less than 0.001px
     
     img = cv2.imread(img_path)
-    print('eh', img is None)
     if img is None:
-        with suppress_stdout_stderr():
-            cap = cv2.VideoCapture(img_path)
-            ret, img = cap.read()
+        cap = cv2.VideoCapture(img_path)
+        ret, img = cap.read()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     
@@ -768,9 +766,10 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
             cv2.drawChessboardCorners(img, corner_nb, imgp, ret)
             # Add corner index 
             for i, corner in enumerate(imgp):
-                x, y = corner.ravel()
-                cv2.putText(img, str(i+1), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .8, (255, 255, 255), 7) 
-                cv2.putText(img, str(i+1), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .8, (0,0,0), 2) 
+                if i in [0, corner_nb[0]-1, corner_nb[0]*(corner_nb[1]-1), corner_nb[0]*corner_nb[1] -1]:
+                    x, y = corner.ravel()
+                    cv2.putText(img, str(i+1), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .8, (255, 255, 255), 7) 
+                    cv2.putText(img, str(i+1), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .8, (0,0,0), 2) 
             
             # Visualizer and key press event handler
             for var_to_delete in ['imgp_confirmed', 'objp_confirmed']:
