@@ -657,13 +657,13 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
 
         # Find corners or label by hand
         if extrinsics_board_type == 'checkerboard':
-            imgp = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=[], show=show_reprojection_error)
+            objp = np.zeros((extrinsics_corners_nb[0] * extrinsics_corners_nb[1], 3), np.float32)
+            objp[:, :2] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]].T.reshape(-1, 2)
+            objp[:, :2] = objp[:, 0:2] * extrinsics_square_size
+            imgp, objp_not_used = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=objp, show=show_reprojection_error)
             if imgp == []:
                 logging.exception('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
                 raise ValueError('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
-            objp = np.zeros((extrinsics_corners_nb[0]*extrinsics_corners_nb[1],3), np.float32) 
-            objp[:,:2] = np.mgrid[0:extrinsics_corners_nb[0],0:extrinsics_corners_nb[1]].T.reshape(-1,2)
-            objp[:,:2] = objp[:,0:2]*extrinsics_square_size
 
         elif extrinsics_board_type == 'scene':
             imgp, objp = imgp_objp_visualizer_clicker(img, imgp=[], objp=object_coords_3d, img_path=img_vid_files[0])
