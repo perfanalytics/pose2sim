@@ -546,7 +546,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
     overwrite_extraction = False
     show_detection_intrinsics = intrinsics_config_dict.get('show_detection_intrinsics')
     intrinsics_corners_nb = intrinsics_config_dict.get('intrinsics_corners_nb')
-    intrinsics_square_size = intrinsics_config_dict.get('intrinsics_square_size')
+    intrinsics_square_size = intrinsics_config_dict.get('intrinsics_square_size') / 1000 # convert to meters
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
 
     for i,cam in enumerate(intrinsics_cam_listdirs_names):
@@ -632,7 +632,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
     extrinsics_extension = extrinsics_config_dict.get('extrinsics_extension')
     extrinsics_board_type = extrinsics_config_dict.get('extrinsics_board_type')
     extrinsics_corners_nb = extrinsics_config_dict.get('extrinsics_corners_nb')
-    extrinsics_square_size = extrinsics_config_dict.get('extrinsics_square_size')
+    extrinsics_square_size = extrinsics_config_dict.get('extrinsics_square_size') / 1000 # convert to meters
     object_coords_3d = np.array(extrinsics_config_dict.get('object_coords_3d'), np.float32)
     show_reprojection_error = extrinsics_config_dict.get('show_reprojection_error')
 
