@@ -817,7 +817,8 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     - imgp_confirmed: image points that have been correctly identified. array of [[2d corner coordinates]]
     - only if objp!=[]: objp_confirmed: array of [3d corner coordinates]
     '''
-
+    global old_image_path
+    old_image_path = img_path
                                  
     def on_key(event):
         '''
@@ -856,6 +857,16 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
 
         if event.key == 'c':
             # TODO: RIGHT NOW, IF 'C' IS PRESSED ANOTHER TIME, OBJP_CONFIRMED AND IMGP_CONFIRMED ARE RESET TO []
+            # We should reopen a figure without point on it
+            img_for_pointing = cv2.imread(old_image_path)
+            if img_for_pointing is None:
+                cap = cv2.VideoCapture(old_image_path)
+                ret, img_for_pointing = cap.read()
+            img_for_pointing = cv2.cvtColor(img_for_pointing, cv2.COLOR_BGR2RGB)
+            ax.imshow(img_for_pointing)
+            # To update the image
+            plt.draw()
+
             if 'objp_confirmed' in globals():
                 del objp_confirmed
             # If 'c', allows retrieving imgp_confirmed by clicking them on the image
