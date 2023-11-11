@@ -597,7 +597,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
                                     None, None, flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_PRINCIPAL_POINT))
         h, w = [np.float32(i) for i in img.shape[:-1]]
         ret.append(ret_cam)
-        C.append(f'cam_{str(i+1).zfill(2)}')   
+        C.append(cam)
         S.append([w, h])
         D.append(dist[0])
         K.append(mtx)
