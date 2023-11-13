@@ -297,9 +297,9 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     - Create a folder for each camera in your `calibration\intrinsics` folder.
     - For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
     - Adjust parameters in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
-    - Make sure that the board:\
-      is filmed from different angles, covers a large part of the video frame, and is in focus.\
-      is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
+    - Make sure that the board:
+      - is filmed from different angles, covers a large part of the video frame, and is in focus.
+      - is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
     - A common error is to specify the external, instead of the internal number of corners. This may be one less than you would intuitively think. 
     
     <img src="Content/Calib_int.png" width="600">
