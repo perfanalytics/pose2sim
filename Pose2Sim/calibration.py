@@ -215,7 +215,7 @@ def calib_vicon_fun(file_to_convert_path, binning_factor=1):
     and converts rotation with Rodrigues formula
 
     INPUTS:
-    - file_to_convert_path: path of the .qca.text file to convert
+    - file_to_convert_path: path of the .xcp file to convert
     - binning_factor: always 1 with Vicon calibration
 
     OUTPUTS:
@@ -268,9 +268,8 @@ def read_vicon(vicon_path):
         C += [tag.attrib.get('DEVICEID')]
         S += [[float(t) for t in tag.attrib.get('SENSOR_SIZE').split()]]
         ret += [float(tag.findall('KeyFrames/KeyFrame')[0].attrib.get('WORLD_ERROR'))]
-        # if tag.attrib.get('model') in ('Miqus Video', 'Miqus Video UnderWater', 'none'):
         vid_id += [i]
-
+        
     # Intrinsic parameters: distorsion and intrinsic matrix
     for cam_elem in root.findall('Camera'):
         try:
@@ -294,18 +293,18 @@ def read_vicon(vicon_path):
 
         trans = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('POSITION').split()
         T += [[float(t)/1000 for t in trans]]
-   
-    # Cameras names by natural order
-    C_vid = [C[v] for v in vid_id]
-    C_vid_id = [C_vid.index(c) for c in natural_sort(C_vid)]
-    C_id = [vid_id[c] for c in C_vid_id]
-    C = [C[c] for c in C_id]
-    S = [S[c] for c in C_id]
-    D = [D[c] for c in C_id]
-    K = [K[c] for c in C_id]
-    R = [R[c] for c in C_id]
-    T = [T[c] for c in C_id]
-   
+
+    # Camera names by natural order
+    C_vid_id = [v for v in vid_id if 'VIDEO' in root.findall('Camera')[v].attrib.get('TYPE')]
+    C_vid = [root.findall('Camera')[v].attrib.get('DEVICEID') for v in C_vid_id]
+    C = natural_sort(C_vid)
+    C_id_sorted = [i for v_sorted in C for i,v in enumerate(root.findall('Camera')) if v.attrib.get('DEVICEID')==v_sorted]
+    S = [S[c] for c in C_id_sorted]
+    D = [D[c] for c in C_id_sorted]
+    K = [K[c] for c in C_id_sorted]
+    R = [R[c] for c in C_id_sorted]
+    T = [T[c] for c in C_id_sorted]
+
     return ret, C, S, D, K, R, T
 
 
