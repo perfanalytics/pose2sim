@@ -324,7 +324,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     
     <img src="Content/Calib_ext.png" width="920">
     
-    ***Intrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.***
+    ***Extrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.***
 
 - **With points:**
   - Points can be detected from a wand.\
