@@ -54,14 +54,14 @@ def convert_json2csv(json_dir):
     json_files_names = fnmatch.filter(os.listdir(os.path.join(json_dir)), '.json')
     json_files_path = [os.path.join(json_dir, j_f) for j_f in json_files_names]
     json_coords = []
-    for i, j_p in enumerate(json_files_path)
+    for i, j_p in enumerate(json_files_path):
         # if i in range(frames)
-            with open(j_p) as j_f
-                try 
+            with open(j_p) as j_f:
+                try:
                     json_data = json.load(j_f)['people'][0]['pose_keypoints_2d']
-                except
+                except:
                     print(f'No person found in {os.path.basename(json_dir)}, frame {i}')
-                    json_data = [0]75
+                    json_data = [0]*75
             json_coords.append(json_data)
     df_json_coords = pd.DataFrame(json_coords)
     return df_json_coords
@@ -73,17 +73,17 @@ def drop_col(df,col_nb):
     return df_dropped
 
 def speed_vert(df, axis='y'):
-    axis_dict = {'x'0, 'y'1, 'z'2}
+    axis_dict = {'x':0, 'y':1, 'z':2}
     df_diff = df.diff()
-    df_diff = df_diff.fillna(df_diff.iloc[1]2)
-    df_vert_speed = pd.DataFrame([df_diff.loc[, 2k + axis_dict[axis]] for k in range(int(df_diff.shape[1]2))]).T
+    df_diff = df_diff.fillna(df_diff.iloc[1]*2)
+    df_vert_speed = pd.DataFrame([df_diff.loc[:, 2*k + axis_dict[axis]] for k in range(int(df_diff.shape[1]*2))]).T
     df_vert_speed.columns = np.arange(len(df_vert_speed.columns))
     return df_vert_speed
 
 def speed_2D(df):
     df_diff = df.diff()
-    df_diff = df_diff.fillna(df_diff.iloc[1]2)
-    df_2Dspeed = pd.DataFrame([np.sqrt(df_diff.loc[,2k]2 + df_diff.loc[,2k+1]2) for k in range(int(df_diff.shape[1]2))]).T
+    df_diff = df_diff.fillna(df_diff.iloc[1]*2)
+    df_2Dspeed = pd.DataFrame([np.sqrt(df_diff.loc[:,2*k]*2 + df_diff.loc[:,2*k+1]*2) for k in range(int(df_diff.shape[1]*2))]).T
     return df_2Dspeed
 
 def interpolate_nans(col, kind):
@@ -100,12 +100,12 @@ def interpolate_nans(col, kind):
 
     idx = col.index
     idx_good = np.where(np.isfinite(col))[0] #index of non zeros
-    if len(idx_good) = 10 return col
+    if len(idx_good) == 10: return col
     # idx_notgood = np.delete(np.arange(len(col)), idx_good)
 
-    if not kind # 'linear', 'slinear', 'quadratic', 'cubic'
+    if not kind: # 'linear', 'slinear', 'quadratic', 'cubic'
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=cubic, bounds_error=False)
-    else
+    else:
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind[0], bounds_error=False)
     col_interp = np.where(np.isfinite(col), col, f_interp(idx)) #replace nans with interpolated values
     col_interp = np.where(np.isfinite(col_interp), col_interp, np.nanmean(col_interp)) #replace remaining nans
@@ -113,12 +113,12 @@ def interpolate_nans(col, kind):
     return col_interp #, idx_notgood
 
 def plot_time_lagged_cross_corr(camx, camy, ax):
-    pearson_r = [camx.corr(camy.shift(lag)) for lag in range(-2fps, 2fps)] # lag -2 sec à +2 sec
-    offset = int(np.floor(len(pearson_r)2)-np.argmax(pearson_r))
+    pearson_r = [camx.corr(camy.shift(lag)) for lag in range(-2*fps, 2*fps)] # lag -2 sec à +2 sec
+    offset = int(np.floor(len(pearson_r)*2)-np.argmax(pearson_r))
     max_corr = np.max(pearson_r)
-    ax.plot(list(range(-2fps, 2fps)), pearson_r)
-    ax.axvline(np.ceil(len(pearson_r)2)-2fps,color='k',linestyle='--')
-    ax.axvline(np.argmax(pearson_r)-2fps,color='r',linestyle='--',label='Peak synchrony')
+    ax.plot(list(range(-2*fps, 2*fps)), pearson_r)
+    ax.axvline(np.ceil(len(pearson_r)*2)-2*fps,color='k',linestyle='--')
+    ax.axvline(np.argmax(pearson_r)-2*fps,color='r',linestyle='--',label='Peak synchrony')
     plt.annotate(f'Max correlation={np.round(max_corr,2)}', xy=(0.05, 0.9), xycoords='axes fraction')
     ax.set(title=f'Offset = {offset} frames', xlabel='Offset (frames)',ylabel='Pearson r')
     plt.legend()
@@ -136,16 +136,16 @@ json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
 json_dirs = [os.path.join(pose_dir, j_d) for j_d in json_dirs_names]
 
 df_coords = []
-for i, json_dir in enumerate(json_dirs)
+for i, json_dir in enumerate(json_dirs):
     df_coords.append(convert_json2csv(json_dir))
     df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
 
 b, a = signal.butter(42, cut_off_frequency(fps2), 'low', analog = False) 
-for i in range(len(json_dirs))
+for i in range(len(json_dirs)):
     df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0)) # filter 
 
 ## Pour sauvegarder et réouvrir au besoin
-with open(os.path.join(pose_dir, 'coords'), 'wb') as fp
+with open(os.path.join(pose_dir, 'coords'), 'wb') as fp:
     pk.dump(df_coords, fp)
 # with open(os.path.join(pose_dir, 'coords'), 'rb') as fp
 #     df_coords = pk.load(fp)
@@ -159,12 +159,12 @@ with open(os.path.join(pose_dir, 'coords'), 'wb') as fp
 
 # Vitesse verticale    
 df_speed = []
-for i in range(len(json_dirs))
-    if speed_kind == 'y'
+for i in range(len(json_dirs)):
+    if speed_kind == 'y':
         df_speed.append(speed_vert(df_coords[i]))
-    elif speed_kind == '2D'
+    elif speed_kind == '2D':
         df_speed.append(speed_2D(df_coords[i]))
-    df_speed[i] = df_speed[i].where(df_speed[i]vmax, other=np.nan)
+    df_speed[i] = df_speed[i].where(df_speed[i]*vmax, other=np.nan)
     df_speed[i] = df_speed[i].apply(interpolate_nans, axis=0, args = ['cubic'])
 
 
@@ -182,20 +182,20 @@ for i in range(len(json_dirs))
 
 id_kpt_dict = {}
 
-if len(id_kpt)==1 and id_kpt != ['all']
+if len(id_kpt)==1 and id_kpt != ['all']:
     camx = df_speed[cam1_nb-1].loc[range(np.array(frames)),id_kpt[0]]
     camy = df_speed[cam2_nb-1].loc[range(np.array(frames)),id_kpt[0]]
-elif id_kpt == ['all']
+elif id_kpt == ['all']:
     camx = df_speed[cam1_nb-1].loc[range(np.array(frames)),].sum(axis=1)
     camy = df_speed[cam2_nb-1].loc[range(np.array(frames)),].sum(axis=1)
-elif len(id_kpt)1 and len(id_kpt)==len(weights_kpt) # ex id_kpt1=9 set to 10, id_kpt2=10 to 15
+elif len(id_kpt)==1 and len(id_kpt)==len(weights_kpt): # ex id_kpt1=9 set to 10, id_kpt2=10 to 15
     # ajouter frames
-    dict_id_weights = {iw for i, w in zip(id_kpt, weights_kpt)}
+    dict_id_weights = {i:w for i, w in zip(id_kpt, weights_kpt)}
     camx = df_speed[cam1_nb-1].dot(pd.Series(dict_id_weights).reindex(df_speed[cam1_nb-1].columns, fill_value=0))
     camy = df_speed[cam2_nb-1].dot(pd.Series(dict_id_weights).reindex(df_speed[cam2_nb-1].columns, fill_value=0))
     camx = camx.loc[range(np.array(frames))]
     camy = camy.loc[range(np.array(frames))]
-else
+else:
     raise ValueError('wrong values for id_kpt or weights_kpt')
 
 
@@ -220,9 +220,9 @@ plt.show()
 # et on relance tout le code
 
 
-if offset  0
+if offset == 0:
     json_dir_to_offset = json_dirs[cam2_nb-1]
-else
+else:
     json_dir_to_offset = json_dirs[cam1_nb-1]
     offset = -offset
 
