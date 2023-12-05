@@ -104,7 +104,7 @@ def interpolate_nans(col, kind):
     # idx_notgood = np.delete(np.arange(len(col)), idx_good)
 
     if not kind: # 'linear', 'slinear', 'quadratic', 'cubic'
-        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=cubic, bounds_error=False)
+        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind='cubic', bounds_error=False)
     else:
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind[0], bounds_error=False)
     col_interp = np.where(np.isfinite(col), col, f_interp(idx)) #replace nans with interpolated values
@@ -140,7 +140,7 @@ for i, json_dir in enumerate(json_dirs):
     df_coords.append(convert_json2csv(json_dir))
     df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
 
-b, a = signal.butter(42, cut_off_frequency(fps2), 'low', analog = False) 
+b, a = signal.butter(42, cut_off_frequency(fps*2), 'low', analog = False) 
 for i in range(len(json_dirs)):
     df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0)) # filter 
 
