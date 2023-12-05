@@ -375,7 +375,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 > _**Cameras need to be synchronized, so that 2D points correspond to the same position across cameras.**_\
 *N.B.: Skip this step if your cameras are already synchronized.*
 
-If your cameras are not natively synchronized, you can use [this script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).\
+If your cameras are not natively synchronized, you can use [this script](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/synchronize_cams_draft.py). This is still a draft, and will be updated in the future.\
 Alternatively, use a clap, a flash, or a beep noise to synchronize them.
 
 
