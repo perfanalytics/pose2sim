@@ -50,7 +50,7 @@ frames = [2850,3490]
 # FUNCTIONS#
 ############
 
-def convert_json2csv(json_dir)
+def convert_json2csv(json_dir):
     json_files_names = fnmatch.filter(os.listdir(os.path.join(json_dir)), '.json')
     json_files_path = [os.path.join(json_dir, j_f) for j_f in json_files_names]
     json_coords = []
@@ -66,13 +66,13 @@ def convert_json2csv(json_dir)
     df_json_coords = pd.DataFrame(json_coords)
     return df_json_coords
 
-def drop_col(df,col_nb)
+def drop_col(df,col_nb):
     idx_col = list(range(col_nb-1, df.shape[1], col_nb)) 
     df_dropped = df.drop(idx_col, axis=1)
     df_dropped.columns = range(df_dropped.columns.size)
     return df_dropped
 
-def speed_vert(df, axis='y')
+def speed_vert(df, axis='y'):
     axis_dict = {'x'0, 'y'1, 'z'2}
     df_diff = df.diff()
     df_diff = df_diff.fillna(df_diff.iloc[1]2)
@@ -80,13 +80,13 @@ def speed_vert(df, axis='y')
     df_vert_speed.columns = np.arange(len(df_vert_speed.columns))
     return df_vert_speed
 
-def speed_2D(df)
+def speed_2D(df):
     df_diff = df.diff()
     df_diff = df_diff.fillna(df_diff.iloc[1]2)
     df_2Dspeed = pd.DataFrame([np.sqrt(df_diff.loc[,2k]2 + df_diff.loc[,2k+1]2) for k in range(int(df_diff.shape[1]2))]).T
     return df_2Dspeed
 
-def interpolate_nans(col, kind)
+def interpolate_nans(col, kind):
     '''
     Interpolate missing points (of value nan)
 
@@ -112,7 +112,7 @@ def interpolate_nans(col, kind)
 
     return col_interp #, idx_notgood
 
-def plot_time_lagged_cross_corr(camx, camy, ax)
+def plot_time_lagged_cross_corr(camx, camy, ax):
     pearson_r = [camx.corr(camy.shift(lag)) for lag in range(-2fps, 2fps)] # lag -2 sec à +2 sec
     offset = int(np.floor(len(pearson_r)2)-np.argmax(pearson_r))
     max_corr = np.max(pearson_r)
