@@ -194,12 +194,10 @@ def recap_tracking(config, error, nb_cams_excluded):
     # Read config
     project_dir = config.get('project').get('project_dir')
     if project_dir == '': project_dir = os.getcwd()
-    poseTracked_folder_name = config.get('project').get('poseAssociated_folder_name')
-    calib_folder_name = config.get('project').get('calib_folder_name')
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
     error_threshold_tracking = config.get('personAssociation').get('error_threshold_tracking')
-    poseTracked_dir = os.path.join(project_dir, poseTracked_folder_name)
-    calib_dir = os.path.join(project_dir, calib_folder_name)
+    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
+    calib_dir = os.path.join(project_dir, 'Calibration')
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
     
     # Error
@@ -243,18 +241,14 @@ def track_2d_all(config):
     # Read config
     project_dir = config.get('project').get('project_dir')
     if project_dir == '': project_dir = os.getcwd()
-    calib_folder_name = config.get('project').get('calib_folder_name')
-    poseTracked_folder_name = config.get('project').get('poseAssociated_folder_name')
-    pose_folder_name = config.get('project').get('pose_folder_name')
     pose_model = config.get('pose').get('pose_model')
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
-    json_folder_extension =  config.get('project').get('pose_json_folder_extension')
     frame_range = config.get('project').get('frame_range')
     
-    calib_dir = os.path.join(project_dir, calib_folder_name)
+    calib_dir = os.path.join(project_dir, 'Calibration')
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
-    pose_dir = os.path.join(project_dir, pose_folder_name)
-    poseTracked_dir = os.path.join(project_dir, poseTracked_folder_name)
+    pose_dir = os.path.join(project_dir, 'pose')
+    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
 
     # projection matrix from toml calibration file
     P = computeP(calib_file)
@@ -274,7 +268,7 @@ def track_2d_all(config):
     # 2d-pose files selection
     pose_listdirs_names = next(os.walk(pose_dir))[1]
     pose_listdirs_names = natural_sort(pose_listdirs_names)
-    json_dirs_names = [k for k in pose_listdirs_names if json_folder_extension in k]
+    json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
     json_files_names = [natural_sort(j) for j in json_files_names]
     json_files = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]

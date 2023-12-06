@@ -145,8 +145,7 @@ def make_trc(config, Q, keypoints_names, f_range):
     if project_dir == '': project_dir = os.getcwd()
     frame_rate = config.get('project').get('frame_rate')
     seq_name = os.path.basename(project_dir)
-    pose3d_folder_name = config.get('project').get('pose3d_folder_name')
-    pose3d_dir = os.path.join(project_dir, pose3d_folder_name)
+    pose3d_dir = os.path.join(project_dir, 'pose-3d')
 
     trc_f = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
 
@@ -196,8 +195,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     # Read config
     project_dir = config.get('project').get('project_dir')
     if project_dir == '': project_dir = os.getcwd()
-    calib_folder_name = config.get('project').get('calib_folder_name')
-    calib_dir = os.path.join(project_dir, calib_folder_name)
+    calib_dir = os.path.join(project_dir, 'Calibration')
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
     calib = toml.load(calib_file)
     cam_names = np.array([calib[c].get('name') for c in list(calib.keys())])
@@ -408,20 +406,16 @@ def triangulate_all(config):
     # Read config
     project_dir = config.get('project').get('project_dir')
     if project_dir == '': project_dir = os.getcwd()
-    calib_folder_name = config.get('project').get('calib_folder_name')
     pose_model = config.get('pose').get('pose_model')
-    pose_folder_name = config.get('project').get('pose_folder_name')
-    json_folder_extension =  config.get('project').get('pose_json_folder_extension')
     frame_range = config.get('project').get('frame_range')
     likelihood_threshold = config.get('triangulation').get('likelihood_threshold')
     interpolation_kind = config.get('triangulation').get('interpolation')
     interp_gap_smaller_than = config.get('triangulation').get('interp_if_gap_smaller_than')
     show_interp_indices = config.get('triangulation').get('show_interp_indices')
-    pose_dir = os.path.join(project_dir, pose_folder_name)
-    poseTracked_folder_name = config.get('project').get('poseAssociated_folder_name')
-    calib_dir = os.path.join(project_dir, calib_folder_name)
+    pose_dir = os.path.join(project_dir, 'pose')
+    calib_dir = os.path.join(project_dir, 'Calibration')
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
-    poseTracked_dir = os.path.join(project_dir, poseTracked_folder_name)
+    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
     
     # Projection matrix from toml calibration file
     P = computeP(calib_file)
@@ -444,7 +438,7 @@ def triangulate_all(config):
     # 2d-pose files selection
     pose_listdirs_names = next(os.walk(pose_dir))[1]
     pose_listdirs_names = natural_sort(pose_listdirs_names)
-    json_dirs_names = [k for k in pose_listdirs_names if json_folder_extension in k]
+    json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     try: 
         json_files_names = [fnmatch.filter(os.listdir(os.path.join(poseTracked_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
         json_files_names = [natural_sort(j) for j in json_files_names]

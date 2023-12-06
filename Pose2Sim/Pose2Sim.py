@@ -60,11 +60,18 @@ __status__ = "Development"
 ## FUNCTIONS
 def read_config_file(config):
     '''
-    Read configation file.
+    Read Session configuration file, and overwrite it with Participant and Trial
+    configuration dicts if exist.
     '''
 
-    config_dict = toml.load(config)
-    return config_dict
+    trial_config_dict = toml.load(config)
+    participant_config_dict = toml.load('BLa')
+    session_config_dict = toml.load(config)
+    
+    session_config_dict.update(participant_config_dict)
+    session_config_dict.update(trial_config_dict)
+    
+    return session_config_dict
 
 
 def base_params(config_dict):
@@ -72,8 +79,7 @@ def base_params(config_dict):
     Retrieve sequence name and frames to be analyzed.
     '''
 
-    project_dir = config_dict.get('project').get('project_dir')
-    if project_dir == '': project_dir = os.getcwd()
+    project_dir = os.getcwd()
     frame_range = config_dict.get('project').get('frame_range')
     seq_name = os.path.basename(project_dir)
     frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
@@ -86,7 +92,40 @@ def base_params(config_dict):
     return project_dir, seq_name, frames
 
 
-def poseEstimation(config=os.path.join('User', 'Config.toml')):
+def calibration(config='Config.toml'):
+    '''
+    Cameras calibration from checkerboards or from qualisys files.
+    
+    config can either be a path or a dictionary (for batch processing)
+    '''
+
+    from Pose2Sim.calibration import calibrate_cams_all
+    
+    if type(config)==dict:
+        config_dict = config
+    else:
+        config_dict = read_config_file(config)
+
+        ## Rechercher dans sublevels jusqu'à ce qu'on n'ait plus de config.toml
+        # Créer une boucle avec un config_dict différent pour chaque trial
+        # Exclure from batch analysis 
+
+
+    project_dir, seq_name, frames = base_params(config_dict)
+    
+    logging.info("\n\n---------------------------------------------------------------------")
+    logging.info("Camera calibration")
+    logging.info("---------------------------------------------------------------------")
+    logging.info(f"\nProject directory: {project_dir}")
+    start = time.time()
+    
+    calibrate_cams_all(config_dict)
+    
+    end = time.time()
+    logging.info(f'Calibration took {end-start:.2f} s.')
+
+
+def poseEstimation(config='Config.toml'):
     '''
     Estimate pose using BlazePose, OpenPose, AlphaPose, or DeepLabCut.
     
@@ -114,36 +153,9 @@ def poseEstimation(config=os.path.join('User', 'Config.toml')):
     
     end = time.time()
     logging.info(f'Pose estimation took {end-start:.2f} s.')
-
-
-def calibration(config=os.path.join('User', 'Config.toml')):
-    '''
-    Cameras calibration from checkerboards or from qualisys files.
-    
-    config can either be a path or a dictionary (for batch processing)
-    '''
-
-    from Pose2Sim.calibration import calibrate_cams_all
-    
-    if type(config)==dict:
-        config_dict = config
-    else:
-        config_dict = read_config_file(config)
-    project_dir, seq_name, frames = base_params(config_dict)
-    
-    logging.info("\n\n---------------------------------------------------------------------")
-    logging.info("Camera calibration")
-    logging.info("---------------------------------------------------------------------")
-    logging.info(f"\nProject directory: {project_dir}")
-    start = time.time()
-    
-    calibrate_cams_all(config_dict)
-    
-    end = time.time()
-    logging.info(f'Calibration took {end-start:.2f} s.')
     
 
-def synchronization(config=os.path.join('User', 'Config.toml')):
+def synchronization(config='Config.toml'):
     '''
     Synchronize cameras if needed.
     
@@ -173,7 +185,7 @@ def synchronization(config=os.path.join('User', 'Config.toml')):
     logging.info(f'Synchronization took {end-start:.2f} s.')    
     
     
-def personAssociation(config=os.path.join('User', 'Config.toml')):
+def personAssociation(config='Config.toml'):
     '''
     Tracking of the person of interest in case of multiple persons detection.
     Needs a calibration file.
@@ -201,7 +213,7 @@ def personAssociation(config=os.path.join('User', 'Config.toml')):
     logging.info(f'Tracking took {end-start:.2f} s.')
     
     
-def triangulation(config=os.path.join('User', 'Config.toml')):
+def triangulation(config='Config.toml'):
     '''
     Robust triangulation of 2D points coordinates.
     
@@ -228,7 +240,7 @@ def triangulation(config=os.path.join('User', 'Config.toml')):
     logging.info(f'Triangulation took {end-start:.2f} s.')
     
     
-def filtering(config=os.path.join('User', 'Config.toml')):
+def filtering(config='Config.toml'):
     '''
     Filter trc 3D coordinates.
     
@@ -251,7 +263,7 @@ def filtering(config=os.path.join('User', 'Config.toml')):
     filter_all(config_dict)
 
 
-def scalingModel(config=os.path.join('User', 'Config.toml')):
+def scalingModel(config='Config.toml'):
     '''
     Uses OpenSim to scale a model based on a static 3D pose.
     
@@ -281,7 +293,7 @@ def scalingModel(config=os.path.join('User', 'Config.toml')):
     logging.info(f'Model scaling took {end-start:.2f} s.')
     
     
-def inverseKinematics(config=os.path.join('User', 'Config.toml')):
+def inverseKinematics(config='Config.toml'):
     '''
     Uses OpenSim to perform inverse kinematics.
     

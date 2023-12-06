@@ -445,25 +445,21 @@ def filter_all(config):
     # Read config
     project_dir = config.get('project').get('project_dir')
     if project_dir == '': project_dir = os.getcwd()
-    pose_tracked_folder_name = config.get('project').get('poseAssociated_folder_name')
-    pose_folder_name = config.get('project').get('pose_folder_name')
     try:
-        pose_tracked_dir = os.path.join(project_dir, pose_tracked_folder_name)
+        pose_tracked_dir = os.path.join(project_dir, 'pose-associated')
         os.listdir(pose_tracked_dir)
         pose_dir = pose_tracked_dir
     except:
-        pose_dir = os.path.join(project_dir, pose_folder_name)
-    json_folder_extension =  config.get('project').get('pose_json_folder_extension')
+        pose_dir = os.path.join(project_dir, 'pose')
     frame_range = config.get('project').get('frame_range')
     seq_name = os.path.basename(project_dir)
-    pose3d_folder_name = config.get('project').get('pose3d_folder_name')
-    pose3d_dir = os.path.join(project_dir, pose3d_folder_name)
+    pose3d_dir = os.path.join(project_dir, 'pose-3d')
     display_figures = config.get('filtering').get('display_figures')
     filter_type = config.get('filtering').get('type')
 
     # Frames range
     pose_listdirs_names = next(os.walk(pose_dir))[1]
-    json_dirs_names = [k for k in pose_listdirs_names if json_folder_extension in k]
+    json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
     f_range = [[0,min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
     

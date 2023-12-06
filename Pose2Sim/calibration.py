@@ -467,8 +467,8 @@ def calib_board_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
 
     INPUTS:
     - calib_dir: directory containing intrinsic and extrinsic folders, each populated with camera directories
-    - intrinsics_config_dict: dictionary of intrinsics parameters (intrinsics_board_type, overwrite_intrinsics, show_detection_intrinsics, intrinsics_extension, extract_every_N_sec, intrinsics_corners_nb, intrinsics_square_size, intrinsics_marker_size, intrinsics_aruco_dict)
-    - extrinsics_config_dict: dictionary of extrinsics parameters (extrinsics_board_type, calculate_extrinsics, show_detection_extrinsics, extrinsics_extension, extrinsics_corners_nb, extrinsics_square_size, extrinsics_marker_size, extrinsics_aruco_dict, object_coords_3d)
+    - intrinsics_config_dict: dictionary of intrinsics parameters (overwrite_intrinsics, show_detection_intrinsics, intrinsics_extension, extract_every_N_sec, intrinsics_corners_nb, intrinsics_square_size, intrinsics_marker_size, intrinsics_aruco_dict)
+    - extrinsics_config_dict: dictionary of extrinsics parameters (calculate_extrinsics, show_detection_extrinsics, extrinsics_extension, extrinsics_corners_nb, extrinsics_square_size, extrinsics_marker_size, extrinsics_aruco_dict, object_coords_3d)
 
     OUTPUTS:
     - ret: residual reprojection error in _px_: list of floats
@@ -528,7 +528,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
 
     INPUTS:
     - calib_dir: directory containing intrinsic and extrinsic folders, each populated with camera directories
-    - intrinsics_config_dict: dictionary of intrinsics parameters (intrinsics_board_type, overwrite_intrinsics, show_detection_intrinsics, intrinsics_extension, extract_every_N_sec, intrinsics_corners_nb, intrinsics_square_size, intrinsics_marker_size, intrinsics_aruco_dict)
+    - intrinsics_config_dict: dictionary of intrinsics parameters (overwrite_intrinsics, show_detection_intrinsics, intrinsics_extension, extract_every_N_sec, intrinsics_corners_nb, intrinsics_square_size, intrinsics_marker_size, intrinsics_aruco_dict)
 
     OUTPUTS:
     - D: distorsion: list of arrays of floats
@@ -1201,8 +1201,7 @@ def calibrate_cams_all(config):
     # Read config
     project_dir = config.get('project').get('project_dir')
     if project_dir == '': project_dir = os.getcwd()
-    calib_folder_name = config.get('project').get('calib_folder_name')
-    calib_dir = os.path.join(project_dir, calib_folder_name)
+    calib_dir = os.path.join(project_dir, 'Calibration')
     calib_type = config.get('calibration').get('calibration_type')
 
     if calib_type=='convert':
@@ -1233,6 +1232,9 @@ def calibrate_cams_all(config):
                 list_dir_noext = [os.path.splitext(f)[0] for f in list_dir if os.path.splitext(f)[1]=='']	
                 file_to_convert_path = [os.path.join(calib_dir,f) for f in list_dir_noext if os.path.isfile(os.path.join(calib_dir, f))]
                 binning_factor = 1
+            elif convert_filetype=='biocv' or convert_filetype=='biocv': # no conversion needed, skips this stage
+                logging.info(f'\n--> No conversion needed from AniPose nor from FreeMocap. Calibration skipped.\n')
+                return
             else:
                 convert_ext = '???'
                 file_to_convert_path = ['']
@@ -1249,11 +1251,10 @@ def calibrate_cams_all(config):
     elif calib_type=='calculate':
         calculate_method = config.get('calibration').get('calculate').get('calculate_method')
         if calculate_method=='board':
-            intrinsics_board_type = config.get('calibration').get('calculate').get('board').get('intrinsics').get('intrinsics_board_type')
             intrinsics_config_dict = config.get('calibration').get('calculate').get('board').get('intrinsics')
             extrinsics_board_type = config.get('calibration').get('calculate').get('board').get('extrinsics').get('extrinsics_board_type')
             extrinsics_config_dict = config.get('calibration').get('calculate').get('board').get('extrinsics')
-            calib_output_path = os.path.join(calib_dir, f'Calib_int{intrinsics_board_type}_ext{extrinsics_board_type}.toml')
+            calib_output_path = os.path.join(calib_dir, f'Calib_{extrinsics_board_type}.toml')
             
             calib_full_type = '_'.join([calib_type, calculate_method])
             args_calib_fun = [calib_dir, intrinsics_config_dict, extrinsics_config_dict]

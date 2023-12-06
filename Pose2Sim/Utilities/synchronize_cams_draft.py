@@ -37,7 +37,7 @@ cut_off_frequency = 10 # cut-off frequency for a 4th order low-pass Butterworth 
 
 # Vertical speeds (on X, Y, or Z axis, or 2D speeds)
 speed_kind = 'y' # 'x', 'y', 'z', or '2D'
-vmax = 20 # pxs
+vmax = 20 # px/s
 
 cam1_nb = 4
 cam2_nb = 3

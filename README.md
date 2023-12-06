@@ -13,9 +13,9 @@
 
 # Pose2Sim
 
-> **_News_: Version 0.4 released:** \
-**Calibration used to be the main stumbling block for users: it should be easier and better now!**\
-To upgrade, type `pip install pose2sim --upgrade`. You will need to update your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.\
+> **_News_: Version 0.5 released:** \
+**New folder structure to allow batch processing!**\
+To upgrade, type `pip install pose2sim --upgrade`.\
 *N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to the more usual marker-based motion capture methods. It aims to provide a free tool to obtain research-grade results from consumer-grade equipment. Any combination of phone, webcam, gopro, etc can be used.
@@ -35,15 +35,16 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
    2. [Demonstration Part-1: Build 3D TRC file on Python](#demonstration-part-1-build-3d-trc-file-on-python)
    3. [Demonstration Part-2: Obtain 3D joint angles with OpenSim](#demonstration-part-2-obtain-3d-joint-angles-with-opensim)
 2. [Use on your own data](#use-on-your-own-data)
-   1. [Prepare for running on your own data](#prepare-for-running-on-your-own-data)
-   2. [2D pose estimation](#2d-pose-estimation)
+   1. [Folder structure](#folder-structure)
+   2. [Camera calibration](#camera-calibration)
+      1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
+      2. [Calculate from scratch](#calculate-from-scratch)
+         1. 
+   3. [2D pose estimation](#2d-pose-estimation)
       1. [With OpenPose](#with-openpose)
       2. [With Mediapipe](#with-mediapipe)
       3. [With DeepLabCut](#with-deeplabcut)
       4. [With AlphaPose](#with-alphapose)
-   3. [Camera calibration](#camera-calibration)
-      1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
-      2. [Calculate from scratch](#calculate-from-scratch)
    4. [Camera synchronization](#camera-synchronization)
    5. [Tracking, Triangulating, Filtering](#tracking-triangulating-filtering)
       1. [Associate persons across cameras](#associate-persons-across-cameras)
@@ -90,7 +91,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.8
 > _**This demonstration provides an example experiment of a person balancing on a beam, filmed with 4 calibrated cameras processed with OpenPose.**_ 
 
 Open a terminal, enter `pip show pose2sim`, report package location. \
-Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo`. \
+Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo\S00_Demo_Session`. \
 Type `ipython`, and test the following code:
 ``` python
 from Pose2Sim import Pose2Sim
@@ -122,14 +123,16 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
 
 # Use on your own data
 
-> _**Deeper explanations and instructions are given below.**_
+> _**Deeper explanations and instructions are given below.**_ \
+> N.B.: If a step is not relevant for your use case (synchronization, person association, etc), you can skip it.
 
-## Prepare for running on your own data
+## Folder structure
   > _**Get ready.**_
   
-  1. Find your `Pose2Sim\Empty_project`, copy-paste it where you like and give it the name of your choice.
+  1. Open a terminal, enter `pip show pose2sim`, report package location. \
+     Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo\S01_Empty_Session`.
   2. Edit the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file as needed, **especially regarding the path to your project**. 
-  3. Populate the `raw-2d`folder with your videos.
+  3. Populate the `videos` folder with your videos.
   
        <pre>
        Project
@@ -140,7 +143,7 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
        │    ├──Scaling_Setup_Pose2Sim_Body25b.xml
        │    └──IK_Setup_Pose2Sim_Body25b.xml
        │        
-       ├── <b>raw
+       ├── <b>videos
        │    ├──vid_cam1.mp4 (or other extension)
        │    ├──...
        │    └──vid_camN.mp4</b>
@@ -149,6 +152,139 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
            └──Config.toml
        </b>
     
+
+## Camera calibration
+> _**Calculate camera intrinsic properties and extrinsic locations and positions.\
+> Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ \
+> _**N.B.:**_ You can visualize camera calibration in 3D with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
+
+Open an Anaconda prompt or a terminal, type `ipython`.\
+By default, `calibration()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.calibration(r'path_to_config.toml')`.
+
+``` python
+from Pose2Sim import Pose2Sim
+Pose2Sim.calibration()
+```
+
+Output:\
+<img src="Content/Calib2D.png" width="760">
+<img src="Content/CalibFile.png" width="760">
+
+### Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
+
+If you already have a calibration file, set `calibration_type` type to `convert` in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
+- **From [Qualisys](https://www.qualisys.com):**
+  - Export calibration to `.qca.txt` within QTM.
+  - Copy it in the `calibration` Pose2Sim folder.
+  - set `convert_from` to 'qualisys' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
+- **From [Optitrack](https://optitrack.com/):** Exporting calibration will be available in Motive 3.2. In the meantime:
+  - Calculate intrinsics with a board (see next section).
+  - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28).
+  - Use the `Calib.toml` file as is and do not run Pose2Sim.calibration()
+- **From [Vicon](http://www.vicon.com/Software/Nexus):**  
+  - Copy your `.xcp` Vicon calibration file to the Pose2Sim `Calibration` folder.
+  - set `convert_from` to 'vicon' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
+- **From [OpenCap](https://www.opencap.ai/):**  
+  - Copy your `.pickle` OpenCap calibration files to the Pose2Sim `Calibration` folder.
+  - set `convert_from` to 'opencap' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
+- **From [EasyMocap](https://github.com/zju3dv/EasyMocap/):**  
+  - Copy your `intri.yml` and `extri.yml` files to the Pose2Sim `Calibration` folder.
+  - set `convert_from` to 'easymocap' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
+- **From [bioCV](https://github.com/camera-mc-dev/.github/blob/main/profile/mocapPipe.md):**  
+  - Copy your bioCV calibration files (no extension) to the Pose2Sim `Calibration` folder.
+  - set `convert_from` to 'biocv' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
+- **From [AniPose](https://github.com/lambdaloop/anipose) or [FreeMocap](https://github.com/freemocap/freemocap):**  
+  - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
+  - Calibration can be skipped since Pose2Sim uses the same [Aniposelib](https://anipose.readthedocs.io/en/latest/aniposelibtutorial.html) format.
+
+
+### Calculate from scratch
+
+> _**Calculate calibration parameters with a checkerboard, with measurements on the scene, or automatically with detected keypoints.**_\
+> Take heart, it is not that complicated once you get the hang of it!
+
+  > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml).\
+  For the sake of practicality, there are voluntarily few board images for intrinsic calibration, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm#:~:text=Angle%20results%20were,Table%203).).
+  
+  - **Calculate intrinsic parameters with a checkerboard:**
+
+    > *N.B.:* _Intrinsic parameters:_ camera properties (focal length, optical center, distortion), usually need to be calculated only once in their lifetime. In theory, cameras with same model and same settings will have identical intrinsic parameters.\
+    > *N.B.:* If you already calculated intrinsic parameters earlier, you can skip this step. Copy your intrinsic parameters (`size`, `mat`, and `dist`) in a new `Calib*.toml` file, and set `overwrite_intrinsics` to false. Run Demo to obtain an example `Calib.toml` file.
+
+    - Create a folder for each camera in your `calibration\intrinsics` folder.
+    - For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
+    - Adjust parameters in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
+    - Make sure that the board:
+      - is filmed from different angles, covers a large part of the video frame, and is in focus.
+      - is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
+    - A common error is to specify the external, instead of the internal number of corners. This may be one less than you would intuitively think. 
+    
+    <img src="Content/Calib_int.png" width="600">
+
+    ***Intrinsic calibration error should be below 0.5 px.***
+        
+- **Calculate extrinsic parameters:** 
+
+  > *N.B.:* _Extrinsic parameters:_ camera placement in space (position and orientation), need to be calculated every time a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates.
+
+  - Create a folder for each camera in your `calibration\extrinsics` folder.
+  - Once your cameras are in place, shortly film either a board laid on the floor, or the raw scene\
+  (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format).
+  - Adjust parameters in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
+  - Then,
+    - **With a checkerboard:**\
+      Make sure that it is seen by all cameras. \
+      It should preferably be larger than the one used for intrinsics, as results will not be very accurate out of the covered zone.
+    - **With scene measurements** (more flexible and potentially more accurate if points are spread out):\
+      Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, boxes, treadmill dimensions, etc). These points should be as spread out as possible.\
+      Then you will click on the corresponding image points for each view.
+    - **With keypoints:**\
+      For a more automatic calibration, OpenPose keypoints could also be used for calibration.\
+      **COMING SOON!**
+
+  <img src="Content/Calib_ext.png" width="920">
+  
+  ***Extrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.***
+
+
+<details>
+  <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
+    <pre>
+   Project
+   │
+   ├──<i><b>calibration
+   │   ├──intrinsics
+   │   │  ├──int_cam1_img
+   │   │  ├──...
+   │   │  └──int_camN_img
+   │   ├──extrinsics
+   │   │  ├──ext_cam1_img
+   │   │  ├──...
+   │   │  └──ext_camN_img
+   │   └──Calib.toml</i></b>
+   │
+   ├──opensim
+   │    ├──Geometry
+   │    ├──Model_Pose2Sim_Body25b.osim
+   │    ├──Scaling_Setup_Pose2Sim_Body25b.xml
+   │    └──IK_Setup_Pose2Sim_Body25b.xml
+   │
+   ├──pose-2d
+   │    ├──pose_cam1_json
+   │    ├──...
+   │    └──pose_camN_json
+   │        
+   ├── videos
+   │    ├──vid_cam1.mp4
+   │    ├──...
+   │    └──vid_camN.mp4
+   │
+   └──User
+       └──Config.toml
+   </pre>
+</details>
+
+
 ## 2D pose estimation
 > _**Estimate 2D pose from images with Openpose or another pose estimation solution.**_ \
 N.B.: First film a short static pose that will be used for scaling the OpenSim model (A-pose for example), and then film your motions of interest.\
@@ -157,9 +293,9 @@ N.B.: Note that the names of your camera folders must follow the same order as i
 ### With OpenPose:
 The accuracy and robustness of Pose2Sim have been thoroughly assessed only with OpenPose, and especially with the BODY_25B model. Consequently, we recommend using this 2D pose estimation solution. See [OpenPose repository](https://github.com/CMU-Perceptual-Computing-Lab/openpose) for installation and running.
 * Open a command prompt in your **OpenPose** directory. \
-  Launch OpenPose for each raw image folder: 
+  Launch OpenPose for each `videos` folder: 
   ``` cmd
-  bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_PROJECT_DIR>\raw-2d\vid_cam1.mp4 --write_json <PATH_TO_PROJECT_DIR>\pose-2d\pose_cam1_json
+  bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_PROJECT_DIR>\videos\vid_cam1.mp4 --write_json <PATH_TO_PROJECT_DIR>\pose\pose_cam1_json
   ```
 * The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results than the standard BODY_25 one and has been extensively tested for Pose2Sim. \
 You can also use the [BODY_135 model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models), which allows for the evaluation of pronation/supination, wrist flexion, and wrist deviation.\
@@ -227,139 +363,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
    │    ├──...
    │    └──pose_camN_json</i></b>
    │        
-   ├── raw-2d
-   │    ├──vid_cam1.mp4
-   │    ├──...
-   │    └──vid_camN.mp4
-   │
-   └──User
-       └──Config.toml
-   </pre>
-</details>
-
-## Camera calibration
-> _**Calculate camera intrinsic properties and extrinsic locations and positions.\
-> Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ \
-> _**N.B.:**_ You can visualize camera calibration in 3D with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
-
-Open an Anaconda prompt or a terminal, type `ipython`.\
-By default, `calibration()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.calibration(r'path_to_config.toml')`.
-
-``` python
-from Pose2Sim import Pose2Sim
-Pose2Sim.calibration()
-```
-
-Output:\
-<img src="Content/Calib2D.png" width="760">
-<img src="Content/CalibFile.png" width="760">
-
-### Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
-
-> N.B.: Since Pose2Sim uses the [Aniposelib](https://anipose.readthedocs.io/en/latest/aniposelibtutorial.html) format, calibration does not need to be run if you already have an [AniPose](https://github.com/lambdaloop/anipose) or [FreeMocap](https://github.com/freemocap/freemocap) calibration .toml file. 
-      
-If you already have a calibration file, set `calibration_type` type to `convert` in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
-- **From [Qualisys](https://www.qualisys.com):**
-  - Export calibration to `.qca.txt` within QTM.
-  - Copy it in the `calibration` Pose2Sim folder.
-  - set `convert_from` to 'qualisys' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
-- **From [Optitrack](https://optitrack.com/):** Exporting calibration will be available in Motive 3.2. In the meantime:
-  - Calculate intrinsics with a board (see next section).
-  - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28).
-  - Use the `Calib.toml` file as is and do not run Pose2Sim.calibration()
-- **From [Vicon](http://www.vicon.com/Software/Nexus):**  
-  - Copy your `.xcp` Vicon calibration file to the Pose2Sim `calibration` folder.
-  - set `convert_from` to 'vicon' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
-- **From [OpenCap](https://www.opencap.ai/):**  
-  - Copy your `.pickle` OpenCap calibration files to the Pose2Sim `calibration` folder.
-  - set `convert_from` to 'opencap' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
-- **From [EasyMocap](https://github.com/zju3dv/EasyMocap/):**  
-  - Copy your `intri.yml` and `extri.yml` files to the Pose2Sim `calibration` folder.
-  - set `convert_from` to 'easymocap' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
-- **From [bioCV](https://github.com/camera-mc-dev/.github/blob/main/profile/mocapPipe.md):**  
-  - Copy your bioCV calibration files (no extension) to the Pose2Sim `calibration` folder.
-  - set `convert_from` to 'biocv' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
-
-
-### Calculate from scratch
-
-> Calculate calibration parameters with a board, or with points (such as detected on a wand or a human body).
-
-- **With a board:**
-  > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml).\
-  For the sake of practicality, there are voluntarily few board images for intrinsic calibration, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm#:~:text=Angle%20results%20were,Table%203).).
-  
-  - **Calculate intrinsic parameters:**
-
-    > *N.B.:* _Intrinsic parameters:_ camera properties (focal length, optical center, distortion), usually need to be calculated only once in their lifetime. In theory, cameras with same model and same settings will have identical intrinsic parameters.\
-    > *N.B.:* If you already calculated intrinsic parameters earlier, you can skip this step. Copy your intrinsic parameters (`size`, `mat`, and `dist`) in a new `Calib*.toml` file, and set `overwrite_intrinsics` to false. Run Demo to obtain an example `Calib.toml` file.
-
-    - Create a folder for each camera in your `calibration\intrinsics` folder.
-    - For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
-    - Adjust parameters in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
-    - Make sure that the board:
-      - is filmed from different angles, covers a large part of the video frame, and is in focus.
-      - is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
-    - A common error is to specify the external, instead of the internal number of corners. This may be one less than you would intuitively think. 
-    
-    <img src="Content/Calib_int.png" width="600">
-
-    ***Intrinsic calibration error should be below 0.5 px.***
-        
-  - **Calculate extrinsic parameters:** 
-
-    > *N.B.:* _Extrinsic parameters:_ camera placement in space (position and orientation), need to be calculated every time a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates.
-
-    - Create a folder for each camera in your `calibration\extrinsics` folder.
-    - Once your cameras are in place, shortly film either a board laid on the floor, or the raw scene\
-    (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format).
-    - Adjust parameters in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
-    - Then,
-      - **If you film a board:**\
-        Make sure that it is seen by all cameras. \
-        It should preferably be larger than the one used for intrinsics, as results will not be very accurate out of the covered zone.
-      - **If you film the raw scene** (more flexible and potentially more accurate if points are spread out):\
-        Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, boxes, treadmill dimensions, etc). These points should be as spread out as possible.\
-        Then you will click on the corresponding image points for each view.
-    
-    <img src="Content/Calib_ext.png" width="920">
-    
-    ***Extrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.***
-
-- **With points:**
-  - Points can be detected from a wand.\
-  [Want to contribute?](#how-to-contribute)
-  - For a more automatic calibration, OpenPose keypoints could also be used for calibration.\
-  [Want to contribute?](#how-to-contribute) 
-
-<details>
-  <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
-    <pre>
-   Project
-   │
-   ├──<i><b>calibration
-   │   ├──intrinsics
-   │   │  ├──int_cam1_img
-   │   │  ├──...
-   │   │  └──int_camN_img
-   │   ├──extrinsics
-   │   │  ├──ext_cam1_img
-   │   │  ├──...
-   │   │  └──ext_camN_img
-   │   └──Calib.toml</i></b>
-   │
-   ├──opensim
-   │    ├──Geometry
-   │    ├──Model_Pose2Sim_Body25b.osim
-   │    ├──Scaling_Setup_Pose2Sim_Body25b.xml
-   │    └──IK_Setup_Pose2Sim_Body25b.xml
-   │
-   ├──pose-2d
-   │    ├──pose_cam1_json
-   │    ├──...
-   │    └──pose_camN_json
-   │        
-   ├── raw-2d
+   ├── videos
    │    ├──vid_cam1.mp4
    │    ├──...
    │    └──vid_camN.mp4
@@ -376,7 +380,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 *N.B.: Skip this step if your cameras are already synchronized.*
 
 If your cameras are not natively synchronized, you can use [this script](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/synchronize_cams_draft.py). This is still a draft, and will be updated in the future.\
-Alternatively, use a clap, a flash, or a beep noise to synchronize them.
+Alternatively, use a flashlight or a clap to synchronize them. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors) or with a remote control (slightly less reliable).
 
 
 ## Tracking, Triangulating, Filtering
@@ -432,7 +436,7 @@ Output:\
    │   ├──...
    │   └──tracked_camN_json</i></b>
    │        
-   ├── raw-2d
+   ├── videos
    │    ├──vid_cam1.mp4
    │    ├──...
    │    └──vid_camN.mp4
@@ -497,7 +501,7 @@ Output:\
    <i><b>├──pose-3d
        └──Pose-3d.trc</i></b>>
    │        
-   ├── raw-2d
+   ├── videos
    │    ├──vid_cam1.mp4
    │    ├──...
    │    └──vid_camN.mp4
@@ -564,7 +568,7 @@ Output:\
    │   ├──Pose-3d.trc
    │   └──Pose-3d-filtered.trc</i></b>
    │        
-   ├── raw-2d
+   ├── videos
    │    ├──vid_cam1.mp4
    │    ├──...
    │    └──vid_camN.mp4
@@ -666,7 +670,7 @@ Make sure to replace `py38np120` with your Python version (3.8 in this case) and
    │   ├──triangulation.trc
    │   └──triangulation-filtered.trc
    │        
-   ├── raw
+   ├── videos
    │    ├──vid_cam1.mp4
    │    ├──...
    │    └──vid_camN.mp4
@@ -831,7 +835,8 @@ If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org
 ### How to contribute and to-do list
 
 I would happily welcome any proposal for new features, code improvement, and more!\
-If you want to contribute to Pose2Sim, please follow [this guide](https://docs.github.com/en/get-started/quickstart/contributing-to-projects) on how to fork, modify and push code, and submit a pull request. I would appreciate it if you provided as much useful information as possible about how you modified the code, and a rationale for why you're making this pull request. Please also specify on which operating system and on which Python version you have tested the code.
+If you want to contribute to Pose2Sim, please see [this issue](https://github.com/perfanalytics/pose2sim/issues/40).\
+You will be proposed a to-do list, but please feel absolutely free to propose your own ideas and improvements.
 
 </br>
 
@@ -842,7 +847,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 - Self-calibration based on keypoint detection
 
 <details>
-  <summary><b>Detailed to-do list</b> (CLICK TO SHOW)</summary>
+  <summary><b>Detailed GOT-DONE and TO-DO list</b> (CLICK TO SHOW)</summary>
     <pre>
        
 &#10004; **Pose:** Support OpenPose [body_25b](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#body_25b-model---option-2-recommended) for more accuracy, [body_135](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models#single-network-whole-body-pose-estimation-model) for pronation/supination.
@@ -930,7 +935,7 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 - Supervised my PhD: [@lreveret](https://github.com/lreveret) (INRIA, Université Grenoble Alpes), and [@mdomalai](https://github.com/mdomalai) (Université de Poitiers).
 - Provided the Demo data: [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
 - Tested the code and provided feedback: [@simonozan](https://github.com/simonozan), [@daeyongyang](https://github.com/daeyongyang), [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals)
-- Submitted merged pull requests: [@ANaaim](https://github.com/ANaaim)
+- Submitted various accepted pull requests: [@ANaaim](https://github.com/ANaaim)
 - Provided a code snippet for Optitrack calibration: [@claraaudap](https://github.com/claraaudap) (Université Bretagne Sud).
 - Issued MPP2SOS, a (non-free) Blender extension based on Pose2Sim: [@carlosedubarreto](https://github.com/carlosedubarreto)
 
@@ -940,8 +945,10 @@ If you want to contribute to Pose2Sim, please follow [this guide](https://docs.g
 - [x] v0.1: Published online
 - [x] v0.2: Published associated paper
 - [x] v0.3: Supported other pose estimation algorithms
-- [x] v0.4: New calibration tool
-- [ ] v0.5: Supports multi-person analysis
-- [ ] v0.6: New synchronization tool
-- [ ] v0.7: Graphical User Interface
+- [x] v0.4: New calibration tool based on scene measurements
+- [ ] v0.5: Batch processing
+- [ ] v0.6: Calibration based on keypoint detection
+- [ ] v0.7: Supports multi-person analysis
+- [ ] v0.8: New synchronization tool
+- [ ] v0.9: Graphical User Interface
 - [ ] v1.0: First accomplished release
