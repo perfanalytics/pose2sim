@@ -43,6 +43,7 @@
 import toml
 import os
 import time
+from copy import deepcopy
 import logging, logging.handlers
 
 
@@ -58,20 +59,96 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def read_config_file(config):
+def determine_level():
     '''
-    Read Session configuration file, and overwrite it with Participant and Trial
-    configuration dicts if exist.
+    Determine the level at which the function is called.
+    Level = 1: called from a Trial folder
+    Level = 2: called from a Participant folder
+    Level = 3: called from a Session folder
     '''
 
-    trial_config_dict = toml.load(config)
-    participant_config_dict = toml.load('BLa')
-    session_config_dict = toml.load(config)
+    level = max([len(root.split(os.sep)) for root,dirs,files in os.walk('.') if 'Config.toml' in files])
+    return level
+
+
+def recursive_update(dict_to_update, dict_with_new_values):
+    '''
+    Update nested dictionaries without overwriting existing keys in any level of nesting
     
-    session_config_dict.update(participant_config_dict)
-    session_config_dict.update(trial_config_dict)
+    Example: 
+    dict_to_update = {'key': {'key_1': 'val_1', 'key_2': 'val_2'}}
+    dict_with_new_values = {'key': {'key_1': 'val_1_new'}}
+    returns {'key': {'key_1': 'val_1_new', 'key_2': 'val_2'}}
+    while dict_to_update.update(dict_with_new_values) would return {'key': {'key_1': 'val_1_new'}}
+    '''
+
+    for key, value in dict_with_new_values.items():
+        if key in dict_to_update and isinstance(value, dict) and isinstance(dict_to_update[key], dict):
+            # Recursively update nested dictionaries
+            dict_to_update[key] = recursive_update(dict_to_update[key], value)
+        else:
+            # Update or add new key-value pairs
+            dict_to_update[key] = value
+
+    return dict_to_update
+
+
+def read_config_files(level):
+    '''
+    Read Session, Participant, and Trial configuration files, 
+    and output a dictionary with all the parameters.
+    '''
+
+    # Trial level
+    if level == 1: 
+        session_config_dict = toml.load(os.path.join('..','..','Config.toml'))
+        participant_config_dict = toml.load(os.path.join('..','Config.toml'))
+        trial_config_dict = toml.load('Config.toml')
+            
+        session_config_dict = recursive_update(session_config_dict,participant_config_dict)
+        session_config_dict = recursive_update(session_config_dict,trial_config_dict)
+        session_config_dict.get("project").update({"project_dir":os.getcwd()})
+        config_dicts = [session_config_dict]
     
-    return session_config_dict
+    # Participant level
+    if level == 2:
+        session_config_dict = toml.load(os.path.join('..','Config.toml'))
+        participant_config_dict = toml.load('Config.toml')
+        config_dicts = []
+        # Create config dictionaries for all trials of the participant
+        for (root,dirs,files) in os.walk('.'):
+            if 'Config.toml' in files and root != '.':
+                trial_config_dict = toml.load(os.path.join(root, files[0]))
+                # deep copy, otherwise session_config_dict is modified at each iteration within the config_dicts list
+                temp_dict = deepcopy(session_config_dict)
+                temp_dict = recursive_update(temp_dict,participant_config_dict)
+                temp_dict = recursive_update(temp_dict,trial_config_dict)
+                temp_dict.get("project").update({"project_dir":os.path.join(os.getcwd(), os.path.basename(root))})
+                if not os.path.basename(root) in temp_dict.get("project").get('exclude_from_batch'):
+                    config_dicts.append(temp_dict)
+
+    # Session level
+    if level == 3:
+        session_config_dict = toml.load('Config.toml')
+        config_dicts = []
+        # Create config dictionaries for all trials of all participants of the session
+        for (root,dirs,files) in os.walk('.'):
+            if 'Config.toml' in files and root != '.':
+                # participant
+                if len(root.split(os.sep)) == 2:
+                    participant_config_dict = toml.load(os.path.join(root, files[0]))
+                # trial 
+                elif len(root.split(os.sep)) == 3: 
+                    trial_config_dict = toml.load(os.path.join(root, files[0]))
+                    # deep copy, otherwise session_config_dict is modified at each iteration within the config_dicts list
+                    temp_dict = deepcopy(session_config_dict)
+                    temp_dict = recursive_update(temp_dict,participant_config_dict)
+                    temp_dict = recursive_update(temp_dict,trial_config_dict)
+                    temp_dict.get("project").update({"project_dir":os.path.join(os.getcwd(), root)})
+                    if not os.path.relpath(root) in [os.path.relpath(p) for p in temp_dict.get("project").get('exclude_from_batch')]:
+                        config_dicts.append(temp_dict)
+
+    return config_dicts
 
 
 def base_params(config_dict):
@@ -102,13 +179,38 @@ def calibration(config='Config.toml'):
     from Pose2Sim.calibration import calibrate_cams_all
     
     if type(config)==dict:
-        config_dict = config
+        config_dict = config # which project?
+        if config_dict.get('project').get('project_dir') == None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
     else:
-        config_dict = read_config_file(config)
+        # Determine the level at which the function is called (session:3, participant:2, trial:1)
+        level = determine_level()
 
-        ## Rechercher dans sublevels jusqu'à ce qu'on n'ait plus de config.toml
-        # Créer une boucle avec un config_dict différent pour chaque trial
-        # Exclure from batch analysis 
+        if level == 1: # trial
+            session_config_dict = toml.load(os.path.join('..','..','Config.toml'))
+            participant_config_dict = toml.load(os.path.join('..','Config.toml'))
+            trial_config_dict = toml.load('Config.toml')
+            session_config_dict.update(participant_config_dict)
+            session_config_dict.update(trial_config_dict)
+            session_config_dict.get("project").update({"project_dir":os.path.join('..','..',os.getcwd())})
+        if level == 2: # participant
+            session_config_dict = toml.load(os.path.join('..','Config.toml'))
+            participant_config_dict = toml.load('Config.toml')
+            session_config_dict.update(participant_config_dict)
+            session_config_dict.get("project").update({"project_dir":os.path.join('..',os.getcwd())})
+        if level == 3: # session
+            session_config_dict = toml.load('Config.toml')
+            session_config_dict.get("project").update({"project_dir":os.getcwd()})
+        config_dict = session_config_dict
+    
+
+
+        # config_dicts = read_config_files(level)
+
+            #LANCER LA CALIBRATION
+
+        
 
 
     project_dir, seq_name, frames = base_params(config_dict)
@@ -140,7 +242,7 @@ def poseEstimation(config='Config.toml'):
     if type(config)==dict:
         config_dict = config
     else:
-        config_dict = read_config_file(config)
+        config_dict = read_config_files(config)
     project_dir, seq_name, frames = base_params(config_dict)
     
     logging.info("\n\n---------------------------------------------------------------------")
@@ -170,7 +272,7 @@ def synchronization(config='Config.toml'):
     if type(config)==dict:
         config_dict = config
     else:
-        config_dict = read_config_file(config)
+        config_dict = read_config_files(config)
     project_dir, seq_name, frames = base_params(config_dict)
     
     logging.info("\n\n---------------------------------------------------------------------")
@@ -198,7 +300,7 @@ def personAssociation(config='Config.toml'):
     if type(config)==dict:
         config_dict = config
     else:
-        config_dict = read_config_file(config)
+        config_dict = read_config_files(config)
     project_dir, seq_name, frames = base_params(config_dict)
     
     logging.info("\n\n---------------------------------------------------------------------")
@@ -225,7 +327,7 @@ def triangulation(config='Config.toml'):
     if type(config)==dict:
         config_dict = config
     else:
-        config_dict = read_config_file(config)
+        config_dict = read_config_files(config)
     project_dir, seq_name, frames = base_params(config_dict)
 
     logging.info("\n\n---------------------------------------------------------------------")
@@ -252,7 +354,7 @@ def filtering(config='Config.toml'):
     if type(config)==dict:
         config_dict = config
     else:
-        config_dict = read_config_file(config)
+        config_dict = read_config_files(config)
     project_dir, seq_name, frames = base_params(config_dict)
     
     logging.info("\n\n---------------------------------------------------------------------")
@@ -278,7 +380,7 @@ def scalingModel(config='Config.toml'):
     if type(config)==dict:
         config_dict = config
     else:
-        config_dict = read_config_file(config)
+        config_dict = read_config_files(config)
     project_dir, seq_name, frames = base_params(config_dict)
     
     logging.info("\n\n---------------------------------------------------------------------")
@@ -308,7 +410,7 @@ def inverseKinematics(config='Config.toml'):
     if type(config)==dict:
         config_dict = config
     else:
-        config_dict = read_config_file(config)
+        config_dict = read_config_files(config)
     project_dir, seq_name, frames = base_params(config_dict)
     
     logging.info("\n\n---------------------------------------------------------------------")

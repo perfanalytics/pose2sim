@@ -14,7 +14,7 @@
 # Pose2Sim
 
 > **_News_: Version 0.5 released:** \
-**New folder structure to allow batch processing!**\
+**Deep change in folder structure to allow batch processing!**\
 To upgrade, type `pip install pose2sim --upgrade`.\
 *N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
 

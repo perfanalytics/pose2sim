@@ -3,18 +3,28 @@
 ###############################################################################
 
 
-# IMPORTANT: All configuration parameters specified at that level will 
-# overwrite the ones given in the subfolders. 
-# Example: A parameter given in the Config.toml file at the Session level 
-# will be ignored if it is also given at the Participant or Trial level.
+# Configure your project parameters here. 
+# 
+# IMPORTANT:
+# If a parameter is not found here, Pose2Sim will look for its value in the 
+# Config.toml file of the level above. This way, you can set global 
+# instructions for the Session and alter them for specific Participants or Trials.
+# If you wish to overwrite a parameter for a specific trial or participant, 
+# edit its Config.toml file by uncommenting its key (e.g., [project])
+# and editing its value (e.g., frame_range = [10,300]). Or else, uncomment 
+# [filtering.butterworth] and set cut_off_frequency = 10, etc.
+
 
 
 [project]
-frame_rate = 60 # FPS
+frame_rate = 60 # fps
 frame_range = [] # For example [10,300], or [] for all frames
-# N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
-# For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
-# frame_range = [0.1, 2.0]*frame_rate = [6, 120]
+## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
+## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
+## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
+
+exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
+# e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
 
 # Take heart, calibration is not that complicated once you get the hang of it!
@@ -22,7 +32,7 @@ frame_range = [] # For example [10,300], or [] for all frames
 calibration_type = 'convert' # 'convert' or 'calculate'
 
    [calibration.convert]
-   convert_from = 'qualisys' # 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', or 'biocv'
+   convert_from = 'qualisys' # 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
       [calibration.convert.qualisys]
       binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
       [calibration.convert.optitrack]  # See readme for instructions
@@ -140,17 +150,21 @@ display_figures = true # true or false (lowercase)
    [filtering.median]
    kernel_size = 9
 
+
 [opensim]
-static_trial = 'yes' # 'yes' or 'no' at the Trial level;
-                     # folder name at the Participant level, e.g. 'S00_P00_T00_StaticTrial';
-                     # list of folder names at the Session level, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01/S00_P01_T00', 'S00_P02/S00_P02_T00']
+static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
+#            # 'yes' or 'no' if this Config.toml file is at the Trial level;
+#            # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
+#            # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']
 
 
 
-# CUSTOM skeleton, for DeepLabCut for example (others are in skeletons.py)
-# In this example, CUSTOM reproduces the BODY_25B skeleton.
-# You can create as many custom skeletons as you want, just add them further down and rename them.
+# CUSTOM skeleton, if you trained your own DeepLabCut model for example. 
 # Make sure the node ids correspond to the column numbers of the 2D pose file, starting from zero.
+# If you want to perform inverse kinematics, you will also need to create an OpenSim model
+# and add to its markerset the location where you expect the triangulated keypoints to be detected.
+# In this example, CUSTOM reproduces the BODY_25B skeleton  (default skeletons are stored in skeletons.py).
+# You can create as many custom skeletons as you want, just add them further down and rename them.
 [pose.CUSTOM]
 name = "CHip"
 id = "None"
