@@ -123,7 +123,7 @@ def read_config_files(level):
                 temp_dict = deepcopy(session_config_dict)
                 temp_dict = recursive_update(temp_dict,participant_config_dict)
                 temp_dict = recursive_update(temp_dict,trial_config_dict)
-                temp_dict.get("project").update({"project_dir":os.path.join(os.getcwd(), os.path.basename(root))})
+                temp_dict.get("project").update({"project_dir":os.path.join(os.getcwd(), os.path.relpath(root))})
                 if not os.path.basename(root) in temp_dict.get("project").get('exclude_from_batch'):
                     config_dicts.append(temp_dict)
 
@@ -144,14 +144,14 @@ def read_config_files(level):
                     temp_dict = deepcopy(session_config_dict)
                     temp_dict = recursive_update(temp_dict,participant_config_dict)
                     temp_dict = recursive_update(temp_dict,trial_config_dict)
-                    temp_dict.get("project").update({"project_dir":os.path.join(os.getcwd(), root)})
+                    temp_dict.get("project").update({"project_dir":os.path.join(os.getcwd(), os.path.relpath(root))})
                     if not os.path.relpath(root) in [os.path.relpath(p) for p in temp_dict.get("project").get('exclude_from_batch')]:
                         config_dicts.append(temp_dict)
 
     return config_dicts
 
 
-def base_params(config_dict):
+def base_params(config_dict, level):
     '''
     Retrieve sequence name and frames to be analyzed.
     '''
@@ -161,64 +161,49 @@ def base_params(config_dict):
     seq_name = os.path.basename(project_dir)
     frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
-    if not os.path.exists('User'): os.mkdir('User')
-    with open(os.path.join(project_dir, 'User', 'logs.txt'), 'a+') as log_f: pass
+    log_dir = os.path.realpath([os.getcwd() if level==3 else os.path.join(os.getcwd(), '..') if level==2 else os.path.join(os.getcwd(), '..', '..')][0])
+    with open(os.path.join(log_dir, 'logs.txt'), 'a+') as log_f: pass
     logging.basicConfig(format='%(message)s', level=logging.INFO, 
-        handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(project_dir, 'User', 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
+        handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(log_dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
 
     return project_dir, seq_name, frames
 
 
-def calibration(config='Config.toml'):
+def calibration(config=None):
     '''
     Cameras calibration from checkerboards or from qualisys files.
     
-    config can either be a path or a dictionary (for batch processing)
+    config is usually deduced from the path the function is called from
+    (see read_config_files(level) function) but it can also be a dictionary
     '''
 
     from Pose2Sim.calibration import calibrate_cams_all
     
     if type(config)==dict:
-        config_dict = config # which project?
+        level = 3 # log_dir = os.getcwd()
+        config_dict = config
         if config_dict.get('project').get('project_dir') == None:
             raise ValueError('Please specify the project directory in config_dict:\n \
                              config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
     else:
         # Determine the level at which the function is called (session:3, participant:2, trial:1)
         level = determine_level()
+        config_dict = read_config_files(level)[0]
 
-        if level == 1: # trial
-            session_config_dict = toml.load(os.path.join('..','..','Config.toml'))
-            participant_config_dict = toml.load(os.path.join('..','Config.toml'))
-            trial_config_dict = toml.load('Config.toml')
-            session_config_dict.update(participant_config_dict)
-            session_config_dict.update(trial_config_dict)
-            session_config_dict.get("project").update({"project_dir":os.path.join('..','..',os.getcwd())})
-        if level == 2: # participant
-            session_config_dict = toml.load(os.path.join('..','Config.toml'))
-            participant_config_dict = toml.load('Config.toml')
-            session_config_dict.update(participant_config_dict)
-            session_config_dict.get("project").update({"project_dir":os.path.join('..',os.getcwd())})
-        if level == 3: # session
-            session_config_dict = toml.load('Config.toml')
-            session_config_dict.get("project").update({"project_dir":os.getcwd()})
-        config_dict = session_config_dict
+    session_dir = os.path.realpath([os.getcwd() if level==3 else os.path.join(os.getcwd(), '..') if level==2 else os.path.join(os.getcwd(), '..', '..')][0])
+    config_dict.get("project").update({"project_dir":session_dir})
+
+    # Set up logging
+    with open(os.path.join(session_dir, 'logs.txt'), 'a+') as log_f: pass
+    logging.basicConfig(format='%(message)s', level=logging.INFO, 
+        handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(session_dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
     
-
-
-        # config_dicts = read_config_files(level)
-
-            #LANCER LA CALIBRATION
-
-        
-
-
-    project_dir, seq_name, frames = base_params(config_dict)
-    
+    # Path to the calibration directory
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
     logging.info("\n\n---------------------------------------------------------------------")
     logging.info("Camera calibration")
     logging.info("---------------------------------------------------------------------")
-    logging.info(f"\nProject directory: {project_dir}")
+    logging.info(f"\nCalibration directory: {calib_dir}")
     start = time.time()
     
     calibrate_cams_all(config_dict)
@@ -227,7 +212,7 @@ def calibration(config='Config.toml'):
     logging.info(f'Calibration took {end-start:.2f} s.')
 
 
-def poseEstimation(config='Config.toml'):
+def poseEstimation(config=None):
     '''
     Estimate pose using BlazePose, OpenPose, AlphaPose, or DeepLabCut.
     
@@ -257,7 +242,7 @@ def poseEstimation(config='Config.toml'):
     logging.info(f'Pose estimation took {end-start:.2f} s.')
     
 
-def synchronization(config='Config.toml'):
+def synchronization(config=None):
     '''
     Synchronize cameras if needed.
     
@@ -287,7 +272,7 @@ def synchronization(config='Config.toml'):
     logging.info(f'Synchronization took {end-start:.2f} s.')    
     
     
-def personAssociation(config='Config.toml'):
+def personAssociation(config=None):
     '''
     Tracking of the person of interest in case of multiple persons detection.
     Needs a calibration file.
@@ -315,7 +300,7 @@ def personAssociation(config='Config.toml'):
     logging.info(f'Tracking took {end-start:.2f} s.')
     
     
-def triangulation(config='Config.toml'):
+def triangulation(config=None):
     '''
     Robust triangulation of 2D points coordinates.
     
@@ -342,7 +327,7 @@ def triangulation(config='Config.toml'):
     logging.info(f'Triangulation took {end-start:.2f} s.')
     
     
-def filtering(config='Config.toml'):
+def filtering(config=None):
     '''
     Filter trc 3D coordinates.
     
@@ -365,7 +350,7 @@ def filtering(config='Config.toml'):
     filter_all(config_dict)
 
 
-def scalingModel(config='Config.toml'):
+def scalingModel(config=None):
     '''
     Uses OpenSim to scale a model based on a static 3D pose.
     
@@ -395,7 +380,7 @@ def scalingModel(config='Config.toml'):
     logging.info(f'Model scaling took {end-start:.2f} s.')
     
     
-def inverseKinematics(config='Config.toml'):
+def inverseKinematics(config=None):
     '''
     Uses OpenSim to perform inverse kinematics.
     

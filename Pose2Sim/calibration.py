@@ -1192,7 +1192,7 @@ def calibrate_cams_all(config):
     Prints recap.
     
     INPUTS:
-    - a Config.toml file
+    - a config dictionary
 
     OUTPUT:
     - a .toml camera calibration file
@@ -1200,8 +1200,7 @@ def calibrate_cams_all(config):
 
     # Read config
     project_dir = config.get('project').get('project_dir')
-    if project_dir == '': project_dir = os.getcwd()
-    calib_dir = os.path.join(project_dir, 'Calibration')
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
     calib_type = config.get('calibration').get('calibration_type')
 
     if calib_type=='convert':
