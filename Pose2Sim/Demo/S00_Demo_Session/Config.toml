@@ -56,13 +56,12 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 
       # Camera placements, need to be done before every session
       [calibration.calculate.extrinsics]
+      calculate_extrinsics = true # true or false (lowercase) 
       extrinsics_method = 'scene' # 'board', 'scene', 'keypoints'
       # 'board' should be large enough to be detected when laid on the floor. Not recommended.
       # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out.
       # 'keypoints' uses automatic pose estimation of a person freely walking and waving arms in the scene. Slighlty less accurate, requires synchronized cameras.
-
       moving_cameras = false # Not implemented yet
-      calculate_extrinsics = true # true or false (lowercase) 
 
          [calibration.calculate.extrinsics.board]
          show_reprojection_error = true # true or false (lowercase)
@@ -114,6 +113,7 @@ weights_kpt = [1,1] # Pris en compte uniquement si on a plusieurs keypoints
 
 
 [personAssociation]
+single_person = true # false for multi-person analysis (not supported yet), true for only triangulating the main person in scene. 
 tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
 # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
 reproj_error_threshold_association = 20 # px
@@ -153,9 +153,10 @@ display_figures = true # true or false (lowercase)
 
 [opensim]
 static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
-#            # 'yes' or 'no' if this Config.toml file is at the Trial level;
+#            # If this Config.toml file is at the Trial level, set to true or false (lowercase);
 #            # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
 #            # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']
+opensim_bin_path = 'C:\OpenSim 4.4\bin'
 
 
 

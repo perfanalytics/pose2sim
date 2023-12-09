@@ -116,6 +116,7 @@
 
 
 # [personAssociation]
+# single_person = true # false for multi-person analysis (not supported yet), true for only triangulating the main person in scene. 
 # tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
 ## and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
 # reproj_error_threshold_association = 20 # px
@@ -155,10 +156,10 @@
 
 # [opensim]
 # static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
-#              # 'yes' or 'no' if this Config.toml file is at the Trial level;
+#              # If this Config.toml file is at the Trial level, set to true or false (lowercase);
 #              # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
 #              # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']
-
+# opensim_bin_path = 'C:\OpenSim 4.4\bin'
 
 
 ## CUSTOM skeleton, if you trained your own DeepLabCut model for example. 

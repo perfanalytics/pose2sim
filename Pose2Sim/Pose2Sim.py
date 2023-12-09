@@ -59,6 +59,15 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def setup_logging(session_dir):
+    '''
+    Create logging file and stream handlers
+    '''
+    with open(os.path.join(session_dir, 'logs.txt'), 'a+') as log_f: pass
+    logging.basicConfig(format='%(message)s', level=logging.INFO, 
+        handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(session_dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
+
+    
 def determine_level():
     '''
     Determine the level at which the function is called.
@@ -194,9 +203,7 @@ def calibration(config=None):
     config_dict.get("project").update({"project_dir":session_dir})
 
     # Set up logging
-    with open(os.path.join(session_dir, 'logs.txt'), 'a+') as log_f: pass
-    logging.basicConfig(format='%(message)s', level=logging.INFO, 
-        handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(session_dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
+    setup_logging(session_dir)  
     
     # Path to the calibration directory
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
@@ -283,9 +290,25 @@ def personAssociation(config=None):
     from Pose2Sim.personAssociation import track_2d_all
     
     if type(config)==dict:
+        level = 3 # log_dir = os.getcwd()
         config_dict = config
+        if config_dict.get('project').get('project_dir') == None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
+
     else:
-        config_dict = read_config_files(config)
+        # Determine the level at which the function is called (session:3, participant:2, trial:1)
+        level = determine_level()
+        config_dicts = read_config_files(level)
+
+    # Set up logging
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    setup_logging(session_dir)    
+
+    # Batch process all trials
+    for config_dict in config_dicts:
+
+
     project_dir, seq_name, frames = base_params(config_dict)
     
     logging.info("\n\n---------------------------------------------------------------------")
@@ -298,6 +321,26 @@ def personAssociation(config=None):
     
     end = time.time()
     logging.info(f'Tracking took {end-start:.2f} s.')
+
+
+
+
+    session_dir = os.path.realpath([os.getcwd() if level==3 else os.path.join(os.getcwd(), '..') if level==2 else os.path.join(os.getcwd(), '..', '..')][0])
+    config_dict.get("project").update({"project_dir":session_dir})
+
+    
+    # Path to the calibration directory
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    logging.info("\n\n---------------------------------------------------------------------")
+    logging.info("Camera calibration")
+    logging.info("---------------------------------------------------------------------")
+    logging.info(f"\nCalibration directory: {calib_dir}")
+    start = time.time()
+    
+    calibrate_cams_all(config_dict)
+    
+    end = time.time()
+    logging.info(f'Calibration took {end-start:.2f} s.')
     
     
 def triangulation(config=None):
