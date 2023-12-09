@@ -68,18 +68,6 @@ def setup_logging(session_dir):
         handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(session_dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
 
     
-def determine_level():
-    '''
-    Determine the level at which the function is called.
-    Level = 1: called from a Trial folder
-    Level = 2: called from a Participant folder
-    Level = 3: called from a Session folder
-    '''
-
-    level = max([len(root.split(os.sep)) for root,dirs,files in os.walk('.') if 'Config.toml' in files])
-    return level
-
-
 def recursive_update(dict_to_update, dict_with_new_values):
     '''
     Update nested dictionaries without overwriting existing keys in any level of nesting
@@ -102,62 +90,86 @@ def recursive_update(dict_to_update, dict_with_new_values):
     return dict_to_update
 
 
-def read_config_files(level):
+def determine_level(config_dir):
+    '''
+    Determine the level at which the function is called.
+    Level = 1: Trial folder
+    Level = 2: Participant folder
+    Level = 3: Session folder
+    '''
+
+    len_paths = [len(root.split(os.sep)) for root,dirs,files in os.walk(config_dir) if 'Config.toml' in files]
+    level = max(len_paths) - min(len_paths) + 1
+    return level
+
+
+def read_config_files(config):
     '''
     Read Session, Participant, and Trial configuration files, 
     and output a dictionary with all the parameters.
     '''
 
-    # Trial level
-    if level == 1: 
-        session_config_dict = toml.load(os.path.join('..','..','Config.toml'))
-        participant_config_dict = toml.load(os.path.join('..','Config.toml'))
-        trial_config_dict = toml.load('Config.toml')
-            
-        session_config_dict = recursive_update(session_config_dict,participant_config_dict)
-        session_config_dict = recursive_update(session_config_dict,trial_config_dict)
-        session_config_dict.get("project").update({"project_dir":os.getcwd()})
-        config_dicts = [session_config_dict]
-    
-    # Participant level
-    if level == 2:
-        session_config_dict = toml.load(os.path.join('..','Config.toml'))
-        participant_config_dict = toml.load('Config.toml')
-        config_dicts = []
-        # Create config dictionaries for all trials of the participant
-        for (root,dirs,files) in os.walk('.'):
-            if 'Config.toml' in files and root != '.':
-                trial_config_dict = toml.load(os.path.join(root, files[0]))
-                # deep copy, otherwise session_config_dict is modified at each iteration within the config_dicts list
-                temp_dict = deepcopy(session_config_dict)
-                temp_dict = recursive_update(temp_dict,participant_config_dict)
-                temp_dict = recursive_update(temp_dict,trial_config_dict)
-                temp_dict.get("project").update({"project_dir":os.path.join(os.getcwd(), os.path.relpath(root))})
-                if not os.path.basename(root) in temp_dict.get("project").get('exclude_from_batch'):
-                    config_dicts.append(temp_dict)
-
-    # Session level
-    if level == 3:
-        session_config_dict = toml.load('Config.toml')
-        config_dicts = []
-        # Create config dictionaries for all trials of all participants of the session
-        for (root,dirs,files) in os.walk('.'):
-            if 'Config.toml' in files and root != '.':
-                # participant
-                if len(root.split(os.sep)) == 2:
-                    participant_config_dict = toml.load(os.path.join(root, files[0]))
-                # trial 
-                elif len(root.split(os.sep)) == 3: 
+    if type(config)==dict:
+        level = 3 # log_dir = os.getcwd()
+        config_dicts = [config]
+        if config_dicts[0].get('project').get('project_dir') == None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
+    else:
+        # if launched without an argument, config == None, else it is the path to the config directory
+        config_dir = ['.' if config == None else config][0]  
+        level = determine_level(config_dir)
+        
+        # Trial level
+        if level == 1: 
+            session_config_dict = toml.load(os.path.join(config_dir, '..','..','Config.toml'))
+            participant_config_dict = toml.load(os.path.join(config_dir, '..','Config.toml'))
+            trial_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
+                
+            session_config_dict = recursive_update(session_config_dict,participant_config_dict)
+            session_config_dict = recursive_update(session_config_dict,trial_config_dict)
+            session_config_dict.get("project").update({"project_dir":config_dir})
+            config_dicts = [session_config_dict]
+        
+        # Participant level
+        if level == 2:
+            session_config_dict = toml.load(os.path.join(config_dir, '..','Config.toml'))
+            participant_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
+            config_dicts = []
+            # Create config dictionaries for all trials of the participant
+            for (root,dirs,files) in os.walk(config_dir):
+                if 'Config.toml' in files and root != config_dir:
                     trial_config_dict = toml.load(os.path.join(root, files[0]))
                     # deep copy, otherwise session_config_dict is modified at each iteration within the config_dicts list
                     temp_dict = deepcopy(session_config_dict)
                     temp_dict = recursive_update(temp_dict,participant_config_dict)
                     temp_dict = recursive_update(temp_dict,trial_config_dict)
-                    temp_dict.get("project").update({"project_dir":os.path.join(os.getcwd(), os.path.relpath(root))})
-                    if not os.path.relpath(root) in [os.path.relpath(p) for p in temp_dict.get("project").get('exclude_from_batch')]:
+                    temp_dict.get("project").update({"project_dir":os.path.join(config_dir, os.path.relpath(root))})
+                    if not os.path.basename(root) in temp_dict.get("project").get('exclude_from_batch'):
                         config_dicts.append(temp_dict)
 
-    return config_dicts
+        # Session level
+        if level == 3:
+            session_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
+            config_dicts = []
+            # Create config dictionaries for all trials of all participants of the session
+            for (root,dirs,files) in os.walk(config_dir):
+                if 'Config.toml' in files and root != config_dir:
+                    # participant
+                    if determine_level(root) == 2:
+                        participant_config_dict = toml.load(os.path.join(root, files[0]))
+                    # trial 
+                    elif determine_level(root) == 1: 
+                        trial_config_dict = toml.load(os.path.join(root, files[0]))
+                        # deep copy, otherwise session_config_dict is modified at each iteration within the config_dicts list
+                        temp_dict = deepcopy(session_config_dict)
+                        temp_dict = recursive_update(temp_dict,participant_config_dict)
+                        temp_dict = recursive_update(temp_dict,trial_config_dict)
+                        temp_dict.get("project").update({"project_dir":os.path.join(config_dir, os.path.relpath(root))})
+                        if not os.path.relpath(root) in [os.path.relpath(p) for p in temp_dict.get("project").get('exclude_from_batch')]:
+                            config_dicts.append(temp_dict)
+
+    return level, config_dicts
 
 
 def base_params(config_dict, level):
@@ -182,23 +194,15 @@ def calibration(config=None):
     '''
     Cameras calibration from checkerboards or from qualisys files.
     
-    config is usually deduced from the path the function is called from
-    (see read_config_files(level) function) but it can also be a dictionary
+    config can be a dictionary,
+    or a trial, participant, or session directory path,
+    or the function can be called without an argument, in which case it is the current directory.
     '''
 
     from Pose2Sim.calibration import calibrate_cams_all
-    
-    if type(config)==dict:
-        level = 3 # log_dir = os.getcwd()
-        config_dict = config
-        if config_dict.get('project').get('project_dir') == None:
-            raise ValueError('Please specify the project directory in config_dict:\n \
-                             config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
-    else:
-        # Determine the level at which the function is called (session:3, participant:2, trial:1)
-        level = determine_level()
-        config_dict = read_config_files(level)[0]
 
+    level, config_dicts = read_config_files(config)
+    config_dict = config_dicts[0]
     session_dir = os.path.realpath([os.getcwd() if level==3 else os.path.join(os.getcwd(), '..') if level==2 else os.path.join(os.getcwd(), '..', '..')][0])
     config_dict.get("project").update({"project_dir":session_dir})
 
