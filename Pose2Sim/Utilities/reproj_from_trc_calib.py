@@ -17,10 +17,10 @@
     format with a different model.
     
     Usage: 
-    from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', r'<openpose_or_deeplabcut_format>', r'<output_file>')
+    from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', '<output_format>', r'<output_file_root>')
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'openpose'
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'deeplabcut' -o output_file
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'deeplabcut' -o output_file_root
 '''
 
 
@@ -194,7 +194,7 @@ def reproj_from_trc_calib_func(*args):
     format with a different model.
     
     Usage: 
-    from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', r'<openpose_or_deeplabcut_format>', r'<output_file_root>')
+    from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', '<output_format>', r'<output_file_root>')
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'openpose'
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'deeplabcut' -o output_file_root
@@ -203,10 +203,10 @@ def reproj_from_trc_calib_func(*args):
     try:
         input_trc_file = args[0]['input_trc_file'] # invoked with argparse
         input_calib_file = args[0]['input_calib_file']
-        if args[0]['openpose_or_deeplabcut_format'] == None:
-            openpose_or_deeplabcut_format = 'deeplabcut'
+        if args[0]['output_format'] == None:
+            output_format = 'deeplabcut'
         else:
-            openpose_or_deeplabcut_format = args[0]['openpose_or_deeplabcut_format']
+            output_format = args[0]['output_format']
         if args[0]['output_file_root'] == None:
             output_file_root = input_trc_file.replace('.trc', '_reproj')
         else:
@@ -215,9 +215,9 @@ def reproj_from_trc_calib_func(*args):
         input_trc_file = args[0] # invoked as a function
         input_calib_file = args[1]
         try:
-            openpose_or_deeplabcut_format = args[2]
+            output_format = args[2]
         except:
-            openpose_or_deeplabcut_format = 'deeplabcut'
+            output_format = 'deeplabcut'
         try:
             output_file_root = args[3]
         except:
@@ -262,7 +262,7 @@ def reproj_from_trc_calib_func(*args):
             data_proj[cam].iloc[row,:] = coords[cam]
         
     # Save as h5 and csv if DeepLabCut format
-    if openpose_or_deeplabcut_format == 'deeplabcut':
+    if output_format == 'deeplabcut':
         # to h5
         h5_files = [os.path.join(cam_dir,f'{filename}_cam_{i+1:02d}.h5') for i,cam_dir in enumerate(cam_dirs)]
         [data_proj[i].to_hdf(h5_files[i], index=True, key='reprojected_points') for i in range(len(P_all))]
@@ -272,7 +272,7 @@ def reproj_from_trc_calib_func(*args):
         [data_proj[i].to_csv(csv_files[i], sep=',', index=True, lineterminator='\n') for i in range(len(P_all))]
 
     # Save as json if OpenPose format
-    elif openpose_or_deeplabcut_format == 'openpose':        
+    elif output_format == 'openpose':        
         # read body_25b tree
         bodyparts_ids = [[node.id for _, _, node in RenderTree(BODY_25B) if node.name==b][0] for b in bodyparts]
         #prepare json files
@@ -302,15 +302,15 @@ def reproj_from_trc_calib_func(*args):
 
     # Wrong format
     else:
-        raise ValueError('openpose_or_deeplabcut_format must be either "openpose" or "deeplabcut"')
+        raise ValueError('output_format must be either "openpose" or "deeplabcut"')
     
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--trc_input_file', required = True, help='trc 3D coordinates input file')
-    parser.add_argument('-c', '--calib_input_file', required = True, help='toml calibration input file')
+    parser.add_argument('-t', '--input_trc_file', required = True, help='trc 3D coordinates input file')
+    parser.add_argument('-c', '--input_calib_file', required = True, help='toml calibration input file')
     parser.add_argument('-f', '--output_format', required=False, help='deeplabcut or openpose output format')
-    parser.add_argument('-o', '--output_file', required=False, help='output file root, without extension')
+    parser.add_argument('-o', '--output_file_root', required=False, help='output file root, without extension')
     args = vars(parser.parse_args())
 
     reproj_from_trc_calib_func(args)
