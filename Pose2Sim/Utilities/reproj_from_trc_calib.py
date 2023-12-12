@@ -7,15 +7,20 @@
     ## Reproject 3D points on camera planes         ##
     ##################################################
     
-    Build a trc file which stores all real and virtual markers 
-    calculated from a .mot motion file and a .osim model file.
-    
-    Default: DeepLabCut
+    Reproject 3D points from a trc file to the camera planes determined by a 
+    toml calibration file.
+
+    The output 2D points can be chosen to follow the DeepLabCut (default) or 
+    the OpenPose format. If OpenPose is chosen, the BODY_25B model is used, 
+    with ear and eye at coordinates (0,0) since they are not used by Pose2Sim. 
+    You can change the BODY_25B tree if you need to reproject in OpenPose 
+    format with a different model.
     
     Usage: 
-    from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', r'<openpose_or_deeplabcut_format>')
+    from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', r'<openpose_or_deeplabcut_format>', r'<output_file>')
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -o 'openpose'
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'openpose'
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'deeplabcut' -o output_file
 '''
 
 
@@ -23,7 +28,11 @@
 import os
 import pandas as pd
 import numpy as np
-import opensim as osim
+import toml
+import cv2
+import json
+from anytree import Node, RenderTree
+from copy import deepcopy
 import argparse
 
 
@@ -38,119 +47,270 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
+## SKELETON
+'''BODY_25B (full-body without hands, experimental, from OpenPose)
+https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/blob/master/experimental_models/README.md
+Adjust it if your want to reproject in OpenPose format with a different model'''
+nb_joints = 25
+BODY_25B = Node("CHip", id=None, children=[
+    Node("RHip", id=12, children=[
+        Node("RKnee", id=14, children=[
+            Node("RAnkle", id=16, children=[
+                Node("RBigToe", id=22, children=[
+                    Node("RSmallToe", id=23),
+                ]),
+                Node("RHeel", id=24),
+            ]),
+        ]),
+    ]),
+    Node("LHip", id=11, children=[
+        Node("LKnee", id=13, children=[
+            Node("LAnkle", id=15, children=[
+                Node("LBigToe", id=19, children=[
+                    Node("LSmallToe", id=20),
+                ]),
+                Node("LHeel", id=21),
+            ]),
+        ]),
+    ]),
+    Node("Neck", id=17, children=[
+        Node("Head", id=18, children=[
+            Node("Nose", id=0),
+        ]),
+        Node("RShoulder", id=6, children=[
+            Node("RElbow", id=8, children=[
+                Node("RWrist", id=10),
+            ]),
+        ]),
+        Node("LShoulder", id=5, children=[
+            Node("LElbow", id=7, children=[
+                Node("LWrist", id=9),
+            ]),
+        ]),
+    ]),
+])
+
+
 ## FUNCTIONS
-def get_marker_positions(motion_data, model):
+def computeP(calib_file):
     '''
-    Get dataframe of marker positions
+    Compute projection matrices from toml calibration file.
     
-    INPUTS: 
-    - motion_data: .mot file opened with osim.TimeSeriesTable
-    - model: .osim file opened with osim.Model 
+    INPUT:
+    - calib_file: calibration .toml file.
     
     OUTPUT:
-    - marker_positions_pd: DataFrame of marker positions 
+    - P: projection matrix as list of arrays
     '''
     
-    # Markerset
-    marker_set = model.getMarkerSet()
-    marker_set_names = [mk.getName() for mk in list(marker_set)]
-    marker_set_names_xyz = np.array([[m+'_x', m+'_y', m+'_z'] for m in marker_set_names]).flatten()
-
-    # Data
-    times = motion_data.getIndependentColumn()
-    joint_angle_set_names = motion_data.getColumnLabels() # or [c.getName() for c in model.getCoordinateSet()]
-    joint_angle_set_names = [j for j in joint_angle_set_names if not j.endswith('activation')]
-    motion_data_pd = pd.DataFrame(motion_data.getMatrix().to_numpy()[:,:len(joint_angle_set_names)], columns=joint_angle_set_names)
-
-    # Get marker positions at each state
-    state = model.initSystem()
-    marker_positions = []
-    for n,t in enumerate(times):
-        # put the model in the right position
-        for coord in joint_angle_set_names:
-            if not coord.endswith('_tx') and not coord.endswith('_ty') and not coord.endswith('_tz'):
-                value = motion_data_pd.loc[n,coord]*np.pi/180
-            else:
-                value = motion_data_pd.loc[n,coord]
-            model.getCoordinateSet().get(coord).setValue(state,value)
-        # get marker positions
-        marker_positions += [np.array([marker_set.get(mk_name).findLocationInFrame(state, model.getGround()).to_numpy() for mk_name in marker_set_names]).flatten()]
-    marker_positions_pd = pd.DataFrame(marker_positions, columns=marker_set_names_xyz)
-    marker_positions_pd.insert(0, 'time', times)
-    marker_positions_pd.insert(0, 'frame', np.arange(len(times)))
+    K, R, T, Kh, H = [], [], [], [], []
+    P = []
     
-    return marker_positions_pd
+    calib = toml.load(calib_file)
+    for cam in list(calib.keys()):
+        if cam != 'metadata':
+            K = np.array(calib[cam]['matrix'])
+            Kh = np.block([K, np.zeros(3).reshape(3,1)])
+            R, _ = cv2.Rodrigues(np.array(calib[cam]['rotation']))
+            T = np.array(calib[cam]['translation'])
+            H = np.block([[R,T.reshape(3,1)], [np.zeros(3), 1 ]])
+            
+            P.append(Kh.dot(H))
+   
+    return P
     
     
-def trc_from_mot_osim_func(*args):
+def reprojection(P_all, Q):
     '''
-    Build a trc file which stores all real and virtual markers 
-    calculated from a .mot motion file and a .osim model file.
+    Reprojects 3D point on all cameras.
+    
+    INPUTS:
+    - P_all: list of arrays. Projection matrix for all cameras
+    - Q: array of triangulated point (x,y,z,1.)
+
+    OUTPUTS:
+    - x_calc, y_calc: list of coordinates of point reprojected on all cameras
+    '''
+    
+    x_calc, y_calc = [], []
+    for c in range(len(P_all)):  
+        P_cam = P_all[c]
+        x_calc.append(P_cam[0].dot(Q) / P_cam[2].dot(Q))
+        y_calc.append(P_cam[1].dot(Q) / P_cam[2].dot(Q))
+        
+    return x_calc, y_calc
+    
+
+def df_from_trc(trc_path):
+    '''
+    Retrieve header and data from trc path.
+    '''
+
+    # DataRate	CameraRate	NumFrames	NumMarkers	Units	OrigDataRate	OrigDataStartFrame	OrigNumFrames
+    df_header = pd.read_csv(trc_path, sep="\t", skiprows=1, header=None, nrows=2, encoding="ISO-8859-1")
+    header = dict(zip(df_header.iloc[0].tolist(), df_header.iloc[1].tolist()))
+    
+    # Label1_X  Label1_Y    Label1_Z    Label2_X    Label2_Y
+    df_lab = pd.read_csv(trc_path, sep="\t", skiprows=3, nrows=1)
+    labels = df_lab.columns.tolist()[2:-1:3]
+    labels_XYZ = np.array([[labels[i]+'_X', labels[i]+'_Y', labels[i]+'_Z'] for i in range(len(labels))], dtype='object').flatten()
+    labels_FTXYZ = np.concatenate((['Frame#','Time'], labels_XYZ))
+    
+    data = pd.read_csv(trc_path, sep="\t", skiprows=5, index_col=False, header=None, names=labels_FTXYZ)
+    
+    return header, data
+
+
+def yup2zup(Q):
+    '''
+    Turns Y-up system coordinates into Z-up coordinates
+
+    INPUT:
+    - Q: pandas dataframe
+    N 3D points as columns, ie 3*N columns in Z-up system coordinates
+    and frame number as rows
+
+    OUTPUT:
+    - Q: pandas dataframe with N 3D points in Y-up system coordinates
+    '''
+    
+    # X->Y, Y->Z, Z->X
+    cols = list(Q.columns)
+    cols = np.array([[cols[i*3+2],cols[i*3],cols[i*3+1]] for i in range(int(len(cols)/3))]).flatten()
+    Q = Q[cols]
+
+    return Q
+
+
+def reproj_from_trc_calib_func(*args):
+    '''
+    Reproject 3D points from a trc file to the camera planes determined by a 
+    toml calibration file.
+    
+    The output 2D points can be chosen to follow the DeepLabCut (default) or 
+    the OpenPose format. If OpenPose is chosen, the BODY_25B model is used, 
+    with ear and eye at coordinates (0,0) since they are not used by Pose2Sim. 
+    You can change the BODY_25B tree if you need to reproject in OpenPose 
+    format with a different model.
     
     Usage: 
-    from Pose2Sim.Utilities import trc_from_mot_osim; trc_from_mot_osim.trc_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<trc_output_file>')
-    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file
-    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file -t trc_output_file
+    from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', r'<openpose_or_deeplabcut_format>', r'<output_file_root>')
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'openpose'
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'deeplabcut' -o output_file_root
     '''
 
     try:
-        motion_path = args[0]['input_mot_file'] # invoked with argparse
-        osim_path = args[0]['input_osim_file']
-        if args[0]['trc_output_file'] == None:
-            trc_path = motion_path.replace('.mot', '.trc')
+        input_trc_file = args[0]['input_trc_file'] # invoked with argparse
+        input_calib_file = args[0]['input_calib_file']
+        if args[0]['openpose_or_deeplabcut_format'] == None:
+            openpose_or_deeplabcut_format = 'deeplabcut'
         else:
-            trc_path = args[0]['trc_output_file']
+            openpose_or_deeplabcut_format = args[0]['openpose_or_deeplabcut_format']
+        if args[0]['output_file_root'] == None:
+            output_file_root = input_trc_file.replace('.trc', '_reproj')
+        else:
+            output_file_root = args[0]['output_file_root']
     except:
-        motion_path = args[0] # invoked as a function
-        osim_path = args[1]
+        input_trc_file = args[0] # invoked as a function
+        input_calib_file = args[1]
         try:
-            trc_path = args[2]
+            openpose_or_deeplabcut_format = args[2]
         except:
-            trc_path = motion_path.replace('.mot', '.trc')
+            openpose_or_deeplabcut_format = 'deeplabcut'
+        try:
+            output_file_root = args[3]
+        except:
+            output_file_root = input_trc_file.replace('.trc', '_reproj')
 
-    # Create dataframe with marker positions
-    model = osim.Model(osim_path)
-    motion_data = osim.TimeSeriesTable(motion_path)
-    marker_positions_pd = get_marker_positions(motion_data, model)
+    # Extract data from trc file
+    header_trc, data_trc = df_from_trc(input_trc_file)
+    data_trc_zup = pd.concat([data_trc.iloc[:,:2], yup2zup(data_trc.iloc[:,2:])], axis=1) # yup to zup system coordinates
+    bodyparts = [d[:-2] for d in data_trc_zup.columns[2::3]]
+    num_bodyparts = int(header_trc['NumMarkers'])
+    filename = os.path.splitext(os.path.basename(input_trc_file))[0]
     
-    # Trc header
-    times = motion_data.getIndependentColumn()
-    marker_set = model.getMarkerSet()
-    marker_set_names = [mk.getName() for mk in list(marker_set)]
-    
-    fps = str(int( 1/ (times[1]-times[0]) / (len(times)-1) ))
-    nb_frames = str(len(times))
-    nb_markers = str(len(marker_set_names))
-    header0_str = 'PathFileType\t4\t(X/Y/Z)\t' + os.path.basename(trc_path)
+    # Extract data from calibration file
+    P_all = computeP(input_calib_file)
 
-    header1 = {}
-    header1['DataRate'] = fps
-    header1['CameraRate'] = fps
-    header1['NumFrames'] = nb_frames
-    header1['NumMarkers'] = nb_markers
-    header1['Units'] = 'm'
-    header1['OrigDataRate'] = fps
-    header1['OrigDataStartFrame'] = '0'
-    header1['OrigNumFrames'] = nb_frames
-    header1_str1 = '\t'.join(header1.keys())
-    header1_str2 = '\t'.join(header1.values())
+    # Create camera folders
+    reproj_dir = os.path.realpath(output_file_root)
+    cam_dirs = [os.path.join(reproj_dir, f'cam_{cam+1:02d}_json') for cam in range(len(P_all))]
+    if not os.path.exists(reproj_dir): os.mkdir(reproj_dir)  
+    try:
+        [os.mkdir(cam_dir) for cam_dir in cam_dirs]
+    except:
+        pass
 
-    header2_str1 = 'Frame#\tTime\t' + '\t\t\t'.join([mk.strip() for mk in marker_set_names]) + '\t\t'
-    header2_str2 = '\t\t'+'\t'.join(['X{i}\tY{i}\tZ{i}'.format(i=i+1) for i in range(int(header1['NumMarkers']))])
+    # header preparation
+    columns_iterables = [['DavidPagnon'], ['person0'], bodyparts, ['x','y']]
+    columns_h5 = pd.MultiIndex.from_product(columns_iterables, names=['scorer', 'individuals', 'bodyparts', 'coords'])
+    rows_iterables = [['labeled_data'], [filename], [f'img_{i:03d}.png' for i in range(len(data_trc))]]
+    rows_h5 = pd.MultiIndex.from_product(rows_iterables)
+    data_h5 = pd.DataFrame(np.nan, index=rows_h5, columns=columns_h5)
 
-    header_trc = '\n'.join([header0_str, header1_str1, header1_str2, header2_str1, header2_str2])
-    
-    # write data
-    with open(trc_path, 'w') as trc_o:
-        trc_o.write(header_trc+'\n')
-    marker_positions_pd.to_csv(trc_path, header=False, sep = '\t', mode='a', index=False)
+    # Reproject 3D points on all cameras
+    data_proj = [deepcopy(data_h5) for cam in range(len(P_all))] # copy data_h5 as many times as there are cameras
+    Q = data_trc_zup.iloc[:,2:]
+    for row in range(len(Q)):
+        coords = [[] for cam in range(len(P_all))]
+        for keypoint in range(num_bodyparts):
+            q = np.append(Q.iloc[row,3*keypoint:3*keypoint+3], 1)
+            x_all, y_all = reprojection(P_all, q)
+            [coords[cam].extend([x_all[cam], y_all[cam]]) for cam in range(len(P_all))]
+        for cam in range(len(P_all)):
+            data_proj[cam].iloc[row,:] = coords[cam]
+        
+    # Save as h5 and csv if DeepLabCut format
+    if openpose_or_deeplabcut_format == 'deeplabcut':
+        # to h5
+        h5_files = [os.path.join(cam_dir,f'{filename}_cam_{i+1:02d}.h5') for i,cam_dir in enumerate(cam_dirs)]
+        [data_proj[i].to_hdf(h5_files[i], index=True, key='reprojected_points') for i in range(len(P_all))]
+
+        # to csv
+        csv_files = [os.path.join(cam_dir,f'{filename}_cam_{i+1:02d}.csv') for i,cam_dir in enumerate(cam_dirs)]
+        [data_proj[i].to_csv(csv_files[i], sep=',', index=True, lineterminator='\n') for i in range(len(P_all))]
+
+    # Save as json if OpenPose format
+    elif openpose_or_deeplabcut_format == 'openpose':        
+        # read body_25b tree
+        bodyparts_ids = [[node.id for _, _, node in RenderTree(BODY_25B) if node.name==b][0] for b in bodyparts]
+        #prepare json files
+        json_dict = {'version':1.3, 'people':[]}
+        json_dict['people'] = [{'person_id':[-1], 
+                        'pose_keypoints_2d': np.zeros(nb_joints*3), 
+                        'face_keypoints_2d': [], 
+                        'hand_left_keypoints_2d':[], 
+                        'hand_right_keypoints_2d':[], 
+                        'pose_keypoints_3d':[], 
+                        'face_keypoints_3d':[], 
+                        'hand_left_keypoints_3d':[], 
+                        'hand_right_keypoints_3d':[]}]
+        # write one json file per camera and per frame
+        for cam, cam_dir in enumerate(cam_dirs):
+            for frame in range(len(Q)):
+                json_dict_copy = deepcopy(json_dict)
+                data_proj_frame = data_proj[cam].iloc[row]['DavidPagnon']['person0']
+                # store 2D keypoints and respect body_25b keypoint order
+                for (i,b) in zip(bodyparts_ids, bodyparts):
+                    json_dict_copy['people'][0]['pose_keypoints_2d'][[i*3,i*3+1,i*3+2]] = np.append(data_proj_frame[b].values, 1)
+                json_dict_copy['people'][0]['pose_keypoints_2d'] = json_dict_copy['people'][0]['pose_keypoints_2d'].tolist()
+                # write json file
+                json_file = os.path.join(cam_dir, f'{filename}_cam_{cam+1:02d}.{frame:05d}.json')
+                with open(json_file, 'w') as js_f:
+                    js_f.write(json.dumps(json_dict_copy))
+
+    # Wrong format
+    else:
+        raise ValueError('openpose_or_deeplabcut_format must be either "openpose" or "deeplabcut"')
     
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--input_mot_file', required = True, help='input mot file')
-    parser.add_argument('-o', '--input_osim_file', required = True, help='input osim file')
-    parser.add_argument('-t', '--trc_output_file', required=False, help='trc output file')
+    parser.add_argument('-t', '--trc_input_file', required = True, help='trc 3D coordinates input file')
+    parser.add_argument('-c', '--calib_input_file', required = True, help='toml calibration input file')
+    parser.add_argument('-f', '--output_format', required=False, help='deeplabcut or openpose output format')
+    parser.add_argument('-o', '--output_file', required=False, help='output file root, without extension')
     args = vars(parser.parse_args())
-    
-    trc_from_mot_osim_func(args)
+
+    reproj_from_trc_calib_func(args)

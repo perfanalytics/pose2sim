@@ -347,7 +347,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input_file', required = True, help='trc input file')
     parser.add_argument('-t', '--type', required=True, help='type of filter. "butterworth", \
-    "butterworth_on_speed", "loess"/"lowess", "gaussian", or "median"')
+        "butterworth_on_speed", "loess"/"lowess", "gaussian", or "median"')
     parser.add_argument('-d', '--display', required = False, default = True, help='display plots')
     parser.add_argument('-o', '--output_file', required=False, help='filtered trc output file')
     
