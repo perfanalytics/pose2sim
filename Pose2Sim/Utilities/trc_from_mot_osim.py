@@ -116,7 +116,7 @@ def trc_from_mot_osim_func(*args):
     marker_set = model.getMarkerSet()
     marker_set_names = [mk.getName() for mk in list(marker_set)]
     
-    fps = str(int( 1/ (times[1]-times[0]) / (len(times)-1) ))
+    fps = str( int(1/ ((times[-1]-times[0]) / (len(times)-1))))
     nb_frames = str(len(times))
     nb_markers = str(len(marker_set_names))
     header0_str = 'PathFileType\t4\t(X/Y/Z)\t' + os.path.basename(trc_path)
