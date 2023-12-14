@@ -348,46 +348,46 @@ HALPE_136 = Node("Hip", id=19, children=[
 '''COCO_133 (full-body with hands and face, from AlphaPose)
 https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md'''
 COCO_133 = Node("Hip", id=None, children=[
-    Node("RHip", id=13, children=[
-        Node("RKnee", id=15, children=[
-            Node("RAnkle", id=17, children=[
-                Node("RBigToe", id=21, children=[
-                    Node("RSmallToe", id=22),
+    Node("RHip", id=12, children=[
+        Node("RKnee", id=14, children=[
+            Node("RAnkle", id=16, children=[
+                Node("RBigToe", id=20, children=[
+                    Node("RSmallToe", id=21),
                 ]),
-                Node("RHeel", id=23),
+                Node("RHeel", id=22),
             ]),
         ]),
     ]),
-    Node("LHip", id=12, children=[
-        Node("LKnee", id=14, children=[
-            Node("LAnkle", id=16, children=[
-                Node("LBigToe", id=18, children=[
-                    Node("LSmallToe", id=19),
+    Node("LHip", id=11, children=[
+        Node("LKnee", id=13, children=[
+            Node("LAnkle", id=15, children=[
+                Node("LBigToe", id=17, children=[
+                    Node("LSmallToe", id=18),
                 ]),
-                Node("LHeel", id=20),
+                Node("LHeel", id=19),
             ]),
         ]),
     ]),
     Node("Neck", id=None, children=[
-        Node("Nose", id=1, children=[
-            Node("right_eye", id=3),
-            Node("left_eye", id=2),
+        Node("Nose", id=0, children=[
+            Node("right_eye", id=2),
+            Node("left_eye", id=1),
         ]),
-        Node("RShoulder", id=7, children=[
-            Node("RElbow", id=9, children=[
-                Node("RWrist", id=11, children=[
-                    Node("RThumb", id=115),
-                    Node("RIndex", id=118),
-                    Node("RPinky", id=130),
+        Node("RShoulder", id=6, children=[
+            Node("RElbow", id=8, children=[
+                Node("RWrist", id=10, children=[
+                    Node("RThumb", id=114),
+                    Node("RIndex", id=117),
+                    Node("RPinky", id=129),
                 ]),
             ]),
         ]),
-        Node("LShoulder", id=6, children=[
-            Node("LElbow", id=8, children=[
-                Node("LWrist", id=10, children=[
-                    Node("LThumb", id=94),
-                    Node("LIndex", id=97),
-                    Node("LPinky", id=109),
+        Node("LShoulder", id=5, children=[
+            Node("LElbow", id=7, children=[
+                Node("LWrist", id=9, children=[
+                    Node("LThumb", id=93),
+                    Node("LIndex", id=96),
+                    Node("LPinky", id=108),
                 ])
             ]),
         ]),
@@ -451,4 +451,3 @@ MPII = Node("CHip", id=14, children=[
         ]),
     ]),
 ])
-
