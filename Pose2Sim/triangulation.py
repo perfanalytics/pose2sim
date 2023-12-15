@@ -464,6 +464,14 @@ def triangulate_all(config):
         # Get x,y,likelihood values from files
         json_tracked_files_f = [json_tracked_files[c][f] for c in range(n_cams)]
         x_files, y_files, likelihood_files = extract_files_frame_f(json_tracked_files_f, keypoints_ids)
+
+        # # undistort points draft: start with
+        # points = [np.array(tuple(zip(x_files[i],y_files[i]))).reshape(-1, 1, 2) for i in range(n_cams)]
+        # # calculate optimal matrix optimal_mat cf https://stackoverflow.com/a/76635257/12196632
+        # undistorted_points = [cv2.undistortPoints(points[i], K[i], distortions[i], None, optimal_mat[i]) for i in range(n_cams)]
+        # # then put back into original shape of x_files, y_files 
+        # # Points are undistorted and better triangulated, however reprojection error is not accurate if points are not distorted again prior to reprojection
+        # # This is good for slight distortion. For fishey camera, the model does not work anymore. See there for an example https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301
         
         # Replace likelihood by 0 if under likelihood_threshold
         with np.errstate(invalid='ignore'):
