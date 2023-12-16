@@ -444,7 +444,6 @@ def filter_all(config):
 
     # Read config
     project_dir = config.get('project').get('project_dir')
-    if project_dir == '': project_dir = os.getcwd()
     try:
         pose_tracked_dir = os.path.join(project_dir, 'pose-associated')
         os.listdir(pose_tracked_dir)
@@ -452,8 +451,8 @@ def filter_all(config):
     except:
         pose_dir = os.path.join(project_dir, 'pose')
     frame_range = config.get('project').get('frame_range')
-    seq_name = os.path.basename(project_dir)
-    pose3d_dir = os.path.join(project_dir, 'pose-3d')
+    seq_name = os.path.basename(os.path.realpath(project_dir))
+    pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     display_figures = config.get('filtering').get('display_figures')
     filter_type = config.get('filtering').get('type')
 

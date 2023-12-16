@@ -130,9 +130,9 @@
 # show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 
 
-# [filtering]
+[filtering]
 # type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
-# display_figures = true # true or false (lowercase)
+display_figures = true # true or false (lowercase)
 
    # [filtering.butterworth]
    # order = 4 

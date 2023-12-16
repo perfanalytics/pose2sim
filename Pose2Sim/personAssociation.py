@@ -11,7 +11,10 @@
     Which is the one of interest?
     
     This module tries all possible triangulations of a chosen anatomical 
-    point, and chooses the person for whom the reprojection error is smallest.
+    point. If "single_person" mode is used, it chooses the person for whom the 
+    reprojection error is smallest. If multi-person is used, it selects all 
+    persons with a reprojection error smaller than a threshold, and then 
+    associates them across time frames by minimizing the displacement speed.
     
     INPUTS: 
     - a calibration file (.toml extension)
@@ -193,12 +196,12 @@ def recap_tracking(config, error, nb_cams_excluded):
     
     # Read config
     project_dir = config.get('project').get('project_dir')
-    if project_dir == '': project_dir = os.getcwd()
+    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
     error_threshold_tracking = config.get('personAssociation').get('error_threshold_tracking')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
-    calib_dir = os.path.join(project_dir, 'Calibration')
-    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     
     # Error
     mean_error_px = np.around(np.mean(error), decimals=1)
@@ -215,7 +218,7 @@ def recap_tracking(config, error, nb_cams_excluded):
     # Recap
     logging.info(f'\n--> Mean reprojection error for {tracked_keypoint} point on all frames is {mean_error_px} px, which roughly corresponds to {mean_error_mm} mm. ')
     logging.info(f'--> In average, {mean_cam_off_count} cameras had to be excluded to reach the demanded {error_threshold_tracking} px error threshold.')
-    logging.info(f'\nTracked json files are stored in {poseTracked_dir}.')
+    logging.info(f'\nTracked json files are stored in {os.path.realpath(poseTracked_dir)}.')
     
 
 def track_2d_all(config):
@@ -240,13 +243,13 @@ def track_2d_all(config):
     
     # Read config
     project_dir = config.get('project').get('project_dir')
-    if project_dir == '': project_dir = os.getcwd()
+    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     pose_model = config.get('pose').get('pose_model')
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
     frame_range = config.get('project').get('frame_range')
     
-    calib_dir = os.path.join(project_dir, 'Calibration')
-    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     pose_dir = os.path.join(project_dir, 'pose')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
 

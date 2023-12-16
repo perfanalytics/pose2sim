@@ -172,31 +172,13 @@ def read_config_files(config):
     return level, config_dicts
 
 
-def base_params(config_dict, level):
-    '''
-    Retrieve sequence name and frames to be analyzed.
-    '''
-
-    project_dir = os.getcwd()
-    frame_range = config_dict.get('project').get('frame_range')
-    seq_name = os.path.basename(project_dir)
-    frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
-
-    log_dir = os.path.realpath([os.getcwd() if level==3 else os.path.join(os.getcwd(), '..') if level==2 else os.path.join(os.getcwd(), '..', '..')][0])
-    with open(os.path.join(log_dir, 'logs.txt'), 'a+') as log_f: pass
-    logging.basicConfig(format='%(message)s', level=logging.INFO, 
-        handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(log_dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
-
-    return project_dir, seq_name, frames
-
-
 def calibration(config=None):
     '''
     Cameras calibration from checkerboards or from qualisys files.
     
     config can be a dictionary,
-    or a trial, participant, or session directory path,
-    or the function can be called without an argument, in which case it is the current directory.
+    or a the directory path of a trial, participant, or session,
+    or the function can be called without an argument, in which case it the config directory is the current one.
     '''
 
     from Pose2Sim.calibration import calibrate_cams_all
@@ -209,7 +191,7 @@ def calibration(config=None):
     # Set up logging
     setup_logging(session_dir)  
     
-    # Path to the calibration directory
+    # Run calibration
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
     logging.info("\n\n---------------------------------------------------------------------")
     logging.info("Camera calibration")
@@ -227,7 +209,9 @@ def poseEstimation(config=None):
     '''
     Estimate pose using BlazePose, OpenPose, AlphaPose, or DeepLabCut.
     
-    config can either be a path or a dictionary (for batch processing)
+    config can be a dictionary,
+    or a the directory path of a trial, participant, or session,
+    or the function can be called without an argument, in which case it the config directory is the current one.
     '''
     
     raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
@@ -257,7 +241,9 @@ def synchronization(config=None):
     '''
     Synchronize cameras if needed.
     
-    config can either be a path or a dictionary (for batch processing)
+    config can be a dictionary,
+    or a the directory path of a trial, participant, or session,
+    or the function can be called without an argument, in which case it the config directory is the current one.
     '''   
 
     raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
@@ -285,10 +271,12 @@ def synchronization(config=None):
     
 def personAssociation(config=None):
     '''
-    Tracking of the person of interest in case of multiple persons detection.
+    Tracking one or several persons of interest.
     Needs a calibration file.
     
-    config can either be a path or a dictionary (for batch processing)
+    config can be a dictionary,
+    or a the directory path of a trial, participant, or session,
+    or the function can be called without an argument, in which case it the config directory is the current one.
     '''
     
     from Pose2Sim.personAssociation import track_2d_all
@@ -299,11 +287,97 @@ def personAssociation(config=None):
         if config_dict.get('project').get('project_dir') == None:
             raise ValueError('Please specify the project directory in config_dict:\n \
                              config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
-
     else:
         # Determine the level at which the function is called (session:3, participant:2, trial:1)
-        level = determine_level()
-        config_dicts = read_config_files(level)
+        level, config_dicts = read_config_files(config)
+
+    # Set up logging
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    setup_logging(session_dir)    
+
+    # Batch process all trials
+    start = time.time()
+    for config_dict in config_dicts:
+        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        seq_name = os.path.basename(project_dir)
+        frame_range = config_dict.get('project').get('frame_range')
+        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+        
+        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info(f"Associating persons for {seq_name}, for {frames}.")
+        logging.info("---------------------------------------------------------------------")
+        logging.info(f"\nProject directory: {project_dir}")
+    
+        track_2d_all(config_dict)
+    
+    end = time.time()
+    logging.info(f'Associating persons took {end-start:.2f} s.')
+    
+    
+def triangulation(config=None):
+    '''
+    Robust triangulation of 2D points coordinates.
+    
+    config can be a dictionary,
+    or a the directory path of a trial, participant, or session,
+    or the function can be called without an argument, in which case it the config directory is the current one.
+    '''
+
+    from Pose2Sim.triangulation import triangulate_all
+
+    if type(config)==dict:
+        level = 3 # log_dir = os.getcwd()
+        config_dict = config
+        if config_dict.get('project').get('project_dir') == None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
+    else:
+        # Determine the level at which the function is called (session:3, participant:2, trial:1)
+        level, config_dicts = read_config_files(config)
+
+    # Set up logging
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    setup_logging(session_dir)    
+
+    # Batch process all trials
+    start = time.time()
+    for config_dict in config_dicts:
+        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        seq_name = os.path.basename(project_dir)
+        frame_range = config_dict.get('project').get('frame_range')
+        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+
+        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info(f"Triangulation of 2D points for {seq_name}, for {frames}.")
+        logging.info("---------------------------------------------------------------------")
+        logging.info(f"\nProject directory: {project_dir}")
+    
+        triangulate_all(config_dict)
+    
+    end = time.time()
+    logging.info(f'Associating persons took {end-start:.2f} s.')
+    
+    
+def filtering(config=None):
+    '''
+    Filter trc 3D coordinates.
+    
+    config can be a dictionary,
+    or a the directory path of a trial, participant, or session,
+    or the function can be called without an argument, in which case it the config directory is the current one.
+    '''
+
+    from Pose2Sim.filtering import filter_all
+
+    if type(config)==dict:
+        level = 3 # log_dir = os.getcwd()
+        config_dict = config
+        if config_dict.get('project').get('project_dir') == None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
+    else:
+        # Determine the level at which the function is called (session:3, participant:2, trial:1)
+        level, config_dicts = read_config_files(config)
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
@@ -311,88 +385,15 @@ def personAssociation(config=None):
 
     # Batch process all trials
     for config_dict in config_dicts:
-
-
-    project_dir, seq_name, frames = base_params(config_dict)
+        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        seq_name = os.path.basename(project_dir)
+        frame_range = config_dict.get('project').get('frame_range')
+        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
     
-    logging.info("\n\n---------------------------------------------------------------------")
-    logging.info(f"Tracking of the person of interest for {seq_name}, for {frames}.")
-    logging.info("---------------------------------------------------------------------")
-    logging.info(f"\nProject directory: {project_dir}")
-    start = time.time()
-    
-    track_2d_all(config_dict)
-    
-    end = time.time()
-    logging.info(f'Tracking took {end-start:.2f} s.')
-
-
-
-
-    session_dir = os.path.realpath([os.getcwd() if level==3 else os.path.join(os.getcwd(), '..') if level==2 else os.path.join(os.getcwd(), '..', '..')][0])
-    config_dict.get("project").update({"project_dir":session_dir})
-
-    
-    # Path to the calibration directory
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
-    logging.info("\n\n---------------------------------------------------------------------")
-    logging.info("Camera calibration")
-    logging.info("---------------------------------------------------------------------")
-    logging.info(f"\nCalibration directory: {calib_dir}")
-    start = time.time()
-    
-    calibrate_cams_all(config_dict)
-    
-    end = time.time()
-    logging.info(f'Calibration took {end-start:.2f} s.')
-    
-    
-def triangulation(config=None):
-    '''
-    Robust triangulation of 2D points coordinates.
-    
-    config can either be a path or a dictionary (for batch processing)
-    '''
-
-    from Pose2Sim.triangulation import triangulate_all
-
-    if type(config)==dict:
-        config_dict = config
-    else:
-        config_dict = read_config_files(config)
-    project_dir, seq_name, frames = base_params(config_dict)
-
-    logging.info("\n\n---------------------------------------------------------------------")
-    logging.info(f"Triangulation of 2D points for {seq_name}, for {frames}.")
-    logging.info("---------------------------------------------------------------------")
-    logging.info(f"\nProject directory: {project_dir}")
-    start = time.time()
-    
-    triangulate_all(config_dict)
-    
-    end = time.time()
-    logging.info(f'Triangulation took {end-start:.2f} s.')
-    
-    
-def filtering(config=None):
-    '''
-    Filter trc 3D coordinates.
-    
-    config can either be a path or a dictionary (for batch processing)
-    '''
-
-    from Pose2Sim.filtering import filter_all
-
-    if type(config)==dict:
-        config_dict = config
-    else:
-        config_dict = read_config_files(config)
-    project_dir, seq_name, frames = base_params(config_dict)
-    
-    logging.info("\n\n---------------------------------------------------------------------")
-    logging.info(f"Filtering 3D coordinates for {seq_name}, for {frames}.")
-    logging.info("---------------------------------------------------------------------")
-    logging.info(f"\nProject directory: {project_dir}")
+        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info(f"Filtering 3D coordinates for {seq_name}, for {frames}.")
+        logging.info("---------------------------------------------------------------------")
+        logging.info(f"\nProject directory: {project_dir}")
     
     filter_all(config_dict)
 
@@ -401,7 +402,9 @@ def scalingModel(config=None):
     '''
     Uses OpenSim to scale a model based on a static 3D pose.
     
-    config can either be a path or a dictionary (for batch processing)
+    config can be a dictionary,
+    or a the directory path of a trial, participant, or session,
+    or the function can be called without an argument, in which case it the config directory is the current one.
     '''
     
     raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
@@ -431,7 +434,9 @@ def inverseKinematics(config=None):
     '''
     Uses OpenSim to perform inverse kinematics.
     
-    config can either be a path or a dictionary (for batch processing)
+    config can be a dictionary,
+    or a the directory path of a trial, participant, or session,
+    or the function can be called without an argument, in which case it the config directory is the current one.
     '''
     
     raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
