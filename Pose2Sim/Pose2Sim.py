@@ -302,7 +302,7 @@ def personAssociation(config=None):
         seq_name = os.path.basename(project_dir)
         frame_range = config_dict.get('project').get('frame_range')
         frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
-        
+
         logging.info("\n\n---------------------------------------------------------------------")
         logging.info(f"Associating persons for {seq_name}, for {frames}.")
         logging.info("---------------------------------------------------------------------")
@@ -395,7 +395,7 @@ def filtering(config=None):
         logging.info("---------------------------------------------------------------------")
         logging.info(f"\nProject directory: {project_dir}")
     
-    filter_all(config_dict)
+        filter_all(config_dict)
 
 
 def scalingModel(config=None):
