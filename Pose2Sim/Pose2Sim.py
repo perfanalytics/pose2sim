@@ -280,16 +280,15 @@ def personAssociation(config=None):
     '''
     
     from Pose2Sim.personAssociation import track_2d_all
-    
+
+    # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    level, config_dicts = read_config_files(config)
+
     if type(config)==dict:
-        level = 3 # log_dir = os.getcwd()
-        config_dict = config
+        config_dict = config_dicts[0]
         if config_dict.get('project').get('project_dir') == None:
             raise ValueError('Please specify the project directory in config_dict:\n \
-                             config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
-    else:
-        # Determine the level at which the function is called (session:3, participant:2, trial:1)
-        level, config_dicts = read_config_files(config)
+                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
@@ -325,19 +324,18 @@ def triangulation(config=None):
 
     from Pose2Sim.triangulation import triangulate_all
 
+    # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    level, config_dicts = read_config_files(config)
+
     if type(config)==dict:
-        level = 3 # log_dir = os.getcwd()
-        config_dict = config
+        config_dict = config_dicts[0]
         if config_dict.get('project').get('project_dir') == None:
             raise ValueError('Please specify the project directory in config_dict:\n \
-                             config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
-    else:
-        # Determine the level at which the function is called (session:3, participant:2, trial:1)
-        level, config_dicts = read_config_files(config)
+                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
-    setup_logging(session_dir)    
+    setup_logging(session_dir)  
 
     # Batch process all trials
     start = time.time()
@@ -355,7 +353,7 @@ def triangulation(config=None):
         triangulate_all(config_dict)
     
     end = time.time()
-    logging.info(f'Associating persons took {end-start:.2f} s.')
+    logging.info(f'Triangulation took {end-start:.2f} s.')
     
     
 def filtering(config=None):
@@ -369,15 +367,18 @@ def filtering(config=None):
 
     from Pose2Sim.filtering import filter_all
 
+    # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    level, config_dicts = read_config_files(config)
+
     if type(config)==dict:
-        level = 3 # log_dir = os.getcwd()
-        config_dict = config
+        config_dict = config_dicts[0]
         if config_dict.get('project').get('project_dir') == None:
             raise ValueError('Please specify the project directory in config_dict:\n \
-                             config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
-    else:
-        # Determine the level at which the function is called (session:3, participant:2, trial:1)
-        level, config_dicts = read_config_files(config)
+                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+
+    # Set up logging
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    setup_logging(session_dir)
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
