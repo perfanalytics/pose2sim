@@ -244,11 +244,11 @@ def track_2d_all(config):
     # Read config
     project_dir = config.get('project').get('project_dir')
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
-    print('\n\n\nHLKAJHLKJHL\n\n', project_dir, session_dir, '\n\n\nHLKAJHLKJHL\n\n')
     pose_model = config.get('pose').get('pose_model')
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
     frame_range = config.get('project').get('frame_range')
     
+    print('\n\n\nHLKAJHLKJHL\n\n', project_dir, session_dir, '\n', os.listdir(session_dir), '\n\n\nHLKAJHLKJHL\n\n')
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     pose_dir = os.path.join(project_dir, 'pose')
