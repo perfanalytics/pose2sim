@@ -411,8 +411,8 @@ Output:\
 ### OpenSim Scaling
 1. Use the previous steps to capture a static pose, typically an A-pose or a T-pose.
 2. Open OpenSim.
-3. Open the provided `Model_Pose2Sim_Body25b.osim` model from `pose2sim/Empty_project/opensim`. *(File -> Open Model)*
-4. Load the provided `Scaling_Setup_Pose2Sim_Body25b.xml` scaling file from `pose2sim/Empty_project/opensim`. *(Tools -> Scale model -> Load)*
+3. Open the provided `Model_Pose2Sim_Body25b.osim` model from `Demo/OpenSim_Setup`. *(File -> Open Model)*
+4. Load the provided `Scaling_Setup_Pose2Sim_Body25b.xml` scaling file. *(Tools -> Scale model -> Load)*
 5. Replace the example static .trc file with your own data.
 6. Run
 7. Save the new scaled OpenSim model.
@@ -420,10 +420,9 @@ Output:\
 ### OpenSim Inverse kinematics
 1. Use Pose2Sim to generate 3D trajectories.
 2. Open OpenSim.
-3. Load the provided `IK_Setup_Pose2Sim_Body25b.xml` scaling file from `pose2sim/Empty_project/opensim`. *(Tools -> Inverse kinematics -> Load)*
+3. Load the provided `IK_Setup_Pose2Sim_Body25b.xml` scaling file from `Demo/OpenSim_Setup`. *(Tools -> Inverse kinematics -> Load)*
 4. Replace the example .trc file with your own data, and specify the path to your angle kinematics output file.
 5. Run
-6. Motion results will appear as .mot file in the `pose2sim/Empty_project/opensim` directory (automatically saved).
 
 <img src="Content/OpenSim.JPG" width="380">
 
