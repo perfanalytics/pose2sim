@@ -386,7 +386,7 @@
 			<!--TRC file (.trc) containing the marker positions used for measurement-based scaling. This is usually a static trial, but doesn't need to be.  The marker-pair distances are computed for each time step in the TRC file and averaged across the time range.-->
 			<marker_file>../S00_Demo_Session/S00_P00_Participant/S00_P00_T00_StaticTrial/pose-3d/S00_P00_T00_StaticTrial_0-12.trc</marker_file>
 			<!--Time range over which to average marker-pair distances in the marker file (.trc) for measurement-based scaling.-->
-			<time_range> 0.016666666666666666 0.4166666666666667 </time_range>
+			<time_range> 0.0166663666666666666 0.4166666666666667 </time_range>
 			<!--Flag (true or false) indicating whether or not to preserve relative mass between segments.-->
 			<preserve_mass_distribution>true</preserve_mass_distribution>
 			<!--Name of OpenSim model file (.osim) to write when done scaling.-->

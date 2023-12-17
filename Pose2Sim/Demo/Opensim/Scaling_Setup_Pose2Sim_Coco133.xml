@@ -589,7 +589,7 @@
 			<!--Name of the motion file (.mot) written after marker relocation (optional).-->
 			<output_motion_file>Unassigned</output_motion_file>
 			<!--Output OpenSim model file (.osim) after scaling and maker placement.-->
-			<output_model_file>Model_Pose2Sim_Body135_scaled.osim</output_model_file>
+			<output_model_file>../S00_Demo_Session/S00_P00_Participant/S00_P00_OpenSim/Model_Pose2Sim_S00_P00_Coco133_scaled.osim</output_model_file>
 			<!--Output marker set containing the new marker locations after markers have been placed.-->
 			<output_marker_file>Unassigned</output_marker_file>
 			<!--Maximum amount of movement allowed in marker data when averaging frames of the static trial. A negative value means there is not limit.-->

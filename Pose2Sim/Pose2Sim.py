@@ -217,24 +217,36 @@ def poseEstimation(config=None):
     raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
     
     # TODO
-    from Pose2Sim.poseEstimation import pose_estimation_all
-    
+    # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    level, config_dicts = read_config_files(config)
+
     if type(config)==dict:
-        config_dict = config
-    else:
-        config_dict = read_config_files(config)
-    project_dir, seq_name, frames = base_params(config_dict)
+        config_dict = config_dicts[0]
+        if config_dict.get('project').get('project_dir') == None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+
+    # Set up logging
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    setup_logging(session_dir)    
+
+    # Batch process all trials
+    for config_dict in config_dicts:
+        start = time.time()
+        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        seq_name = os.path.basename(project_dir)
+        frame_range = config_dict.get('project').get('frame_range')
+        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+
+        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info("Camera synchronization")
+        logging.info("---------------------------------------------------------------------")
+        logging.info(f"\nProject directory: {project_dir}")
     
-    logging.info("\n\n---------------------------------------------------------------------")
-    logging.info("Pose estimation")
-    logging.info("---------------------------------------------------------------------")
-    logging.info(f"\nProject directory: {project_dir}")
-    start = time.time()
-    
-    pose_estimation_all(config_dict)
-    
-    end = time.time()
-    logging.info(f'Pose estimation took {end-start:.2f} s.')
+        pose_estimation_all(config_dict)
+        
+        end = time.time()
+        logging.info(f'Pose estimation took {end-start:.2f} s.')
     
 
 def synchronization(config=None):
@@ -249,24 +261,36 @@ def synchronization(config=None):
     raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
     
     #TODO
-    from Pose2Sim.synchronization import synchronize_cams_all
-    
+    # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    level, config_dicts = read_config_files(config)
+
     if type(config)==dict:
-        config_dict = config
-    else:
-        config_dict = read_config_files(config)
-    project_dir, seq_name, frames = base_params(config_dict)
+        config_dict = config_dicts[0]
+        if config_dict.get('project').get('project_dir') == None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+
+    # Set up logging
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    setup_logging(session_dir)    
+
+    # Batch process all trials
+    for config_dict in config_dicts:
+        start = time.time()
+        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        seq_name = os.path.basename(project_dir)
+        frame_range = config_dict.get('project').get('frame_range')
+        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+
+        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info("Camera synchronization")
+        logging.info("---------------------------------------------------------------------")
+        logging.info(f"\nProject directory: {project_dir}")
+        
+        synchronize_cams_all(config_dict)
     
-    logging.info("\n\n---------------------------------------------------------------------")
-    logging.info("Camera synchronization")
-    logging.info("---------------------------------------------------------------------")
-    logging.info(f"\nProject directory: {project_dir}")
-    start = time.time()
-    
-    synchronize_cams_all(config_dict)
-    
-    end = time.time()
-    logging.info(f'Synchronization took {end-start:.2f} s.')    
+        end = time.time()
+        logging.info(f'Synchronization took {end-start:.2f} s.')    
     
     
 def personAssociation(config=None):
@@ -295,8 +319,8 @@ def personAssociation(config=None):
     setup_logging(session_dir)    
 
     # Batch process all trials
-    start = time.time()
     for config_dict in config_dicts:
+        start = time.time()
         project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
         seq_name = os.path.basename(project_dir)
         frame_range = config_dict.get('project').get('frame_range')
@@ -309,8 +333,8 @@ def personAssociation(config=None):
     
         track_2d_all(config_dict)
     
-    end = time.time()
-    logging.info(f'Associating persons took {end-start:.2f} s.')
+        end = time.time()
+        logging.info(f'Associating persons took {end-start:.2f} s.')
     
     
 def triangulation(config=None):
@@ -338,8 +362,8 @@ def triangulation(config=None):
     setup_logging(session_dir)  
 
     # Batch process all trials
-    start = time.time()
     for config_dict in config_dicts:
+        start = time.time()
         project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
         seq_name = os.path.basename(project_dir)
         frame_range = config_dict.get('project').get('frame_range')
@@ -399,9 +423,10 @@ def filtering(config=None):
         filter_all(config_dict)
 
 
-def scalingModel(config=None):
+def opensimProcessing(config=None):
     '''
-    Uses OpenSim to scale a model based on a static 3D pose.
+    Uses OpenSim to run scaling based on a static trc pose
+    and inverse kinematics based on a trc motion file.
     
     config can be a dictionary,
     or a the directory path of a trial, participant, or session,
@@ -411,53 +436,39 @@ def scalingModel(config=None):
     raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
     
     # TODO
-    from Pose2Sim.scalingModel import scale_model_all
+    from Pose2Sim.opensimProcessing import opensim_processing_all
     
+    # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    level, config_dicts = read_config_files(config)
+
     if type(config)==dict:
-        config_dict = config
-    else:
-        config_dict = read_config_files(config)
-    project_dir, seq_name, frames = base_params(config_dict)
+        config_dict = config_dicts[0]
+        if config_dict.get('project').get('project_dir') == None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+
+    # Set up logging
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    setup_logging(session_dir)    
+
+    # Batch process all trials
+    for config_dict in config_dicts:
+        start = time.time()
+        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        seq_name = os.path.basename(project_dir)
+        frame_range = config_dict.get('project').get('frame_range')
+        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+
+        logging.info("\n\n---------------------------------------------------------------------")
+        # if static_file in project_dir: 
+        #     logging.info(f"Scaling model with <STATIC TRC FILE>.")
+        # else:
+        #     logging.info(f"Running inverse kinematics <MOTION TRC FILE>.")
+        logging.info("---------------------------------------------------------------------")
+        logging.info(f"\nOpenSim output directory: {project_dir}")
+   
+        opensim_processing_all(config_dict)
     
-    logging.info("\n\n---------------------------------------------------------------------")
-    logging.info("Scaling model")
-    logging.info("---------------------------------------------------------------------")
-    logging.info(f"\nProject directory: {project_dir}")
-    start = time.time()
+        end = time.time()
+        logging.info(f'Model scaling took {end-start:.2f} s.')
     
-    scale_model_all(config_dict)
-    
-    end = time.time()
-    logging.info(f'Model scaling took {end-start:.2f} s.')
-    
-    
-def inverseKinematics(config=None):
-    '''
-    Uses OpenSim to perform inverse kinematics.
-    
-    config can be a dictionary,
-    or a the directory path of a trial, participant, or session,
-    or the function can be called without an argument, in which case it the config directory is the current one.
-    '''
-    
-    raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
-    
-    # TODO
-    from Pose2Sim.inverseKinematics import inverse_kinematics_all
-    
-    if type(config)==dict:
-        config_dict = config
-    else:
-        config_dict = read_config_files(config)
-    project_dir, seq_name, frames = base_params(config_dict)
-    
-    logging.info("\n\n---------------------------------------------------------------------")
-    logging.info("Inverse kinematics")
-    logging.info("---------------------------------------------------------------------")
-    logging.info(f"\nProject directory: {project_dir}")
-    start = time.time()
-    
-    inverse_kinematics_all(config_dict)
-    
-    end = time.time()
-    logging.info(f'Inverse kinematics took {end-start:.2f} s.')

@@ -153,7 +153,7 @@
 
 
 # [opensim]
-# static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
+# static_trial = ['S01_P01_Participant1/S01_P01_T00_StaticTrial']
 #              # If this Config.toml file is at the Trial level, set to true or false (lowercase);
 #              # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
 #              # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']
