@@ -244,6 +244,7 @@ def track_2d_all(config):
     # Read config
     project_dir = config.get('project').get('project_dir')
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
+    print('\n\n\nHLKAJHLKJHL\n\n', project_dir, session_dir, '\n\n\nHLKAJHLKJHL\n\n')
     pose_model = config.get('pose').get('pose_model')
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
     frame_range = config.get('project').get('frame_range')
