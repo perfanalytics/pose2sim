@@ -11,7 +11,10 @@
     Which is the one of interest?
     
     This module tries all possible triangulations of a chosen anatomical 
-    point, and chooses the person for whom the reprojection error is smallest.
+    point. If "single_person" mode is used, it chooses the person for whom the 
+    reprojection error is smallest. If multi-person is used, it selects all 
+    persons with a reprojection error smaller than a threshold, and then 
+    associates them across time frames by minimizing the displacement speed.
     
     INPUTS: 
     - a calibration file (.toml extension)
@@ -193,14 +196,12 @@ def recap_tracking(config, error, nb_cams_excluded):
     
     # Read config
     project_dir = config.get('project').get('project_dir')
-    if project_dir == '': project_dir = os.getcwd()
-    poseTracked_folder_name = config.get('project').get('poseAssociated_folder_name')
-    calib_folder_name = config.get('project').get('calib_folder_name')
+    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
     error_threshold_tracking = config.get('personAssociation').get('error_threshold_tracking')
-    poseTracked_dir = os.path.join(project_dir, poseTracked_folder_name)
-    calib_dir = os.path.join(project_dir, calib_folder_name)
-    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
+    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     
     # Error
     mean_error_px = np.around(np.mean(error), decimals=1)
@@ -217,7 +218,7 @@ def recap_tracking(config, error, nb_cams_excluded):
     # Recap
     logging.info(f'\n--> Mean reprojection error for {tracked_keypoint} point on all frames is {mean_error_px} px, which roughly corresponds to {mean_error_mm} mm. ')
     logging.info(f'--> In average, {mean_cam_off_count} cameras had to be excluded to reach the demanded {error_threshold_tracking} px error threshold.')
-    logging.info(f'\nTracked json files are stored in {poseTracked_dir}.')
+    logging.info(f'\nTracked json files are stored in {os.path.realpath(poseTracked_dir)}.')
     
 
 def track_2d_all(config):
@@ -242,19 +243,15 @@ def track_2d_all(config):
     
     # Read config
     project_dir = config.get('project').get('project_dir')
-    if project_dir == '': project_dir = os.getcwd()
-    calib_folder_name = config.get('project').get('calib_folder_name')
-    poseTracked_folder_name = config.get('project').get('poseAssociated_folder_name')
-    pose_folder_name = config.get('project').get('pose_folder_name')
+    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     pose_model = config.get('pose').get('pose_model')
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
-    json_folder_extension =  config.get('project').get('pose_json_folder_extension')
     frame_range = config.get('project').get('frame_range')
     
-    calib_dir = os.path.join(project_dir, calib_folder_name)
-    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
-    pose_dir = os.path.join(project_dir, pose_folder_name)
-    poseTracked_dir = os.path.join(project_dir, poseTracked_folder_name)
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
+    pose_dir = os.path.join(project_dir, 'pose')
+    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
 
     # projection matrix from toml calibration file
     P = computeP(calib_file)
@@ -274,7 +271,7 @@ def track_2d_all(config):
     # 2d-pose files selection
     pose_listdirs_names = next(os.walk(pose_dir))[1]
     pose_listdirs_names = natural_sort(pose_listdirs_names)
-    json_dirs_names = [k for k in pose_listdirs_names if json_folder_extension in k]
+    json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
     json_files_names = [natural_sort(j) for j in json_files_names]
     json_files = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]

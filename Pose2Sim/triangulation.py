@@ -10,12 +10,15 @@
     This module triangulates 2D json coordinates and builds a .trc file readable 
     by OpenSim.
     
-    The triangulation is weighted by the likelihood of each detected 2D keypoint,
-    strives to meet the reprojection error threshold and the likelihood threshold.
-    Missing values are then interpolated.
+    The triangulation is weighted by the likelihood of each detected 2D keypoint 
+    (if they meet the likelihood threshold). It the reprojection error is above a
+    threshold, right and left sides are swapped; if it is still above, a camera 
+    is removed for this point and this frame, until the threshold is met. If more 
+    cameras are removed than a predefined minimum, triangulation is skipped for 
+    the point and this frame. In the end, missing values are interpolated.
 
-    In case of multiple subjects detection, make sure you first run the track_2d 
-    module.
+    In case of multiple subjects detection, make sure you first run the 
+    personAssociation module.
 
     INPUTS: 
     - a calibration file (.toml extension)
@@ -142,11 +145,9 @@ def make_trc(config, Q, keypoints_names, f_range):
 
     # Read config
     project_dir = config.get('project').get('project_dir')
-    if project_dir == '': project_dir = os.getcwd()
     frame_rate = config.get('project').get('frame_rate')
-    seq_name = os.path.basename(project_dir)
-    pose3d_folder_name = config.get('project').get('pose3d_folder_name')
-    pose3d_dir = os.path.join(project_dir, pose3d_folder_name)
+    seq_name = os.path.basename(os.path.realpath(project_dir))
+    pose3d_dir = os.path.join(project_dir, 'pose-3d')
 
     trc_f = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
 
@@ -169,7 +170,7 @@ def make_trc(config, Q, keypoints_names, f_range):
 
     #Write file
     if not os.path.exists(pose3d_dir): os.mkdir(pose3d_dir)
-    trc_path = os.path.join(pose3d_dir, trc_f)
+    trc_path = os.path.realpath(os.path.join(pose3d_dir, trc_f))
     with open(trc_path, 'w') as trc_o:
         [trc_o.write(line+'\n') for line in header_trc]
         Q.to_csv(trc_o, sep='\t', index=True, header=None, lineterminator='\n')
@@ -195,10 +196,9 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
 
     # Read config
     project_dir = config.get('project').get('project_dir')
-    if project_dir == '': project_dir = os.getcwd()
-    calib_folder_name = config.get('project').get('calib_folder_name')
-    calib_dir = os.path.join(project_dir, calib_folder_name)
-    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
+    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     calib = toml.load(calib_file)
     cam_names = np.array([calib[c].get('name') for c in list(calib.keys())])
     cam_names = cam_names[list(cam_excluded_count.keys())]
@@ -407,21 +407,18 @@ def triangulate_all(config):
     
     # Read config
     project_dir = config.get('project').get('project_dir')
-    if project_dir == '': project_dir = os.getcwd()
-    calib_folder_name = config.get('project').get('calib_folder_name')
+    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     pose_model = config.get('pose').get('pose_model')
-    pose_folder_name = config.get('project').get('pose_folder_name')
-    json_folder_extension =  config.get('project').get('pose_json_folder_extension')
     frame_range = config.get('project').get('frame_range')
     likelihood_threshold = config.get('triangulation').get('likelihood_threshold')
     interpolation_kind = config.get('triangulation').get('interpolation')
     interp_gap_smaller_than = config.get('triangulation').get('interp_if_gap_smaller_than')
     show_interp_indices = config.get('triangulation').get('show_interp_indices')
-    pose_dir = os.path.join(project_dir, pose_folder_name)
-    poseTracked_folder_name = config.get('project').get('poseAssociated_folder_name')
-    calib_dir = os.path.join(project_dir, calib_folder_name)
-    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0]
-    poseTracked_dir = os.path.join(project_dir, poseTracked_folder_name)
+
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
+    pose_dir = os.path.join(project_dir, 'pose')
+    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
     
     # Projection matrix from toml calibration file
     P = computeP(calib_file)
@@ -444,7 +441,7 @@ def triangulate_all(config):
     # 2d-pose files selection
     pose_listdirs_names = next(os.walk(pose_dir))[1]
     pose_listdirs_names = natural_sort(pose_listdirs_names)
-    json_dirs_names = [k for k in pose_listdirs_names if json_folder_extension in k]
+    json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     try: 
         json_files_names = [fnmatch.filter(os.listdir(os.path.join(poseTracked_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
         json_files_names = [natural_sort(j) for j in json_files_names]
@@ -473,6 +470,14 @@ def triangulate_all(config):
         # # Points are undistorted and better triangulated, however reprojection error is not accurate if points are not distorted again prior to reprojection
         # # This is good for slight distortion. For fishey camera, the model does not work anymore. See there for an example https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301
         
+        # # undistort points draft: start with
+        # points = [np.array(tuple(zip(x_files[i],y_files[i]))).reshape(-1, 1, 2) for i in range(n_cams)]
+        # # calculate optimal matrix optimal_mat cf https://stackoverflow.com/a/76635257/12196632
+        # undistorted_points = [cv2.undistortPoints(points[i], K[i], distortions[i], None, optimal_mat[i]) for i in range(n_cams)]
+        # # then put back into original shape of x_files, y_files 
+        # # Points are undistorted and better triangulated, however reprojection error is not accurate if points are not distorted again prior to reprojection
+        # # This is good for slight distortion. For fishey camera, the model does not work anymore. See there for an example https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301
+
         # Replace likelihood by 0 if under likelihood_threshold
         with np.errstate(invalid='ignore'):
             likelihood_files[likelihood_files<likelihood_threshold] = 0.

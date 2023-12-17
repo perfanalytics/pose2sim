@@ -64,7 +64,7 @@ def DLC_to_OpenPose_func(*args):
     if not os.path.exists(json_folder_path):    
         os.mkdir(json_folder_path)
 
-  # json preparation
+    # json preparation
     json_dict = {'version':1.3, 'people':[]}
     json_dict['people'] = [{'person_id':[-1], 
                     'pose_keypoints_2d': [], 

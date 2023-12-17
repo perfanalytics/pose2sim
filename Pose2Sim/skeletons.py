@@ -451,4 +451,3 @@ MPII = Node("CHip", id=14, children=[
         ]),
     ]),
 ])
-
