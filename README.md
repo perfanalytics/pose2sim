@@ -29,13 +29,17 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 
 <img src='Content/Activities_verylow.gif' title='Other more or less challenging tasks and conditions.' width="760">
 
+</br>
+
 # Contents
 1. [Installation and Demonstration](#installation-and-demonstration)
    1. [Installation](#installation)
    2. [Demonstration Part-1: Build 3D TRC file on Python](#demonstration-part-1-build-3d-trc-file-on-python)
    3. [Demonstration Part-2: Obtain 3D joint angles with OpenSim](#demonstration-part-2-obtain-3d-joint-angles-with-opensim)
 2. [Use on your own data](#use-on-your-own-data)
-   1. [Folder structure](#folder-structure)
+   1. [Setting your project up](#setting-your-project-up)
+      1. [Retrieve the folder structure](#retrieve-the-folder-structure)
+      2. [Batch processing](#batch-processing)
    2. [Camera calibration](#camera-calibration)
       1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
@@ -54,11 +58,12 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
       1. [OpenSim Scaling](#opensim-scaling)
       2. [OpenSim Inverse kinematics](#opensim-inverse-kinematics)
       3. [Command Line](#command-line)
-   7. [Batch processing](#batch-processing)
 3. [Utilities](#utilities)
 4. [How to cite and how to contribute](#how-to-cite-and-how-to-contribute)
    1. [How to cite](#how-to-cite)
    2. [How to contribute and to-do list](#how-to-contribute-and-to-do-list)
+
+</br>
 
 # Installation and Demonstration
 
@@ -86,7 +91,9 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.8
        cd pose2sim
        pip install .
        ```
-          
+
+</br>
+
 ## Demonstration Part-1: Build 3D TRC file on Python  
 > _**This demonstration provides an example experiment of a person balancing on a beam, filmed with 4 calibrated cameras processed with OpenPose.**_ 
 
@@ -100,11 +107,12 @@ Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
 Pose2Sim.filtering()
 ```
-You should obtain a plot of all the 3D coordinates trajectories. You can check the logs in`Demo\Users\logs.txt`.\
-Results are stored as .trc files in the `Demo/pose-3d` directory.
+You should obtain a plot of all the 3D coordinates trajectories.\
+3D results are stored as .trc files in each trial folder in the `pose-3d` directory.
 
-*N.B.:* Default parameters have been provided in [Demo\User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/User/Config.toml) but can be edited.\
+*N.B.:* Default parameters have been provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S00_Demo_Session/Config.toml) but can be edited.\
 *N.B.:* *Try calibration tool by changing `calibration_type` to `calculate` instead of `convert` (more info [there](#calculate-from-scratch)).*
+
 <br/>
 
 ## Demonstration Part-2: Obtain 3D joint angles with OpenSim  
@@ -112,54 +120,62 @@ Results are stored as .trc files in the `Demo/pose-3d` directory.
 
 ### Scaling
 1. Open OpenSim.
-2. Open the provided `Model_Pose2Sim_Body25b.osim` model from `pose2sim/Demo/opensim`. *(File -> Open Model)*
-3. Load the provided `Scaling_Setup_Pose2Sim_Body25b.xml` scaling file from `pose2sim/Demo/opensim`. *(Tools -> Scale model -> Load)*
+2. Open the provided `Model_Pose2Sim_Body25b.osim` model from `Pose2Sim/Demo/OpenSim`. *(File -> Open Model)*
+3. Load the provided `Scaling_Setup_Pose2Sim_Body25b.xml` scaling file from `Pose2Sim/Demo/OpenSim`. *(Tools -> Scale model -> Load)*
 4. Run. You should see your skeletal model take the static pose.
 
 ### Inverse kinematics
-1. Load the provided `IK_Setup_Pose2Sim_Body25b.xml` scaling file from `pose2sim/Demo/opensim`. *(Tools -> Inverse kinematics -> Load)*
+1. Load the provided `IK_Setup_Pose2Sim_Body25b.xml` scaling file from `Pose2Sim/Demo/OpenSim`. *(Tools -> Inverse kinematics -> Load)*
 2. Run. You should see your skeletal model move in the Vizualizer window.
 <br/>
+
+<p style="text-align: center;"><img src="Content/OpenSim.JPG" width="380"></p>
+
+</br></br>
 
 # Use on your own data
 
 > _**Deeper explanations and instructions are given below.**_ \
 > N.B.: If a step is not relevant for your use case (synchronization, person association, etc), you can skip it.
 
-## Folder structure
-  > _**Get ready.**_
+</br>
+
+## Setting your project up
+  > _**Get ready for automatic batch processing.**_
   
+### Retrieve the folder structure
   1. Open a terminal, enter `pip show pose2sim`, report package location. \
-     Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo\S01_Empty_Session`.
-  2. Edit the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file as needed, **especially regarding the path to your project**. 
-  3. Populate the `videos` folder with your videos.
-  
-       <pre>
-       Project
-       │
-       ├──opensim
-       │    ├──Geometry
-       │    ├──Model_Pose2Sim_Body25b.osim
-       │    ├──Scaling_Setup_Pose2Sim_Body25b.xml
-       │    └──IK_Setup_Pose2Sim_Body25b.xml
-       │        
-       ├── <b>videos
-       │    ├──vid_cam1.mp4 (or other extension)
-       │    ├──...
-       │    └──vid_camN.mp4</b>
-       │
-       └──User
-           └──Config.toml
-       </b>
-    
+     Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo`.
+  2. Copy this folder wherever you like, and rename it as you wish. 
+  3. The rest of the tutorial will explain to you how to populate the `Calibration` and `videos` folders, edit the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) files, and run each Pose2Sim step.
+
+</br>
+
+### Batch processing
+  Each session folder should follow a `Session -> Participant -> Trial` structure, with a `Config.toml` file in each of the directory levels:
+
+<pre>
+Session_s1         \ <i><b>Config.toml</i></b>
+├── Calibration\ 
+└── Participant_p1 \ <i><b>Config.toml</i></b>
+    └── Trial_t1   \ <i><b>Config.toml</i></b>
+</pre>
+
+Run Pose2Sim from the `Session` folder if you want to batch process the whole session, from the `Participant` folder if you want to batch process all the trials of a participant, or from the `Trial` folder if you want to process a single trial.
+
+Global instructions are given in the Config.toml file of the `Session` folder, and can be altered for specific `Participants` or `Trials` by uncommenting keys and their values in their respective Config.toml files.\
+Try uncommenting `[project]` and set `frame_range = [10,300]` for a Participant for example, or uncomment `[filtering.butterworth]` and set `cut_off_frequency = 10` for a Trial.
+
+</br>
 
 ## Camera calibration
 > _**Calculate camera intrinsic properties and extrinsic locations and positions.\
 > Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ \
 > _**N.B.:**_ You can visualize camera calibration in 3D with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
-Open an Anaconda prompt or a terminal, type `ipython`.\
-By default, `calibration()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.calibration(r'path_to_config.toml')`.
+Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Type `ipython`.
+
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -170,50 +186,52 @@ Output:\
 <img src="Content/Calib2D.png" width="760">
 <img src="Content/CalibFile.png" width="760">
 
+
 ### Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
 
-If you already have a calibration file, set `calibration_type` type to `convert` in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
+If you already have a calibration file, set `calibration_type` type to `convert` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 - **From [Qualisys](https://www.qualisys.com):**
   - Export calibration to `.qca.txt` within QTM.
-  - Copy it in the `calibration` Pose2Sim folder.
-  - set `convert_from` to 'qualisys' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
+  - Copy it in the `Calibration` Pose2Sim folder.
+  - set `convert_from` to 'qualisys' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
 - **From [Optitrack](https://optitrack.com/):** Exporting calibration will be available in Motive 3.2. In the meantime:
   - Calculate intrinsics with a board (see next section).
   - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28).
   - Use the `Calib.toml` file as is and do not run Pose2Sim.calibration()
 - **From [Vicon](http://www.vicon.com/Software/Nexus):**  
   - Copy your `.xcp` Vicon calibration file to the Pose2Sim `Calibration` folder.
-  - set `convert_from` to 'vicon' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
+  - set `convert_from` to 'vicon' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file. No other setting is needed.
 - **From [OpenCap](https://www.opencap.ai/):**  
   - Copy your `.pickle` OpenCap calibration files to the Pose2Sim `Calibration` folder.
-  - set `convert_from` to 'opencap' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
+  - set `convert_from` to 'opencap' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file. No other setting is needed.
 - **From [EasyMocap](https://github.com/zju3dv/EasyMocap/):**  
   - Copy your `intri.yml` and `extri.yml` files to the Pose2Sim `Calibration` folder.
-  - set `convert_from` to 'easymocap' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
+  - set `convert_from` to 'easymocap' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file. No other setting is needed.
 - **From [bioCV](https://github.com/camera-mc-dev/.github/blob/main/profile/mocapPipe.md):**  
   - Copy your bioCV calibration files (no extension) to the Pose2Sim `Calibration` folder.
-  - set `convert_from` to 'biocv' in your [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file. No other setting is needed.
+  - set `convert_from` to 'biocv' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file. No other setting is needed.
 - **From [AniPose](https://github.com/lambdaloop/anipose) or [FreeMocap](https://github.com/freemocap/freemocap):**  
   - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
   - Calibration can be skipped since Pose2Sim uses the same [Aniposelib](https://anipose.readthedocs.io/en/latest/aniposelibtutorial.html) format.
 
+</br>
 
 ### Calculate from scratch
 
 > _**Calculate calibration parameters with a checkerboard, with measurements on the scene, or automatically with detected keypoints.**_\
 > Take heart, it is not that complicated once you get the hang of it!
 
-  > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml).\
+  > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml).\
   For the sake of practicality, there are voluntarily few board images for intrinsic calibration, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm#:~:text=Angle%20results%20were,Table%203).).
   
   - **Calculate intrinsic parameters with a checkerboard:**
 
     > *N.B.:* _Intrinsic parameters:_ camera properties (focal length, optical center, distortion), usually need to be calculated only once in their lifetime. In theory, cameras with same model and same settings will have identical intrinsic parameters.\
-    > *N.B.:* If you already calculated intrinsic parameters earlier, you can skip this step. Copy your intrinsic parameters (`size`, `mat`, and `dist`) in a new `Calib*.toml` file, and set `overwrite_intrinsics` to false. Run Demo to obtain an example `Calib.toml` file.
+    > *N.B.:* If you already calculated intrinsic parameters earlier, you can skip this step by setting `overwrite_intrinsics` to false.
 
     - Create a folder for each camera in your `calibration\intrinsics` folder.
     - For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
-    - Adjust parameters in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
+    - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file.
     - Make sure that the board:
       - is filmed from different angles, covers a large part of the video frame, and is in focus.
       - is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
@@ -227,10 +245,10 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
   > *N.B.:* _Extrinsic parameters:_ camera placement in space (position and orientation), need to be calculated every time a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates.
 
-  - Create a folder for each camera in your `calibration\extrinsics` folder.
+  - Create a folder for each camera in your `Calibration\extrinsics` folder.
   - Once your cameras are in place, shortly film either a board laid on the floor, or the raw scene\
   (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format).
-  - Adjust parameters in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
+  - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file.
   - Then,
     - **With a checkerboard:**\
       Make sure that it is seen by all cameras. \
@@ -246,44 +264,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
   
   ***Extrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.***
 
-
-<details>
-  <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
-    <pre>
-   Project
-   │
-   ├──<i><b>calibration
-   │   ├──intrinsics
-   │   │  ├──int_cam1_img
-   │   │  ├──...
-   │   │  └──int_camN_img
-   │   ├──extrinsics
-   │   │  ├──ext_cam1_img
-   │   │  ├──...
-   │   │  └──ext_camN_img
-   │   └──Calib.toml</i></b>
-   │
-   ├──opensim
-   │    ├──Geometry
-   │    ├──Model_Pose2Sim_Body25b.osim
-   │    ├──Scaling_Setup_Pose2Sim_Body25b.xml
-   │    └──IK_Setup_Pose2Sim_Body25b.xml
-   │
-   ├──pose-2d
-   │    ├──pose_cam1_json
-   │    ├──...
-   │    └──pose_camN_json
-   │        
-   ├── videos
-   │    ├──vid_cam1.mp4
-   │    ├──...
-   │    └──vid_camN.mp4
-   │
-   └──User
-       └──Config.toml
-   </pre>
-</details>
-
+</br>
 
 ## 2D pose estimation
 > _**Estimate 2D pose from images with Openpose or another pose estimation solution.**_ \
@@ -295,12 +276,12 @@ The accuracy and robustness of Pose2Sim have been thoroughly assessed only with 
 * Open a command prompt in your **OpenPose** directory. \
   Launch OpenPose for each `videos` folder: 
   ``` cmd
-  bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_PROJECT_DIR>\videos\vid_cam1.mp4 --write_json <PATH_TO_PROJECT_DIR>\pose\pose_cam1_json
+  bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_TRIAL_DIR>\videos\vid_cam1.mp4 --write_json <PATH_TO_TRIAL_DIR>\pose\pose_cam1_json
   ```
 * The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results than the standard BODY_25 one and has been extensively tested for Pose2Sim. \
 You can also use the [BODY_135 model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models), which allows for the evaluation of pronation/supination, wrist flexion, and wrist deviation.\
 All other OpenPose models (BODY_25, COCO, MPII) are also supported.\
-Make sure you modify the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file accordingly.
+Make sure you modify the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file accordingly.
 * Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
 
 **N.B.:** *OpenPose BODY_25B is the default 2D pose estimation model used in Pose2Sim. However, other skeleton models from other 2D pose estimation solutions can be used alternatively.* 
@@ -312,10 +293,10 @@ Make sure you modify the [User\Config.toml](https://github.com/perfanalytics/pos
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 * Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
   ``` cmd
-  python -m Blazepose_runsave -i rinput_file -dJs
+  python -m Blazepose_runsave -i input_file -dJs
   ```
   Type in `python -m Blazepose_runsave -h` for explanation on parameters.
-* Make sure you changed the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
+* Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file.
 
 ### With DeepLabCut:
 If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut).
@@ -324,7 +305,7 @@ If you need to detect specific points on a human being, an animal, or an object,
    ``` cmd
    python -m DLC_to_OpenPose -i input_h5_file
    ```
-3. Edit `pose.CUSTOM` in [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml), and edit the node ids so that they correspond to the column numbers of the 2D pose file, starting from zero. Make sure you also changed the `pose_model` and the `tracked_keypoint`.\
+3. Edit `pose.CUSTOM` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml), and edit the node ids so that they correspond to the column numbers of the 2D pose file, starting from zero. Make sure you also changed the `pose_model` and the `tracked_keypoint`.\
    You can visualize your skeleton's hierarchy by changing pose_model to CUSTOM and writing these lines: 
    ``` python
     config_path = r'path_to_Config.toml'
@@ -345,34 +326,9 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
    ``` cmd
    python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
    ```
-* Make sure you changed the `pose_model` and the `tracked_keypoint` in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
+* Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file.
 
-<details>
-  <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
-    <pre>
-   Project
-   │
-   ├──opensim
-   │    ├──Geometry
-   │    ├──Model_Pose2Sim_Body25b.osim
-   │    ├──Scaling_Setup_Pose2Sim_Body25b.xml
-   │    └──IK_Setup_Pose2Sim_Body25b.xml
-   │
-   <i><b>├──pose-2d
-   │    ├──pose_cam1_json
-   │    ├──...
-   │    └──pose_camN_json</i></b>
-   │        
-   ├── videos
-   │    ├──vid_cam1.mp4
-   │    ├──...
-   │    └──vid_camN.mp4
-   │
-   └──User
-       └──Config.toml
-   </pre>
-</details>
-
+</br>
 
 ## Camera synchronization
 
@@ -382,6 +338,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 If your cameras are not natively synchronized, you can use [this script](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/synchronize_cams_draft.py). This is still a draft, and will be updated in the future.\
 Alternatively, use a flashlight or a clap to synchronize them. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors) or with a remote control (slightly less reliable).
 
+</br>
 
 ## Tracking, Triangulating, Filtering
 
@@ -392,67 +349,26 @@ Alternatively, use a flashlight or a clap to synchronize them. GoPro cameras can
 > [Want to contribute?](#how-to-contribute) _**Allow for multiple person analysis.**_
 
 
-Open an Anaconda prompt or a terminal, type `ipython`.\
-By default, `personAssociation()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.personAssociation(r'path_to_config.toml')`.
+Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Type `ipython`.
 ``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.personAssociation()
 ```
 
-Check printed output. If results are not satisfying, try and release the constraints in the [User\Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
+Check printed output. If results are not satisfying, try and release the constraints in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file.
 
 Output:\
 <img src="Content/Track2D.png" width="760">
-
-<details>
-  <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
-    <pre>
-   Project
-   │
-   ├──calibration
-   │   ├──intrinsics
-   │   │  ├──int_cam1_img
-   │   │  ├──...
-   │   │  └──int_camN_img
-   │   ├──extrinsics
-   │   │  ├──ext_cam1_img
-   │   │  ├──...
-   │   │  └──ext_camN_img
-   │   └──Calib.toml
-   │
-   ├──opensim
-   │    ├──Geometry
-   │    ├──Model_Pose2Sim_Body25b.osim
-   │    ├──Scaling_Setup_Pose2Sim_Body25b.xml
-   │    └──IK_Setup_Pose2Sim_Body25b.xml
-   │
-   ├──pose-2d
-   │   ├──pose_cam1_json
-   │   ├──...
-   │   └──pose_camN_json
-   │
-   <i><b>├──pose-2d-tracked
-   │   ├──tracked_cam1_json
-   │   ├──...
-   │   └──tracked_camN_json</i></b>
-   │        
-   ├── videos
-   │    ├──vid_cam1.mp4
-   │    ├──...
-   │    └──vid_camN.mp4
-   │
-   └──User
-       └──Config.toml
-   </pre>
-</details>
    
+</br>
 
 ### Triangulating keypoints
 > _**Triangulate your 2D coordinates in a robust way.**_ \
 > _**N.B.:**_ You can visualize your resulting 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
-Open an Anaconda prompt or a terminal, type `ipython`.\
-By default, `triangulation()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.triangulation(r'path_to_config.toml')`.
+Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Type `ipython`.
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -465,122 +381,32 @@ If your triangulation is not satisfying, try and release the constraints in the 
 Output:\
 <img src="Content/Triangulate3D.png" width="760">
 
-
-<details>
-  <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
-    <pre>
-   Project
-   │
-   ├──calibration
-   │   ├──intrinsics
-   │   │  ├──int_cam1_img
-   │   │  ├──...
-   │   │  └──int_camN_img
-   │   ├──extrinsics
-   │   │  ├──ext_cam1_img
-   │   │  ├──...
-   │   │  └──ext_camN_img
-   │   └──Calib.toml
-   │
-   ├──opensim
-   │    ├──Geometry
-   │    ├──Model_Pose2Sim_Body25b.osim
-   │    ├──Scaling_Setup_Pose2Sim_Body25b.xml
-   │    └──IK_Setup_Pose2Sim_Body25b.xml
-   │
-   ├──pose-2d
-   │   ├──pose_cam1_json
-   │   ├──...
-   │   └──pose_camN_json
-   │
-   ├──pose-2d-tracked
-   │   ├──tracked_cam1_json
-   │   ├──...
-   │   └──tracked_camN_json
-   │
-   <i><b>├──pose-3d
-       └──Pose-3d.trc</i></b>>
-   │        
-   ├── videos
-   │    ├──vid_cam1.mp4
-   │    ├──...
-   │    └──vid_camN.mp4
-   │
-   └──User
-       └──Config.toml
-   </pre>
-</details>
-
+</br>
 
 ### Filtering 3D coordinates
 > _**Filter your 3D coordinates.**_\
 > _**N.B.:**_ You can visualize your resulting filtered 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
-Open an Anaconda prompt or a terminal, type `ipython`.\
-By default, `filtering()` will look for `Config.toml` in the `User` folder of your current directory. If you want to store it somewhere else (e.g. in your data directory), specify this path as an argument: `Pose2Sim.filtering(r'path_to_config.toml')`.
+Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Type `ipython`.
 
 ``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.filtering()
 ```
 
-Check your filtration with the displayed figures, and vizualise your trc in OpenSim. If your filtering is not satisfying, try and change the parameters in the `Config.toml` file.
+Check your filtration with the displayed figures, and visualize your .trc file in OpenSim. If your filtering is not satisfying, try and change the parameters in the `Config.toml` file.
 
 Output:\
 <img src="Content/FilterPlot.png" width="760">
 
 <img src="Content/Filter3D.png" width="760">
 
-
-<details>
-  <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
-    <pre>
-   Project
-   │
-   ├──calibration
-   │   ├──intrinsics
-   │   │  ├──int_cam1_img
-   │   │  ├──...
-   │   │  └──int_camN_img
-   │   ├──extrinsics
-   │   │  ├──ext_cam1_img
-   │   │  ├──...
-   │   │  └──ext_camN_img
-   │   └──Calib.toml
-   │
-   ├──opensim
-   │    ├──Geometry
-   │    ├──Model_Pose2Sim_Body25b.osim
-   │    ├──Scaling_Setup_Pose2Sim_Body25b.xml
-   │    └──IK_Setup_Pose2Sim_Body25b.xml
-   │
-   ├──pose-2d
-   │   ├──pose_cam1_json
-   │   ├──...
-   │   └──pose_camN_json
-   │
-   ├──pose-2d-tracked
-   │   ├──tracked_cam1_json
-   │   ├──...
-   │   └──tracked_camN_json
-   │
-   <i><b>├──pose-3d
-   │   ├──Pose-3d.trc
-   │   └──Pose-3d-filtered.trc</i></b>
-   │        
-   ├── videos
-   │    ├──vid_cam1.mp4
-   │    ├──...
-   │    └──vid_camN.mp4
-   │
-   └──User
-       └──Config.toml
-   </pre>
-</details>
-
+</br>
 
 ## OpenSim kinematics
-> _**Obtain 3D joint angles.**_
+> _**Obtain 3D joint angles.**_\
+> Your OpenSim .osim scaled model and .mot inverse kinematic results will be found in the OpenSim folder of your `Participant` directory.
 
 ### OpenSim Scaling
 1. Use the previous steps to capture a static pose, typically an A-pose or a T-pose.
@@ -601,6 +427,7 @@ Output:\
 
 <img src="Content/OpenSim.JPG" width="380">
 
+</br>
 
 ### Command line
 Alternatively, you can use command-line tools:
@@ -632,85 +459,7 @@ Make sure to replace `py38np120` with your Python version (3.8 in this case) and
   ```
   You can also run other API commands. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Common+Scripting+Commands#CommonScriptingCommands-UsingtheTools) for more instructions on how to use it.
 
-<details>
-  <summary>The project hierarchy becomes: (CLICK TO SHOW)</summary>
-    <pre>
-   Project
-   │
-   ├──calibration
-   │   ├──intrinsics
-   │   │  ├──int_cam1_img
-   │   │  ├──...
-   │   │  └──int_camN_img
-   │   ├──extrinsics
-   │   │  ├──ext_cam1_img
-   │   │  ├──...
-   │   │  └──ext_camN_img
-   │   └──Calib.toml
-   │
-   ├──<i><b>opensim</i></b>  
-   │    ├──Geometry
-   │    ├──Model_Pose2Sim_Body25b.osim
-   │    ├──Scaling_Setup_Pose2Sim_Body25b.xml
-   │    ├──<i><b>Model_Pose2Sim_Body25b_Scaled.osim</i></b>  
-   │    ├──IK_Setup_Pose2Sim_Body25b.xml
-   │    └──<i><b>IK_result.mot</i></b>   
-   │
-   ├──pose
-   │   ├──pose_cam1_json
-   │   ├──...
-   │   └──pose_camN_json
-   │
-   ├──pose-associated
-   │   ├──tracked_cam1_json
-   │   ├──...
-   │   └──tracked_camN_json
-   │
-   ├──triangulation
-   │   ├──triangulation.trc
-   │   └──triangulation-filtered.trc
-   │        
-   ├── videos
-   │    ├──vid_cam1.mp4
-   │    ├──...
-   │    └──vid_camN.mp4
-   │
-   └──User
-       └──Config.toml
-   </pre>
-</details>
-
-
-## Batch processing
-If you need to batch process multiple data or with multiple different parameters, you can run any Pose2Sim function with a `config` dictionary instead of a file. For example:
-``` python
-from Pose2Sim import Pose2Sim
-import toml
-
-config_dict = toml.load('User/Config.toml')
-config_dict['project']['pose_folder_name'] = new_project_path
-Pose2Sim.triangulate(config_dict)
-```
-Or into a loop:
-``` python
-from Pose2Sim import Pose2Sim
-import toml
-config_dict = toml.load('User/Config.toml')
-
-# Change project_path
-for new_project_path in new_project_paths:
-  config_dict['project']['project_dir'] = new_project_path
-  config_dict['filtering']['display_figures'] = False
-
-  # Run any Pose2Sim function with config_dict instead of a path
-  Pose2Sim.triangulation(config_dict)
-  
-  # Now change filtering type
-  for new_filter in ['butterworth', 'kalman', 'gaussian']:
-    config_dict['filtering']['type'] = new_filter
-    Pose2Sim.filtering(config_dict)
-```
-
+</br>
 
 # Utilities
 A list of standalone tools (see [Utilities](https://github.com/perfanalytics/pose2sim/tree/main/Pose2Sim/Utilities)), which can be either run as scripts, or imported as functions. Check usage in the docstrings of each Python file. The figure below shows how some of these toolscan be used to further extend Pose2Sim usage.
@@ -801,6 +550,8 @@ Converts a mot file to a .csv file with rotation and orientation of all segments
 
 <img src="Content/Pose2Sim_workflow_utilities.jpg" width="760">
 
+</br>
+
 # How to cite and how to contribute
 ### How to cite
 If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org/10.21105/joss.04362), [Pagnon et al., 2022a](https://www.mdpi.com/1424-8220/22/7/2712), or [Pagnon et al., 2021](https://www.mdpi.com/1424-8220/21/19/6530).
@@ -831,6 +582,8 @@ If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org
       DOI = {10.3390/s21196530},
       URL = {https://www.mdpi.com/1424-8220/21/19/6530}
     }
+
+</br>
 
 ### How to contribute and to-do list
 
@@ -917,6 +670,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 
 &#9634; **Catch errors**
 &#10004; **Pip package**
+&#9634; **Batch processing**
 &#9634; **Conda package** 
 &#9634; **Docker image**
 &#9634; Run pose estimation and OpenSim from within Pose2Sim
@@ -947,7 +701,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 - [x] v0.2: Published associated paper
 - [x] v0.3: Supported other pose estimation algorithms
 - [x] v0.4: New calibration tool based on scene measurements
-- [ ] v0.5: Batch processing
+- [x] v0.5: Batch processing
 - [ ] v0.6: Calibration based on keypoint detection
 - [ ] v0.7: Supports multi-person analysis
 - [ ] v0.8: New synchronization tool

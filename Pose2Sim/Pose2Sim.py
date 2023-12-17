@@ -17,13 +17,11 @@
     - Robust triangulation,
     - Filtration.
 
-    It has been tested on Windows 10 but should work similarly on Linux.
-    Please subscribe to this issue if you wish to be notified of the code release. 
-    See https://github.com/perfanalytics/pose2sim
+    It has been tested on Windows, Linux and MacOS, and works for any Python version < 3.8
     
     Installation: 
     # Open Anaconda prompt. Type:
-    # - conda create -n Pose2Sim python=3.7 tensorflow-gpu=1.13.1
+    # - conda create -n Pose2Sim python=3.8
     # - conda activate Pose2Sim
     # - conda install Pose2Sim
 
