@@ -214,37 +214,37 @@ def poseEstimation(config=None):
     
     raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
     
-    # TODO
-    # Determine the level at which the function is called (session:3, participant:2, trial:1)
-    level, config_dicts = read_config_files(config)
+    # # TODO
+    # # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    # level, config_dicts = read_config_files(config)
 
-    if type(config)==dict:
-        config_dict = config_dicts[0]
-        if config_dict.get('project').get('project_dir') == None:
-            raise ValueError('Please specify the project directory in config_dict:\n \
-                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+    # if type(config)==dict:
+    #     config_dict = config_dicts[0]
+    #     if config_dict.get('project').get('project_dir') == None:
+    #         raise ValueError('Please specify the project directory in config_dict:\n \
+    #                          config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
-    # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
-    setup_logging(session_dir)    
+    # # Set up logging
+    # session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    # setup_logging(session_dir)    
 
-    # Batch process all trials
-    for config_dict in config_dicts:
-        start = time.time()
-        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
-        seq_name = os.path.basename(project_dir)
-        frame_range = config_dict.get('project').get('frame_range')
-        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+    # # Batch process all trials
+    # for config_dict in config_dicts:
+    #     start = time.time()
+    #     project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+    #     seq_name = os.path.basename(project_dir)
+    #     frame_range = config_dict.get('project').get('frame_range')
+    #     frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
-        logging.info("\n\n---------------------------------------------------------------------")
-        logging.info("Camera synchronization")
-        logging.info("---------------------------------------------------------------------")
-        logging.info(f"\nProject directory: {project_dir}")
+    #     logging.info("\n\n---------------------------------------------------------------------")
+    #     logging.info("Camera synchronization")
+    #     logging.info("---------------------------------------------------------------------")
+    #     logging.info(f"\nProject directory: {project_dir}")
     
-        pose_estimation_all(config_dict)
+    #     pose_estimation_all(config_dict)
         
-        end = time.time()
-        logging.info(f'Pose estimation took {end-start:.2f} s.')
+    #     end = time.time()
+    #     logging.info(f'Pose estimation took {end-start:.2f} s.')
     
 
 def synchronization(config=None):
@@ -258,37 +258,37 @@ def synchronization(config=None):
 
     raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
     
-    #TODO
-    # Determine the level at which the function is called (session:3, participant:2, trial:1)
-    level, config_dicts = read_config_files(config)
+    # #TODO
+    # # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    # level, config_dicts = read_config_files(config)
 
-    if type(config)==dict:
-        config_dict = config_dicts[0]
-        if config_dict.get('project').get('project_dir') == None:
-            raise ValueError('Please specify the project directory in config_dict:\n \
-                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+    # if type(config)==dict:
+    #     config_dict = config_dicts[0]
+    #     if config_dict.get('project').get('project_dir') == None:
+    #         raise ValueError('Please specify the project directory in config_dict:\n \
+    #                          config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
-    # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
-    setup_logging(session_dir)    
+    # # Set up logging
+    # session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    # setup_logging(session_dir)    
 
-    # Batch process all trials
-    for config_dict in config_dicts:
-        start = time.time()
-        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
-        seq_name = os.path.basename(project_dir)
-        frame_range = config_dict.get('project').get('frame_range')
-        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+    # # Batch process all trials
+    # for config_dict in config_dicts:
+    #     start = time.time()
+    #     project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+    #     seq_name = os.path.basename(project_dir)
+    #     frame_range = config_dict.get('project').get('frame_range')
+    #     frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
-        logging.info("\n\n---------------------------------------------------------------------")
-        logging.info("Camera synchronization")
-        logging.info("---------------------------------------------------------------------")
-        logging.info(f"\nProject directory: {project_dir}")
+    #     logging.info("\n\n---------------------------------------------------------------------")
+    #     logging.info("Camera synchronization")
+    #     logging.info("---------------------------------------------------------------------")
+    #     logging.info(f"\nProject directory: {project_dir}")
         
-        synchronize_cams_all(config_dict)
+    #     synchronize_cams_all(config_dict)
     
-        end = time.time()
-        logging.info(f'Synchronization took {end-start:.2f} s.')    
+    #     end = time.time()
+    #     logging.info(f'Synchronization took {end-start:.2f} s.')    
     
     
 def personAssociation(config=None):
@@ -433,40 +433,40 @@ def opensimProcessing(config=None):
     
     raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
     
-    # TODO
-    from Pose2Sim.opensimProcessing import opensim_processing_all
+    # # TODO
+    # from Pose2Sim.opensimProcessing import opensim_processing_all
     
-    # Determine the level at which the function is called (session:3, participant:2, trial:1)
-    level, config_dicts = read_config_files(config)
+    # # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    # level, config_dicts = read_config_files(config)
 
-    if type(config)==dict:
-        config_dict = config_dicts[0]
-        if config_dict.get('project').get('project_dir') == None:
-            raise ValueError('Please specify the project directory in config_dict:\n \
-                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+    # if type(config)==dict:
+    #     config_dict = config_dicts[0]
+    #     if config_dict.get('project').get('project_dir') == None:
+    #         raise ValueError('Please specify the project directory in config_dict:\n \
+    #                          config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
-    # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
-    setup_logging(session_dir)    
+    # # Set up logging
+    # session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    # setup_logging(session_dir)    
 
-    # Batch process all trials
-    for config_dict in config_dicts:
-        start = time.time()
-        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
-        seq_name = os.path.basename(project_dir)
-        frame_range = config_dict.get('project').get('frame_range')
-        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+    # # Batch process all trials
+    # for config_dict in config_dicts:
+    #     start = time.time()
+    #     project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+    #     seq_name = os.path.basename(project_dir)
+    #     frame_range = config_dict.get('project').get('frame_range')
+    #     frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
-        logging.info("\n\n---------------------------------------------------------------------")
-        # if static_file in project_dir: 
-        #     logging.info(f"Scaling model with <STATIC TRC FILE>.")
-        # else:
-        #     logging.info(f"Running inverse kinematics <MOTION TRC FILE>.")
-        logging.info("---------------------------------------------------------------------")
-        logging.info(f"\nOpenSim output directory: {project_dir}")
+    #     logging.info("\n\n---------------------------------------------------------------------")
+    #     # if static_file in project_dir: 
+    #     #     logging.info(f"Scaling model with <STATIC TRC FILE>.")
+    #     # else:
+    #     #     logging.info(f"Running inverse kinematics <MOTION TRC FILE>.")
+    #     logging.info("---------------------------------------------------------------------")
+    #     logging.info(f"\nOpenSim output directory: {project_dir}")
    
-        opensim_processing_all(config_dict)
+    #     opensim_processing_all(config_dict)
     
-        end = time.time()
-        logging.info(f'Model scaling took {end-start:.2f} s.')
+    #     end = time.time()
+    #     logging.info(f'Model scaling took {end-start:.2f} s.')
     
