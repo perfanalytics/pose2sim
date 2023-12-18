@@ -14,7 +14,7 @@
 # Pose2Sim
 
 > **_News_: Version 0.5 released:** \
-**Deep change in folder structure to allow batch processing!**\
+**Deep change in the folder structure to allow for automatic batch processing!**\
 To upgrade, type `pip install pose2sim --upgrade`.\
 *N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
 
@@ -229,7 +229,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     > *N.B.:* _Intrinsic parameters:_ camera properties (focal length, optical center, distortion), usually need to be calculated only once in their lifetime. In theory, cameras with same model and same settings will have identical intrinsic parameters.\
     > *N.B.:* If you already calculated intrinsic parameters earlier, you can skip this step by setting `overwrite_intrinsics` to false.
 
-    - Create a folder for each camera in your `calibration\intrinsics` folder.
+    - Create a folder for each camera in your `Calibration\intrinsics` folder.
     - For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
     - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file.
     - Make sure that the board:
