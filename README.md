@@ -161,7 +161,7 @@ Session_s1         \ <i><b>Config.toml</i></b>
     └── Trial_t1   \ <i><b>Config.toml</i></b>
 </pre>
 
-Run Pose2Sim from the `Session` folder if you want to batch process the whole session, from the `Participant` folder if you want to batch process all the trials of a participant, or from the `Trial` folder if you want to process a single trial.
+Run Pose2Sim from the `Session` folder if you want to batch process the whole session, from the `Participant` folder if you want to batch process all the trials of a participant, or from the `Trial` folder if you want to process a single trial. There should be one `Calibration` folder per session. 
 
 Global instructions are given in the Config.toml file of the `Session` folder, and can be altered for specific `Participants` or `Trials` by uncommenting keys and their values in their respective Config.toml files.\
 Try uncommenting `[project]` and set `frame_range = [10,300]` for a Participant for example, or uncomment `[filtering.butterworth]` and set `cut_off_frequency = 10` for a Trial.
