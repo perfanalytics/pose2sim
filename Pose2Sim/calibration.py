@@ -1184,7 +1184,7 @@ def recap_calibrate(ret, calib_path, calib_full_type):
             if calib_full_type in ['convert_qualisys', 'convert_vicon','convert_opencap', 'convert_biocv']:
                 ret_m.append( np.around(ret[c], decimals=3) )
                 ret_px.append( np.around(ret[c] / (Dm*1000) * f_px, decimals=3) )
-            elif calib_full_type=='calculate_board':
+            elif calib_full_type=='calculate':
                 ret_px.append( np.around(ret[c], decimals=3) )
                 ret_m.append( np.around(ret[c]*Dm*1000 / f_px, decimals=3) )
                 
