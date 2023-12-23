@@ -128,6 +128,7 @@
 ## 'none' if you don't want to interpolate missing points
 # interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
 # show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
+# make_c3d = false # save triangulated data in c3d format in addition to trc
 
 
 [filtering]
