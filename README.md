@@ -15,6 +15,7 @@
 
 > **_News_: Version 0.5 released:** \
 **Deep change in the folder structure to allow for automatic batch processing!**\
+Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used.\
 To upgrade, type `pip install pose2sim --upgrade`.\
 *N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
 
@@ -365,6 +366,8 @@ Output:\
 
 ### Triangulating keypoints
 > _**Triangulate your 2D coordinates in a robust way.**_ \
+> The triangulation is weighted by the likelihood of each detected 2D keypoint, provided that they meet a likelihood threshold.\
+  If the reprojection error is above a threshold, right and left sides are swapped; if it is still above, cameras are removed until the threshold is met. If more cameras are removed than threshold, triangulation is skipped for this point and this frame. In the end, missing values are interpolated.\
 > _**N.B.:**_ You can visualize your resulting 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
@@ -385,6 +388,7 @@ Output:\
 
 ### Filtering 3D coordinates
 > _**Filter your 3D coordinates.**_\
+> Numerous filter types are provided, and can be tuned accordingly.\
 > _**N.B.:**_ You can visualize your resulting filtered 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
