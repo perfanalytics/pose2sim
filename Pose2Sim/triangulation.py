@@ -48,8 +48,8 @@ from anytree import RenderTree
 from anytree.importer import DictImporter
 import logging
 
-from Pose2Sim.common import computeP, weighted_triangulation, reprojection, \
-    euclidean_distance, natural_sort
+from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
+    reprojection, euclidean_distance, natural_sort
 from Pose2Sim.skeletons import *
 
 
@@ -206,6 +206,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     likelihood_threshold = config.get('triangulation').get('likelihood_threshold')
     show_interp_indices = config.get('triangulation').get('show_interp_indices')
     interpolation_kind = config.get('triangulation').get('interpolation')
+    handle_LR_swap = config.get('triangulation').get('handle_LR_swap')
     
     # Recap
     calib_cam1 = calib[list(calib.keys())[0]]
@@ -236,7 +237,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     mean_cam_excluded = np.around(nb_cams_excluded['mean'].mean(), decimals=2)
 
     logging.info(f'\n--> Mean reprojection error for all points on all frames is {mean_error_px} px, which roughly corresponds to {mean_error_mm} mm. ')
-    logging.info(f'Cameras were excluded if likelihood was below {likelihood_threshold} and if the reprojection error was above {error_threshold_triangulation} px.')
+    logging.info(f'Cameras were excluded if likelihood was below {likelihood_threshold} and if the reprojection error was above {error_threshold_triangulation} px. Limb swapping was {"handled" if handle_LR_swap else "not handled"}.')
     logging.info(f'In average, {mean_cam_excluded} cameras had to be excluded to reach these thresholds.')
     cam_excluded_count = {i: v for i, v in zip(cam_names, cam_excluded_count.values())}
     str_cam_excluded_count = ''
@@ -252,7 +253,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     logging.info(f'\n3D coordinates are stored at {trc_path}.')
 
 
-def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped, projection_matrices):
+def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped, projection_matrices, *calib_params):
     '''
     Triangulates 2D keypoint coordinates. If reprojection error is above threshold,
     tries swapping left and right sides. If still above, removes a camera until error
@@ -281,6 +282,7 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
     error_threshold_triangulation = config.get('triangulation').get('reproj_error_threshold_triangulation')
     min_cameras_for_triangulation = config.get('triangulation').get('min_cameras_for_triangulation')
     handle_LR_swap = config.get('triangulation').get('handle_LR_swap')
+    undistort_points = config.get('triangulation').get('undistort_points')
 
     # Initialize
     x_files, y_files, likelihood_files = coords_2D_kpt
@@ -319,7 +321,10 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
         Q_filt = [weighted_triangulation(projection_matrices_filt[i], x_files_filt[i], y_files_filt[i], likelihood_files_filt[i]) for i in range(len(id_cams_off))]
         
         # Reprojection
-        coords_2D_kpt_calc_filt = [reprojection(projection_matrices_filt[i], Q_filt[i])  for i in range(len(id_cams_off))]
+        if undistort_points:
+            coords_2D_kpt_calc_filt = [cv2.projectPoints(Q_filt[i], calib_params['R'][i], calib_params['T'][i], calib_params['K'][i], calib_params['dist'][i]) for i in range(len(id_cams_off))]
+        else:
+            coords_2D_kpt_calc_filt = [reprojection(projection_matrices_filt[i], Q_filt[i]) for i in range(len(id_cams_off))]
         coords_2D_kpt_calc_filt = np.array(coords_2D_kpt_calc_filt, dtype=object)
         x_calc_filt = coords_2D_kpt_calc_filt[:,0]
         y_calc_filt = coords_2D_kpt_calc_filt[:,1]
@@ -359,9 +364,14 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
                                                 for id_off in range(len(id_cams_off))] )
                 
                 # Reprojection
-                coords_2D_kpt_calc_off_swap = np.array([[reprojection(projection_matrices_filt[id_off], Q_filt_off_swap[id_off, id_swapped]) 
-                                                for id_swapped in range(len(id_cams_swapped))]
-                                                for id_off in range(len(id_cams_off))])
+                if undistort_points:
+                    coords_2D_kpt_calc_off_swap = np.array([[cv2.projectPoints(Q_filt[id_off, id_swapped], calib_params['R'][id_off], calib_params['T'][id_off], calib_params['K'][id_off], calib_params['dist'][id_off]) 
+                                                    for id_swapped in range(len(id_cams_swapped))]
+                                                    for id_off in range(len(id_cams_off))])
+                else:
+                    coords_2D_kpt_calc_off_swap = np.array([[reprojection(projection_matrices_filt[id_off], Q_filt_off_swap[id_off, id_swapped]) 
+                                                    for id_swapped in range(len(id_cams_swapped))]
+                                                    for id_off in range(len(id_cams_off))])
                 x_calc_off_swap = coords_2D_kpt_calc_off_swap[:,:,0]
                 y_calc_off_swap = coords_2D_kpt_calc_off_swap[:,:,1]
                 
@@ -477,6 +487,7 @@ def triangulate_all(config):
     interpolation_kind = config.get('triangulation').get('interpolation')
     interp_gap_smaller_than = config.get('triangulation').get('interp_if_gap_smaller_than')
     show_interp_indices = config.get('triangulation').get('show_interp_indices')
+    undistort_points = config.get('triangulation').get('undistort_points')
 
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
@@ -484,8 +495,9 @@ def triangulate_all(config):
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
     
     # Projection matrix from toml calibration file
-    P = computeP(calib_file)
-    
+    P = computeP(calib_file, undistort=undistort_points)
+    calib_params = retrieve_calib_params(calib_file)
+        
     # Retrieve keypoints from model
     try: # from skeletons.py
         model = eval(pose_model)
@@ -530,21 +542,13 @@ def triangulate_all(config):
         json_tracked_files_f = [json_tracked_files[c][f] for c in range(n_cams)]
         x_files, y_files, likelihood_files = extract_files_frame_f(json_tracked_files_f, keypoints_ids)
 
-        # # undistort points draft: start with
-        # points = [np.array(tuple(zip(x_files[i],y_files[i]))).reshape(-1, 1, 2) for i in range(n_cams)]
-        # # calculate optimal matrix optimal_mat cf https://stackoverflow.com/a/76635257/12196632
-        # undistorted_points = [cv2.undistortPoints(points[i], K[i], distortions[i], None, optimal_mat[i]) for i in range(n_cams)]
-        # # then put back into original shape of x_files, y_files 
-        # # Points are undistorted and better triangulated, however reprojection error is not accurate if points are not distorted again prior to reprojection
-        # # This is good for slight distortion. For fishey camera, the model does not work anymore. See there for an example https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301
-        
-        # # undistort points draft: start with
-        # points = [np.array(tuple(zip(x_files[i],y_files[i]))).reshape(-1, 1, 2) for i in range(n_cams)]
-        # # calculate optimal matrix optimal_mat cf https://stackoverflow.com/a/76635257/12196632
-        # undistorted_points = [cv2.undistortPoints(points[i], K[i], distortions[i], None, optimal_mat[i]) for i in range(n_cams)]
-        # # then put back into original shape of x_files, y_files 
-        # # Points are undistorted and better triangulated, however reprojection error is not accurate if points are not distorted again prior to reprojection
-        # # This is good for slight distortion. For fishey camera, the model does not work anymore. See there for an example https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301
+        # undistort points
+        if undistort_points:
+            points = [np.array(tuple(zip(x_files[i],y_files[i]))).reshape(-1, 1, 2).astype('float32') for i in range(n_cams)]
+            undistorted_points = [cv2.undistortPoints(points[i], K[i], dist[i], None, optim_K[i]) for i in range(n_cams)]
+            x_files =  np.array([[u[i][0][0] for i in range(len(u))] for u in undistorted_points])
+            y_files =  np.array([[u[i][0][1] for i in range(len(u))] for u in undistorted_points])
+            # This is good for slight distortion. For fishey camera, the model does not work anymore. See there for an example https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301
 
         # Replace likelihood by 0 if under likelihood_threshold
         with np.errstate(invalid='ignore'):
@@ -554,9 +558,9 @@ def triangulate_all(config):
         for keypoint_idx in keypoints_idx:
         # Triangulate cameras with min reprojection error
             coords_2D_kpt = np.array( (x_files[:, keypoint_idx], y_files[:, keypoint_idx], likelihood_files[:, keypoint_idx]) )
-            coords_2D_kpt_swapped = np.array(( x_files[:, keypoints_idx_swapped[keypoint_idx]], y_files[:, keypoints_idx_swapped[keypoint_idx]], likelihood_files[:, keypoints_idx_swapped[keypoint_idx]] ))# ADD coords_2D_kpt_swapped TO THE ARGUMENTS OF triangulation_from_best_cameras 
+            coords_2D_kpt_swapped = np.array(( x_files[:, keypoints_idx_swapped[keypoint_idx]], y_files[:, keypoints_idx_swapped[keypoint_idx]], likelihood_files[:, keypoints_idx_swapped[keypoint_idx]] ))
 
-            Q_kpt, error_kpt, nb_cams_excluded_kpt, id_excluded_cams_kpt = triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped, P)
+            Q_kpt, error_kpt, nb_cams_excluded_kpt, id_excluded_cams_kpt = triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped, P, calib_params) # P has been modified if undistort_points=True
 
             Q.append(Q_kpt)
             error.append(error_kpt)

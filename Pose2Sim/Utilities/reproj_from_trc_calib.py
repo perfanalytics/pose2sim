@@ -92,12 +92,13 @@ BODY_25B = Node("CHip", id=None, children=[
 
 
 ## FUNCTIONS
-def computeP(calib_file):
+def computeP(calib_file, undistort=False):
     '''
     Compute projection matrices from toml calibration file.
     
     INPUT:
     - calib_file: calibration .toml file.
+    - undistort: boolean
     
     OUTPUT:
     - P: projection matrix as list of arrays
@@ -109,8 +110,14 @@ def computeP(calib_file):
     calib = toml.load(calib_file)
     for cam in list(calib.keys()):
         if cam != 'metadata':
+            S = np.array(calib[cam]['size'])
             K = np.array(calib[cam]['matrix'])
-            Kh = np.block([K, np.zeros(3).reshape(3,1)])
+            if undistort:
+                dist = np.array(calib[cam]['distortions'])
+                optim_K = cv2.getOptimalNewCameraMatrix(K, dist, [int(s) for s in S], 1, [int(s) for s in S])[0]
+                Kh = np.block([optim_K, np.zeros(3).reshape(3,1)])
+            else:
+                Kh = np.block([K, np.zeros(3).reshape(3,1)])
             R, _ = cv2.Rodrigues(np.array(calib[cam]['rotation']))
             T = np.array(calib[cam]['translation'])
             H = np.block([[R,T.reshape(3,1)], [np.zeros(3), 1 ]])
@@ -120,6 +127,38 @@ def computeP(calib_file):
     return P
     
     
+def retrieve_calib_params(calib_file):
+    '''
+    Compute projection matrices from toml calibration file.
+    
+    INPUT:
+    - calib_file: calibration .toml file.
+    
+    OUTPUT:
+    - S: (h,w) vectors as list of 2x1 arrays
+    - K: intrinsic matrices as list of 3x3 arrays
+    - dist: distortion vectors as list of 4x1 arrays
+    - optim_K: intrinsic matrices for undistorting points as list of 3x3 arrays
+    - R: rotation rodrigue vectors as list of 3x1 arrays
+    - T: translation vectors as list of 3x1 arrays
+    '''
+    
+    calib = toml.load(calib_file)
+
+    S, K, dist, optim_K, R, T = [], [], [], [], [], []
+    for c, cam in enumerate(calib.keys()):
+        if cam != 'metadata':
+            S.append(np.array(calib[cam]['size']))
+            K.append(np.array(calib[cam]['matrix']))
+            dist.append(np.array(calib[cam]['distortions']))
+            optim_K.append(cv2.getOptimalNewCameraMatrix(K[c], dist[c], [int(s) for s in S[c]], 1, [int(s) for s in S[c]])[0])
+            R.append(np.array(calib[cam]['rotation']))
+            T.append(np.array(calib[cam]['translation']))
+    calib_params = {'S': S, 'K': K, 'dist': dist, 'optim_K': optim_K, 'R': R, 'T': T}
+            
+    return calib_params
+
+
 def reprojection(P_all, Q):
     '''
     Reprojects 3D point on all cameras.
@@ -231,7 +270,7 @@ def reproj_from_trc_calib_func(*args):
     filename = os.path.splitext(os.path.basename(input_trc_file))[0]
     
     # Extract data from calibration file
-    P_all = computeP(input_calib_file)
+    P_all = computeP(input_calib_file, undistort_points=True)
 
     # Create camera folders
     reproj_dir = os.path.realpath(output_file_root)
