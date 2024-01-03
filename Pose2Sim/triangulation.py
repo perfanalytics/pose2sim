@@ -40,6 +40,7 @@ import numpy as np
 import json
 import itertools as it
 import pandas as pd
+import cv2
 import toml
 from tqdm import tqdm
 from scipy import interpolate
@@ -253,7 +254,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     logging.info(f'\n3D coordinates are stored at {trc_path}.')
 
 
-def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped, projection_matrices, *calib_params):
+def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped, projection_matrices, calib_params):
     '''
     Triangulates 2D keypoint coordinates. If reprojection error is above threshold,
     tries swapping left and right sides. If still above, removes a camera until error
@@ -282,7 +283,13 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
     error_threshold_triangulation = config.get('triangulation').get('reproj_error_threshold_triangulation')
     min_cameras_for_triangulation = config.get('triangulation').get('min_cameras_for_triangulation')
     handle_LR_swap = config.get('triangulation').get('handle_LR_swap')
+
     undistort_points = config.get('triangulation').get('undistort_points')
+    if undistort_points:
+        calib_params_K = calib_params['K']
+        calib_params_dist = calib_params['dist']
+        calib_params_R = calib_params['R']
+        calib_params_T = calib_params['T']
 
     # Initialize
     x_files, y_files, likelihood_files = coords_2D_kpt
@@ -294,7 +301,14 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
     while error_min > error_threshold_triangulation and n_cams - nb_cams_off >= min_cameras_for_triangulation:
         # Create subsets with "nb_cams_off" cameras excluded
         id_cams_off = np.array(list(it.combinations(range(n_cams), nb_cams_off)))
+        
+        if undistort_points:
+            calib_params_K_filt = [calib_params_K]*len(id_cams_off)
+            calib_params_dist_filt = [calib_params_dist]*len(id_cams_off)
+            calib_params_R_filt = [calib_params_R]*len(id_cams_off)
+            calib_params_T_filt = [calib_params_T]*len(id_cams_off)
         projection_matrices_filt = [projection_matrices]*len(id_cams_off)
+
         x_files_filt = np.vstack([x_files.copy()]*len(id_cams_off))
         y_files_filt = np.vstack([y_files.copy()]*len(id_cams_off))
         x_files_swapped_filt = np.vstack([x_files_swapped.copy()]*len(id_cams_off))
@@ -310,7 +324,13 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
                 likelihood_files_filt[i][id_cams_off[i]] = np.nan
         nb_cams_excluded_filt = [np.count_nonzero(np.nan_to_num(x)==0) for x in likelihood_files_filt] # count nans and zeros
         
+        if undistort_points:
+            calib_params_K_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(x_files_filt[j][i]) ] for j, c in enumerate(calib_params_K_filt) ]
+            calib_params_dist_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(x_files_filt[j][i]) ] for j, c in enumerate(calib_params_dist_filt) ]
+            calib_params_R_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(x_files_filt[j][i]) ] for j, c in enumerate(calib_params_R_filt) ]
+            calib_params_T_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(x_files_filt[j][i]) ] for j, c in enumerate(calib_params_T_filt) ]
         projection_matrices_filt = [ [ p[i] for i in range(n_cams) if not np.isnan(x_files_filt[j][i]) ] for j, p in enumerate(projection_matrices_filt) ]
+
         x_files_filt = np.array([ [ xx for ii, xx in enumerate(x) if not np.isnan(xx) ] for x in x_files_filt ])
         y_files_filt = np.array([ [ xx for ii, xx in enumerate(x) if not np.isnan(xx) ] for x in y_files_filt ])
         x_files_swapped_filt = np.array([ [ xx for ii, xx in enumerate(x) if not np.isnan(xx) ] for x in x_files_swapped_filt ])
@@ -322,7 +342,10 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
         
         # Reprojection
         if undistort_points:
-            coords_2D_kpt_calc_filt = [cv2.projectPoints(Q_filt[i], calib_params['R'][i], calib_params['T'][i], calib_params['K'][i], calib_params['dist'][i]) for i in range(len(id_cams_off))]
+            coords_2D_kpt_calc_filt = np.array([[cv2.projectPoints(np.array(Q_filt[i][:-1]), calib_params_R_filt[i][j], calib_params_T_filt[i][j], calib_params_K_filt[i][j], calib_params_dist_filt[i][j])[0].ravel() 
+                                        for j in range(n_cams-nb_cams_off)] 
+                                        for i in range(len(id_cams_off))])
+            coords_2D_kpt_calc_filt = [[coords_2D_kpt_calc_filt[i,:,0], coords_2D_kpt_calc_filt[i,:,1]] for i in range(len(id_cams_off))]
         else:
             coords_2D_kpt_calc_filt = [reprojection(projection_matrices_filt[i], Q_filt[i]) for i in range(len(id_cams_off))]
         coords_2D_kpt_calc_filt = np.array(coords_2D_kpt_calc_filt, dtype=object)
@@ -365,8 +388,12 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
                 
                 # Reprojection
                 if undistort_points:
-                    coords_2D_kpt_calc_off_swap = np.array([[cv2.projectPoints(Q_filt[id_off, id_swapped], calib_params['R'][id_off], calib_params['T'][id_off], calib_params['K'][id_off], calib_params['dist'][id_off]) 
+                    coords_2D_kpt_calc_off_swap = np.array([[[cv2.projectPoints(np.array(Q_filt_off_swap[id_off,id_swapped][:-1]), calib_params_R_filt[id_off][j], calib_params_T_filt[id_off][j], calib_params_K_filt[id_off][j], calib_params_dist_filt[id_off][j])[0].ravel() 
+                                                    for j in range(n_cams-nb_cams_off)] 
                                                     for id_swapped in range(len(id_cams_swapped))]
+                                                    for id_off in range(len(id_cams_off))])
+                    coords_2D_kpt_calc_off_swap = np.array([[[coords_2D_kpt_calc_off_swap[id_off,id_swapped,:,0], coords_2D_kpt_calc_off_swap[id_off,id_swapped,:,1]] 
+                                                    for id_swapped in range(len(id_cams_swapped))] 
                                                     for id_off in range(len(id_cams_off))])
                 else:
                     coords_2D_kpt_calc_off_swap = np.array([[reprojection(projection_matrices_filt[id_off], Q_filt_off_swap[id_off, id_swapped]) 
@@ -545,7 +572,7 @@ def triangulate_all(config):
         # undistort points
         if undistort_points:
             points = [np.array(tuple(zip(x_files[i],y_files[i]))).reshape(-1, 1, 2).astype('float32') for i in range(n_cams)]
-            undistorted_points = [cv2.undistortPoints(points[i], K[i], dist[i], None, optim_K[i]) for i in range(n_cams)]
+            undistorted_points = [cv2.undistortPoints(points[i], calib_params['K'][i], calib_params['dist'][i], None, calib_params['optim_K'][i]) for i in range(n_cams)]
             x_files =  np.array([[u[i][0][0] for i in range(len(u))] for u in undistorted_points])
             y_files =  np.array([[u[i][0][1] for i in range(len(u))] for u in undistorted_points])
             # This is good for slight distortion. For fishey camera, the model does not work anymore. See there for an example https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301
