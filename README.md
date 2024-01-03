@@ -15,9 +15,13 @@
 
 > **_News_: Version 0.5 released:** \
 **Deep change in the folder structure to allow for automatic batch processing!**\
-Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used.\
-To upgrade, type `pip install pose2sim --upgrade`.\
-*N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
+Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
+and lens distortions are better taken into account.\
+To upgrade, type `pip install pose2sim --upgrade`.
+>
+> *N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
+
+<br>
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to the more usual marker-based motion capture methods. It aims to provide a free tool to obtain research-grade results from consumer-grade equipment. Any combination of phone, webcam, gopro, etc can be used.
 
