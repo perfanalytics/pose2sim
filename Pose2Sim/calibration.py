@@ -687,11 +687,13 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             r, t = r.flatten(), t.flatten()
 
             # Projection of object points to image plane
-            Kh_cam = np.block([mtx, np.zeros(3).reshape(3,1)])
-            r_mat, _ = cv2.Rodrigues(r)
-            H_cam = np.block([[r_mat,t.reshape(3,1)], [np.zeros(3), 1 ]])
-            P_cam = Kh_cam.dot(H_cam)
-            proj_obj = [ ( P_cam[0].dot(np.append(o, 1)) /  P_cam[2].dot(np.append(o, 1)),  P_cam[1].dot(np.append(o, 1)) /  P_cam[2].dot(np.append(o, 1)) ) for o in objp]
+            # # Former way, distortions used to be ignored
+            # Kh_cam = np.block([mtx, np.zeros(3).reshape(3,1)])
+            # r_mat, _ = cv2.Rodrigues(r)
+            # H_cam = np.block([[r_mat,t.reshape(3,1)], [np.zeros(3), 1 ]])
+            # P_cam = Kh_cam.dot(H_cam)
+            # proj_obj = [ ( P_cam[0].dot(np.append(o, 1)) /  P_cam[2].dot(np.append(o, 1)),  P_cam[1].dot(np.append(o, 1)) /  P_cam[2].dot(np.append(o, 1)) ) for o in objp]
+            proj_obj = np.squeeze(cv2.projectPoints(objp,r,t,mtx,dist)[0])
 
             # Check calibration results
             if show_reprojection_error:

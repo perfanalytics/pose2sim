@@ -87,9 +87,9 @@ def computeP(calib_file, undistort=False):
     P = []
     for cam in list(calib.keys()):
         if cam != 'metadata':
-            S = np.array(calib[cam]['size'])
             K = np.array(calib[cam]['matrix'])
             if undistort:
+                S = np.array(calib[cam]['size'])
                 dist = np.array(calib[cam]['distortions'])
                 optim_K = cv2.getOptimalNewCameraMatrix(K, dist, [int(s) for s in S], 1, [int(s) for s in S])[0]
                 Kh = np.block([optim_K, np.zeros(3).reshape(3,1)])
