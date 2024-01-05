@@ -413,7 +413,7 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
                 else:
                     coords_2D_kpt_calc_off_swap = np.array([[reprojection(projection_matrices_filt[id_off], Q_filt_off_swap[id_off][id_swapped]) 
                                                     for id_swapped in range(len(id_cams_swapped))]
-                                                    for id_off in range(len(id_cams_off))]))
+                                                    for id_off in range(len(id_cams_off))])
                 x_calc_off_swap = coords_2D_kpt_calc_off_swap[:,:,0]
                 y_calc_off_swap = coords_2D_kpt_calc_off_swap[:,:,1]
                 
