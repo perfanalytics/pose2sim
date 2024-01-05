@@ -13,8 +13,12 @@
 
 # Pose2Sim
 
+
+## There is currently a bug that I hope to fix in the night. You can use Pose2Sim 0.5.2 until then
+**pip install --force-reinstall pose2sim==0.5.2**
+
 > **_News_: Version 0.5 released:** \
-**Deep change in the folder structure to allow for automatic batch processing!**\
+> **Deep change in the folder structure to allow for automatic batch processing!**\
 Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\
 To upgrade, type `pip install pose2sim --upgrade`.
