@@ -14,8 +14,7 @@
 # Pose2Sim
 
 
-## There is currently a bug that I hope to fix in the night. You can use Pose2Sim 0.5.2 until then
-**pip install --force-reinstall pose2sim==0.5.2**
+## Please set undistort_points to false for now since reprojection error is currently inaccurate. Should be fixed this weekend (6-7 Jan 2024)
 
 > **_News_: Version 0.5 released:** \
 > **Deep change in the folder structure to allow for automatic batch processing!**\
