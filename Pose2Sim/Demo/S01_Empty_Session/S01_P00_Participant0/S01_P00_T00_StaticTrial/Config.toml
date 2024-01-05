@@ -28,7 +28,7 @@
 
 # participant_height = 1.7 # m
 # participant_mass = 70 # kg
-# Only taken into account if pose_model is 'BODY_25_AUGMENTED' # Coming soon!
+## Only taken into account if pose_model is 'BODY_25_AUGMENTED' # Coming soon!
 
 
 ## Take heart, calibration is not that complicated once you get the hang of it!
@@ -123,11 +123,12 @@
 # tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
 ## and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
 # reproj_error_threshold_association = 20 # px
+# likelihood_threshold_triangulation = 0.2
 
 
 # [triangulation]
 # reproj_error_threshold_triangulation = 15 # px
-# likelihood_threshold = 0.3
+# likelihood_threshold_triangulation = 0.3
 # min_cameras_for_triangulation = 2
 # interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
 ## 'none' if you don't want to interpolate missing points

@@ -114,7 +114,7 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
     
     error_threshold_tracking = config.get('personAssociation').get('reproj_error_threshold_association')
     min_cameras_for_triangulation = config.get('triangulation').get('min_cameras_for_triangulation')
-    likelihood_threshold = config.get('triangulation').get('likelihood_threshold')
+    likelihood_threshold = config.get('triangulation').get('likelihood_threshold_association')
     undistort_points = config.get('triangulation').get('undistort_points')
 
     n_cams = len(json_files_framef)
