@@ -26,6 +26,10 @@
 # exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
+# participant_height = 1.7 # m
+# participant_mass = 70 # kg
+# Only taken into account if pose_model is 'BODY_25_AUGMENTED' # Coming soon!
+
 
 ## Take heart, calibration is not that complicated once you get the hang of it!
 # [calibration]
@@ -90,7 +94,8 @@
 
 # [pose]
 # pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
-# pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII. 
+# pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII, 
+#                                         BODY_25_AUGMENTED # Coming soon! 
 # 						      #With mediapipe: BLAZEPOSE. 
 # 						      #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
 # 						      #With deeplabcut: CUSTOM. See example at the end of the file.

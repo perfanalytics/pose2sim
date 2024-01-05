@@ -25,14 +25,14 @@ def test_workflow():
   # Pose2Sim.kinematics(config_dict)
 
 
-  # # Balancing trial
-  # project_dir = os.path.join("S00_P00_Participant","S00_P00_T01_BalancingTrial")
-  # config_dict.get("project").update({"project_dir":project_dir})
-  # config_dict['filtering']['display_figures'] = False
+  # Balancing trial
+  project_dir = os.path.join("S00_P00_Participant","S00_P00_T01_BalancingTrial")
+  config_dict.get("project").update({"project_dir":project_dir})
+  config_dict['filtering']['display_figures'] = False
 
-  # # Pose2Sim.poseEstimation(config_dict)
-  # # Pose2Sim.synchronization(config_dict)
-  # Pose2Sim.personAssociation(config_dict)
-  # Pose2Sim.triangulation(config_dict)
-  # Pose2Sim.filtering(config_dict)
-  # # Pose2Sim.kinematics(config_dict)
+  # Pose2Sim.poseEstimation(config_dict)
+  # Pose2Sim.synchronization(config_dict)
+  Pose2Sim.personAssociation(config_dict)
+  Pose2Sim.triangulation(config_dict)
+  Pose2Sim.filtering(config_dict)
+  # Pose2Sim.kinematics(config_dict)
