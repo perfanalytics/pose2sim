@@ -187,7 +187,7 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
                     error_comb_per_cam.append( euclidean_distance(q_file, q_calc) )
                 error_comb.append( np.mean(error_comb_per_cam) )
             
-            error_min = min(error_comb)
+            error_min = np.nanmin(error_comb)
             persons_and_cameras_combination = combinations_with_cams_off[np.argmin(error_comb)]
             
             if error_min < error_threshold_tracking:

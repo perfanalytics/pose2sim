@@ -326,28 +326,27 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
                 x_files_swapped_filt[i][id_cams_off[i]] = np.nan
                 y_files_swapped_filt[i][id_cams_off[i]] = np.nan
                 likelihood_files_filt[i][id_cams_off[i]] = np.nan
+        
+        # Excluded cameras index and count
+        id_cams_off_tot = [np.argwhere(np.isnan(x)).ravel() for x in likelihood_files_filt]
         nb_cams_excluded_filt = [np.count_nonzero(np.nan_to_num(x)==0) for x in likelihood_files_filt] # count nans and zeros
+        nb_cams_off_tot = max(nb_cams_excluded_filt)
+        if nb_cams_off_tot > n_cams - min_cameras_for_triangulation:
+            break
         
         if undistort_points:
-            calib_params_K_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(x_files_filt[j][i]) and not x_files_filt[j][i]==0. ] for j, c in enumerate(calib_params_K_filt) ]
-            calib_params_dist_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(x_files_filt[j][i]) and not x_files_filt[j][i]==0. ] for j, c in enumerate(calib_params_dist_filt) ]
-            calib_params_R_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(x_files_filt[j][i]) and not x_files_filt[j][i]==0. ] for j, c in enumerate(calib_params_R_filt) ]
-            calib_params_T_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(x_files_filt[j][i]) and not x_files_filt[j][i]==0. ] for j, c in enumerate(calib_params_T_filt) ]
-        projection_matrices_filt = [ [ p[i] for i in range(n_cams) if not np.isnan(x_files_filt[j][i]) and not x_files_filt[j][i]==0. ] for j, p in enumerate(projection_matrices_filt) ]
+            calib_params_K_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(likelihood_files_filt[j][i]) and not likelihood_files_filt[j][i]==0. ] for j, c in enumerate(calib_params_K_filt) ]
+            calib_params_dist_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(likelihood_files_filt[j][i]) and not likelihood_files_filt[j][i]==0. ] for j, c in enumerate(calib_params_dist_filt) ]
+            calib_params_R_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(likelihood_files_filt[j][i]) and not likelihood_files_filt[j][i]==0. ] for j, c in enumerate(calib_params_R_filt) ]
+            calib_params_T_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(likelihood_files_filt[j][i]) and not likelihood_files_filt[j][i]==0. ] for j, c in enumerate(calib_params_T_filt) ]
+        projection_matrices_filt = [ [ p[i] for i in range(n_cams) if not np.isnan(likelihood_files_filt[j][i]) and not likelihood_files_filt[j][i]==0. ] for j, p in enumerate(projection_matrices_filt) ]
         
-        print('\nnb_cams_off', repr(nb_cams_off), 'nb_cams_excluded', repr(nb_cams_excluded_filt))
-        nb_cams_off_tot = nb_cams_excluded_filt[0]
-        id_cams_off_tot = [np.argwhere(np.isnan(x)).ravel() for x in x_files_filt]
-        print('x_files ', repr(x_files))
-        print('x_files_filt ', repr(x_files_filt))
-        print('id_cams_off_tot ', id_cams_off_tot)
-        
-        x_files_filt = [ np.array([ xx for ii, xx in enumerate(x) if not np.isnan(xx) and not xx==0. ]) for x in x_files_filt ]
-        y_files_filt = [ np.array([ xx for ii, xx in enumerate(x) if not np.isnan(xx) and not xx==0. ]) for x in y_files_filt ]
-        x_files_swapped_filt = [ np.array([ xx for ii, xx in enumerate(x) if not np.isnan(xx) and not xx==0. ]) for x in x_files_swapped_filt ]
-        y_files_swapped_filt = [ np.array([ xx for ii, xx in enumerate(x) if not np.isnan(xx) and not xx==0. ]) for x in y_files_swapped_filt ]
+        x_files_filt = [ np.array([ xx for ii, xx in enumerate(x) if not np.isnan(likelihood_files_filt[i][ii]) and not likelihood_files_filt[i][ii]==0. ]) for i,x in enumerate(x_files_filt) ]
+        y_files_filt = [ np.array([ xx for ii, xx in enumerate(x) if not np.isnan(likelihood_files_filt[i][ii]) and not likelihood_files_filt[i][ii]==0. ]) for i,x in enumerate(y_files_filt) ]
+        x_files_swapped_filt = [ np.array([ xx for ii, xx in enumerate(x) if not np.isnan(likelihood_files_filt[i][ii]) and not likelihood_files_filt[i][ii]==0. ]) for i,x in enumerate(x_files_swapped_filt) ]
+        y_files_swapped_filt = [ np.array([ xx for ii, xx in enumerate(x) if not np.isnan(likelihood_files_filt[i][ii]) and not likelihood_files_filt[i][ii]==0. ]) for i,x in enumerate(y_files_swapped_filt) ]
         likelihood_files_filt = [ np.array([ xx for ii, xx in enumerate(x) if not np.isnan(xx) and not xx==0. ]) for x in likelihood_files_filt ]
-        print('x_files_filt ', repr(x_files_filt))
+
         # Triangulate 2D points
         Q_filt = [weighted_triangulation(projection_matrices_filt[i], x_files_filt[i], y_files_filt[i], likelihood_files_filt[i]) for i in range(len(id_cams_off))]
         
@@ -361,7 +360,6 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
             coords_2D_kpt_calc_filt = [reprojection(projection_matrices_filt[i], Q_filt[i]) for i in range(len(id_cams_off))]
         coords_2D_kpt_calc_filt = np.array(coords_2D_kpt_calc_filt, dtype=object)
         x_calc_filt = coords_2D_kpt_calc_filt[:,0]
-        print('x_calc_filt ', x_calc_filt)
         y_calc_filt = coords_2D_kpt_calc_filt[:,1]
         
         # Reprojection error
@@ -370,10 +368,9 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
             q_file = [(x_files_filt[config_off_id][i], y_files_filt[config_off_id][i]) for i in range(len(x_files_filt[config_off_id]))]
             q_calc = [(x_calc_filt[config_off_id][i], y_calc_filt[config_off_id][i]) for i in range(len(x_calc_filt[config_off_id]))]
             error.append( np.mean( [euclidean_distance(q_file[i], q_calc[i]) for i in range(len(q_file))] ) )
-        print('error ', error)
             
         # Choosing best triangulation (with min reprojection error)
-        error_min = min(error)
+        error_min = np.nanmin(error)
         best_cams = np.argmin(error)
         nb_cams_excluded = nb_cams_excluded_filt[best_cams]
         
@@ -385,10 +382,8 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
             n_cams_swapped = 1
             error_off_swap_min = error_min
             while error_off_swap_min > error_threshold_triangulation and n_cams_swapped < (n_cams - nb_cams_off_tot) / 2: # more than half of the cameras switched: may triangulate twice the same side
-                print('nb_cams_off ', nb_cams_off, 'n_cams_swapped ', n_cams_swapped, 'nb_cams_off_tot ', nb_cams_off_tot)
                 # Create subsets 
                 id_cams_swapped = np.array(list(it.combinations(range(n_cams-nb_cams_off_tot), n_cams_swapped)))
-                print('id_cams_swapped ', id_cams_swapped)
                 x_files_filt_off_swap = np.array([[x] * len(id_cams_swapped) for x in x_files_filt])
                 y_files_filt_off_swap = np.array([[y] * len(id_cams_swapped) for y in y_files_filt])
                 for id_off in range(len(id_cams_off)): # for each configuration with nb_cams_off_tot removed 
@@ -418,19 +413,15 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
                 y_calc_off_swap = coords_2D_kpt_calc_off_swap[:,:,1]
                 
                 # Reprojection error
-                print('x_files_filt_off_swap ', x_files_filt_off_swap)
                 error_off_swap = []
                 for id_off in range(len(id_cams_off)):
                     error_percam = []
                     for id_swapped, config_swapped in enumerate(id_cams_swapped):
-                        # print(id_off,id_swapped,n_cams,nb_cams_off)
-                        # print(repr(x_files_filt_off_swap))
                         q_file_off_swap = [(x_files_filt_off_swap[id_off,id_swapped,i], y_files_filt_off_swap[id_off,id_swapped,i]) for i in range(n_cams - nb_cams_off_tot)]
                         q_calc_off_swap = [(x_calc_off_swap[id_off,id_swapped,i], y_calc_off_swap[id_off,id_swapped,i]) for i in range(n_cams - nb_cams_off_tot)]
                         error_percam.append( np.mean( [euclidean_distance(q_file_off_swap[i], q_calc_off_swap[i]) for i in range(len(q_file_off_swap))] ) )
                     error_off_swap.append(error_percam)
                 error_off_swap = np.array(error_off_swap)
-                print('error_off_swap ', error_off_swap)
                 
                 # Choosing best triangulation (with min reprojection error)
                 error_off_swap_min = np.min(error_off_swap)
@@ -585,7 +576,6 @@ def triangulate_all(config):
     for f in tqdm(range(*f_range)):
         # Get x,y,likelihood values from files
         json_tracked_files_f = [json_tracked_files[c][f] for c in range(n_cams)]
-        print(json_tracked_files_f)
         x_files, y_files, likelihood_files = extract_files_frame_f(json_tracked_files_f, keypoints_ids)
 
         # undistort points
@@ -648,7 +638,7 @@ def triangulate_all(config):
     # Interpolate missing values
     if interpolation_kind != 'none':
         Q_tot = Q_tot.apply(interpolate_zeros_nans, axis=0, args = [interp_gap_smaller_than, interpolation_kind])
-    Q_tot.replace(np.nan, 0, inplace=True)
+    # Q_tot.replace(np.nan, 0, inplace=True)
     
     # Create TRC file
     trc_path = make_trc(config, Q_tot, keypoints_names, f_range)

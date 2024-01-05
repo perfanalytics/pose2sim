@@ -129,7 +129,7 @@ def weighted_triangulation(P_all,x_all,y_all,likelihood_all):
         V = Vt.T
         Q = np.array([V[0][3]/V[3][3], V[1][3]/V[3][3], V[2][3]/V[3][3], 1])
     else: 
-        Q = np.array([0.,0.,0.,1])
+        Q = np.array([np.nan,np.nan,np.nan,1])
         
     return Q
 
