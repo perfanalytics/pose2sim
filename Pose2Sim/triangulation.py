@@ -581,6 +581,8 @@ def triangulate_all(config):
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_idx = list(range(len(keypoints_ids)))
     keypoints_nb = len(keypoints_ids)
+    # for pre, _, node in RenderTree(model): 
+    #     print(f'{pre}{node.name} id={node.id}')
     
     # left/right swapped keypoints
     keypoints_names_swapped = [keypoint_name.replace('R', 'L') if keypoint_name.startswith('R') else keypoint_name.replace('L', 'R') if keypoint_name.startswith('L') else keypoint_name for keypoint_name in keypoints_names]
