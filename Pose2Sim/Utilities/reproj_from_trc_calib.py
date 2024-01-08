@@ -19,7 +19,7 @@
     Usage: 
     from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', '<output_format>', r'<output_file_root>')
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'openpose'
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'openpose' -u
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'deeplabcut' -o output_file_root
 '''
 
@@ -51,44 +51,64 @@ __status__ = "Development"
 '''BODY_25B (full-body without hands, experimental, from OpenPose)
 https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/blob/master/experimental_models/README.md
 Adjust it if your want to reproject in OpenPose format with a different model'''
-nb_joints = 25
-BODY_25B = Node("CHip", id=None, children=[
-    Node("RHip", id=12, children=[
-        Node("RKnee", id=14, children=[
-            Node("RAnkle", id=16, children=[
-                Node("RBigToe", id=22, children=[
-                    Node("RSmallToe", id=23),
-                ]),
-                Node("RHeel", id=24),
-            ]),
-        ]),
-    ]),
-    Node("LHip", id=11, children=[
-        Node("LKnee", id=13, children=[
-            Node("LAnkle", id=15, children=[
-                Node("LBigToe", id=19, children=[
-                    Node("LSmallToe", id=20),
-                ]),
-                Node("LHeel", id=21),
-            ]),
-        ]),
-    ]),
-    Node("Neck", id=17, children=[
-        Node("Head", id=18, children=[
-            Node("Nose", id=0),
-        ]),
-        Node("RShoulder", id=6, children=[
-            Node("RElbow", id=8, children=[
-                Node("RWrist", id=10),
-            ]),
-        ]),
-        Node("LShoulder", id=5, children=[
-            Node("LElbow", id=7, children=[
-                Node("LWrist", id=9),
-            ]),
-        ]),
-    ]),
-])
+# nb_joints = 25
+# BODY_25B = Node("CHip", id=None, children=[
+#     Node("RHip", id=12, children=[
+#         Node("RKnee", id=14, children=[
+#             Node("RAnkle", id=16, children=[
+#                 Node("RBigToe", id=22, children=[
+#                     Node("RSmallToe", id=23),
+#                 ]),
+#                 Node("RHeel", id=24),
+#             ]),
+#         ]),
+#     ]),
+#     Node("LHip", id=11, children=[
+#         Node("LKnee", id=13, children=[
+#             Node("LAnkle", id=15, children=[
+#                 Node("LBigToe", id=19, children=[
+#                     Node("LSmallToe", id=20),
+#                 ]),
+#                 Node("LHeel", id=21),
+#             ]),
+#         ]),
+#     ]),
+#     Node("Neck", id=17, children=[
+#         Node("Head", id=18, children=[
+#             Node("Nose", id=0),
+#         ]),
+#         Node("RShoulder", id=6, children=[
+#             Node("RElbow", id=8, children=[
+#                 Node("RWrist", id=10),
+#             ]),
+#         ]),
+#         Node("LShoulder", id=5, children=[
+#             Node("LElbow", id=7, children=[
+#                 Node("LWrist", id=9),
+#             ]),
+#         ]),
+#     ]),
+# ])
+nb_joints = 17
+BODY_25B = Node("None", id=None, children=[
+    Node("Origin", id=0),
+    Node("Board1", id=1),
+    Node("Board2", id=2),
+    Node("Board3", id=3),
+    Node("Board4", id=4),
+    Node("Furniture5", id=5),
+    Node("Furniture6", id=6),
+    Node("Furniture7", id=7),
+    Node("Screen8", id=8),
+    Node("Screen9", id=9),
+    Node("Furniture10", id=10),
+    Node("Furniture11", id=11),
+    Node("Furniture12", id=12),
+    Node("Furniture13", id=13),
+    Node("Furniture14", id=14),
+    Node("Furniture15", id=15),
+    Node("Table16", id=16)])
+
 
 
 ## FUNCTIONS
@@ -221,7 +241,7 @@ def yup2zup(Q):
     return Q
 
 
-def reproj_from_trc_calib_func(*args):
+def reproj_from_trc_calib_func(**args):
     '''
     Reproject 3D points from a trc file to the camera planes determined by a 
     toml calibration file.
@@ -233,34 +253,20 @@ def reproj_from_trc_calib_func(*args):
     format with a different model.
     
     Usage: 
-    from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', '<output_format>', r'<output_file_root>')
+    from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(input_trc_file = r'<input_trc_file>', input_calib_file = r'<input_calib_file>', openpose_output=True, deeplabcut_output=True, undistort_points=True, output_file_root = r'<output_file_root>')
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'openpose'
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'deeplabcut' -o output_file_root
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file --openpose_output --deeplabcut_output --undistort_points --output_file_root output_file_root
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -o -O output_file_root
     '''
 
-    try:
-        input_trc_file = args[0]['input_trc_file'] # invoked with argparse
-        input_calib_file = args[0]['input_calib_file']
-        if args[0]['output_format'] == None:
-            output_format = 'deeplabcut'
-        else:
-            output_format = args[0]['output_format']
-        if args[0]['output_file_root'] == None:
-            output_file_root = input_trc_file.replace('.trc', '_reproj')
-        else:
-            output_file_root = args[0]['output_file_root']
-    except:
-        input_trc_file = args[0] # invoked as a function
-        input_calib_file = args[1]
-        try:
-            output_format = args[2]
-        except:
-            output_format = 'deeplabcut'
-        try:
-            output_file_root = args[3]
-        except:
-            output_file_root = input_trc_file.replace('.trc', '_reproj')
+    input_trc_file = os.path.realpath(args.get('input_trc_file')) # invoked with argparse
+    input_calib_file = os.path.realpath(args.get('input_calib_file'))
+    openpose_output = args.get('openpose_output')
+    deeplabcut_output = args.get('deeplabcut_output')
+    undistort_points = args.get('undistort_points')
+    output_file_root = args.get('output_file_root')
+    if output_file_root == None:
+        output_file_root = input_trc_file.replace('.trc', '_reproj')
 
     # Extract data from trc file
     header_trc, data_trc = df_from_trc(input_trc_file)
@@ -270,7 +276,13 @@ def reproj_from_trc_calib_func(*args):
     filename = os.path.splitext(os.path.basename(input_trc_file))[0]
     
     # Extract data from calibration file
-    P_all = computeP(input_calib_file, undistort_points=True)
+    P_all = computeP(input_calib_file, undistort=undistort_points)
+    if undistort_points:
+        calib_params = retrieve_calib_params(input_calib_file)
+        calib_params_R_filt = [calib_params['R'][i] for i in range(len(P_all))]
+        calib_params_T_filt = [calib_params['T'][i] for i in range(len(P_all))]
+        calib_params_K_filt = [calib_params['K'][i] for i in range(len(P_all))]
+        calib_params_dist_filt = [calib_params['dist'][i] for i in range(len(P_all))]
 
     # Create camera folders
     reproj_dir = os.path.realpath(output_file_root)
@@ -295,13 +307,18 @@ def reproj_from_trc_calib_func(*args):
         coords = [[] for cam in range(len(P_all))]
         for keypoint in range(num_bodyparts):
             q = np.append(Q.iloc[row,3*keypoint:3*keypoint+3], 1)
-            x_all, y_all = reprojection(P_all, q)
+            if undistort_points:
+                coords_2D_all = [cv2.projectPoints(np.array(q[:-1]), calib_params_R_filt[i], calib_params_T_filt[i], calib_params_K_filt[i], calib_params_dist_filt[i])[0] for i in range(len(P_all))]
+                x_all = [coords_2D_all[i][0,0,0] for i in range(len(P_all))]
+                y_all = [coords_2D_all[i][0,0,1] for i in range(len(P_all))]
+            else:
+                x_all, y_all = reprojection(P_all, q)
             [coords[cam].extend([x_all[cam], y_all[cam]]) for cam in range(len(P_all))]
         for cam in range(len(P_all)):
             data_proj[cam].iloc[row,:] = coords[cam]
         
     # Save as h5 and csv if DeepLabCut format
-    if output_format == 'deeplabcut':
+    if deeplabcut_output:
         # to h5
         h5_files = [os.path.join(cam_dir,f'{filename}_cam_{i+1:02d}.h5') for i,cam_dir in enumerate(cam_dirs)]
         [data_proj[i].to_hdf(h5_files[i], index=True, key='reprojected_points') for i in range(len(P_all))]
@@ -311,9 +328,13 @@ def reproj_from_trc_calib_func(*args):
         [data_proj[i].to_csv(csv_files[i], sep=',', index=True, lineterminator='\n') for i in range(len(P_all))]
 
     # Save as json if OpenPose format
-    elif output_format == 'openpose':        
+    if openpose_output:
         # read body_25b tree
-        bodyparts_ids = [[node.id for _, _, node in RenderTree(BODY_25B) if node.name==b][0] for b in bodyparts]
+        model = BODY_25B
+        print('Keypoint hierarchy:')
+        for pre, _, node in RenderTree(model): 
+            print(f'{pre}{node.name} id={node.id}')
+        bodyparts_ids = [[node.id for _, _, node in RenderTree(model) if node.name==b][0] for b in bodyparts]
         #prepare json files
         json_dict = {'version':1.3, 'people':[]}
         json_dict['people'] = [{'person_id':[-1], 
@@ -327,11 +348,13 @@ def reproj_from_trc_calib_func(*args):
                         'hand_right_keypoints_3d':[]}]
         # write one json file per camera and per frame
         for cam, cam_dir in enumerate(cam_dirs):
+            print('\n', cam)
             for frame in range(len(Q)):
                 json_dict_copy = deepcopy(json_dict)
                 data_proj_frame = data_proj[cam].iloc[row]['DavidPagnon']['person0']
                 # store 2D keypoints and respect body_25b keypoint order
                 for (i,b) in zip(bodyparts_ids, bodyparts):
+                    print(repr(data_proj_frame[b].values))
                     json_dict_copy['people'][0]['pose_keypoints_2d'][[i*3,i*3+1,i*3+2]] = np.append(data_proj_frame[b].values, 1)
                 json_dict_copy['people'][0]['pose_keypoints_2d'] = json_dict_copy['people'][0]['pose_keypoints_2d'].tolist()
                 # write json file
@@ -346,10 +369,12 @@ def reproj_from_trc_calib_func(*args):
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--input_trc_file', required = True, help='trc 3D coordinates input file')
-    parser.add_argument('-c', '--input_calib_file', required = True, help='toml calibration input file')
-    parser.add_argument('-f', '--output_format', required=False, help='deeplabcut or openpose output format')
-    parser.add_argument('-o', '--output_file_root', required=False, help='output file root, without extension')
+    parser.add_argument('-t', '--input_trc_file', required = True, help='trc 3D coordinates input file path')
+    parser.add_argument('-c', '--input_calib_file', required = True, help='toml calibration input file path')
+    parser.add_argument('-o', '--openpose_output', required=False, action='store_true', help='output format in the openpose json format')
+    parser.add_argument('-d', '--deeplabcut_output', required=False, action='store_true', help='output format in the deeplabcut csv and json formats')
+    parser.add_argument('-u', '--undistort_points', required=False, action='store_true', help='takes distortion into account if True')
+    parser.add_argument('-O', '--output_file_root', required=False, help='output file root path, without extension')
     args = vars(parser.parse_args())
 
-    reproj_from_trc_calib_func(args)
+    reproj_from_trc_calib_func(**args)

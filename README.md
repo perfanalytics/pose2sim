@@ -14,7 +14,7 @@
 # Pose2Sim
 
 
-## Please set undistort_points to false for now since reprojection error is currently inaccurate. Should be fixed this weekend (6-7 Jan 2024)
+## Please set undistort_points to false for now since reprojection error is currently inaccurate. I'll try to fix it soon.
 
 > **_News_: Version 0.5 released:** \
 > **Deep change in the folder structure to allow for automatic batch processing!**\
@@ -554,6 +554,9 @@ Build a trc file from a .mot motion file and a .osim model file.
 
 [bodykin_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/bodykin_from_mot_osim.py)
 Converts a mot file to a .csv file with rotation and orientation of all segments.
+
+[reproj_from_trc_calib.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/reproj_from_trc_calib.py)
+Reprojects 3D coordinates of a trc file to the image planes defined by a calibration file. Output in OpenPose or DeepLabCut format.
 
    </pre>
 </details>

@@ -136,8 +136,8 @@
 # interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
 # show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 # handle_LR_swap = true # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
-# undistort_points = true # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
-# make_c3d = false # save triangulated data in c3d format in addition to trc
+# undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
+# make_c3d = false # save triangulated data in c3d format in addition to trc # Coming soon!
 
 
 [filtering]
@@ -172,10 +172,15 @@ display_figures = true # true or false (lowercase)
 
 ## CUSTOM skeleton, if you trained your own DeepLabCut model for example. 
 ## Make sure the node ids correspond to the column numbers of the 2D pose file, starting from zero.
+## 
 ## If you want to perform inverse kinematics, you will also need to create an OpenSim model
 ## and add to its markerset the location where you expect the triangulated keypoints to be detected.
+## 
 ## In this example, CUSTOM reproduces the BODY_25B skeleton  (default skeletons are stored in skeletons.py).
 ## You can create as many custom skeletons as you want, just add them further down and rename them.
+## 
+## Check your model hierarchy with:  for pre, _, node in RenderTree(model): 
+##                                      print(f'{pre}{node.name} id={node.id}')
 # [pose.CUSTOM]
 # name = "CHip"
 # id = "None"
