@@ -469,4 +469,42 @@ def opensimProcessing(config=None):
     
     #     end = time.time()
     #     logging.info(f'Model scaling took {end-start:.2f} s.')
-    
+
+def augmenter(config=None):
+    '''
+    Augmentation process for marker data.
+
+    config can be a dictionary,
+    or the directory path of a trial, participant, or session,
+    or the function can be called without an argument, in which case the config directory is the current one.
+    '''
+
+    from Pose2Sim.augmenter import augmentTRC
+
+    level, config_dicts = read_config_files(config)
+
+    if type(config) == dict:
+        config_dict = config_dicts[0]
+        if config_dict.get('project').get('project_dir') is None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    setup_logging(session_dir)
+
+    for config_dict in config_dicts:
+        start = time.time()
+        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        seq_name = os.path.basename(project_dir)
+        frame_range = config_dict.get('project').get('frame_range')
+        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+
+        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info(f"Augmentation process for {seq_name}, for {frames}.")
+        logging.info("---------------------------------------------------------------------")
+        logging.info(f"\nProject directory: {project_dir}")
+
+        augmentTRC(config_dict)
+
+        end = time.time()
+        logging.info(f'Augmentation took {end - start:.2f} s.')
