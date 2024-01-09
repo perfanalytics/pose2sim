@@ -103,6 +103,10 @@ pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII,
 overwrite_pose = false
 openpose_path = '' # only checked if OpenPose is used
 
+[BODY_25_AUGMENTED]
+ModelName = "LSTM"
+model = "v0.3" # now, 0.3 is lastest version
+offset = true # default is ture
 
 [synchronization]
 # COMING SOON! 
