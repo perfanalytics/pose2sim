@@ -16,7 +16,7 @@
 
 ## Please set undistort_points to false for now since reprojection error is currently inaccurate. I'll try to fix it soon.
 
-## BODY_25_AUGMENTED
+## BODY_25_AUGMENTED (Test this!)
 Currently it only works with BODY_25B and one .trc file. We'll fix it by January 11.
 Set parameters(height, mass, version) in [project], [BODY_25_AUGMENTED] of Config.toml
 
@@ -28,7 +28,7 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.augmenter()
 ```
 
-The .trc file should be located in pose-3d.
+The .trc file should be located in pose-3d folder.
 
 
 
