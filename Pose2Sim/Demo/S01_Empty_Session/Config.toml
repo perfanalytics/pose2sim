@@ -27,7 +27,7 @@ frame_range = [] # For example [10,300], or [] for all frames
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
-## Only taken into account if pose_model is 'BODY_25_AUGMENTED' # Coming soon!
+## Only taken into account if pose_model is 'BODY_25_AUGMENTED' # Test this!
 participant_height = 1.7 # m
 participant_mass = 70 # kg
 
