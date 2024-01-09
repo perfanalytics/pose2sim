@@ -29,6 +29,7 @@ Pose2Sim.augmenter()
 ```
 
 The .trc file should be located in pose-3d folder.
+If you enter inexact height, model'll be unstable.
 
 
 
