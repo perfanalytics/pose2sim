@@ -31,6 +31,7 @@ Pose2Sim.augmenter()
 The .trc file should be located in pose-3d folder.\
 If you enter inexact height, model'll be unstable.\
 If there is a Nan value in the .trc file, it will not work properly.\
+\
 Opensim scailing and IK \
 Scaling : \
 File -> Open model -> Load LaiUhlrich2022.osim or LaiUhlrich2022_shoulder.osim -> Tools -> Scale model -> Load -> Setup_scailing_LSTM.xml -> Check Add markers from file box -> Load Marker_add.xml -> Load your .trc file -> Run \
