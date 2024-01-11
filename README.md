@@ -16,30 +16,6 @@
 
 ## Please set undistort_points to false for now since reprojection error is currently inaccurate. I'll try to fix it soon.
 
-# BODY_25_AUGMENTED (Test this!)
-### Marker augement
-Set parameters(height, mass, version) in [project], [BODY_25_AUGMENTED] of Config.toml
-
-Open a terminal, enter `pip show pose2sim`, report package location. \
-Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo\S00_Demo_Session`. \
-Type `ipython`, and test the following code:
-``` python
-from Pose2Sim import Pose2Sim
-Pose2Sim.augmenter()
-```
-
-The .trc file should be located in pose-3d folder.\
-If you enter inexact height, model'll be unstable.\
-If there is a Nan value in the .trc file, it will not work properly.
-
-### Opensim scailing and IK 
-Scaling : \
-File -> Open model -> Load LaiUhlrich2022.osim or LaiUhlrich2022_shoulder.osim -> Tools -> Scale model -> Load -> Setup_scailing_LSTM.xml -> Check Add markers from file box -> Load Marker_add.xml -> Load your .trc file -> Run
-
-IK : \
-Tools -> Inverse Kinematics -> Load -> Setup_IK.xml or Setup_IK_shoulder.xml -> Load your .frc file -> Run
-
-
 > **_News_: Version 0.5 released:** \
 > **Deep change in the folder structure to allow for automatic batch processing!**\
 Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
@@ -438,6 +414,23 @@ Output:\
 <img src="Content/Filter3D.png" width="760">
 
 </br>
+
+### BODY_25_AUGMENTED (Test this!)
+#### Marker augement
+Set parameters(height, mass, version) in [project], [BODY_25_AUGMENTED] of Config.toml
+
+Open a terminal, enter `pip show pose2sim`, report package location. \
+Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo\S00_Demo_Session`. \
+Type `ipython`, and test the following code:
+``` python
+from Pose2Sim import Pose2Sim
+Pose2Sim.augmenter()
+```
+
+The .trc file should be located in pose-3d folder.\
+If you enter inexact height, model'll be unstable.\
+If there is a Nan value in the .trc file, it will not work properly.\
+Should input Marker_add.xml when you scale your model.
 
 ## OpenSim kinematics
 > _**Obtain 3D joint angles.**_\
