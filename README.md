@@ -415,7 +415,7 @@ Output:\
 
 </br>
 
-### BODY_25_AUGMENTED (Test this!)
+### BODY_25_AUGMENTED (Test)
 #### Marker augement
 Set parameters(height, mass, version) in [project], [BODY_25_AUGMENTED] of Config.toml
 
