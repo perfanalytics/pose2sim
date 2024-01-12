@@ -12,12 +12,12 @@ import glob
 # subject_height must be in meters
 def get_midhip_data(trc_file):
     try:
-        # OpenPose의 MidHip 데이터를 시도하여 찾습니다.
+        # Find MidHip data
         midhip_data = trc_file.marker("CHip")
         if midhip_data is None or len(midhip_data) == 0:
             raise ValueError("MidHip data is empty")
     except (KeyError, ValueError):
-        # MidHip 데이터가 없는 경우, RHip과 LHip의 평균을 사용합니다.
+        # If MidHip data is not found, calculate it from RHip and LHip
         rhip_data = trc_file.marker("RHip")
         lhip_data = trc_file.marker("LHip")
         midhip_data = (rhip_data + lhip_data) / 2
@@ -36,10 +36,10 @@ def augmentTRC(config_dict):
     if subject_height is None or subject_height == 0:
         raise ValueError("Subject height is not set or invalid in the config file.")
     subject_mass = config_dict.get('project').get('participant_mass')
-    augmenterDir = os.path.join(session_dir, 'MarkerAugmenter')
-    augmenterModelName = config_dict.get('BODY_25_AUGMENTED').get('ModelName')
-    augmenter_model = config_dict.get('BODY_25_AUGMENTED').get('model')
-    offset = config_dict.get('BODY_25_AUGMENTED').get('offset')
+    augmenterDir = os.path.join(session_dir, '..', '..', 'MarkerAugmenter')
+    augmenterModelName = 'LSTM'
+    augmenter_model = 'v0.3'
+    offset = True
 
     # Apply all trc files
     trc_files = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if '_LSTM' not in f]

@@ -10,7 +10,7 @@
 # Config.toml file of the level above. This way, you can set global 
 # instructions for the Session and alter them for specific Participants or Trials.
 #
-# If you wish to overwrite a parameter for a specific trial or participant,  
+# If you wish to overwrite a parameter for a specific trial or participant, 
 # edit its Config.toml file by uncommenting its key (e.g., [project])
 # and editing its value (e.g., frame_range = [10,300]). Or else, uncomment 
 # [filtering.butterworth] and set cut_off_frequency = 10, etc.
@@ -27,9 +27,9 @@
 # exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
-## Only taken into account if pose_model is 'BODY_25_AUGMENTED' # Coming soon!
 # participant_height = 1.7 # m
 # participant_mass = 70 # kg
+## Only taken into account if pose_model is 'BODY_25_AUGMENTED' # Coming soon!
 
 
 ## Take heart, calibration is not that complicated once you get the hang of it!
@@ -163,7 +163,7 @@
 
 
 # [opensim]
-# static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
+# static_trial = ['S01_P01_Participant1/S01_P01_T00_StaticTrial']
 #              # If this Config.toml file is at the Trial level, set to true or false (lowercase);
 #              # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
 #              # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']

@@ -27,7 +27,7 @@ frame_range = [] # For example [10,300], or [] for all frames
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
-## Only taken into account if pose_model is 'BODY_25_AUGMENTED' # Test now!
+## Only taken into account if pose_model is 'BODY_25_AUGMENTED' # Coming soon!
 participant_height = 1.7 # m
 participant_mass = 70 # kg
 
@@ -103,11 +103,6 @@ pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII,
 overwrite_pose = false
 openpose_path = '' # only checked if OpenPose is used
 
-[BODY_25_AUGMENTED]
-## Only taken into account if pose_model is 'BODY_25_AUGMENTED' # Test now!
-ModelName = "LSTM"
-model = "v0.3" # now, 0.3 is lastest version
-offset = true # default is ture
 
 [synchronization]
 # COMING SOON! 
