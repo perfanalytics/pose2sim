@@ -415,16 +415,20 @@ Output:\
 
 </br>
 
-### BODY_25_AUGMENTED (Test)
-#### Marker augement
-Set parameters(height, mass, version) in [project], [BODY_25_AUGMENTED] of Config.toml
+### Triangulation key points with BODY_25_AUGMENTED (Test)
+Set parameters(height, mass) in [project] of Config.toml
 
 Open a terminal, enter `pip show pose2sim`, report package location. \
 Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo\S00_Demo_Session`. \
-Type `ipython`, and test the following code:
+Type `ipython`, If you want to triangulate and marker augment without filtering, test the following code:
 ``` python
 from Pose2Sim import Pose2Sim
-Pose2Sim.augmenter()
+Pose2Sim.triangulation_AUGMENTED()
+```
+Or if you want to triangulate and marker augment with filtering, test the following code:
+``` python
+from Pose2Sim import Pose2Sim
+Pose2Sim.triangulation_filt_AUGMENTED()
 ```
 
 The .trc file should be located in pose-3d folder.\
