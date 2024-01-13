@@ -345,6 +345,8 @@ def triangulation(config=None):
     '''
 
     from Pose2Sim.triangulation import triangulate_all
+    from Pose2Sim.augmenter import augmentTRC
+    from Pose2Sim.filtering import filter_all
 
     # Determine the level at which the function is called (session:3, participant:2, trial:1)
     level, config_dicts = read_config_files(config)
@@ -371,8 +373,10 @@ def triangulation(config=None):
         logging.info(f"Triangulation of 2D points for {seq_name}, for {frames}.")
         logging.info("---------------------------------------------------------------------")
         logging.info(f"\nProject directory: {project_dir}")
-    
-        triangulate_all(config_dict)
+        if config_dict.get('pose').get('pose_model') == 'BODY_25_AUGMENTED':
+            triangulation_filt_AUGMENTED(config_dict)
+        else:
+            triangulate_all(config_dict)
     
     end = time.time()
     logging.info(f'Triangulation took {end-start:.2f} s.')
@@ -548,6 +552,7 @@ def triangulation_filt_AUGMENTED(config=None):
 
         end = time.time()
         logging.info(f'Augmentation took {end - start:.2f} s.')
+
 
     
     

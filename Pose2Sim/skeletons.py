@@ -77,10 +77,88 @@ BODY_25B = Node("CHip", id=None, children=[
     ]),
 ])
 
+'''BODY_25B_AUGMENTED (full-body without hands, experimental, from OpenPose)
+https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/blob/master/experimental_models/README.md'''
+BODY_25B_AUGMENTED = Node("CHip", id=None, children=[
+    Node("RHip", id=12, children=[
+        Node("RKnee", id=14, children=[
+            Node("RAnkle", id=16, children=[
+                Node("RBigToe", id=22, children=[
+                    Node("RSmallToe", id=23),
+                ]),
+                Node("RHeel", id=24),
+            ]),
+        ]),
+    ]),
+    Node("LHip", id=11, children=[
+        Node("LKnee", id=13, children=[
+            Node("LAnkle", id=15, children=[
+                Node("LBigToe", id=19, children=[
+                    Node("LSmallToe", id=20),
+                ]),
+                Node("LHeel", id=21),
+            ]),
+        ]),
+    ]),
+    Node("Neck", id=17, children=[
+        Node("Head", id=18, children=[
+            Node("Nose", id=0),
+        ]),
+        Node("RShoulder", id=6, children=[
+            Node("RElbow", id=8, children=[
+                Node("RWrist", id=10),
+            ]),
+        ]),
+        Node("LShoulder", id=5, children=[
+            Node("LElbow", id=7, children=[
+                Node("LWrist", id=9),
+            ]),
+        ]),
+    ]),
+])
+
 
 '''BODY_25 (full-body without hands, standard, from OpenPose)
 https://github.com/CMU-Perceptual-Computing-Lab/openpose/tree/master/models'''
 BODY_25 = Node("CHip", id=8, children=[
+    Node("RHip", id=9, children=[
+        Node("RKnee", id=10, children=[
+            Node("RAnkle", id=11, children=[
+                Node("RBigToe", id=22, children=[
+                    Node("RSmallToe", id=23),
+                ]),
+                Node("RHeel", id=24),
+            ]),
+        ]),
+    ]),
+    Node("LHip", id=12, children=[
+        Node("LKnee", id=13, children=[
+            Node("LAnkle", id=14, children=[
+                Node("LBigToe", id=19, children=[
+                    Node("LSmallToe", id=20),
+                ]),
+                Node("LHeel", id=21),
+            ]),
+        ]),
+    ]),
+    Node("Neck", id=17, children=[
+        Node("Nose", id=0),
+        Node("RShoulder", id=2, children=[
+            Node("RElbow", id=3, children=[
+                Node("RWrist", id=4),
+            ]),
+        ]),
+        Node("LShoulder", id=5, children=[
+            Node("LElbow", id=6, children=[
+                Node("LWrist", id=7),
+            ]),
+        ]),
+    ]),
+])
+
+'''BODY_25_AUGMENTED (full-body without hands, standard, from OpenPose)
+https://github.com/CMU-Perceptual-Computing-Lab/openpose/tree/master/models'''
+BODY_25_AUGMENTED = Node("CHip", id=8, children=[
     Node("RHip", id=9, children=[
         Node("RKnee", id=10, children=[
             Node("RAnkle", id=11, children=[
