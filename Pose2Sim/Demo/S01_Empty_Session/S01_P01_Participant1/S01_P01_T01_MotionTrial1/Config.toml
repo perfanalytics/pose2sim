@@ -29,7 +29,7 @@
 
 # participant_height = 1.7 # m
 # participant_mass = 70 # kg
-## Only taken into account if pose_model is 'BODY_25_AUGMENTED' # Coming soon!
+## Only taken into account if pose_model is 'BODY_25_AUGMENTED'
 
 
 ## Take heart, calibration is not that complicated once you get the hang of it!
@@ -96,7 +96,7 @@
 # [pose]
 # pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
 # pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII, 
-                        #               BODY_25_AUGMENTED # Coming soon! 
+                          #               BODY_25_AUGMENTED, BODY_25B_AUGMENTED
 # 						      #With mediapipe: BLAZEPOSE. 
 # 						      #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
 # 						      #With deeplabcut: CUSTOM. See example at the end of the file.
@@ -140,9 +140,9 @@
 # make_c3d = false # save triangulated data in c3d format in addition to trc # Coming soon!
 
 
-[filtering]
+# [filtering]
 # type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
-display_figures = true # true or false (lowercase)
+# display_figures = true # true or false (lowercase)
 
    # [filtering.butterworth]
    # order = 4 
@@ -163,7 +163,7 @@ display_figures = true # true or false (lowercase)
 
 
 # [opensim]
-# static_trial = ['S01_P01_Participant1/S01_P01_T00_StaticTrial']
+# static_trial = ['S01_P00_Participant0/S01_P00_T00_StaticTrial']
 #              # If this Config.toml file is at the Trial level, set to true or false (lowercase);
 #              # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
 #              # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']

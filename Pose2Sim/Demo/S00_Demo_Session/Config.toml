@@ -95,7 +95,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 [pose]
 pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
 pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII, 
-                        #               BODY_25_AUGMENTED # Coming soon!
+                        #               BODY_25_AUGMENTED, BODY_25B_AUGMENTED
 						      #With mediapipe: BLAZEPOSE. 
 						      #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
 						      #With deeplabcut: CUSTOM. See example at the end of the file.
