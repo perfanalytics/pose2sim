@@ -10,6 +10,9 @@
     Build a trc file which stores all real and virtual markers 
     calculated from a .mot motion file and a .osim model file.
     
+    Beware, it can be quite slow depending on the ccomplexity 
+    of the model and on the number of frames.
+    
     Usage: 
     from Pose2Sim.Utilities import trc_from_mot_osim; trc_from_mot_osim.trc_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_trc_file>')
     python -m trc_from_mot_osim -m input_mot_file -o input_osim_file
@@ -37,7 +40,7 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def get_marker_positions(motion_data, model):
+def get_marker_positions(motion_data, model, in_degrees=True):
     '''
     Get dataframe of marker positions
     
@@ -63,10 +66,12 @@ def get_marker_positions(motion_data, model):
     # Get marker positions at each state
     state = model.initSystem()
     marker_positions = []
+    print('Time frame:')
     for n,t in enumerate(times):
+        print(t, 's')
         # put the model in the right position
         for coord in joint_angle_set_names:
-            if not coord.endswith('_tx') and not coord.endswith('_ty') and not coord.endswith('_tz'):
+            if in_degrees and not coord.endswith('_tx') and not coord.endswith('_ty') and not coord.endswith('_tz'):
                 value = motion_data_pd.loc[n,coord]*np.pi/180
             else:
                 value = motion_data_pd.loc[n,coord]
@@ -109,7 +114,19 @@ def trc_from_mot_osim_func(*args):
     # Create dataframe with marker positions
     model = osim.Model(osim_path)
     motion_data = osim.TimeSeriesTable(motion_path)
-    marker_positions_pd = get_marker_positions(motion_data, model)
+    
+    # In degrees or radians
+    with open(motion_path) as m_p:
+        while True:
+            line =  m_p.readline()
+            if 'inDegrees' in line:
+                break
+    if 'yes' in line:
+        in_degrees = True
+    else:
+        in_degrees = False
+    
+    marker_positions_pd = get_marker_positions(motion_data, model, in_degrees=in_degrees)
     
     # Trc header
     times = motion_data.getIndependentColumn()

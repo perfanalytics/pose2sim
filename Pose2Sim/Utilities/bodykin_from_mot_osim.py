@@ -15,6 +15,9 @@
 
     Transforms from OpenSim's yup to Blender's zup unless you set direction = 'yup'
     
+    Beware, it can be quite slow depending on the ccomplexity 
+    of the model and on the number of frames.
+    
     Usage: 
     from Pose2Sim.Utilities import bodykin_from_mot_osim; bodykin_from_mot_osim.bodykin_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_csv_file>')
     python -m bodykin_from_mot_osim -m input_mot_file -o input_osim_file
@@ -74,11 +77,24 @@ def bodykin_from_mot_osim_func(*args):
     # Read model and motion files
     model = osim.Model(osim_path)
     motion_data = osim.TimeSeriesTable(motion_path)
+    
+    # # Degrees or radians
+    # with open(motion_path) as m_p:
+        # while True:
+            # line =  m_p.readline()
+            # if 'inDegrees' in line:
+                # break
+    # if 'yes' in line:
+        # in_degrees = True
+    # else:
+        # in_degrees = False
 
     # Model: get model coordinates and bodies
     model_coordSet = model.getCoordinateSet()
-    coordinates = [model_coordSet.get(i) for i in range(model_coordSet.getSize())]
-    coordinateNames = [c.getName() for c in coordinates]
+    # coordinates = [model_coordSet.get(i) for i in range(model_coordSet.getSize())]
+    # coordinates = [c for c in coordinates if '_beta' not in c.getName()]
+    # coordinateNames = [c.getName() for c in coordinates]
+    coordinateNames = motion_data.getColumnLabels()
     model_bodySet = model.getBodySet()
     bodies = [model_bodySet.get(i) for i in range(model_bodySet.getSize())]
     bodyNames = [b.getName() for b in bodies]
@@ -86,16 +102,21 @@ def bodykin_from_mot_osim_func(*args):
     # Motion: read coordinates and convert to radians
     times = motion_data.getIndependentColumn()
     motion_data_np = motion_data.getMatrix().to_numpy()
-    for i in range(len(coordinates)):
-        if coordinates[i].getMotionType() == 1: # 1: rotation, 2: translation, 3: coupled
-            motion_data_np[:,i] = motion_data_np[:,i] * np.pi/180 # if rotation, convert to radians
+    for i, c in enumerate(coordinateNames):
+        if model_coordSet.get(c).getMotionType() == 1: # 1: rotation, 2: translation, 3: coupled
+            if  motion_data.getTableMetaDataAsString('inDegrees') == 'yes':
+    # if in_degrees:
+        # for i in range(len(coordinates)):
+            # if coordinates[i].getMotionType() == 1: # 1: rotation, 2: translation, 3: coupled
+                motion_data_np[:,i] = motion_data_np[:,i] * np.pi/180 # if rotation, convert to radians
 
     # Animate model
     state = model.initSystem()
     loc_rot_frame_all = []
     H_zup = np.array([[1,0,0,0], [0,0,-1,0], [0,1,0,0], [0,0,0,1]])
+    print('Time frame:')
     for n in range(motion_data.getNumRows()):
-        
+        print(times[n], 's')
         # Set model struct in each time state
         for c, coord in enumerate(coordinateNames):
             model.getCoordinateSet().get(coord).setValue(state, motion_data_np[n,c])
