@@ -14,13 +14,14 @@
 # Pose2Sim
 
 
-## Please set undistort_points to false for now since reprojection error is currently inaccurate. I'll try to fix it soon.
+## Please set undistort_points and handle_LR_swap to false for now since reprojection error is currently inaccurate. I'll try to fix it soon.
 
 > **_News_: Version 0.5 released:** \
 > **Deep change in the folder structure to allow for automatic batch processing!**\
+<!--The Stanford LSTM marker augmentation is now supported!\
 Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
-and lens distortions are better taken into account.\
-To upgrade, type `pip install pose2sim --upgrade`.
+and lens distortions are better taken into account.\ -->
+> To upgrade, type `pip install pose2sim --upgrade`.
 >
 > *N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
 
