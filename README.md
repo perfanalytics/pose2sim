@@ -382,7 +382,7 @@ Output:\
 > If you enter inexact height, model'll be unstable.\
 > If there is a Nan value in the .trc file, it will not work properly.\
 > Should input Marker_add.xml when you scale your model.\
-> _**N.B.:**_ You can visualize your resulting 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap).\
+> _**N.B.:**_ You can visualize your resulting 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap).
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
 Type `ipython`.
