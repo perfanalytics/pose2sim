@@ -394,8 +394,6 @@ Pose2Sim.triangulation()
 
 Check printed output, and vizualise your trc in OpenSim: `File -> Preview experimental data`.\
 If your triangulation is not satisfying, try and release the constraints in the `Config.toml` file.\
-\
-
 
 Output:\
 <img src="Content/Triangulate3D.png" width="760">
