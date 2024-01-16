@@ -52,7 +52,6 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
    2. [Camera calibration](#camera-calibration)
       1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
-         1. 
    3. [2D pose estimation](#2d-pose-estimation)
       1. [With OpenPose](#with-openpose)
       2. [With Mediapipe](#with-mediapipe)
