@@ -375,7 +375,13 @@ Output:\
 > _**Triangulate your 2D coordinates in a robust way.**_ \
 > The triangulation is weighted by the likelihood of each detected 2D keypoint, provided that they meet a likelihood threshold.\
   If the reprojection error is above a threshold, right and left sides are swapped; if it is still above, cameras are removed until the threshold is met. If more cameras are removed than threshold, triangulation is skipped for this point and this frame. In the end, missing values are interpolated.\
-> _**N.B.:**_ You can visualize your resulting 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
+> If you want to use the Marker augmenter, follow these instructions.\
+> Set parameters(height, mass) in [project] of Config.toml\
+> The .trc file should be located in pose-3d folder.\
+> If you enter inexact height, model'll be unstable.\
+> If there is a Nan value in the .trc file, it will not work properly.\
+> Should input Marker_add.xml when you scale your model.\
+> _**N.B.:**_ You can visualize your resulting 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap).\
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
 Type `ipython`.
@@ -386,7 +392,9 @@ Pose2Sim.triangulation()
 ```
 
 Check printed output, and vizualise your trc in OpenSim: `File -> Preview experimental data`.\
-If your triangulation is not satisfying, try and release the constraints in the `Config.toml` file.
+If your triangulation is not satisfying, try and release the constraints in the `Config.toml` file.\
+\
+
 
 Output:\
 <img src="Content/Triangulate3D.png" width="760">
@@ -414,27 +422,6 @@ Output:\
 <img src="Content/Filter3D.png" width="760">
 
 </br>
-
-### Triangulation key points with BODY_25_AUGMENTED (Test)
-Set parameters(height, mass) in [project] of Config.toml
-
-Open a terminal, enter `pip show pose2sim`, report package location. \
-Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo\S00_Demo_Session`. \
-Type `ipython`, If you want to triangulate and marker augment without filtering, test the following code:
-``` python
-from Pose2Sim import Pose2Sim
-Pose2Sim.triangulation_AUGMENTED()
-```
-Or if you want to triangulate and marker augment with filtering, test the following code:
-``` python
-from Pose2Sim import Pose2Sim
-Pose2Sim.triangulation_filt_AUGMENTED()
-```
-
-The .trc file should be located in pose-3d folder.\
-If you enter inexact height, model'll be unstable.\
-If there is a Nan value in the .trc file, it will not work properly.\
-Should input Marker_add.xml when you scale your model.
 
 ## OpenSim kinematics
 > _**Obtain 3D joint angles.**_\
