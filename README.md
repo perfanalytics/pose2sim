@@ -415,7 +415,7 @@ Output:\
 
 </br>
 
-### Triangulation key points with BODY_25_AUGMENTED (Test)
+### Marker Augmentation (Test)
 Set parameters(height, mass) in [project] of Config.toml
 
 Open a terminal, enter `pip show pose2sim`, report package location. \
@@ -423,18 +423,13 @@ Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo\S00_Demo_
 Type `ipython`, If you want to triangulate and marker augment without filtering, test the following code:
 ``` python
 from Pose2Sim import Pose2Sim
-Pose2Sim.triangulation_AUGMENTED()
+Pose2Sim.augmenter()
 ```
-Or if you want to triangulate and marker augment with filtering, test the following code:
-``` python
-from Pose2Sim import Pose2Sim
-Pose2Sim.triangulation_filt_AUGMENTED()
-```
-
+Recommand you augment markers after filtering.\
 The .trc file should be located in pose-3d folder.\
 If you enter inexact height, model'll be unstable.\
 If there is a Nan value in the .trc file, it will not work properly.\
-Should input Marker_add.xml when you scale your model.
+Should input Marker_add.xml in OpenSim when you scale your model.
 
 ## OpenSim kinematics
 > _**Obtain 3D joint angles.**_\
