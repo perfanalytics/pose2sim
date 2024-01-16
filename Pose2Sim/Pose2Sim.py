@@ -373,7 +373,7 @@ def triangulation(config=None):
         logging.info(f"Triangulation of 2D points for {seq_name}, for {frames}.")
         logging.info("---------------------------------------------------------------------")
         logging.info(f"\nProject directory: {project_dir}")
-        if config_dict.get('pose').get('pose_model') == 'BODY_25_AUGMENTED':
+        if config_dict.get('pose').get('pose_model') == 'BODY_25_AUGMENTED' or 'BODY_25B_AUGMENTED':
             triangulation_filt_AUGMENTED(config_dict)
         else:
             triangulate_all(config_dict)
