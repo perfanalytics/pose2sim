@@ -371,12 +371,12 @@ def triangulation(config=None):
         logging.info(f"Triangulation of 2D points for {seq_name}, for {frames}.")
         logging.info("---------------------------------------------------------------------")
         logging.info(f"\nProject directory: {project_dir}")
-    
+        
         triangulate_all(config_dict)
     
     end = time.time()
     logging.info(f'Triangulation took {end-start:.2f} s.')
-    
+ 
     
 def filtering(config=None):
     '''
@@ -419,6 +419,37 @@ def filtering(config=None):
         logging.info(f"\nProject directory: {project_dir}")
     
         filter_all(config_dict)
+
+def augmenter(config=None):
+    from Pose2Sim.augmenter import augmentTRC
+    level, config_dicts = read_config_files(config)
+
+    if type(config) == dict:
+        config_dict = config_dicts[0]
+        if config_dict.get('project').get('project_dir') is None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    setup_logging(session_dir)
+
+    for config_dict in config_dicts:
+        start = time.time()
+        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        seq_name = os.path.basename(project_dir)
+        frame_range = config_dict.get('project').get('frame_range')
+        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+
+        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info(f"Augmentation process for {seq_name}, for {frames}.")
+        logging.info("---------------------------------------------------------------------")
+        logging.info(f"\nProject directory: {project_dir}")
+
+        augmentTRC(config_dict)
+
+        end = time.time()
+        logging.info(f'Augmentation took {end - start:.2f} s.')
+
 
 
 def opensimProcessing(config=None):
@@ -469,4 +500,4 @@ def opensimProcessing(config=None):
     
     #     end = time.time()
     #     logging.info(f'Model scaling took {end-start:.2f} s.')
-    
+
