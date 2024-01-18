@@ -366,6 +366,7 @@ def triangulation(config=None):
         start = time.time()
         project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
         seq_name = os.path.basename(project_dir)
+        pose_model = config_dict.get('pose').get('pose_model')
         frame_range = config_dict.get('project').get('frame_range')
         frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
