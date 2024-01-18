@@ -1210,7 +1210,7 @@ def calibrate_cams_all(config):
 
     # Read config
     project_dir = config.get('project').get('project_dir')
-    calib_dir = [os.path.join(project_dir, c) for c in os.listdir(project_dir) if ('Calib' or 'calib') in c][0]
+    calib_dir = [os.path.join(project_dir, c) for c in os.listdir(project_dir) if ('Calib' in c or 'calib' in c)][0]
     calib_type = config.get('calibration').get('calibration_type')
 
     if calib_type=='convert':
