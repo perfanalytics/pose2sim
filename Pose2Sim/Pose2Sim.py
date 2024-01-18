@@ -345,8 +345,6 @@ def triangulation(config=None):
     '''
 
     from Pose2Sim.triangulation import triangulate_all
-    from Pose2Sim.augmenter import augmentTRC
-    from Pose2Sim.filtering import filter_all
 
     # Determine the level at which the function is called (session:3, participant:2, trial:1)
     level, config_dicts = read_config_files(config)
