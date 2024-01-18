@@ -37,12 +37,13 @@ import json
 import itertools as it
 import toml
 from tqdm import tqdm
+import cv2
 from anytree import RenderTree
 from anytree.importer import DictImporter
 import logging
 
-from Pose2Sim.common import computeP, weighted_triangulation, reprojection, \
-    euclidean_distance, natural_sort
+from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
+    reprojection, euclidean_distance, natural_sort
 from Pose2Sim.skeletons import *
 
 
@@ -88,7 +89,7 @@ def persons_combinations(json_files_framef):
     return personsIDs_comb
 
 
-def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_combinations, projection_matrices, tracked_keypoint_id):
+def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_combinations, projection_matrices, tracked_keypoint_id, calib_params):
     '''
     At the same time, chooses the right person among the multiple ones found by
     OpenPose & excludes cameras with wrong 2d-pose estimation.
@@ -112,8 +113,9 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
     '''
     
     error_threshold_tracking = config.get('personAssociation').get('reproj_error_threshold_association')
+    likelihood_threshold = config.get('personAssociation').get('likelihood_threshold_association')
     min_cameras_for_triangulation = config.get('triangulation').get('min_cameras_for_triangulation')
-    likelihood_threshold = config.get('triangulation').get('likelihood_threshold')
+    undistort_points = config.get('triangulation').get('undistort_points')
 
     n_cams = len(json_files_framef)
     error_min = np.inf 
@@ -136,6 +138,13 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
                         y_files.append(np.nan)
                         likelihood_files.append(np.nan)
             
+            # undistort points
+            if undistort_points:
+                points = np.array(tuple(zip(x_files,y_files))).reshape(-1, 1, 2).astype('float32')
+                undistorted_points = [cv2.undistortPoints(points[i], calib_params['K'][i], calib_params['dist'][i], None, calib_params['optim_K'][i]) for i in range(n_cams)]
+                x_files = np.array([[u[i][0][0] for i in range(len(u))] for u in undistorted_points]).squeeze()
+                y_files = np.array([[u[i][0][1] for i in range(len(u))] for u in undistorted_points]).squeeze()
+            
             # Replace likelihood by 0. if under likelihood_threshold
             likelihood_files = [0. if lik < likelihood_threshold else lik for lik in likelihood_files]
             
@@ -153,13 +162,23 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
                 y_files_filt = [y_files[i] for i in range(len(comb)) if not np.isnan(comb[i])]
                 likelihood_files_filt = [likelihood_files[i] for i in range(len(comb)) if not np.isnan(comb[i])]
                 projection_matrices_filt = [projection_matrices[i] for i in range(len(comb)) if not np.isnan(comb[i])]
+                if undistort_points:
+                    calib_params_R_filt = [calib_params['R'][i] for i in range(len(comb)) if not np.isnan(comb[i])]
+                    calib_params_T_filt = [calib_params['T'][i] for i in range(len(comb)) if not np.isnan(comb[i])]
+                    calib_params_K_filt = [calib_params['K'][i] for i in range(len(comb)) if not np.isnan(comb[i])]
+                    calib_params_dist_filt = [calib_params['dist'][i] for i in range(len(comb)) if not np.isnan(comb[i])]
                 
                 # Triangulate 2D points
                 Q_comb = weighted_triangulation(projection_matrices_filt, x_files_filt, y_files_filt, likelihood_files_filt)
                 
                 # Reprojection
-                x_calc, y_calc = reprojection(projection_matrices_filt, Q_comb)
-                                
+                if undistort_points:
+                    coords_2D_kpt_calc_filt = [cv2.projectPoints(np.array(Q_comb[:-1]), calib_params_R_filt[i], calib_params_T_filt[i], calib_params_K_filt[i], calib_params_dist_filt[i])[0] for i in range(n_cams-nb_cams_off)]
+                    x_calc = [coords_2D_kpt_calc_filt[i][0,0,0] for i in range(n_cams-nb_cams_off)]
+                    y_calc = [coords_2D_kpt_calc_filt[i][0,0,1] for i in range(n_cams-nb_cams_off)]
+                else:
+                    x_calc, y_calc = reprojection(projection_matrices_filt, Q_comb)
+                                                
                 # Reprojection error
                 error_comb_per_cam = []
                 for cam in range(len(x_calc)):
@@ -168,7 +187,7 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
                     error_comb_per_cam.append( euclidean_distance(q_file, q_calc) )
                 error_comb.append( np.mean(error_comb_per_cam) )
             
-            error_min = min(error_comb)
+            error_min = np.nanmin(error_comb)
             persons_and_cameras_combination = combinations_with_cams_off[np.argmin(error_comb)]
             
             if error_min < error_threshold_tracking:
@@ -198,7 +217,7 @@ def recap_tracking(config, error, nb_cams_excluded):
     project_dir = config.get('project').get('project_dir')
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
-    error_threshold_tracking = config.get('personAssociation').get('error_threshold_tracking')
+    error_threshold_tracking = config.get('personAssociation').get('reproj_error_threshold_association')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
@@ -247,6 +266,7 @@ def track_2d_all(config):
     pose_model = config.get('pose').get('pose_model')
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
     frame_range = config.get('project').get('frame_range')
+    undistort_points = config.get('triangulation').get('undistort_points')
     
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
@@ -254,8 +274,9 @@ def track_2d_all(config):
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
 
     # projection matrix from toml calibration file
-    P = computeP(calib_file)
-    
+    P = computeP(calib_file, undistort=undistort_points)
+    calib_params = retrieve_calib_params(calib_file)
+        
     # selection of tracked keypoint id
     try: # from skeletons.py
         model = eval(pose_model)
@@ -295,7 +316,7 @@ def track_2d_all(config):
         personsIDs_comb = persons_combinations(json_files_f) 
         
         # choose person of interest and exclude cameras with bad pose estimation
-        error_min, persons_and_cameras_combination = best_persons_and_cameras_combination(config, json_files_f, personsIDs_comb, P, tracked_keypoint_id)
+        error_min, persons_and_cameras_combination = best_persons_and_cameras_combination(config, json_files_f, personsIDs_comb, P, tracked_keypoint_id, calib_params)
         error_min_tot.append(error_min)
         cameras_off_count = np.count_nonzero(np.isnan(persons_and_cameras_combination))
         cameras_off_tot.append(cameras_off_count)

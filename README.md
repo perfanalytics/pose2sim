@@ -13,10 +13,18 @@
 
 # Pose2Sim
 
+
+## Please set undistort_points to false for now since reprojection error is currently inaccurate. I'll try to fix it soon.
+
 > **_News_: Version 0.5 released:** \
-**Deep change in folder structure to allow batch processing!**\
-To upgrade, type `pip install pose2sim --upgrade`.\
-*N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
+> **Deep change in the folder structure to allow for automatic batch processing!**\
+Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
+and lens distortions are better taken into account.\
+To upgrade, type `pip install pose2sim --upgrade`.
+>
+> *N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
+
+<br>
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to the more usual marker-based motion capture methods. It aims to provide a free tool to obtain research-grade results from consumer-grade equipment. Any combination of phone, webcam, gopro, etc can be used.
 
@@ -161,7 +169,7 @@ Session_s1         \ <i><b>Config.toml</i></b>
     └── Trial_t1   \ <i><b>Config.toml</i></b>
 </pre>
 
-Run Pose2Sim from the `Session` folder if you want to batch process the whole session, from the `Participant` folder if you want to batch process all the trials of a participant, or from the `Trial` folder if you want to process a single trial.
+Run Pose2Sim from the `Session` folder if you want to batch process the whole session, from the `Participant` folder if you want to batch process all the trials of a participant, or from the `Trial` folder if you want to process a single trial. There should be one `Calibration` folder per session. 
 
 Global instructions are given in the Config.toml file of the `Session` folder, and can be altered for specific `Participants` or `Trials` by uncommenting keys and their values in their respective Config.toml files.\
 Try uncommenting `[project]` and set `frame_range = [10,300]` for a Participant for example, or uncomment `[filtering.butterworth]` and set `cut_off_frequency = 10` for a Trial.
@@ -229,7 +237,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     > *N.B.:* _Intrinsic parameters:_ camera properties (focal length, optical center, distortion), usually need to be calculated only once in their lifetime. In theory, cameras with same model and same settings will have identical intrinsic parameters.\
     > *N.B.:* If you already calculated intrinsic parameters earlier, you can skip this step by setting `overwrite_intrinsics` to false.
 
-    - Create a folder for each camera in your `calibration\intrinsics` folder.
+    - Create a folder for each camera in your `Calibration\intrinsics` folder.
     - For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
     - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file.
     - Make sure that the board:
@@ -365,6 +373,8 @@ Output:\
 
 ### Triangulating keypoints
 > _**Triangulate your 2D coordinates in a robust way.**_ \
+> The triangulation is weighted by the likelihood of each detected 2D keypoint, provided that they meet a likelihood threshold.\
+  If the reprojection error is above a threshold, right and left sides are swapped; if it is still above, cameras are removed until the threshold is met. If more cameras are removed than threshold, triangulation is skipped for this point and this frame. In the end, missing values are interpolated.\
 > _**N.B.:**_ You can visualize your resulting 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
@@ -385,6 +395,7 @@ Output:\
 
 ### Filtering 3D coordinates
 > _**Filter your 3D coordinates.**_\
+> Numerous filter types are provided, and can be tuned accordingly.\
 > _**N.B.:**_ You can visualize your resulting filtered 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
@@ -404,6 +415,22 @@ Output:\
 
 </br>
 
+### Marker Augmentation (Test)
+Set parameters(height, mass) in [project] of Config.toml
+
+Open a terminal, enter `pip show pose2sim`, report package location. \
+Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo\S00_Demo_Session`. \
+Type `ipython`, If you want to triangulate and marker augment without filtering, test the following code:
+``` python
+from Pose2Sim import Pose2Sim
+Pose2Sim.augmenter()
+```
+Recommand you augment markers after filtering.\
+The .trc file should be located in pose-3d folder.\
+If you enter inexact height, model'll be unstable.\
+If there is a Nan value in the .trc file, it will not work properly.\
+Should input Marker_add.xml in OpenSim when you scale your model.
+
 ## OpenSim kinematics
 > _**Obtain 3D joint angles.**_\
 > Your OpenSim .osim scaled model and .mot inverse kinematic results will be found in the OpenSim folder of your `Participant` directory.
@@ -411,8 +438,8 @@ Output:\
 ### OpenSim Scaling
 1. Use the previous steps to capture a static pose, typically an A-pose or a T-pose.
 2. Open OpenSim.
-3. Open the provided `Model_Pose2Sim_Body25b.osim` model from `pose2sim/Empty_project/opensim`. *(File -> Open Model)*
-4. Load the provided `Scaling_Setup_Pose2Sim_Body25b.xml` scaling file from `pose2sim/Empty_project/opensim`. *(Tools -> Scale model -> Load)*
+3. Open the provided `Model_Pose2Sim_Body25b.osim` model from `Demo/OpenSim_Setup`. *(File -> Open Model)*
+4. Load the provided `Scaling_Setup_Pose2Sim_Body25b.xml` scaling file. *(Tools -> Scale model -> Load)*
 5. Replace the example static .trc file with your own data.
 6. Run
 7. Save the new scaled OpenSim model.
@@ -420,10 +447,9 @@ Output:\
 ### OpenSim Inverse kinematics
 1. Use Pose2Sim to generate 3D trajectories.
 2. Open OpenSim.
-3. Load the provided `IK_Setup_Pose2Sim_Body25b.xml` scaling file from `pose2sim/Empty_project/opensim`. *(Tools -> Inverse kinematics -> Load)*
+3. Load the provided `IK_Setup_Pose2Sim_Body25b.xml` scaling file from `Demo/OpenSim_Setup`. *(Tools -> Inverse kinematics -> Load)*
 4. Replace the example .trc file with your own data, and specify the path to your angle kinematics output file.
 5. Run
-6. Motion results will appear as .mot file in the `pose2sim/Empty_project/opensim` directory (automatically saved).
 
 <img src="Content/OpenSim.JPG" width="380">
 
@@ -545,6 +571,9 @@ Build a trc file from a .mot motion file and a .osim model file.
 [bodykin_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/bodykin_from_mot_osim.py)
 Converts a mot file to a .csv file with rotation and orientation of all segments.
 
+[reproj_from_trc_calib.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/reproj_from_trc_calib.py)
+Reprojects 3D coordinates of a trc file to the image planes defined by a calibration file. Output in OpenPose or DeepLabCut format.
+
    </pre>
 </details>
 
@@ -638,12 +667,12 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Triangulation:** Show how many cameras on average had to be excluded for each keypoint.
 &#10004; **Triangulation:** Evaluate which cameras were the least reliable.
 &#10004; **Triangulation:** Show which frames had to be interpolated for each keypoint.
-&#9634; **Triangulation:** [Undistort](https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c) 2D points before triangulating (and [distort](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301) them before computing reprojection error).
+&#10004; **Triangulation:** Solve limb swapping (although not really an issue with Body_25b). Try triangulating with opposite side if reprojection error too large. Alternatively, ignore right and left sides, use RANSAC or SDS triangulation, and then choose right or left by majority voting. More confidence can be given to cameras whose plane is the most coplanar to the right/left line.
+&#10004; **Triangulation:** [Undistort](https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c) 2D points before triangulating (and [distort](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301) them before computing reprojection error).
 &#9634; **Triangulation:** Multiple person kinematics (output multiple .trc coordinates files). Triangulate all persons with reprojection error above threshold, and identify them by minimizing their displacement across frames.
 &#9634; **Triangulation:** Offer the possibility to augment the triangulated data with [the OpenCap LSTM](https://github.com/stanfordnmbl/opencap-core/blob/main/utilsAugmenter.py). Create "BODY_25_AUGMENTED" model, Scaling_setup, IK_Setup.
 &#9634; **Triangulation:** Pre-compile weighted_traingulation and reprojection with @jit(nopython=True, parallel=True) for faster execution.
 &#9634; **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).
-&#9634; **Triangulation:** Solve limb swapping (although not really an issue with Body_25b). Try triangulating with opposite side if reprojection error too large. Alternatively, ignore right and left sides, use RANSAC or SDS triangulation, and then choose right or left by majority voting. More confidence can be given to cameras whose plane is the most coplanar to the right/left line.
 &#9634; **Triangulation:** Implement normalized DLT and RANSAC triangulation, Outlier rejection (sliding z-score?), as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).
 
 &#10004; **Filtering:** Available filtering methods: Butterworth, Butterworth on speed, Gaussian, Median, LOESS (polynomial smoothing).

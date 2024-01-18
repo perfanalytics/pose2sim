@@ -9,7 +9,8 @@
 # If a parameter is not found here, Pose2Sim will look for its value in the 
 # Config.toml file of the level above. This way, you can set global 
 # instructions for the Session and alter them for specific Participants or Trials.
-# If you wish to overwrite a parameter for a specific trial or participant, 
+#
+# If you wish to overwrite a parameter for a specific trial or participant,  
 # edit its Config.toml file by uncommenting its key (e.g., [project])
 # and editing its value (e.g., frame_range = [10,300]). Or else, uncomment 
 # [filtering.butterworth] and set cut_off_frequency = 10, etc.
@@ -25,6 +26,10 @@ frame_range = [] # For example [10,300], or [] for all frames
 
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
+
+## Only taken into account if want to use marker augmentation
+participant_height = 1.7 # m
+participant_mass = 70 # kg
 
 
 # Take heart, calibration is not that complicated once you get the hang of it!
@@ -89,7 +94,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 
 [pose]
 pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
-pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII. 
+pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
 						      #With mediapipe: BLAZEPOSE. 
 						      #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
 						      #With deeplabcut: CUSTOM. See example at the end of the file.
@@ -117,16 +122,20 @@ single_person = true # false for multi-person analysis (not supported yet), true
 tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
 # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
 reproj_error_threshold_association = 20 # px
+likelihood_threshold_association = 0.2
 
 
 [triangulation]
 reproj_error_threshold_triangulation = 15 # px
-likelihood_threshold = 0.3
+likelihood_threshold_triangulation = 0.3
 min_cameras_for_triangulation = 2
 interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
-# 'none' if you don't want to interpolate missing points
+                        # 'none' if you don't want to interpolate missing points
 interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
 show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
+handle_LR_swap = true # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
+undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
+make_c3d = false # save triangulated data in c3d format in addition to trc # Coming soon!
 
 
 [filtering]
@@ -162,10 +171,15 @@ opensim_bin_path = 'C:\OpenSim 4.4\bin'
 
 # CUSTOM skeleton, if you trained your own DeepLabCut model for example. 
 # Make sure the node ids correspond to the column numbers of the 2D pose file, starting from zero.
+# 
 # If you want to perform inverse kinematics, you will also need to create an OpenSim model
 # and add to its markerset the location where you expect the triangulated keypoints to be detected.
+# 
 # In this example, CUSTOM reproduces the BODY_25B skeleton  (default skeletons are stored in skeletons.py).
 # You can create as many custom skeletons as you want, just add them further down and rename them.
+# 
+# Check your model hierarchy with:  for pre, _, node in RenderTree(model): 
+#                                      print(f'{pre}{node.name} id={node.id}')
 [pose.CUSTOM]
 name = "CHip"
 id = "None"

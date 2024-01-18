@@ -91,7 +91,7 @@ def json_display_with_img_func(**args):
         # Display
         if display == True or display == 'True' or display =='1':
             cv2.imshow('', img)
-            cv2.waitKey(10)
+            cv2.waitKey(0)
         
         # Save
         if save == True or save == 'True' or save == '1':

@@ -464,9 +464,17 @@ def filter_all(config):
     
     # Trc paths
     trc_f_in = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
+    trc_f_in_LSTM = f'{seq_name}_{f_range[0]}-{f_range[1]}_LSTM.trc'
     trc_f_out = f'{seq_name}_filt_{filter_type}_{f_range[0]}-{f_range[1]}.trc'
-    trc_path_in = os.path.join(pose3d_dir, trc_f_in)
-    trc_path_out = os.path.join(pose3d_dir, trc_f_out)
+    trc_f_out_LSTM = f'{seq_name}_filt_{filter_type}_{f_range[0]}-{f_range[1]}_LSTM.trc'
+    if os.path.exists(os.path.join(pose3d_dir, trc_f_in_LSTM)):
+        trc_path_in = os.path.join(pose3d_dir, trc_f_in_LSTM)
+        trc_path_out = os.path.join(pose3d_dir, trc_f_out_LSTM)
+    elif os.path.exists(os.path.join(pose3d_dir, trc_f_in)):
+        trc_path_in = os.path.join(pose3d_dir, trc_f_in)
+        trc_path_out = os.path.join(pose3d_dir, trc_f_out)
+    else:
+        raise FileNotFoundError("Not found .trc file.")
     
     # Read trc header
     with open(trc_path_in, 'r') as trc_file:
