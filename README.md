@@ -377,7 +377,7 @@ Output:\
   If the reprojection error is above a threshold, right and left sides are swapped; if it is still above, cameras are removed until the threshold is met. If more cameras are removed than threshold, triangulation is skipped for this point and this frame. In the end, missing values are interpolated.\
 > \
 > If you want to use the Marker augmenter, follow these instructions.\
-> **Should installed tensorflow, you can install like this 'pip install tensorflow'**
+> **Should installed tensorflow, you can install like this 'pip install tensorflow'**\
 > Set parameters(height, mass) in [project] of Config.toml\
 > The .trc file should be located in pose-3d folder.\
 > **If you enter inexact height, model'll be unstable.**\
