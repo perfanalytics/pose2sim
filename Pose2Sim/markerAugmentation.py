@@ -68,6 +68,7 @@ def augmentTRC(config_dict):
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     pathOutputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
+    pose_model = config_dict.get('pose').get('pose_model')
     subject_height = config_dict.get('markerAugmentation').get('participant_height')
     if subject_height is None or subject_height == 0:
         raise ValueError("Subject height is not set or invalid in the config file.")
@@ -76,6 +77,9 @@ def augmentTRC(config_dict):
     augmenterModelName = 'LSTM'
     augmenter_model = 'v0.3'
     offset = True
+
+    if pose_model not in ['BODY_25', 'BODY_25B']:
+        raise ValueError('Marker augmentation is only supported with OpenPose BODY_25 and BODY_25B models.')
 
     # Apply all trc files
     trc_files = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if '_LSTM' not in f]
