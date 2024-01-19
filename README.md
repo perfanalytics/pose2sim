@@ -435,6 +435,11 @@ Output:\
 > _**Use the Stanford LSTM model to estimate the position of 47 virtual markers.**_\
 > _**N.B.:**_ You can visualize your resulting filtered 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap) 
 
+_**Note that results are surprisingly not necessarily better after marker augmentation.**_\
+**Make sure that `participant_height` is correct in your `Config.toml` file.** `participant_mass` is mostly optional.\
+Will not work properly if missing values are not interpolated (i.e., if there are Nan value in the .trc file).
+
+
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
 Type `ipython`.
 
@@ -442,11 +447,6 @@ Type `ipython`.
 from Pose2Sim import Pose2Sim
 Pose2Sim.markerAugmentation()
 ```
-
-**Make sure that `participant_height` is correct in your `Config.toml` file.**\
-`participant_mass` is mostly optional.\
-Will not work properly if missing values are not interpolated (i.e., if there are Nan value in the .trc file).
-
 
 </br>
 
