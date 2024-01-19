@@ -26,13 +26,9 @@
 
 # exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
-
-## Only taken into account if want to use marker augmentation
-# participant_height = 1.7 # m
-# participant_mass = 70 # kg
-
-
 ## Take heart, calibration is not that complicated once you get the hang of it!
+
+
 # [calibration]
 # calibration_type = 'convert' # 'convert' or 'calculate'
 
@@ -159,6 +155,12 @@
    # nb_values_used = 30 # = fraction of data used * nb frames
    # [filtering.median]
    # kernel_size = 9
+
+
+# [markerAugmentation] 
+# ## Only works on BODY_25 and BODY_25B models
+# participant_height = 1.7 # m
+# participant_mass = 70 # kg
 
 
 # [opensim]

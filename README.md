@@ -16,18 +16,17 @@
 
 ## Please set undistort_points and handle_LR_swap to false for now since reprojection error is currently inaccurate. I'll try to fix it soon.
 
-> **_News_: Version 0.5 released:** \
+> **_News_: Version 0.5 released:**\
 > **Deep change in the folder structure to allow for automatic batch processing!**\
-<!--The Stanford LSTM marker augmentation is now supported!\
-Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
+**The Stanford LSTM marker augmentation is now supported!** (Thank you [@rlagnsals](https://github.com/rlagnsals))
+<!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
 > To upgrade, type `pip install pose2sim --upgrade`.
 >
-> *N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
 
 <br>
 
-`Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to the more usual marker-based motion capture methods. It aims to provide a free tool to obtain research-grade results from consumer-grade equipment. Any combination of phone, webcam, gopro, etc can be used.
+`Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to the more usual marker-based motion capture methods. It aims to provide a free tool to obtain research-grade results from consumer-grade equipment. Any combination of phone, webcam, GoPro, etc can be used.
 
 Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoints coordinates obtained from multiple videos) and leads to an OpenSim result (full-body 3D joint angles). Other 2D pose estimators such as BlazePose, DeeplLabCut, AlphaPose, etc. can now be used as inputs.
 
@@ -37,6 +36,22 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
 
 <img src='Content/Activities_verylow.gif' title='Other more or less challenging tasks and conditions.' width="760">
+
+> *N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
+</br>
+
+**Pose2Sim releases:**
+- [x] v0.1: Published online
+- [x] v0.2: Published associated paper
+- [x] v0.3: Supported other pose estimation algorithms
+- [x] v0.4: New calibration tool based on scene measurements
+- [x] v0.5: Automatic batch processing
+- [ ] v0.6: Marker augmentation, Handling left/right swaps, Correcting lens distortions
+- [ ] v0.7: Calibration based on keypoint detection
+- [ ] v0.8: Supports multi-person analysis
+- [ ] v0.9: New synchronization tool
+- [ ] v0.10: Graphical User Interface
+- [ ] v1.0: First accomplished release
 
 </br>
 
@@ -62,6 +77,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
       1. [Associate persons across cameras](#associate-persons-across-cameras)
       2. [Triangulating keypoints](#triangulating-keypoints)
       3. [Filtering 3D coordinates](#filtering-3d-coordinates)
+      4. [Marker augmentation](#marker-augmentation)
    6. [OpenSim kinematics](#opensim-kinematics)
       1. [OpenSim Scaling](#opensim-scaling)
       2. [OpenSim Inverse kinematics](#opensim-inverse-kinematics)
@@ -114,8 +130,8 @@ Pose2Sim.calibration()
 Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
 Pose2Sim.filtering()
+Pose2Sim.markerAugmentation()
 ```
-You should obtain a plot of all the 3D coordinates trajectories.\
 3D results are stored as .trc files in each trial folder in the `pose-3d` directory.
 
 *N.B.:* Default parameters have been provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S00_Demo_Session/Config.toml) but can be edited.\
@@ -128,12 +144,12 @@ You should obtain a plot of all the 3D coordinates trajectories.\
 
 ### Scaling
 1. Open OpenSim.
-2. Open the provided `Model_Pose2Sim_Body25b.osim` model from `Pose2Sim/Demo/OpenSim`. *(File -> Open Model)*
-3. Load the provided `Scaling_Setup_Pose2Sim_Body25b.xml` scaling file from `Pose2Sim/Demo/OpenSim`. *(Tools -> Scale model -> Load)*
+2. Open the provided `Model_Pose2Sim_LSTM.osim` model from `Pose2Sim/OpenSim_Setup`. *(File -> Open Model)*
+3. Load the provided `Scaling_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Scale model -> Load)*
 4. Run. You should see your skeletal model take the static pose.
 
 ### Inverse kinematics
-1. Load the provided `IK_Setup_Pose2Sim_Body25b.xml` scaling file from `Pose2Sim/Demo/OpenSim`. *(Tools -> Inverse kinematics -> Load)*
+1. Load the provided `IK_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Inverse kinematics -> Load)*
 2. Run. You should see your skeletal model move in the Vizualizer window.
 <br/>
 
@@ -385,7 +401,7 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.triangulation()
 ```
 
-Check printed output, and vizualise your trc in OpenSim: `File -> Preview experimental data`.\
+Check printed output, and visualize your trc in OpenSim: `File -> Preview experimental data`.\
 If your triangulation is not satisfying, try and release the constraints in the `Config.toml` file.
 
 Output:\
@@ -415,21 +431,24 @@ Output:\
 
 </br>
 
-### Marker Augmentation (Test)
-Set parameters(height, mass) in [project] of Config.toml
+### Marker Augmentation
+> _**Use the Stanford LSTM model to estimate the position of 47 virtual markers.**_\
+> _**N.B.:**_ You can visualize your resulting filtered 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap) 
 
-Open a terminal, enter `pip show pose2sim`, report package location. \
-Copy this path and go to the Demo folder with `cd <path>\pose2sim\Demo\S00_Demo_Session`. \
-Type `ipython`, If you want to triangulate and marker augment without filtering, test the following code:
+Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Type `ipython`.
+
 ``` python
 from Pose2Sim import Pose2Sim
-Pose2Sim.augmenter()
+Pose2Sim.markerAugmentation()
 ```
-Recommand you augment markers after filtering.\
-The .trc file should be located in pose-3d folder.\
-If you enter inexact height, model'll be unstable.\
-If there is a Nan value in the .trc file, it will not work properly.\
-Should input Marker_add.xml in OpenSim when you scale your model.
+
+**Make sure that `participant_height` is correct in your `Config.toml` file.**\
+`participant_mass` is mostly optional.\
+Will not work properly if missing values are not interpolated (i.e., if there are Nan value in the .trc file).
+
+
+</br>
 
 ## OpenSim kinematics
 > _**Obtain 3D joint angles.**_\
@@ -719,20 +738,8 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 - Supervised my PhD: [@lreveret](https://github.com/lreveret) (INRIA, Université Grenoble Alpes), and [@mdomalai](https://github.com/mdomalai) (Université de Poitiers).
 - Provided the Demo data: [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
 - Tested the code and provided feedback: [@simonozan](https://github.com/simonozan), [@daeyongyang](https://github.com/daeyongyang), [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals)
-- Submitted various accepted pull requests: [@ANaaim](https://github.com/ANaaim)
+- Submitted various accepted pull requests: [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals)
 - Provided a code snippet for Optitrack calibration: [@claraaudap](https://github.com/claraaudap) (Université Bretagne Sud).
 - Issued MPP2SOS, a (non-free) Blender extension based on Pose2Sim: [@carlosedubarreto](https://github.com/carlosedubarreto)
 
-</br>
 
-**Pose2Sim releases:**
-- [x] v0.1: Published online
-- [x] v0.2: Published associated paper
-- [x] v0.3: Supported other pose estimation algorithms
-- [x] v0.4: New calibration tool based on scene measurements
-- [x] v0.5: Batch processing
-- [ ] v0.6: Calibration based on keypoint detection
-- [ ] v0.7: Supports multi-person analysis
-- [ ] v0.8: New synchronization tool
-- [ ] v0.9: Graphical User Interface
-- [ ] v1.0: First accomplished release
