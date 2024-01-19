@@ -9,6 +9,7 @@
 # If a parameter is not found here, Pose2Sim will look for its value in the 
 # Config.toml file of the level above. This way, you can set global 
 # instructions for the Session and alter them for specific Participants or Trials.
+# 
 # If you wish to overwrite a parameter for a specific trial or participant, 
 # edit its Config.toml file by uncommenting its key (e.g., [project])
 # and editing its value (e.g., frame_range = [10,300]). Or else, uncomment 
@@ -25,13 +26,9 @@
 
 # exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
-
-# participant_height = 1.7 # m
-# participant_mass = 70 # kg
-## Only taken into account if pose_model is 'BODY_25_AUGMENTED' # Coming soon!
-
-
 ## Take heart, calibration is not that complicated once you get the hang of it!
+
+
 # [calibration]
 # calibration_type = 'convert' # 'convert' or 'calculate'
 
@@ -94,8 +91,7 @@
 
 # [pose]
 # pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
-# pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII, 
-                        #               BODY_25_AUGMENTED # Coming soon! 
+# pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII,
 # 						      #With mediapipe: BLAZEPOSE. 
 # 						      #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
 # 						      #With deeplabcut: CUSTOM. See example at the end of the file.
@@ -139,9 +135,9 @@
 # make_c3d = false # save triangulated data in c3d format in addition to trc # Coming soon!
 
 
-[filtering]
+# [filtering]
 # type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
-display_figures = true # true or false (lowercase)
+# display_figures = true # true or false (lowercase)
 
    # [filtering.butterworth]
    # order = 4 
@@ -161,8 +157,14 @@ display_figures = true # true or false (lowercase)
    # kernel_size = 9
 
 
+# [markerAugmentation] 
+# ## Only works on BODY_25 and BODY_25B models
+# participant_height = 1.7 # m
+# participant_mass = 70 # kg
+
+
 # [opensim]
-# static_trial = ['S01_P00_Participant0/S01_P00_T00_StaticTrial']
+# static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
 #              # If this Config.toml file is at the Trial level, set to true or false (lowercase);
 #              # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
 #              # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']
