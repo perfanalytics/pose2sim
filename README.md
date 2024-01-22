@@ -657,7 +657,8 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Pose:** Support [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) as an alternative to OpenPose.
 &#10004; **Pose:** Define custom model in config.toml rather than in skeletons.py.
 &#9634; **Pose:** Support [MMPose](https://github.com/open-mmlab/mmpose), [SLEAP](https://sleap.ai/), etc.
-&#9634; **Pose:** Access skeletons more easily by storing them in skeletons.toml.
+&#9634; **Pose:** Directly reading from DeepLabCut .csv or .h5 files instead of converting to .json (triangulation, person association, calibration, synchronization...) 
+&#9634; **Pose:** GUI help for DeepLabCut model creation.
 
 &#10004; **Calibration:** Convert [Qualisys](https://www.qualisys.com) .qca.txt calibration file.
 &#10004; **Calibration:** Convert [Optitrack](https://optitrack.com/) extrinsic calibration file.
@@ -673,9 +674,6 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#9634; **Calibration:** Support ChArUco board detection (see [there](https://mecaruco2.readthedocs.io/en/latest/notebooks_rst/Aruco/sandbox/ludovic/aruco_calibration_rotation.html)).
 &#9634; **Calibration:** Calculate calibration with points rather than board. (1) SBA calibration with wand (cf [Argus](https://argus.web.unc.edu), see converter [here](https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py)). Set world reference frame in the end.
 &#9634; **Calibration:** Alternatively, self-calibrate with [OpenPose keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
-
-&#9634; **Pose:** Directly reading from DeepLabCut .csv or .h5 files instead of converting to .json (triangulation, person association, calibration, synchronization...) 
-&#9634; **Pose:** GUI help for DeepLabCut model creation.
 
 &#9634; **Synchronization:** Synchronize cameras on 2D keypoint speeds. Cf [this draft script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).
 
