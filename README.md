@@ -336,8 +336,8 @@ If you need to detect specific points on a human being, an animal, or an object,
     import toml, anytree
     config = toml.load(config_path)
     pose_model = config.get('pose').get('pose_model')
-    model = DictImporter().import_(config.get('pose').get(pose_model))
-    for pre, _, node in RenderTree(model): 
+    model = anytree.importer.DictImporter().import_(config.get('pose').get(pose_model))
+    for pre, _, node in anytree.RenderTree(model): 
         print(f'{pre}{node.name} id={node.id}')
    ```
 4. Create an OpenSim model if you need inverse kinematics.
@@ -673,6 +673,9 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#9634; **Calibration:** Support ChArUco board detection (see [there](https://mecaruco2.readthedocs.io/en/latest/notebooks_rst/Aruco/sandbox/ludovic/aruco_calibration_rotation.html)).
 &#9634; **Calibration:** Calculate calibration with points rather than board. (1) SBA calibration with wand (cf [Argus](https://argus.web.unc.edu), see converter [here](https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py)). Set world reference frame in the end.
 &#9634; **Calibration:** Alternatively, self-calibrate with [OpenPose keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
+
+&#9634; **Pose:** Directly reading from DeepLabCut .csv or .h5 files instead of converting to .json (triangulation, person association, calibration, synchronization...) 
+&#9634; **Pose:** GUI help for DeepLabCut model creation.
 
 &#9634; **Synchronization:** Synchronize cameras on 2D keypoint speeds. Cf [this draft script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).
 
