@@ -435,8 +435,15 @@ Output:\
 > _**Use the Stanford LSTM model to estimate the position of 47 virtual markers.**_\
 > _**N.B.:**_ You can visualize your resulting filtered 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap) 
 
-_**Note that results are surprisingly not necessarily better after marker augmentation.**_\
+_**Note that inverse kinematic results are not necessarily better after marker augmentation.**_
+
 **Make sure that `participant_height` is correct in your `Config.toml` file.** `participant_mass` is mostly optional.\
+Only works with models estimating at least the following keypoints (e.g., not COCO):
+``` python
+ ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
+ "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
+ "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
+```
 Will not work properly if missing values are not interpolated (i.e., if there are Nan value in the .trc file).
 
 
