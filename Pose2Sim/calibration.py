@@ -1229,16 +1229,16 @@ def calibrate_cams_all(config):
                 binning_factor = 1
             elif convert_filetype=='opencap': # all files with .pickle extension
                 convert_ext = '.pickle'
-                file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}'))
+                file_to_convert_path = sorted(glob.glob(os.path.join(calib_dir, f'*{convert_ext}')))
                 binning_factor = 1
             elif convert_filetype=='easymocap': #intri.yml and intri.yml
                 convert_ext = '.yml'
-                file_to_convert_path = glob.glob(os.path.join(calib_dir, '*.yml'))
+                file_to_convert_path = sorted(glob.glob(os.path.join(calib_dir, '*.yml')))
                 binning_factor = 1
             elif convert_filetype=='biocv': # all files without extension
                 convert_ext = 'no'
                 list_dir = os.listdir(calib_dir)
-                list_dir_noext = [os.path.splitext(f)[0] for f in list_dir if os.path.splitext(f)[1]=='']	
+                list_dir_noext = sorted([os.path.splitext(f)[0] for f in list_dir if os.path.splitext(f)[1]==''])
                 file_to_convert_path = [os.path.join(calib_dir,f) for f in list_dir_noext if os.path.isfile(os.path.join(calib_dir, f))]
                 binning_factor = 1
             elif convert_filetype=='biocv' or convert_filetype=='biocv': # no conversion needed, skips this stage
