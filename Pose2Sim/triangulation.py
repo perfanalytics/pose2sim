@@ -330,13 +330,15 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
                 likelihood_files_filt[i][id_cams_off[i]] = np.nan
         
         # Excluded cameras index and count
-        id_cams_off_tot = [np.argwhere(np.isnan(x)).ravel() for x in likelihood_files_filt]
+        id_cams_off_tot_new = [np.argwhere(np.isnan(x)).ravel() for x in likelihood_files_filt]
         nb_cams_excluded_filt = [np.count_nonzero(np.nan_to_num(x)==0) for x in likelihood_files_filt] # count nans and zeros
         nb_cams_off_tot = max(nb_cams_excluded_filt)
         # print('likelihood_files_filt ',likelihood_files_filt)
         # print('nb_cams_excluded_filt ', nb_cams_excluded_filt, 'nb_cams_off_tot ', nb_cams_off_tot)
         if nb_cams_off_tot > n_cams - min_cameras_for_triangulation:
             break
+        id_cams_off_tot = id_cams_off_tot_new
+        
         # print('still in loop')
         if undistort_points:
             calib_params_K_filt = [ [ c[i] for i in range(n_cams) if not np.isnan(likelihood_files_filt[j][i]) and not likelihood_files_filt[j][i]==0. ] for j, c in enumerate(calib_params_K_filt) ]
@@ -625,9 +627,9 @@ def triangulate_all(config):
 
         # Replace likelihood by 0 if under likelihood_threshold
         with np.errstate(invalid='ignore'):
-            x_files[likelihood_files<likelihood_threshold] = 0.
-            y_files[likelihood_files<likelihood_threshold] = 0.
-            likelihood_files[likelihood_files<likelihood_threshold] = 0.
+            x_files[likelihood_files<likelihood_threshold] = np.nan
+            y_files[likelihood_files<likelihood_threshold] = np.nan
+            likelihood_files[likelihood_files<likelihood_threshold] = np.nan
         
         Q, error, nb_cams_excluded, id_excluded_cams = [], [], [], []
         for keypoint_idx in keypoints_idx:
