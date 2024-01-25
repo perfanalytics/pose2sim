@@ -38,7 +38,7 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def RT_qca2cv(r, t):
+def world_to_camera_persp(r, t):
     '''
     Converts rotation R and translation T 
     from Qualisys object centered perspective
@@ -126,9 +126,9 @@ def write_opencap_pickle(output_calibration_folder, C, S, D, K, R, T):
     for i in range(len(C)):
         # Transform rotation for vertical frame of reference (checkerboard vertical with OpenCap)
         R_mat = cv2.Rodrigues(R[i])[0] # transform in matrix
-        R_w, T_w = RT_qca2cv(R_mat, T[i]) # transform in world centered perspective
+        R_w, T_w = world_to_camera_persp(R_mat, T[i]) # transform in world centered perspective
         R_w_90, T_w_90 = rotate_cam(R_w, T_w, ang_x=-np.pi/2, ang_y=0, ang_z=np.pi) # rotate cam wrt world frame
-        R_c, T_c = RT_qca2cv(R_w_90, T_w_90) # transform in camera centered perspective
+        R_c, T_c = world_to_camera_persp(R_w_90, T_w_90) # transform in camera centered perspective
 
         # retrieve data
         calib_data = {'distortion': np.append(D[i],np.array([0])),

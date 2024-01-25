@@ -177,10 +177,10 @@ def euclidean_distance(q1, q2):
     return euc_dist
 
 
-def RT_qca2cv(r, t):
+def world_to_camera_persp(r, t):
     '''
     Converts rotation R and translation T 
-    from Qualisys object centered perspective
+    from Qualisys world centered perspective
     to OpenCV camera centered perspective
     and inversely.
 

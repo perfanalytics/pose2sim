@@ -31,7 +31,7 @@
 
 
 ## INIT
-from Pose2Sim.common import RT_qca2cv, rotate_cam, quat2mat, euclidean_distance, natural_sort
+from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort
 
 import os
 import logging
@@ -86,7 +86,7 @@ def calib_qca_fun(file_to_convert_path, binning_factor=1):
     logging.info(f'Converting {file_to_convert_path} to .toml calibration file...')
     ret, C, S, D, K, R, T = read_qca(file_to_convert_path, binning_factor)
     
-    RT = [RT_qca2cv(r,t) for r, t in zip(R, T)]
+    RT = [world_to_camera_persp(r,t) for r, t in zip(R, T)]
     R = [rt[0] for rt in RT]
     T = [rt[1] for rt in RT]
 
@@ -230,7 +230,7 @@ def calib_vicon_fun(file_to_convert_path, binning_factor=1):
     logging.info(f'Converting {file_to_convert_path} to .toml calibration file...')
     ret, C, S, D, K, R, T = read_vicon(file_to_convert_path)
     
-    RT = [RT_qca2cv(r,t) for r, t in zip(R, T)]
+    RT = [world_to_camera_persp(r,t) for r, t in zip(R, T)]
     R = [rt[0] for rt in RT]
     T = [rt[1] for rt in RT]
 
@@ -446,11 +446,11 @@ def calib_opencap_fun(files_to_convert_paths, binning_factor=1):
             
             # Rotate cameras by Pi/2 around x in world frame -> could have just switched some columns in matrix
             # camera frame to world frame
-            R_w, T_w = RT_qca2cv(R_cam, T_cam)
+            R_w, T_w = world_to_camera_persp(R_cam, T_cam)
             # x_rotate -Pi/2 and z_rotate Pi
             R_w_90, T_w_90 = rotate_cam(R_w, T_w, ang_x=-np.pi/2, ang_y=0, ang_z=np.pi)
             # world frame to camera frame
-            R_c_90, T_c_90 = RT_qca2cv(R_w_90, T_w_90)
+            R_c_90, T_c_90 = world_to_camera_persp(R_w_90, T_w_90)
             # store in R and T
             R+=[cv2.Rodrigues(R_c_90)[0].squeeze()]
             T+=[T_cam/1000]

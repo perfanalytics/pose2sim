@@ -118,7 +118,7 @@ def read_qca(qca_path, binning_factor):
     return C, S, D, K, R, T
 
 
-def RT_qca2cv(r, t):
+def world_to_camera_persp(r, t):
     '''
     Converts rotation R and translation T 
     from Qualisys object centered perspective
@@ -216,7 +216,7 @@ def calib_qca_to_toml_func(*args):
 
     C, S, D, K, R, T = read_qca(qca_path, binning_factor)
     
-    RT = [RT_qca2cv(r,t) for r, t in zip(R, T)]
+    RT = [world_to_camera_persp(r,t) for r, t in zip(R, T)]
     R = [rt[0] for rt in RT]
     T = [rt[1] for rt in RT]
 
