@@ -142,7 +142,7 @@ def computeP(calib_file, undistort=False):
             T = np.array(calib[cam]['translation'])
             H = np.block([[R,T.reshape(3,1)], [np.zeros(3), 1 ]])
             
-            P.append(Kh.dot(H))
+            P.append(Kh @ H)
    
     return P
     
@@ -194,8 +194,8 @@ def reprojection(P_all, Q):
     x_calc, y_calc = [], []
     for c in range(len(P_all)):  
         P_cam = P_all[c]
-        x_calc.append(P_cam[0].dot(Q) / P_cam[2].dot(Q))
-        y_calc.append(P_cam[1].dot(Q) / P_cam[2].dot(Q))
+        x_calc.append(P_cam[0] @ Q / (P_cam[2] @ Q))
+        y_calc.append(P_cam[1] @ Q / (P_cam[2] @ Q))
         
     return x_calc, y_calc
     

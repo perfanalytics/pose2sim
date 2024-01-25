@@ -99,7 +99,7 @@ def computeP(calib_file, undistort=False):
             T = np.array(calib[cam]['translation'])
             H = np.block([[R,T.reshape(3,1)], [np.zeros(3), 1 ]])
             
-            P.append(Kh.dot(H))
+            P.append(Kh @ H)
    
     return P
 
@@ -149,8 +149,8 @@ def reprojection(P_all, Q):
     x_calc, y_calc = [], []
     for c in range(len(P_all)):  
         P_cam = P_all[c]
-        x_calc.append(P_cam[0].dot(Q) / P_cam[2].dot(Q))
-        y_calc.append(P_cam[1].dot(Q) / P_cam[2].dot(Q))
+        x_calc.append(P_cam[0] @ Q / (P_cam[2] @ Q))
+        y_calc.append(P_cam[1] @ Q / (P_cam[2] @ Q))
         
     return x_calc, y_calc
         
@@ -188,7 +188,7 @@ def world_to_camera_persp(r, t):
     '''
 
     r = r.T
-    t = - r.dot(t) 
+    t = - r @ t 
 
     return r, t
 
@@ -208,10 +208,10 @@ def rotate_cam(r, t, ang_x=0, ang_y=0, ang_z=0):
     r_ax_x = np.array([1,0,0, 0,np.cos(ang_x),-np.sin(ang_x), 0,np.sin(ang_x),np.cos(ang_x)]).reshape(3,3) 
     r_ax_y = np.array([np.cos(ang_y),0,np.sin(ang_y), 0,1,0, -np.sin(ang_y),0,np.cos(ang_y)]).reshape(3,3)
     r_ax_z = np.array([np.cos(ang_z),-np.sin(ang_z),0, np.sin(ang_z),np.cos(ang_z),0, 0,0,1]).reshape(3,3) 
-    r_ax = r_ax_z.dot(r_ax_y).dot(r_ax_x)
+    r_ax = r_ax_z @ r_ax_y @ r_ax_x
 
     r_ax_h = np.block([[r_ax,np.zeros(3).reshape(3,1)], [np.zeros(3), 1]])
-    r_ax_h__rt_h = r_ax_h.dot(rt_h)
+    r_ax_h__rt_h = r_ax_h @ rt_h
     
     r = r_ax_h__rt_h[:3,:3]
     t = r_ax_h__rt_h[:3,3]

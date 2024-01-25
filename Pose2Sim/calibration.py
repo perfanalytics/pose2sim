@@ -691,8 +691,8 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             # Kh_cam = np.block([mtx, np.zeros(3).reshape(3,1)])
             # r_mat, _ = cv2.Rodrigues(r)
             # H_cam = np.block([[r_mat,t.reshape(3,1)], [np.zeros(3), 1 ]])
-            # P_cam = Kh_cam.dot(H_cam)
-            # proj_obj = [ ( P_cam[0].dot(np.append(o, 1)) /  P_cam[2].dot(np.append(o, 1)),  P_cam[1].dot(np.append(o, 1)) /  P_cam[2].dot(np.append(o, 1)) ) for o in objp]
+            # P_cam = Kh_cam @ H_cam
+            # proj_obj = [ ( P_cam[0] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)),  P_cam[1] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)) ) for o in objp]
             proj_obj = np.squeeze(cv2.projectPoints(objp,r,t,mtx,dist)[0])
 
             # Check calibration results

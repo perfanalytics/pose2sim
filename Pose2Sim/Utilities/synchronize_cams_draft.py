@@ -191,8 +191,8 @@ elif id_kpt == ['all']:
 elif len(id_kpt)==1 and len(id_kpt)==len(weights_kpt): # ex id_kpt1=9 set to 10, id_kpt2=10 to 15
     # ajouter frames
     dict_id_weights = {i:w for i, w in zip(id_kpt, weights_kpt)}
-    camx = df_speed[cam1_nb-1].dot(pd.Series(dict_id_weights).reindex(df_speed[cam1_nb-1].columns, fill_value=0))
-    camy = df_speed[cam2_nb-1].dot(pd.Series(dict_id_weights).reindex(df_speed[cam2_nb-1].columns, fill_value=0))
+    camx = df_speed[cam1_nb-1] @ pd.Series(dict_id_weights).reindex(df_speed[cam1_nb-1].columns, fill_value=0)
+    camy = df_speed[cam2_nb-1] @ pd.Series(dict_id_weights).reindex(df_speed[cam2_nb-1].columns, fill_value=0)
     camx = camx.loc[range(np.array(frames))]
     camy = camy.loc[range(np.array(frames))]
 else:
