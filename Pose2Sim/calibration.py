@@ -366,7 +366,7 @@ def calib_easymocap_fun(files_to_convert_paths, binning_factor=1):
     extrinsic_path, intrinsic_path = files_to_convert_paths
     S, K, D = read_intrinsic_yml(intrinsic_path)
     R, T = read_extrinsic_yml(extrinsic_path)
-    C = np.array(range(len(S)))+1
+    C = np.array(range(len(S)))
     ret = [np.nan]*len(C)
     
     return ret, C, S, D, K, R, T
@@ -397,7 +397,7 @@ def calib_biocv_fun(files_to_convert_paths, binning_factor=1):
         with open(f_path) as f:
             calib_data = f.read().split('\n')
             ret += [np.nan]
-            C += [f'cam_{str(i+1).zfill(2)}']
+            C += [f'cam_{str(i).zfill(2)}']
             S += [[int(calib_data[0]), int(calib_data[1])]]
             D += [[float(d) for d in calib_data[-2].split(' ')[:4]]]
             K += [np.array([k.strip().split(' ') for k in calib_data[2:5]], np.float32)]
@@ -437,7 +437,7 @@ def calib_opencap_fun(files_to_convert_paths, binning_factor=1):
         with open(f_path, 'rb') as f_pickle:
             calib_data = pickle.load(f_pickle)
             ret += [np.nan]
-            C += [f'cam_{str(i+1).zfill(2)}']
+            C += [f'cam_{str(i).zfill(2)}']
             S += [list(calib_data['imageSize'].squeeze()[::-1])]
             D += [list(calib_data['distortion'][0][:-1])]
             K += [calib_data['intrinsicMat']]
@@ -1155,7 +1155,7 @@ def toml_write(calib_path, C, S, D, K, R, T):
 
     with open(os.path.join(calib_path), 'w+') as cal_f:
         for c in range(len(C)):
-            cam=f'[cam_{(c+1):02d}]\n'
+            cam=f'[{C[c]}]\n'
             name = f'name = "{C[c]}"\n'
             size = f'size = [ {S[c][0]}, {S[c][1]}]\n' 
             mat = f'matrix = [ [ {K[c][0,0]}, 0.0, {K[c][0,2]}], [ 0.0, {K[c][1,1]}, {K[c][1,2]}], [ 0.0, 0.0, 1.0]]\n'
