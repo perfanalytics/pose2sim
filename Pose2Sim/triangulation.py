@@ -50,7 +50,7 @@ from anytree.importer import DictImporter
 import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
-    reprojection, euclidean_distance, natural_sort
+    reprojection, euclidean_distance, natural_sort, zup2yup
 from Pose2Sim.skeletons import *
 
 
@@ -66,27 +66,6 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def zup2yup(Q):
-    '''
-    Turns Z-up system coordinates into Y-up coordinates
-
-    INPUT:
-    - Q: pandas dataframe
-    N 3D points as columns, ie 3*N columns in Z-up system coordinates
-    and frame number as rows
-
-    OUTPUT:
-    - Q: pandas dataframe with N 3D points in Y-up system coordinates
-    '''
-    
-    # X->Y, Y->Z, Z->X
-    cols = list(Q.columns)
-    cols = np.array([[cols[i*3+1],cols[i*3+2],cols[i*3]] for i in range(int(len(cols)/3))]).flatten()
-    Q = Q[cols]
-
-    return Q
-
-
 def interpolate_zeros_nans(col, *args):
     '''
     Interpolate missing points (of value zero),
@@ -388,9 +367,16 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
         # print('error ', error)
             
         # Choosing best triangulation (with min reprojection error)
+        # print('\n', error)
+        # print('len(error) ', len(error))
+        # print('len(x_calc_filt) ', len(x_calc_filt))
+        # print('len(likelihood_files_filt) ', len(likelihood_files_filt))
+        # print('len(id_cams_off_tot) ', len(id_cams_off_tot))
+        # print('min error ', np.nanmin(error))
+        # print('argmin error ', np.nanargmin(error))
         error_min = np.nanmin(error)
         # print(error_min)
-        best_cams = np.argmin(error)
+        best_cams = np.nanargmin(error)
         nb_cams_excluded = nb_cams_excluded_filt[best_cams]
         
         Q = Q_filt[best_cams][:-1]
@@ -398,6 +384,7 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
 
         # Swap left and right sides if reprojection error still too high
         if handle_LR_swap and error_min > error_threshold_triangulation:
+            print('handle')
             n_cams_swapped = 1
             error_off_swap_min = error_min
             while error_off_swap_min > error_threshold_triangulation and n_cams_swapped < (n_cams - nb_cams_off_tot) / 2: # more than half of the cameras switched: may triangulate twice the same side
@@ -469,10 +456,19 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
                 Q = Q_best
         
         # print(error_min)
+        
         nb_cams_off += 1
     
     # Index of excluded cams for this keypoint
+    # print('Loop ended')
+    
     if 'best_cams' in locals():
+        # print(id_cams_off_tot)
+        # print('len(id_cams_off_tot) ', len(id_cams_off_tot))
+        # print('id_cams_off_tot ', id_cams_off_tot)
+        id_excluded_cams = id_cams_off_tot[best_cams]
+        # print('id_excluded_cams ', id_excluded_cams)
+        
         id_excluded_cams = id_cams_off_tot[best_cams]
     else:
         id_excluded_cams = list(range(n_cams))
@@ -610,9 +606,12 @@ def triangulate_all(config):
     frames_nb = f_range[1]-f_range[0]
     
     n_cams = len(json_dirs_names)
+
     Q_tot, error_tot, nb_cams_excluded_tot,id_excluded_cams_tot = [], [], [], []
     for f in tqdm(range(*f_range)):
         # Get x,y,likelihood values from files
+        
+        
         json_tracked_files_f = [json_tracked_files[c][f] for c in range(n_cams)]
         # print(json_tracked_files_f)
         x_files, y_files, likelihood_files = extract_files_frame_f(json_tracked_files_f, keypoints_ids)
@@ -634,6 +633,7 @@ def triangulate_all(config):
         Q, error, nb_cams_excluded, id_excluded_cams = [], [], [], []
         for keypoint_idx in keypoints_idx:
         # Triangulate cameras with min reprojection error
+            # print('\n', keypoints_names[keypoint_idx])
             coords_2D_kpt = np.array( (x_files[:, keypoint_idx], y_files[:, keypoint_idx], likelihood_files[:, keypoint_idx]) )
             coords_2D_kpt_swapped = np.array(( x_files[:, keypoints_idx_swapped[keypoint_idx]], y_files[:, keypoints_idx_swapped[keypoint_idx]], likelihood_files[:, keypoints_idx_swapped[keypoint_idx]] ))
 

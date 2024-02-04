@@ -119,7 +119,7 @@
 # tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
 ## and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
 # reproj_error_threshold_association = 20 # px
-# likelihood_threshold_association = 0.2
+# likelihood_error_threshold_association = 0.2
 
 
 # [triangulation]

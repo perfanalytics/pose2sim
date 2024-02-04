@@ -31,12 +31,13 @@
 
 
 ## INIT
-from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort
+from Pose2Sim.common import RT_qca2cv, rotate_cam, quat2mat, euclidean_distance, natural_sort, zup2yup
 
 import os
 import logging
 import pickle
 import numpy as np
+import pandas as pd
 os.environ["OPENCV_LOG_LEVEL"]="FATAL"
 import cv2
 import glob
@@ -632,6 +633,22 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
     ret, R, T = [], [], []
     
     if extrinsics_method in ('board', 'scene'):
+    
+                
+        # Define 3D object points
+        if extrinsics_method == 'board':
+            extrinsics_corners_nb = extrinsics_config_dict.get('board').get('extrinsics_corners_nb')
+            extrinsics_square_size = extrinsics_config_dict.get('board').get('extrinsics_square_size') / 1000 # convert to meters
+            object_coords_3d = np.zeros((extrinsics_corners_nb[0] * extrinsics_corners_nb[1], 3), np.float32)
+            object_coords_3d[:, :2] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]].T.reshape(-1, 2)
+            object_coords_3d[:, :2] = object_coords_3d[:, 0:2] * extrinsics_square_size
+        elif extrinsics_method == 'scene':
+            object_coords_3d = np.array(extrinsics_config_dict.get('scene').get('object_coords_3d'), np.float32)
+                
+        # Save reference 3D coordinates as trc
+        calib_output_path = os.path.join(calib_dir, f'Object_points.trc')
+        trc_write(object_coords_3d, calib_output_path)
+    
         for i, cam in enumerate(extrinsics_cam_listdirs_names):
             logging.info(f'\nCamera {cam}:')
             
@@ -657,20 +674,12 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
 
             # Find corners or label by hand
             if extrinsics_method == 'board':
-                extrinsics_corners_nb = extrinsics_config_dict.get('board').get('extrinsics_corners_nb')
-                extrinsics_square_size = extrinsics_config_dict.get('board').get('extrinsics_square_size') / 1000 # convert to meters
-
-                objp = np.zeros((extrinsics_corners_nb[0] * extrinsics_corners_nb[1], 3), np.float32)
-                objp[:, :2] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]].T.reshape(-1, 2)
-                objp[:, :2] = objp[:, 0:2] * extrinsics_square_size
-                imgp, objp_not_used = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=objp, show=show_reprojection_error)
+                imgp, objp_not_used = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=object_coords_3d, show=show_reprojection_error)
                 if imgp == []:
                     logging.exception('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
                     raise ValueError('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
 
             elif extrinsics_method == 'scene':
-                object_coords_3d = np.array(extrinsics_config_dict.get('scene').get('object_coords_3d'), np.float32)
-
                 imgp, objp = imgp_objp_visualizer_clicker(img, imgp=[], objp=object_coords_3d, img_path=img_vid_files[0])
                 if imgp == []:
                     logging.exception('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
@@ -727,7 +736,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             ret.append(rms_px)
             R.append(r)
             T.append(t)
-    
+        
     elif extrinsics_method == 'keypoints':
         raise NotImplementedError('This has not been integrated yet.')
     
@@ -1136,6 +1145,45 @@ def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False
                     break
 
 
+def trc_write(object_coords_3d, trc_path):
+    '''
+    Make Opensim compatible trc file from a dataframe with 3D coordinates
+
+    INPUT:
+    - object_coords_3d: list of 3D point lists
+    - trc_path: output path of the trc file
+
+    OUTPUT:
+    - trc file with 2 frames of the same 3D points
+    '''
+
+    #Header
+    DataRate = CameraRate = OrigDataRate = 1
+    NumFrames = 2
+    NumMarkers = len(object_coords_3d)
+    keypoints_names = np.arange(NumMarkers)
+    header_trc = ['PathFileType\t4\t(X/Y/Z)\t' + os.path.basename(trc_path), 
+            'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames', 
+            '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, NumFrames])),
+            'Frame#\tTime\t' + '\t\t\t'.join(str(k) for k in keypoints_names) + '\t\t',
+            '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(NumMarkers)])]
+    
+    # Zup to Yup coordinate system
+    object_coords_3d = pd.DataFrame([np.array(object_coords_3d).flatten(), np.array(object_coords_3d).flatten()])
+    object_coords_3d = zup2yup(object_coords_3d)
+    
+    #Add Frame# and Time columns
+    object_coords_3d.index = np.array(range(0, NumFrames)) + 1
+    object_coords_3d.insert(0, 't', object_coords_3d.index / DataRate)
+
+    #Write file
+    with open(trc_path, 'w') as trc_o:
+        [trc_o.write(line+'\n') for line in header_trc]
+        object_coords_3d.to_csv(trc_o, sep='\t', index=True, header=None, lineterminator='\n')
+
+    return trc_path
+
+
 def toml_write(calib_path, C, S, D, K, R, T):
     '''
     Writes calibration parameters to a .toml file
@@ -1241,7 +1289,7 @@ def calibrate_cams_all(config):
                 list_dir_noext = sorted([os.path.splitext(f)[0] for f in list_dir if os.path.splitext(f)[1]==''])
                 file_to_convert_path = [os.path.join(calib_dir,f) for f in list_dir_noext if os.path.isfile(os.path.join(calib_dir, f))]
                 binning_factor = 1
-            elif convert_filetype=='biocv' or convert_filetype=='biocv': # no conversion needed, skips this stage
+            elif convert_filetype=='anipose' or convert_filetype=='freemocap': # no conversion needed, skips this stage
                 logging.info(f'\n--> No conversion needed from AniPose nor from FreeMocap. Calibration skipped.\n')
                 return
             else:
