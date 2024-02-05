@@ -31,7 +31,7 @@
 
 
 ## INIT
-from Pose2Sim.common import RT_qca2cv, rotate_cam, quat2mat, euclidean_distance, natural_sort, zup2yup
+from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort, zup2yup
 
 import os
 import logging

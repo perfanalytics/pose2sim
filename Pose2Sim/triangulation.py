@@ -384,7 +384,7 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
 
         # Swap left and right sides if reprojection error still too high
         if handle_LR_swap and error_min > error_threshold_triangulation:
-            print('handle')
+            # print('handle')
             n_cams_swapped = 1
             error_off_swap_min = error_min
             while error_off_swap_min > error_threshold_triangulation and n_cams_swapped < (n_cams - nb_cams_off_tot) / 2: # more than half of the cameras switched: may triangulate twice the same side
@@ -468,8 +468,6 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
         # print('id_cams_off_tot ', id_cams_off_tot)
         id_excluded_cams = id_cams_off_tot[best_cams]
         # print('id_excluded_cams ', id_excluded_cams)
-        
-        id_excluded_cams = id_cams_off_tot[best_cams]
     else:
         id_excluded_cams = list(range(n_cams))
         nb_cams_excluded = n_cams
@@ -610,8 +608,6 @@ def triangulate_all(config):
     Q_tot, error_tot, nb_cams_excluded_tot,id_excluded_cams_tot = [], [], [], []
     for f in tqdm(range(*f_range)):
         # Get x,y,likelihood values from files
-        
-        
         json_tracked_files_f = [json_tracked_files[c][f] for c in range(n_cams)]
         # print(json_tracked_files_f)
         x_files, y_files, likelihood_files = extract_files_frame_f(json_tracked_files_f, keypoints_ids)

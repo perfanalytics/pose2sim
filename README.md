@@ -300,7 +300,7 @@ The accuracy and robustness of Pose2Sim have been thoroughly assessed only with 
 * Open a command prompt in your **OpenPose** directory. \
   Launch OpenPose for each `videos` folder: 
   ``` cmd
-  bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_TRIAL_DIR>\videos\vid_cam1.mp4 --write_json <PATH_TO_TRIAL_DIR>\pose\pose_cam1_json
+  bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_TRIAL_DIR>\videos\cam01.mp4 --write_json <PATH_TO_TRIAL_DIR>\pose\pose_cam01_json
   ```
 * The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results than the standard BODY_25 one and has been extensively tested for Pose2Sim. \
 You can also use the [BODY_135 model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models), which allows for the evaluation of pronation/supination, wrist flexion, and wrist deviation.\
