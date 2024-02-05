@@ -46,8 +46,8 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 - [x] v0.3: Supported other pose estimation algorithms
 - [x] v0.4: New calibration tool based on scene measurements
 - [x] v0.5: Automatic batch processing
-- [ ] v0.6: Marker augmentation, Handling left/right swaps, Correcting lens distortions
-- [ ] v0.7: Calibration based on keypoint detection
+- [x] v0.6: Marker augmentation, Blender visualizer
+- [ ] v0.7: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
 - [ ] v0.8: Supports multi-person analysis
 - [ ] v0.9: New synchronization tool
 - [ ] v0.10: Graphical User Interface
@@ -156,7 +156,7 @@ Pose2Sim.markerAugmentation()
 
 <p style="text-align: center;"><img src="Content/OpenSim.JPG" width="380"></p>
 
-## Demonstration Part-3: Visualize your results with Blender
+## Demonstration Part-3 (optional): Visualize your results with Blender
 > _**Visualize your results and look in detail for potential areas of improvement (and more).**_ 
 
 ### Install the add-on
@@ -167,7 +167,9 @@ Just play with the buttons!
 
 **N.B.:** You need to proceed to the full install to import the inverse kinematic results from OpenSim. See instructions [there](https://github.com/davidpagnon/Pose2Sim_Blender?tab=readme-ov-file#full-install).
 
-<video src='Content/Pose2Sim_Blender.mp4' />
+<!-- ![](Content/Pose2Sim_Blender.mp4) -->
+
+Content/Pose2Sim_Blender.mp4
 
 </br></br>
 
