@@ -30,7 +30,7 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 
 [calibration]
-calibration_type = 'calculate' # 'convert' or 'calculate'
+calibration_type = 'convert' # 'convert' or 'calculate'
 
    [calibration.convert]
    convert_from = 'qualisys' # 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
