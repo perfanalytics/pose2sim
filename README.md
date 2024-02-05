@@ -167,9 +167,6 @@ Just play with the buttons!
 
 **N.B.:** You need to proceed to the full install to import the inverse kinematic results from OpenSim. See instructions [there](https://github.com/davidpagnon/Pose2Sim_Blender?tab=readme-ov-file#full-install).
 
-<!-- ![](Content/Pose2Sim_Blender.mp4) -->
-
-Content/Pose2Sim_Blender.mp4
 
 </br></br>
 
