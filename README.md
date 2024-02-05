@@ -60,6 +60,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
    1. [Installation](#installation)
    2. [Demonstration Part-1: Build 3D TRC file on Python](#demonstration-part-1-build-3d-trc-file-on-python)
    3. [Demonstration Part-2: Obtain 3D joint angles with OpenSim](#demonstration-part-2-obtain-3d-joint-angles-with-opensim)
+   3. [Demonstration Part-3 (optional): Visualize your results with Blender](#demonstration-part-3-optional-visualize-your-results-with-blender)
 2. [Use on your own data](#use-on-your-own-data)
    1. [Setting your project up](#setting-your-project-up)
       1. [Retrieve the folder structure](#retrieve-the-folder-structure)
@@ -154,6 +155,19 @@ Pose2Sim.markerAugmentation()
 <br/>
 
 <p style="text-align: center;"><img src="Content/OpenSim.JPG" width="380"></p>
+
+## Demonstration Part-3: Visualize your results with Blender
+> _**Visualize your results and look in detail for potential areas of improvement (and more).**_ 
+
+### Install the add-on
+Follow instructions on the [Pose2Sim_Blender](https://github.com/davidpagnon/Pose2Sim_Blender) add-on page.
+
+### Visualize your results
+Just play with the buttons!
+
+**N.B.:** You need to proceed to the full install to import the inverse kinematic results from OpenSim. See instructions [there](https://github.com/davidpagnon/Pose2Sim_Blender?tab=readme-ov-file#full-install).
+
+<video src='Content/Pose2Sim_Blender.mp4' />
 
 </br></br>
 

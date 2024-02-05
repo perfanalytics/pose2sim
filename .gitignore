@@ -4,4 +4,4 @@ logs.txt*
 *.egg-info/
 dist/
 **/*.avi
-**/*.mp4
+# **/*.mp4
