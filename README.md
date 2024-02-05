@@ -14,11 +14,10 @@
 # Pose2Sim
 
 
-## Please set undistort_points and handle_LR_swap to false for now since reprojection error is currently inaccurate. I'll try to fix it soon.
+##### N.B:. Please set undistort_points and handle_LR_swap to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
 
-> **_News_: Version 0.5 released:**\
-> **Deep change in the folder structure to allow for automatic batch processing!**\
-**The Stanford LSTM marker augmentation is now supported!** (Thank you [@rlagnsals](https://github.com/rlagnsals))
+> **_News_: Version 0.6:**\
+> **Batch processing, Marker augmentation, and Blender visualizer now released!**
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
 > To upgrade, type `pip install pose2sim --upgrade`.
@@ -46,7 +45,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 - [x] v0.3: Supported other pose estimation algorithms
 - [x] v0.4: New calibration tool based on scene measurements
 - [x] v0.5: Automatic batch processing
-- [x] v0.6: Marker augmentation, Blender visualizer
+- [x] v0.6: **Marker augmentation, Blender visualizer**
 - [ ] v0.7: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
 - [ ] v0.8: Supports multi-person analysis
 - [ ] v0.9: New synchronization tool
@@ -167,7 +166,7 @@ Just play with the buttons!
 
 **N.B.:** You need to proceed to the full install to import the inverse kinematic results from OpenSim. See instructions [there](https://github.com/davidpagnon/Pose2Sim_Blender?tab=readme-ov-file#full-install).
 
-https://github.com/perfanalytics/pose2sim/assets/54667644/ca3d9f2e-dbc2-4840-8349-08296bc08908
+https://github.com/perfanalytics/pose2sim/assets/54667644/5d7c858f-7e46-40c1-928c-571a5679633a
 
 </br></br>
 
