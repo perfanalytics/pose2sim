@@ -369,7 +369,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 ## Camera synchronization
 
 > _**Cameras need to be synchronized, so that 2D points correspond to the same position across cameras.**_\
-*N.B.: Skip this step if your cameras are already synchronized.*
+***N.B.:** Skip this step if your cameras are already synchronized.*
 
 If your cameras are not natively synchronized, you can use [this script](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/synchronize_cams_draft.py). This is still a draft, and will be updated in the future.\
 Alternatively, use a flashlight or a clap to synchronize them. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors) or with a remote control (slightly less reliable).
@@ -381,7 +381,7 @@ Alternatively, use a flashlight or a clap to synchronize them. GoPro cameras can
 ### Associate persons across cameras
 
 > _**Track the person viewed by the most cameras, in case of several detections by OpenPose.**_ \
-*N.B.: Skip this step if only one person is in the field of view.*\
+***N.B.:** Skip this step if only one person is in the field of view.*\
 > [Want to contribute?](#how-to-contribute) _**Allow for multiple person analysis.**_
 
 
@@ -402,7 +402,7 @@ Output:\
 ### Triangulating keypoints
 > _**Triangulate your 2D coordinates in a robust way.**_ \
 > The triangulation is weighted by the likelihood of each detected 2D keypoint, provided that they meet a likelihood threshold.\
-  If the reprojection error is above a threshold, right and left sides are swapped; if it is still above, cameras are removed until the threshold is met. If more cameras are removed than threshold, triangulation is skipped for this point and this frame. In the end, missing values are interpolated.\
+  If the reprojection error is above a threshold, right and left sides are swapped; if it is still above, cameras are removed until the threshold is met. If more cameras are removed than threshold, triangulation is skipped for this point and this frame. In the end, missing values are interpolated.
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
 Type `ipython`.
@@ -443,8 +443,7 @@ Output:\
 
 ### Marker Augmentation
 > _**Use the Stanford LSTM model to estimate the position of 47 virtual markers.**_\
-
-_**Note that inverse kinematic results are not necessarily better after marker augmentation.**_
+_**Note that inverse kinematic results are not necessarily better after marker augmentation.**_ Skip if results are not convincing.
 
 **Make sure that `participant_height` is correct in your `Config.toml` file.** `participant_mass` is mostly optional.\
 Only works with models estimating at least the following keypoints (e.g., not COCO):
