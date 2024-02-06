@@ -208,7 +208,6 @@ Try uncommenting `[project]` and set `frame_range = [10,300]` for a Participant 
 ## Camera calibration
 > _**Calculate camera intrinsic properties and extrinsic locations and positions.\
 > Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ \
-> _**N.B.:**_ You can visualize camera calibration in 3D with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
 Type `ipython`.
@@ -404,7 +403,6 @@ Output:\
 > _**Triangulate your 2D coordinates in a robust way.**_ \
 > The triangulation is weighted by the likelihood of each detected 2D keypoint, provided that they meet a likelihood threshold.\
   If the reprojection error is above a threshold, right and left sides are swapped; if it is still above, cameras are removed until the threshold is met. If more cameras are removed than threshold, triangulation is skipped for this point and this frame. In the end, missing values are interpolated.\
-> _**N.B.:**_ You can visualize your resulting 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
 Type `ipython`.
@@ -425,7 +423,6 @@ Output:\
 ### Filtering 3D coordinates
 > _**Filter your 3D coordinates.**_\
 > Numerous filter types are provided, and can be tuned accordingly.\
-> _**N.B.:**_ You can visualize your resulting filtered 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap). 
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
 Type `ipython`.
@@ -446,7 +443,6 @@ Output:\
 
 ### Marker Augmentation
 > _**Use the Stanford LSTM model to estimate the position of 47 virtual markers.**_\
-> _**N.B.:**_ You can visualize your resulting filtered 3D coordinates with my (experimental) [Maya-Mocap tool](https://github.com/davidpagnon/Maya-Mocap) 
 
 _**Note that inverse kinematic results are not necessarily better after marker augmentation.**_
 
@@ -667,6 +663,8 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 - Synchronization
 - Self-calibration based on keypoint detection
 
+</br>
+
 <details>
   <summary><b>Detailed GOT-DONE and TO-DO list</b> (CLICK TO SHOW)</summary>
     <pre>
@@ -694,6 +692,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#9634; **Calibration:** Support ChArUco board detection (see [there](https://mecaruco2.readthedocs.io/en/latest/notebooks_rst/Aruco/sandbox/ludovic/aruco_calibration_rotation.html)).
 &#9634; **Calibration:** Calculate calibration with points rather than board. (1) SBA calibration with wand (cf [Argus](https://argus.web.unc.edu), see converter [here](https://github.com/backyardbiomech/DLCconverterDLT/blob/master/DLTcameraPosition.py)). Set world reference frame in the end.
 &#9634; **Calibration:** Alternatively, self-calibrate with [OpenPose keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
+&#9634; **Calibration:** Convert [fSpy calibration](https://fspy.io/) based on vanishing point.
 
 &#9634; **Synchronization:** Synchronize cameras on 2D keypoint speeds. Cf [this draft script](https://github.com/perfanalytics/pose2sim/blob/draft/Pose2Sim/Utilities/synchronize_cams.py).
 
@@ -709,8 +708,8 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Triangulation:** Show which frames had to be interpolated for each keypoint.
 &#10004; **Triangulation:** Solve limb swapping (although not really an issue with Body_25b). Try triangulating with opposite side if reprojection error too large. Alternatively, ignore right and left sides, use RANSAC or SDS triangulation, and then choose right or left by majority voting. More confidence can be given to cameras whose plane is the most coplanar to the right/left line.
 &#10004; **Triangulation:** [Undistort](https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c) 2D points before triangulating (and [distort](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301) them before computing reprojection error).
+&#10004; **Triangulation:** Offer the possibility to augment the triangulated data with [the OpenCap LSTM](https://github.com/stanfordnmbl/opencap-core/blob/main/utilsAugmenter.py). Create "BODY_25_AUGMENTED" model, Scaling_setup, IK_Setup. 
 &#9634; **Triangulation:** Multiple person kinematics (output multiple .trc coordinates files). Triangulate all persons with reprojection error above threshold, and identify them by minimizing their displacement across frames.
-&#9634; **Triangulation:** Offer the possibility to augment the triangulated data with [the OpenCap LSTM](https://github.com/stanfordnmbl/opencap-core/blob/main/utilsAugmenter.py). Create "BODY_25_AUGMENTED" model, Scaling_setup, IK_Setup.
 &#9634; **Triangulation:** Pre-compile weighted_traingulation and reprojection with @jit(nopython=True, parallel=True) for faster execution.
 &#9634; **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).
 &#9634; **Triangulation:** Implement normalized DLT and RANSAC triangulation, Outlier rejection (sliding z-score?), as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).
@@ -726,9 +725,9 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#9634; **OpenSim:** Add model with [ISB shoulder](https://github.com/stanfordnmbl/opencap-core/blob/main/opensimPipeline/Models/LaiUhlrich2022_shoulder.osim).
 &#9634; **OpenSim:** Implement optimal fixed-interval Kalman smoothing for inverse kinematics ([this OpenSim fork](https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp)), or [Biorbd](https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp))
 
+&#10004; **GUI:** Blender add-on (cf [MPP2SOS](https://blendermarket.com/products/mocap-mpp2soss)), or webapp (e.g., with [Napari](https://napari.org/stable). See my draft project [Maya-Mocap](https://github.com/davidpagnon/Maya-Mocap) and [BlendOsim](https://github.com/JonathanCamargo/BlendOsim).
 &#9634; **GUI:** 3D plot of cameras and of triangulated keypoints.
 &#9634; **GUI:** Demo on Google Colab (see [Sports2D](https://bit.ly/Sports2D_Colab) for OpenPose and Python package installation on Google Drive).
-&#9634; **GUI:** Blender add-on (cf [MPP2SOS](https://blendermarket.com/products/mocap-mpp2soss)), or webapp (e.g., with [Napari](https://napari.org/stable). See my draft project [Maya-Mocap](https://github.com/davidpagnon/Maya-Mocap) and [BlendOsim](https://github.com/JonathanCamargo/BlendOsim).
 
 &#10004; **Demo:** Provide Demo data for users to test the code.
 &#9634; **Demo:** Add videos for users to experiment with other pose detection frameworks
