@@ -279,7 +279,8 @@ If you already have a calibration file, set `calibration_type` type to `convert`
         
 - **Calculate extrinsic parameters:** 
 
-  > *N.B.:* _Extrinsic parameters:_ camera placement in space (position and orientation), need to be calculated every time a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates.
+  > *N.B.:* _Extrinsic parameters:_ camera placement in space (position and orientation), need to be calculated every time a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates.\
+  > *N.B.:* If there is no measurable item in the scene, you can temporarily bring something in (a table, for example), perform calibration, and then remove it before you start capturing motion.
 
   - Create a folder for each camera in your `Calibration\extrinsics` folder.
   - Once your cameras are in place, shortly film either a board laid on the floor, or the raw scene\
