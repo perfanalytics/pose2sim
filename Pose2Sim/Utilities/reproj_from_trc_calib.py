@@ -13,8 +13,8 @@
     The output 2D points can be chosen to follow the DeepLabCut (default) or 
     the OpenPose format. If OpenPose is chosen, the BODY_25B model is used, 
     with ear and eye at coordinates (0,0) since they are not used by Pose2Sim. 
-    You can change the BODY_25B tree if you need to reproject in OpenPose 
-    format with a different model.
+    You can change the MODEL tree to a different one if you need to reproject 
+    in OpenPose format with a different model than BODY_25B.
     
     Usage: 
     from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', '<output_format>', r'<output_file_root>')
@@ -50,64 +50,65 @@ __status__ = "Development"
 ## SKELETON
 '''BODY_25B (full-body without hands, experimental, from OpenPose)
 https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/blob/master/experimental_models/README.md
-Adjust it if your want to reproject in OpenPose format with a different model'''
-# nb_joints = 25
-# BODY_25B = Node("CHip", id=None, children=[
-#     Node("RHip", id=12, children=[
-#         Node("RKnee", id=14, children=[
-#             Node("RAnkle", id=16, children=[
-#                 Node("RBigToe", id=22, children=[
-#                     Node("RSmallToe", id=23),
-#                 ]),
-#                 Node("RHeel", id=24),
-#             ]),
-#         ]),
-#     ]),
-#     Node("LHip", id=11, children=[
-#         Node("LKnee", id=13, children=[
-#             Node("LAnkle", id=15, children=[
-#                 Node("LBigToe", id=19, children=[
-#                     Node("LSmallToe", id=20),
-#                 ]),
-#                 Node("LHeel", id=21),
-#             ]),
-#         ]),
-#     ]),
-#     Node("Neck", id=17, children=[
-#         Node("Head", id=18, children=[
-#             Node("Nose", id=0),
-#         ]),
-#         Node("RShoulder", id=6, children=[
-#             Node("RElbow", id=8, children=[
-#                 Node("RWrist", id=10),
-#             ]),
-#         ]),
-#         Node("LShoulder", id=5, children=[
-#             Node("LElbow", id=7, children=[
-#                 Node("LWrist", id=9),
-#             ]),
-#         ]),
-#     ]),
-# ])
+Adjust it if you want to reproject in OpenPose format with a different model'''
+nb_joints = 25
+MODEL = Node("CHip", id=None, children=[
+    Node("RHip", id=12, children=[
+        Node("RKnee", id=14, children=[
+            Node("RAnkle", id=16, children=[
+                Node("RBigToe", id=22, children=[
+                    Node("RSmallToe", id=23),
+                ]),
+                Node("RHeel", id=24),
+            ]),
+        ]),
+    ]),
+    Node("LHip", id=11, children=[
+        Node("LKnee", id=13, children=[
+            Node("LAnkle", id=15, children=[
+                Node("LBigToe", id=19, children=[
+                    Node("LSmallToe", id=20),
+                ]),
+                Node("LHeel", id=21),
+            ]),
+        ]),
+    ]),
+    Node("Neck", id=17, children=[
+        Node("Head", id=18, children=[
+            Node("Nose", id=0),
+        ]),
+        Node("RShoulder", id=6, children=[
+            Node("RElbow", id=8, children=[
+                Node("RWrist", id=10),
+            ]),
+        ]),
+        Node("LShoulder", id=5, children=[
+            Node("LElbow", id=7, children=[
+                Node("LWrist", id=9),
+            ]),
+        ]),
+    ]),
+])
+
 nb_joints = 17
-BODY_25B = Node("None", id=None, children=[
-    Node("Origin", id=0),
-    Node("Board1", id=1),
-    Node("Board2", id=2),
-    Node("Board3", id=3),
-    Node("Board4", id=4),
-    Node("Furniture5", id=5),
-    Node("Furniture6", id=6),
-    Node("Furniture7", id=7),
-    Node("Screen8", id=8),
-    Node("Screen9", id=9),
-    Node("Furniture10", id=10),
-    Node("Furniture11", id=11),
-    Node("Furniture12", id=12),
-    Node("Furniture13", id=13),
-    Node("Furniture14", id=14),
-    Node("Furniture15", id=15),
-    Node("Table16", id=16)])
+# MODEL = Node("None", id=None, children=[
+#     Node("Origin", id=0),
+#     Node("Board1", id=1),
+#     Node("Board2", id=2),
+#     Node("Board3", id=3),
+#     Node("Board4", id=4),
+#     Node("Furniture5", id=5),
+#     Node("Furniture6", id=6),
+#     Node("Furniture7", id=7),
+#     Node("Screen8", id=8),
+#     Node("Screen9", id=9),
+#     Node("Furniture10", id=10),
+#     Node("Furniture11", id=11),
+#     Node("Furniture12", id=12),
+#     Node("Furniture13", id=13),
+#     Node("Furniture14", id=14),
+#     Node("Furniture15", id=15),
+#     Node("Table16", id=16)])
 
 
 
@@ -249,8 +250,8 @@ def reproj_from_trc_calib_func(**args):
     The output 2D points can be chosen to follow the DeepLabCut (default) or 
     the OpenPose format. If OpenPose is chosen, the BODY_25B model is used, 
     with ear and eye at coordinates (0,0) since they are not used by Pose2Sim. 
-    You can change the BODY_25B tree if you need to reproject in OpenPose 
-    format with a different model.
+    You can change the MODEL tree to a different one if you need to reproject 
+    in OpenPose format with a different model than BODY_25B.
     
     Usage: 
     from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(input_trc_file = r'<input_trc_file>', input_calib_file = r'<input_calib_file>', openpose_output=True, deeplabcut_output=True, undistort_points=True, output_file_root = r'<output_file_root>')
@@ -329,8 +330,8 @@ def reproj_from_trc_calib_func(**args):
 
     # Save as json if OpenPose format
     if openpose_output:
-        # read body_25b tree
-        model = BODY_25B
+        # read model tree
+        model = MODEL
         print('Keypoint hierarchy:')
         for pre, _, node in RenderTree(model): 
             print(f'{pre}{node.name} id={node.id}')
@@ -352,7 +353,7 @@ def reproj_from_trc_calib_func(**args):
             for frame in range(len(Q)):
                 json_dict_copy = deepcopy(json_dict)
                 data_proj_frame = data_proj[cam].iloc[row]['DavidPagnon']['person0']
-                # store 2D keypoints and respect body_25b keypoint order
+                # store 2D keypoints and respect model keypoint order
                 for (i,b) in zip(bodyparts_ids, bodyparts):
                     print(repr(data_proj_frame[b].values))
                     json_dict_copy['people'][0]['pose_keypoints_2d'][[i*3,i*3+1,i*3+2]] = np.append(data_proj_frame[b].values, 1)
