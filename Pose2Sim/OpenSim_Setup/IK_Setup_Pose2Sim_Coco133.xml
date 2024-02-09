@@ -4,7 +4,7 @@
 		<!--Name of the directory where results are written. Be default this is the directory in which the setup file is be  executed.-->
 		<results_directory>./</results_directory>
 		<!--Name/path to the xml .osim file.-->
-		<model_file>../DEMO/S00_Demo_Session/S00_P00_Participant/S00_P00_OpenSim/Model_Pose2Sim_S00_P00_coco133_scaled.osim</model_file>
+		<model_file>../Demo/S00_Demo_Session/S00_P00_Participant/S00_P00_OpenSim/Model_Pose2Sim_S00_P00_coco133_scaled.osim</model_file>
 		<!--The relative weighting of kinematic constraint errors. By default this is Infinity, which means constraints are strictly enforced as part of the optimization and are not appended to the objective (cost) function. Any other non-zero positive scalar is the penalty factor for constraint violations.-->
 		<constraint_weight>Inf</constraint_weight>
 		<!--The accuracy of the solution in absolute terms, i.e. the number of significant digits to which the solution can be trusted. Default 1e-5.-->
@@ -12,7 +12,7 @@
 		<!--The time range for the study.-->
 		<time_range>0.016666666666666666 1.6666666666666667</time_range>
 		<!--Name of the resulting inverse kinematics motion (.mot) file.-->
-		<output_motion_file>../DEMO/S00_Demo_Session/S00_P00_Participant/S00_P00_OpenSim/S00_P00_T01_BalancingTrial_filt_butterworth_0-100_coco133.mot</output_motion_file>
+		<output_motion_file>../Demo/S00_Demo_Session/S00_P00_Participant/S00_P00_OpenSim/S00_P00_T01_BalancingTrial_filt_butterworth_0-100_coco133.mot</output_motion_file>
 		<!--Flag (true or false) indicating whether or not to report errors from the inverse kinematics solution. Default is true.-->
 		<report_errors>true</report_errors>
 		<!--Markers and coordinates to be considered (tasks) and their weightings. The sum of weighted-squared task errors composes the cost function.-->
@@ -194,7 +194,7 @@
 			<groups />
 		</IKTaskSet>
 		<!--TRC file (.trc) containing the time history of observations of marker positions obtained during a motion capture experiment. Markers in this file that have a corresponding task and model marker are included.-->
-		<marker_file>../DEMO/S00_Demo_Session/S00_P00_Participant/S00_P00_T01_BalancingTrial/pose-3d/S00_P00_T01_BalancingTrial_filt_butterworth_0-100.trc</marker_file>
+		<marker_file>../Demo/S00_Demo_Session/S00_P00_Participant/S00_P00_T01_BalancingTrial/pose-3d/S00_P00_T01_BalancingTrial_filt_butterworth_0-100.trc</marker_file>
 		<!--The name of the storage (.sto or .mot) file containing the time history of coordinate observations. Coordinate values from this file are included if there is a corresponding model coordinate and task. -->
 		<coordinate_file>Unassigned</coordinate_file>
 		<!--Flag indicating whether or not to report model marker locations. Note, model marker locations are expressed in Ground.-->
