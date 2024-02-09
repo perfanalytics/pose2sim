@@ -171,9 +171,6 @@ def read_config_files(config):
                         temp_dict.get("project").update({"project_dir":os.path.join(config_dir, os.path.relpath(root))})
                         if not os.path.relpath(root) in [os.path.relpath(p) for p in temp_dict.get("project").get('exclude_from_batch')]:
                             config_dicts.append(temp_dict)
-                            
-        else:
-            raise FileNotFoundError('Please run Pose2Sim from a Session, Participant, or Trial directory.')
 
     return level, config_dicts
 
