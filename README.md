@@ -291,7 +291,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
       Make sure that it is seen by all cameras. \
       It should preferably be larger than the one used for intrinsics, as results will not be very accurate out of the covered zone.
     - **With scene measurements** (more flexible and potentially more accurate if points are spread out):\
-      Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, boxes, treadmill dimensions, etc). These points should be as spread out as possible.\
+      Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, boxes, treadmill dimensions, etc). These points should be as spread out as possible. Replace `object_coords_3d` by these coordinates in Config.toml.\
       Then you will click on the corresponding image points for each view.
     - **With keypoints:**\
       For a more automatic calibration, OpenPose keypoints could also be used for calibration.\
