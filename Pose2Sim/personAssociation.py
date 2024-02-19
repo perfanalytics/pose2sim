@@ -307,6 +307,12 @@ def track_2d_all(config):
     f_range = [[min([len(j) for j in json_files])] if frame_range==[] else frame_range][0]
     n_cams = len(json_dirs_names)
     error_min_tot, cameras_off_tot = [], []
+
+    # Check that camera number is consistent between calibration file and pose folders
+    if n_cams != len(P):
+        raise Exception(f'Error: The number of cameras is not consistent:\
+                    Found {len(P)} cameras in the calibration file,\
+                    and {n_cams} cameras based on the number of pose folders.')
     
     for f in tqdm(range(*f_range)):
         json_files_f = [json_files[c][f] for c in range(n_cams)]
