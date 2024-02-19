@@ -504,10 +504,25 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
                 D += [calib_data[cam]['distortions']]
                 R += [[0.0, 0.0, 0.0]]
                 T += [[0.0, 0.0, 0.0]]
+        nb_cams_intrinsics = len(C)
     
     # calculate intrinsics otherwise
     else:
         logging.info(f'\nCalculating intrinsic parameters...')
+        ret, C, S, D, K, R, T = calibrate_intrinsics(calib_dir, intrinsics_config_dict)
+        nb_cams_intrinsics = len(C)
+
+    # calculate extrinsics
+    if calculate_extrinsics:
+        logging.info(f'\nCalculating extrinsic parameters...')
+        
+        # check that the number of cameras is consistent
+        nb_cams_extrinsics = len(next(os.walk(os.path.join(calib_dir, 'extrinsics')))[1])
+        if nb_cams_intrinsics != nb_cams_extrinsics:
+            raise Exception(f'Error: The number of cameras is not consistent:\
+                    Found {nb_cams_intrinsics} cameras based on the number of intrinsic folders or on calibration file data,\
+                    and {nb_cams_extrinsics} cameras from based on the number of extrinsic folders.')
+
         ret, C, S, D, K, R, T = calibrate_intrinsics(calib_dir, intrinsics_config_dict)
 
     # calculate extrinsics
