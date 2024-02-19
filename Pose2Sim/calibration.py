@@ -521,7 +521,7 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
         if nb_cams_intrinsics != nb_cams_extrinsics:
             raise Exception(f'Error: The number of cameras is not consistent:\
                     Found {nb_cams_intrinsics} cameras based on the number of intrinsic folders or on calibration file data,\
-                    and {nb_cams_extrinsics} cameras from based on the number of extrinsic folders.')
+                    and {nb_cams_extrinsics} cameras based on the number of extrinsic folders.')
 
         ret, C, S, D, K, R, T = calibrate_intrinsics(calib_dir, intrinsics_config_dict)
 
