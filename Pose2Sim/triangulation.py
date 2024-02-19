@@ -604,6 +604,12 @@ def triangulate_all(config):
     frames_nb = f_range[1]-f_range[0]
     
     n_cams = len(json_dirs_names)
+    
+    # Check that camera number is consistent between calibration file and pose folders
+    if n_cams != len(P):
+        raise Exception(f'Error: The number of cameras is not consistent:\
+                    Found {len(P)} cameras in the calibration file,\
+                    and {n_cams} cameras based on the number of pose folders.')
 
     Q_tot, error_tot, nb_cams_excluded_tot,id_excluded_cams_tot = [], [], [], []
     for f in tqdm(range(*f_range)):
