@@ -13,6 +13,8 @@
     Beware, it can be quite slow depending on the ccomplexity 
     of the model and on the number of frames.
     
+    Also, make sure that OpenSim is installed (e.g. via conda)
+    
     Usage: 
     from Pose2Sim.Utilities import trc_from_mot_osim; trc_from_mot_osim.trc_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_trc_file>')
     python -m trc_from_mot_osim -m input_mot_file -o input_osim_file
@@ -68,7 +70,7 @@ def get_marker_positions(motion_data, model, in_degrees=True):
     marker_positions = []
     print('Time frame:')
     for n,t in enumerate(times):
-        print(t, 's')
+        print('t = ', t, 's')
         # put the model in the right position
         for coord in joint_angle_set_names:
             if in_degrees and not coord.endswith('_tx') and not coord.endswith('_ty') and not coord.endswith('_tz'):
@@ -159,6 +161,7 @@ def trc_from_mot_osim_func(*args):
     with open(trc_path, 'w') as trc_o:
         trc_o.write(header_trc+'\n')
     marker_positions_pd.to_csv(trc_path, header=False, sep = '\t', mode='a', index=False)
+    print(f'trc file successfully saved as {trc_path}')
     
     
 if __name__ == '__main__':

@@ -19,8 +19,8 @@
     Usage: 
     from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', '<output_format>', r'<output_file_root>')
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'openpose' -u
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -f 'deeplabcut' -o output_file_root
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -o -u
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -d -o output_file_root
 '''
 
 
@@ -90,7 +90,7 @@ MODEL = Node("CHip", id=None, children=[
     ]),
 ])
 
-nb_joints = 17
+# nb_joints = 17
 # MODEL = Node("None", id=None, children=[
 #     Node("Origin", id=0),
 #     Node("Board1", id=1),
@@ -349,23 +349,25 @@ def reproj_from_trc_calib_func(**args):
                         'hand_right_keypoints_3d':[]}]
         # write one json file per camera and per frame
         for cam, cam_dir in enumerate(cam_dirs):
-            print('\n', cam)
             for frame in range(len(Q)):
                 json_dict_copy = deepcopy(json_dict)
                 data_proj_frame = data_proj[cam].iloc[row]['DavidPagnon']['person0']
                 # store 2D keypoints and respect model keypoint order
                 for (i,b) in zip(bodyparts_ids, bodyparts):
-                    print(repr(data_proj_frame[b].values))
+                    # print(repr(data_proj_frame[b].values))
                     json_dict_copy['people'][0]['pose_keypoints_2d'][[i*3,i*3+1,i*3+2]] = np.append(data_proj_frame[b].values, 1)
                 json_dict_copy['people'][0]['pose_keypoints_2d'] = json_dict_copy['people'][0]['pose_keypoints_2d'].tolist()
                 # write json file
                 json_file = os.path.join(cam_dir, f'{filename}_cam_{cam+1:02d}.{frame:05d}.json')
                 with open(json_file, 'w') as js_f:
                     js_f.write(json.dumps(json_dict_copy))
-
+            print('Camera #', cam, 'done.')
+            
     # Wrong format
     else:
         raise ValueError('output_format must be either "openpose" or "deeplabcut"')
+    
+    print(f'Reprojected points saved at {output_file_root}.')
     
     
 if __name__ == '__main__':
