@@ -13,7 +13,7 @@ def test_workflow():
   
   
   # Static trial
-  project_dir = os.path.join("S00_P00_Participant","S00_P00_T00_StaticTrial")
+  project_dir = os.path.join("S00_P00_SingleParticipant","S00_P00_T00_StaticTrial")
   config_dict.get("project").update({"project_dir":project_dir})
   config_dict['filtering']['display_figures'] = False
 
@@ -27,7 +27,7 @@ def test_workflow():
 
 
   # Balancing trial
-  project_dir = os.path.join("S00_P00_Participant","S00_P00_T01_BalancingTrial")
+  project_dir = os.path.join("S00_P00_SingleParticipant","S00_P00_T01_BalancingTrial")
   config_dict.get("project").update({"project_dir":project_dir})
   config_dict['filtering']['display_figures'] = False
 
