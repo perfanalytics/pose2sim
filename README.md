@@ -162,7 +162,8 @@ Pose2Sim.markerAugmentation()
 Follow instructions on the [Pose2Sim_Blender](https://github.com/davidpagnon/Pose2Sim_Blender) add-on page.
 
 ### Visualize your results
-Just play with the buttons!
+Just play with the buttons!\
+Visualize camera positions, videos, triangulated keypoints, OpenSim skeleton, and more.
 
 **N.B.:** You need to proceed to the full install to import the inverse kinematic results from OpenSim. See instructions [there](https://github.com/davidpagnon/Pose2Sim_Blender?tab=readme-ov-file#full-install).
 
