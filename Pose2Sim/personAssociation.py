@@ -91,12 +91,13 @@ def persons_combinations(json_files_framef):
 
 def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_combinations, projection_matrices, tracked_keypoint_id, calib_params):
     '''
-    At the same time, chooses the right person among the multiple ones found by
+    - if single_person: Choose the right person among the multiple ones found by
     OpenPose & excludes cameras with wrong 2d-pose estimation.
+    - else: Choose all the combination of cameras that give a reprojection error below a threshold
     
     1. triangulate the tracked keypoint for all possible combinations of people,
     2. compute difference between reprojection & original openpose detection,
-    3. take combination with smallest difference.
+    3. take combination with smallest error OR all those below the error threshold
     If error is too big, take off one or several of the cameras until err is 
     lower than "max_err_px".
     
@@ -108,10 +109,11 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
     - tracked_keypoint_id: int
 
     OUTPUTS:
-    - error_min: float
-    - persons_and_cameras_combination: array of ints
+    - errors_below_thresh: list of float
+    - comb_errors_below_thresh: list of arrays of ints
     '''
     
+    single_person = config.get('project').get('single_person')
     error_threshold_tracking = config.get('personAssociation').get('reproj_error_threshold_association')
     likelihood_threshold = config.get('personAssociation').get('likelihood_threshold_association')
     min_cameras_for_triangulation = config.get('triangulation').get('min_cameras_for_triangulation')
@@ -121,6 +123,9 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
     error_min = np.inf 
     nb_cams_off = 0 # cameras will be taken-off until the reprojection error is under threshold
     
+    errors_below_thresh = []
+    comb_errors_below_thresh = []
+    Q_kpt = []
     while error_min > error_threshold_tracking and n_cams - nb_cams_off >= min_cameras_for_triangulation:
         # Try all persons combinations
         for combination in personsIDs_combinations:
@@ -156,6 +161,7 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
 
             # Try all subsets
             error_comb = []
+            Q_comb = []
             for comb in combinations_with_cams_off:
                 # Filter x, y, likelihood, projection_matrices, with subset
                 x_files_filt = [x_files[i] for i in range(len(comb)) if not np.isnan(comb[i])]
@@ -169,15 +175,15 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
                     calib_params_dist_filt = [calib_params['dist'][i] for i in range(len(comb)) if not np.isnan(comb[i])]
                 
                 # Triangulate 2D points
-                Q_comb = weighted_triangulation(projection_matrices_filt, x_files_filt, y_files_filt, likelihood_files_filt)
+                Q_comb.append(weighted_triangulation(projection_matrices_filt, x_files_filt, y_files_filt, likelihood_files_filt))
                 
                 # Reprojection
                 if undistort_points:
-                    coords_2D_kpt_calc_filt = [cv2.projectPoints(np.array(Q_comb[:-1]), calib_params_R_filt[i], calib_params_T_filt[i], calib_params_K_filt[i], calib_params_dist_filt[i])[0] for i in range(n_cams-nb_cams_off)]
+                    coords_2D_kpt_calc_filt = [cv2.projectPoints(np.array(Q_comb[-1][:-1]), calib_params_R_filt[i], calib_params_T_filt[i], calib_params_K_filt[i], calib_params_dist_filt[i])[0] for i in range(n_cams-nb_cams_off)]
                     x_calc = [coords_2D_kpt_calc_filt[i][0,0,0] for i in range(n_cams-nb_cams_off)]
                     y_calc = [coords_2D_kpt_calc_filt[i][0,0,1] for i in range(n_cams-nb_cams_off)]
                 else:
-                    x_calc, y_calc = reprojection(projection_matrices_filt, Q_comb)
+                    x_calc, y_calc = reprojection(projection_matrices_filt, Q_comb[-1])
                                                 
                 # Reprojection error
                 error_comb_per_cam = []
@@ -187,15 +193,34 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
                     error_comb_per_cam.append( euclidean_distance(q_file, q_calc) )
                 error_comb.append( np.mean(error_comb_per_cam) )
             
-            error_min = np.nanmin(error_comb)
-            persons_and_cameras_combination = combinations_with_cams_off[np.argmin(error_comb)]
-            
-            if error_min < error_threshold_tracking:
+            if single_person:
+                error_min = np.nanmin(error_comb)
+                errors_below_thresh = [error_min]
+                comb_errors_below_thresh = [combinations_with_cams_off[np.argmin(error_comb)]]
+                Q_kpt = [Q_comb[np.argmin(error_comb)]]
+                if errors_below_thresh[0] < error_threshold_tracking:
+                    break 
+            else:
+                errors_below_thresh += [e for e in error_comb if e<error_threshold_tracking]
+                comb_errors_below_thresh += [combinations_with_cams_off[error_comb.index(e)] for e in error_comb if e<error_threshold_tracking]
+                Q_kpt += [Q_comb[error_comb.index(e)] for e in error_comb if e<error_threshold_tracking]
+        
+        print('\n', personsIDs_combinations)
+        print(errors_below_thresh)
+        print(comb_errors_below_thresh)
+        print(Q_kpt)
+        if not single_person:
+            # Remove indices already used for a person
+            personsIDs_combinations = np.array([personsIDs_combinations[i] for i in range(len(personsIDs_combinations))
+                                           if not np.array( 
+                                                [personsIDs_combinations[i,j]==comb[j] for comb in comb_errors_below_thresh for j in range(len(comb))]
+                                                ).any()])
+            if len(personsIDs_combinations) < len(errors_below_thresh):
                 break
 
         nb_cams_off += 1
     
-    return error_min, persons_and_cameras_combination
+    return errors_below_thresh, comb_errors_below_thresh, Q_kpt
 
 
 def recap_tracking(config, error, nb_cams_excluded):
@@ -307,7 +332,7 @@ def track_2d_all(config):
     f_range = [[min([len(j) for j in json_files])] if frame_range==[] else frame_range][0]
     n_cams = len(json_dirs_names)
     error_min_tot, cameras_off_tot = [], []
-
+    
     # Check that camera number is consistent between calibration file and pose folders
     if n_cams != len(P):
         raise Exception(f'Error: The number of cameras is not consistent:\
@@ -315,32 +340,38 @@ def track_2d_all(config):
                     and {n_cams} cameras based on the number of pose folders.')
     
     for f in tqdm(range(*f_range)):
+        print(f'\nFrame {f}:')
         json_files_f = [json_files[c][f] for c in range(n_cams)]
         json_tracked_files_f = [json_tracked_files[c][f] for c in range(n_cams)]
         
         # all possible combinations of persons
         personsIDs_comb = persons_combinations(json_files_f) 
         
-        # choose person of interest and exclude cameras with bad pose estimation
-        error_min, persons_and_cameras_combination = best_persons_and_cameras_combination(config, json_files_f, personsIDs_comb, P, tracked_keypoint_id, calib_params)
-        error_min_tot.append(error_min)
-        cameras_off_count = np.count_nonzero(np.isnan(persons_and_cameras_combination))
+        # choose persons of interest and exclude cameras with bad pose estimation
+        errors_below_thresh, comb_errors_below_thresh, Q_kpt = best_persons_and_cameras_combination(config, json_files_f, personsIDs_comb, P, tracked_keypoint_id, calib_params)
+        
+        # reID persons across frames by checking the distance from one frame to another
+        ##### TO DO
+        
+        error_min_tot.append(np.mean(errors_below_thresh))
+        cameras_off_count = np.count_nonzero([np.isnan(comb) for comb in comb_errors_below_thresh]) / len(comb_errors_below_thresh)
+        print(cameras_off_count)
         cameras_off_tot.append(cameras_off_count)
         
-        # rewrite json files with only one person of interest
-        for cam_nb, person_id in enumerate(persons_and_cameras_combination):
-            with open(json_tracked_files_f[cam_nb], 'w') as json_tracked_f:
-                with open(json_files_f[cam_nb], 'r') as json_f:
+        # rewrite json files with a single or multiple persons of interest
+        for cam in range(n_cams):
+            with open(json_tracked_files_f[cam], 'w') as json_tracked_f:
+                with open(json_files_f[cam], 'r') as json_f:
                     js = json.load(json_f)
-                    if not np.isnan(person_id):
-                        js['people'] = [js['people'][int(person_id)]]
-                    else: 
-                        js['people'] = []
-                json_tracked_f.write(json.dumps(js))
+                    js_new = js.copy()
+                    js_new['people'] = []
+                    for new_comb in comb_errors_below_thresh:
+                        if not np.isnan(new_comb[cam]):
+                            js_new['people'] += [js['people'][int(new_comb[cam])]]
+                        else:
+                            js_new['people'] += [{}]
+                json_tracked_f.write(json.dumps(js_new))
 
     # recap message
     recap_tracking(config, error_min_tot, cameras_off_tot)
-    
-    
-    
     

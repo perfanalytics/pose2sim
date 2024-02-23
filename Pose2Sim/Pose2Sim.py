@@ -380,7 +380,7 @@ def triangulation(config=None):
         triangulate_all(config_dict)
     
     end = time.time()
-    logging.info(f'Triangulation took {end-start:.2f} s.')
+    logging.info(f'\nTriangulation took {end-start:.2f} s.')
  
     
 def filtering(config=None):
