@@ -304,10 +304,10 @@ def reproj_from_trc_calib_func(**args):
     # Reproject 3D points on all cameras
     data_proj = [deepcopy(data_h5) for cam in range(len(P_all))] # copy data_h5 as many times as there are cameras
     Q = data_trc_zup.iloc[:,2:]
-    for row in range(len(Q)):
+    for frame in range(len(Q)):
         coords = [[] for cam in range(len(P_all))]
         for keypoint in range(num_bodyparts):
-            q = np.append(Q.iloc[row,3*keypoint:3*keypoint+3], 1)
+            q = np.append(Q.iloc[frame,3*keypoint:3*keypoint+3], 1)
             if undistort_points:
                 coords_2D_all = [cv2.projectPoints(np.array(q[:-1]), calib_params_R_filt[i], calib_params_T_filt[i], calib_params_K_filt[i], calib_params_dist_filt[i])[0] for i in range(len(P_all))]
                 x_all = [coords_2D_all[i][0,0,0] for i in range(len(P_all))]
@@ -316,7 +316,7 @@ def reproj_from_trc_calib_func(**args):
                 x_all, y_all = reprojection(P_all, q)
             [coords[cam].extend([x_all[cam], y_all[cam]]) for cam in range(len(P_all))]
         for cam in range(len(P_all)):
-            data_proj[cam].iloc[row,:] = coords[cam]
+            data_proj[cam].iloc[frame,:] = coords[cam]
         
     # Save as h5 and csv if DeepLabCut format
     if deeplabcut_output:
@@ -351,7 +351,7 @@ def reproj_from_trc_calib_func(**args):
         for cam, cam_dir in enumerate(cam_dirs):
             for frame in range(len(Q)):
                 json_dict_copy = deepcopy(json_dict)
-                data_proj_frame = data_proj[cam].iloc[row]['DavidPagnon']['person0']
+                data_proj_frame = data_proj[cam].iloc[frame]['DavidPagnon']['person0']
                 # store 2D keypoints and respect model keypoint order
                 for (i,b) in zip(bodyparts_ids, bodyparts):
                     # print(repr(data_proj_frame[b].values))
