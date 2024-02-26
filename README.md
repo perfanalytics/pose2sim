@@ -64,15 +64,15 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
    1. [Setting your project up](#setting-your-project-up)
       1. [Retrieve the folder structure](#retrieve-the-folder-structure)
       2. [Batch processing](#batch-processing)
-   2. [Camera calibration](#camera-calibration)
-      1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
-      2. [Calculate from scratch](#calculate-from-scratch)
-   3. [2D pose estimation](#2d-pose-estimation)
+   2. [2D pose estimation](#2d-pose-estimation)
       1. [With OpenPose](#with-openpose)
       2. [With Mediapipe](#with-mediapipe)
       3. [With DeepLabCut](#with-deeplabcut)
       4. [With AlphaPose](#with-alphapose)
-   4. [Camera synchronization](#camera-synchronization)
+   3. [Camera synchronization](#camera-synchronization)
+   4. [Camera calibration](#camera-calibration)
+      1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
+      2. [Calculate from scratch](#calculate-from-scratch)
    5. [Tracking, Triangulating, Filtering](#tracking-triangulating-filtering)
       1. [Associate persons across cameras](#associate-persons-across-cameras)
       2. [Triangulating keypoints](#triangulating-keypoints)
@@ -206,6 +206,80 @@ Try uncommenting `[project]` and set `frame_range = [10,300]` for a Participant 
 
 </br>
 
+## 2D pose estimation
+> _**Estimate 2D pose from images with Openpose or another pose estimation solution.**_ \
+N.B.: First film a short static pose that will be used for scaling the OpenSim model (A-pose for example), and then film your motions of interest.\
+N.B.: Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json'.
+
+### With OpenPose:
+The accuracy and robustness of Pose2Sim have been thoroughly assessed only with OpenPose, and especially with the BODY_25B model. Consequently, we recommend using this 2D pose estimation solution. See [OpenPose repository](https://github.com/CMU-Perceptual-Computing-Lab/openpose) for installation and running.
+* Open a command prompt in your **OpenPose** directory. \
+  Launch OpenPose for each `videos` folder: 
+  ``` cmd
+  bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_TRIAL_DIR>\videos\cam01.mp4 --write_json <PATH_TO_TRIAL_DIR>\pose\pose_cam01_json
+  ```
+* The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results than the standard BODY_25 one and has been extensively tested for Pose2Sim. \
+You can also use the [BODY_135 model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models), which allows for the evaluation of pronation/supination, wrist flexion, and wrist deviation.\
+All other OpenPose models (BODY_25, COCO, MPII) are also supported.\
+Make sure you modify the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file accordingly.
+* Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
+
+**N.B.:** *OpenPose BODY_25B is the default 2D pose estimation model used in Pose2Sim. However, other skeleton models from other 2D pose estimation solutions can be used alternatively.* 
+
+<img src="Content/Pose2D.png" width="760">
+
+### With MediaPipe:
+[Mediapipe BlazePose](https://google.github.io/mediapipe/solutions/pose.html) is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
+However, it is less robust and accurate than OpenPose, and can only detect a single person.
+* Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
+  ``` cmd
+  python -m Blazepose_runsave -i input_file -dJs
+  ```
+  Type in `python -m Blazepose_runsave -h` for explanation on parameters.
+* Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file.
+
+### With DeepLabCut:
+If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut). In this case, Pose2Sim is used as an alternative to [AniPose](https://github.com/lambdaloop/anipose), but it may yield better results since 3D reconstruction takes confidence into account (see [this article](https://doi.org/10.1080/21681163.2023.2292067)).
+1. Train your DeepLabCut model and run it on your images or videos (more instruction on their repository)
+2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
+   ``` cmd
+   python -m DLC_to_OpenPose -i input_h5_file
+   ```
+3. Edit `pose.CUSTOM` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml), and edit the node ids so that they correspond to the column numbers of the 2D pose file, starting from zero. Make sure you also changed the `pose_model` and the `tracked_keypoint`.\
+   You can visualize your skeleton's hierarchy by changing pose_model to CUSTOM and writing these lines: 
+   ``` python
+    config_path = r'path_to_Config.toml'
+    import toml, anytree
+    config = toml.load(config_path)
+    pose_model = config.get('pose').get('pose_model')
+    model = anytree.importer.DictImporter().import_(config.get('pose').get(pose_model))
+    for pre, _, node in anytree.RenderTree(model): 
+        print(f'{pre}{node.name} id={node.id}')
+   ```
+4. Create an OpenSim model if you need inverse kinematics.
+
+### With AlphaPose:
+[AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) is one of the main competitors of OpenPose, and its accuracy is comparable. As a top-down approach (unlike OpenPose which is bottom-up), it is faster on single-person detection, but slower on multi-person detection.\
+All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII). For COCO and MPII, AlphaPose must be run with the flag "--format cmu".
+* Install and run AlphaPose on your videos (more instruction on their repository)
+* Translate the AlphaPose single json file to OpenPose frame-by-frame files (with `AlphaPose_to_OpenPose.py` script, see [Utilities](#utilities)): 
+   ``` cmd
+   python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
+   ```
+* Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file.
+
+</br>
+
+## Camera synchronization
+
+> _**Cameras need to be synchronized, so that 2D points correspond to the same position across cameras.**_\
+***N.B.:** Skip this step if your cameras are already synchronized.*
+
+If your cameras are not natively synchronized, you can use [this script](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/synchronize_cams_draft.py). This is still a draft, and will be updated in the future.\
+Alternatively, use a flashlight or a clap to synchronize them. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors) or with a remote control (slightly less reliable).
+
+</br>
+
 ## Camera calibration
 > _**Calculate camera intrinsic properties and extrinsic locations and positions.\
 > Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_ \
@@ -304,79 +378,6 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 </br>
 
-## 2D pose estimation
-> _**Estimate 2D pose from images with Openpose or another pose estimation solution.**_ \
-N.B.: First film a short static pose that will be used for scaling the OpenSim model (A-pose for example), and then film your motions of interest.\
-N.B.: Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json'.
-
-### With OpenPose:
-The accuracy and robustness of Pose2Sim have been thoroughly assessed only with OpenPose, and especially with the BODY_25B model. Consequently, we recommend using this 2D pose estimation solution. See [OpenPose repository](https://github.com/CMU-Perceptual-Computing-Lab/openpose) for installation and running.
-* Open a command prompt in your **OpenPose** directory. \
-  Launch OpenPose for each `videos` folder: 
-  ``` cmd
-  bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_TRIAL_DIR>\videos\cam01.mp4 --write_json <PATH_TO_TRIAL_DIR>\pose\pose_cam01_json
-  ```
-* The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results than the standard BODY_25 one and has been extensively tested for Pose2Sim. \
-You can also use the [BODY_135 model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models), which allows for the evaluation of pronation/supination, wrist flexion, and wrist deviation.\
-All other OpenPose models (BODY_25, COCO, MPII) are also supported.\
-Make sure you modify the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file accordingly.
-* Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
-
-**N.B.:** *OpenPose BODY_25B is the default 2D pose estimation model used in Pose2Sim. However, other skeleton models from other 2D pose estimation solutions can be used alternatively.* 
-
-<img src="Content/Pose2D.png" width="760">
-
-### With MediaPipe:
-[Mediapipe BlazePose](https://google.github.io/mediapipe/solutions/pose.html) is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
-However, it is less robust and accurate than OpenPose, and can only detect a single person.
-* Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
-  ``` cmd
-  python -m Blazepose_runsave -i input_file -dJs
-  ```
-  Type in `python -m Blazepose_runsave -h` for explanation on parameters.
-* Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file.
-
-### With DeepLabCut:
-If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut). In this case, Pose2Sim is used as an alternative to [AniPose](https://github.com/lambdaloop/anipose), but it may yield better results since 3D reconstruction takes confidence into account (see [this article](https://doi.org/10.1080/21681163.2023.2292067)).
-1. Train your DeepLabCut model and run it on your images or videos (more instruction on their repository)
-2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
-   ``` cmd
-   python -m DLC_to_OpenPose -i input_h5_file
-   ```
-3. Edit `pose.CUSTOM` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml), and edit the node ids so that they correspond to the column numbers of the 2D pose file, starting from zero. Make sure you also changed the `pose_model` and the `tracked_keypoint`.\
-   You can visualize your skeleton's hierarchy by changing pose_model to CUSTOM and writing these lines: 
-   ``` python
-    config_path = r'path_to_Config.toml'
-    import toml, anytree
-    config = toml.load(config_path)
-    pose_model = config.get('pose').get('pose_model')
-    model = anytree.importer.DictImporter().import_(config.get('pose').get(pose_model))
-    for pre, _, node in anytree.RenderTree(model): 
-        print(f'{pre}{node.name} id={node.id}')
-   ```
-4. Create an OpenSim model if you need inverse kinematics.
-
-### With AlphaPose:
-[AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) is one of the main competitors of OpenPose, and its accuracy is comparable. As a top-down approach (unlike OpenPose which is bottom-up), it is faster on single-person detection, but slower on multi-person detection.\
-All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII). For COCO and MPII, AlphaPose must be run with the flag "--format cmu".
-* Install and run AlphaPose on your videos (more instruction on their repository)
-* Translate the AlphaPose single json file to OpenPose frame-by-frame files (with `AlphaPose_to_OpenPose.py` script, see [Utilities](#utilities)): 
-   ``` cmd
-   python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
-   ```
-* Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo/S01_Empty_Session/Config.toml) file.
-
-</br>
-
-## Camera synchronization
-
-> _**Cameras need to be synchronized, so that 2D points correspond to the same position across cameras.**_\
-***N.B.:** Skip this step if your cameras are already synchronized.*
-
-If your cameras are not natively synchronized, you can use [this script](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/synchronize_cams_draft.py). This is still a draft, and will be updated in the future.\
-Alternatively, use a flashlight or a clap to synchronize them. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors) or with a remote control (slightly less reliable).
-
-</br>
 
 ## Tracking, Triangulating, Filtering
 
