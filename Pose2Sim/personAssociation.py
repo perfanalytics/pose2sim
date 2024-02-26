@@ -205,10 +205,10 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
                 comb_errors_below_thresh += [combinations_with_cams_off[error_comb.index(e)] for e in error_comb if e<error_threshold_tracking]
                 Q_kpt += [Q_comb[error_comb.index(e)] for e in error_comb if e<error_threshold_tracking]
         
-        print('\n', personsIDs_combinations)
-        print(errors_below_thresh)
-        print(comb_errors_below_thresh)
-        print(Q_kpt)
+        # print('\n', personsIDs_combinations)
+        # print(errors_below_thresh)
+        # print(comb_errors_below_thresh)
+        # print(Q_kpt)
         if not single_person:
             # Remove indices already used for a person
             personsIDs_combinations = np.array([personsIDs_combinations[i] for i in range(len(personsIDs_combinations))
@@ -340,7 +340,7 @@ def track_2d_all(config):
                     and {n_cams} cameras based on the number of pose folders.')
     
     for f in tqdm(range(*f_range)):
-        print(f'\nFrame {f}:')
+        # print(f'\nFrame {f}:')
         json_files_f = [json_files[c][f] for c in range(n_cams)]
         json_tracked_files_f = [json_tracked_files[c][f] for c in range(n_cams)]
         
@@ -355,7 +355,7 @@ def track_2d_all(config):
         
         error_min_tot.append(np.mean(errors_below_thresh))
         cameras_off_count = np.count_nonzero([np.isnan(comb) for comb in comb_errors_below_thresh]) / len(comb_errors_below_thresh)
-        print(cameras_off_count)
+        # print(cameras_off_count)
         cameras_off_tot.append(cameras_off_count)
         
         # rewrite json files with a single or multiple persons of interest

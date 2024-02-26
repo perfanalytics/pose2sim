@@ -16,8 +16,9 @@
 
 ##### N.B:. Please set undistort_points and handle_LR_swap to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
 
-> **_News_: Version 0.6:**\
-> **Batch processing, Marker augmentation, and Blender visualizer now released!**
+> **_News_: Version 0.7:**\
+> **Multi-person analysis is now supported!** Team or combat sports can now take advantage of Pose2Sim.\
+> Other recent releases: Automatic batch processing, Marker augmentation, Blender visualizer.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
 > To upgrade, type `pip install pose2sim --upgrade`.
@@ -45,9 +46,9 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 - [x] v0.3: Supported other pose estimation algorithms
 - [x] v0.4: New calibration tool based on scene measurements
 - [x] v0.5: Automatic batch processing
-- [x] v0.6: **Marker augmentation, Blender visualizer**
-- [ ] v0.7: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
-- [ ] v0.8: Supports multi-person analysis
+- [x] v0.6: Marker augmentation, Blender visualizer
+- [ ] **v0.7: Multi-person analysis**
+- [ ] v0.8: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
 - [ ] v0.9: New synchronization tool
 - [ ] v0.10: Graphical User Interface
 - [ ] v1.0: First accomplished release

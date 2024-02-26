@@ -24,6 +24,7 @@
 
 ## INIT
 import os
+import glob
 import fnmatch
 import numpy as np
 import pandas as pd
@@ -426,7 +427,7 @@ def recap_filter3d(config, trc_path):
         'median': f'--> Filter type: Median. Kernel size: {median_filter_kernel_size}'
     }
     logging.info(filter_mapping_recap[filter_type])
-    logging.info(f'Filtered 3D coordinates are stored at {trc_path}.')
+    logging.info(f'Filtered 3D coordinates are stored at {trc_path}.\n')
 
 
 def filter_all(config):
@@ -444,6 +445,7 @@ def filter_all(config):
 
     # Read config
     project_dir = config.get('project').get('project_dir')
+    single_person = config.get('project').get('single_person')
     try:
         pose_tracked_dir = os.path.join(project_dir, 'pose-associated')
         os.listdir(pose_tracked_dir)
@@ -451,11 +453,11 @@ def filter_all(config):
     except:
         pose_dir = os.path.join(project_dir, 'pose')
     frame_range = config.get('project').get('frame_range')
-    seq_name = os.path.basename(os.path.realpath(project_dir))
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     display_figures = config.get('filtering').get('display_figures')
     filter_type = config.get('filtering').get('type')
-
+    seq_name = os.path.basename(os.path.realpath(project_dir))
+    
     # Frames range
     pose_listdirs_names = next(os.walk(pose_dir))[1]
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
@@ -463,35 +465,35 @@ def filter_all(config):
     f_range = [[0,min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
     
     # Trc paths
-    trc_f_in = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
-    trc_f_out = f'{seq_name}_filt_{filter_type}_{f_range[0]}-{f_range[1]}.trc'
-    trc_path_in = os.path.join(pose3d_dir, trc_f_in)
-    trc_path_out = os.path.join(pose3d_dir, trc_f_out)
+    trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in file]
+    trc_f_out = [f'{os.path.basename(t).split(".")[0]}_filt_{filter_type}.trc' for t in trc_path_in]
+    trc_path_out = [os.path.join(pose3d_dir, t) for t in trc_f_out]
     
-    # Read trc header
-    with open(trc_path_in, 'r') as trc_file:
-        header = [next(trc_file) for line in range(5)]
+    for t_in, t_out in zip(trc_path_in, trc_path_out):
+        # Read trc header
+        with open(t_in, 'r') as trc_file:
+            header = [next(trc_file) for line in range(5)]
 
-    # Read trc coordinates values
-    trc_df = pd.read_csv(trc_path_in, sep="\t", skiprows=4)
-    frames_col, time_col = trc_df.iloc[:,0], trc_df.iloc[:,1]
-    Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
+        # Read trc coordinates values
+        trc_df = pd.read_csv(t_in, sep="\t", skiprows=4)
+        frames_col, time_col = trc_df.iloc[:,0], trc_df.iloc[:,1]
+        Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
 
-    # Filter coordinates
-    Q_filt = Q_coord.apply(filter1d, axis=0, args = [config, filter_type])
+        # Filter coordinates
+        Q_filt = Q_coord.apply(filter1d, axis=0, args = [config, filter_type])
 
-    # Display figures
-    if display_figures:
-        # Retrieve keypoints
-        keypoints_names = pd.read_csv(trc_path_in, sep="\t", skiprows=3, nrows=0).columns[2::3].to_numpy()
-        display_figures_fun(Q_coord, Q_filt, time_col, keypoints_names)
+        # Display figures
+        if display_figures:
+            # Retrieve keypoints
+            keypoints_names = pd.read_csv(t_in, sep="\t", skiprows=3, nrows=0).columns[2::3].to_numpy()
+            display_figures_fun(Q_coord, Q_filt, time_col, keypoints_names)
 
-    # Reconstruct trc file with filtered coordinates
-    with open(trc_path_out, 'w') as trc_o:
-        [trc_o.write(line) for line in header]
-        Q_filt.insert(0, 'Frame#', frames_col)
-        Q_filt.insert(1, 'Time', time_col)
-        Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+        # Reconstruct trc file with filtered coordinates
+        with open(t_out, 'w') as trc_o:
+            [trc_o.write(line) for line in header]
+            Q_filt.insert(0, 'Frame#', frames_col)
+            Q_filt.insert(1, 'Time', time_col)
+            Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
 
-    # Recap
-    recap_filter3d(config, trc_path_out)
+        # Recap
+        recap_filter3d(config, t_out)

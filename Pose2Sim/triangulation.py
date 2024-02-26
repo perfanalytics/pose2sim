@@ -126,10 +126,11 @@ def make_trc(config, Q, keypoints_names, f_range, id_person=-1):
     # Read config
     project_dir = config.get('project').get('project_dir')
     frame_rate = config.get('project').get('frame_rate')
-    if id_person == -1:
+    single_person = config.get('project').get('single_person')
+    if single_person:
         seq_name = f'{os.path.basename(os.path.realpath(project_dir))}'
     else:
-        seq_name = f'{os.path.basename(os.path.realpath(project_dir))}_Participant{id_person+1}'
+        seq_name = f'{os.path.basename(os.path.realpath(project_dir))}_P{id_person+1}'
     pose3d_dir = os.path.join(project_dir, 'pose-3d')
 
     trc_f = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
@@ -716,7 +717,7 @@ def triangulate_all(config):
     # Interpolate missing values
     if interpolation_kind != 'none':
         for n in range(nb_persons_to_detect):
-            Q_tot[n].apply(interpolate_zeros_nans, axis=0, args = [interp_gap_smaller_than, interpolation_kind])
+            Q_tot[n] = Q_tot[n].apply(interpolate_zeros_nans, axis=0, args = [interp_gap_smaller_than, interpolation_kind])
     # Q_tot.replace(np.nan, 0, inplace=True)
     
     # Create TRC file

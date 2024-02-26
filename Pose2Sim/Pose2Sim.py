@@ -421,7 +421,7 @@ def filtering(config=None):
         logging.info("\n\n---------------------------------------------------------------------")
         logging.info(f"Filtering 3D coordinates for {seq_name}, for {frames}.")
         logging.info("---------------------------------------------------------------------")
-        logging.info(f"\nProject directory: {project_dir}")
+        logging.info(f"\nProject directory: {project_dir}\n")
     
         filter_all(config_dict)
 
@@ -458,12 +458,12 @@ def markerAugmentation(config=None):
         logging.info("\n\n---------------------------------------------------------------------")
         logging.info(f"Augmentation process for {seq_name}, for {frames}.")
         logging.info("---------------------------------------------------------------------")
-        logging.info(f"\nProject directory: {project_dir}")
+        logging.info(f"\nProject directory: {project_dir}\n")
 
         augmentTRC(config_dict)
 
         end = time.time()
-        logging.info(f'Augmentation took {end - start:.2f} s.')
+        logging.info(f'\nAugmentation took {end - start:.2f} s.')
 
 
 

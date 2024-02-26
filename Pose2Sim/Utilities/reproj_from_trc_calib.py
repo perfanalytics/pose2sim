@@ -287,7 +287,7 @@ def reproj_from_trc_calib_func(**args):
 
     # Create camera folders
     reproj_dir = os.path.realpath(output_file_root)
-    cam_dirs = [os.path.join(reproj_dir, f'cam_{cam+1:02d}_json') for cam in range(len(P_all))]
+    cam_dirs = [os.path.join(reproj_dir, f'cam{cam+1:02d}_json') for cam in range(len(P_all))]
     if not os.path.exists(reproj_dir): os.mkdir(reproj_dir)  
     try:
         [os.mkdir(cam_dir) for cam_dir in cam_dirs]
