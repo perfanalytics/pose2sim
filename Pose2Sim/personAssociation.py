@@ -59,6 +59,83 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def min_with_single_indices(L, T):
+    '''
+    Let L be a list (size s) with T associated tuple indices (size s).
+    Select the smallest values of L, considering that 
+    the next smallest value cannot have the same numbers 
+    in the associated tuple as any of the previous ones.
+
+    Example:
+    L = [  20,   27,  51,    33,   43,   23,   37,   24,   4,   68,   84,    3  ]
+    T = list(it.product(range(2),range(3)))
+      = [(0,0),(0,1),(0,2),(0,3),(1,0),(1,1),(1,2),(1,3),(2,0),(2,1),(2,2),(2,3)]
+
+    - 1st smallest value: 3 with tuple (2,3), index 11
+    - 2nd smallest value when excluding indices (2,.) and (.,3), i.e. [(0,0),(0,1),(0,2),X,(1,0),(1,1),(1,2),X,X,X,X,X]:
+    20 with tuple (0,0), index 0
+    - 3rd smallest value when excluding [X,X,X,X,X,(1,1),(1,2),X,X,X,X,X]:
+    23 with tuple (1,1), index 5
+    
+    INPUTS:
+    - L: list (size s)
+    - T: T associated tuple indices (size s)
+
+    OUTPUTS: 
+    - minL: list of smallest values of L, considering constraints on tuple indices
+    - argminL: list of indices of smallest values of L
+    - T_minL: list of tuples associated with smallest values of L
+    '''
+
+    minL = [np.min(L)]
+    argminL = [np.argmin(L)]
+    T_minL = [T[argminL[0]]]
+    
+    mask_tokeep = np.array([True for t in T])
+    i=0
+    while mask_tokeep.any()==True:
+        mask_tokeep = mask_tokeep & np.array([t[0]!=T_minL[i][0] and t[1]!=T_minL[i][1] for t in T])
+        if mask_tokeep.any()==True:
+            indicesL_tokeep = np.where(mask_tokeep)[0]
+            minL += [np.min(np.array(L)[indicesL_tokeep])]
+            argminL += [indicesL_tokeep[np.argmin(np.array(L)[indicesL_tokeep])]]
+            T_minL += (T[argminL[i+1]],)
+            i+=1
+    
+    return minL, argminL, T_minL
+    
+    
+def sort_people(Q_kpt_old, Q_kpt, nb_persons_to_detect):
+    '''
+    Associate persons across frames
+    Persons' indices are sometimes swapped when changing frame
+    A person is associated to another in the next frame when they are at a small distance
+    
+    INPUTS:
+    - Q_kpt_old: list of arrays of 3D coordinates [X, Y, Z, 1.] for the previous frame
+    - Q_kpt: idem Q_kpt_old, for current frame
+    
+    OUTPUT:
+    - Q_kpt: array with reordered persons
+    - personsIDs_sorted: index of reordered persons
+    '''
+    
+    # Generate possible person correspondences across frames
+    personsIDs_comb = sorted(list(it.product(range(len(Q_kpt_old)),range(len(Q_kpt)))))
+    # Compute distance between persons from one frame to another
+    frame_by_frame_dist = []
+    for comb in personsIDs_comb:
+        frame_by_frame_dist += [euclidean_distance(Q_kpt_old[comb[0]][:3],Q_kpt[comb[1]][:3])]
+    # sort correspondences by distance
+    _, index_best_comb, _ = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
+    index_best_comb.sort()
+    personsIDs_sorted = np.array(personsIDs_comb)[index_best_comb][:,1]
+    # rearrange persons
+    Q_kpt = np.array(Q_kpt)[personsIDs_sorted]
+    
+    return Q_kpt, personsIDs_sorted
+
+
 def persons_combinations(json_files_framef):
     '''
     Find all possible combinations of detected persons' ids. 
@@ -329,6 +406,8 @@ def track_2d_all(config):
     json_tracked_files = [[os.path.join(poseTracked_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # person's tracking
+    json_files_flatten = [item for sublist in json_files for item in sublist]
+    nb_persons_to_detect = max([len(json.load(open(json_fname))['people']) for json_fname in json_files_flatten])
     f_range = [[min([len(j) for j in json_files])] if frame_range==[] else frame_range][0]
     n_cams = len(json_dirs_names)
     error_min_tot, cameras_off_tot = [], []
@@ -339,6 +418,7 @@ def track_2d_all(config):
                     Found {len(P)} cameras in the calibration file,\
                     and {n_cams} cameras based on the number of pose folders.')
     
+    Q_kpt = [np.array([0., 0., 0., 1.])] * nb_persons_to_detect
     for f in tqdm(range(*f_range)):
         # print(f'\nFrame {f}:')
         json_files_f = [json_files[c][f] for c in range(n_cams)]
@@ -348,17 +428,19 @@ def track_2d_all(config):
         personsIDs_comb = persons_combinations(json_files_f) 
         
         # choose persons of interest and exclude cameras with bad pose estimation
+        Q_kpt_old = Q_kpt
         errors_below_thresh, comb_errors_below_thresh, Q_kpt = best_persons_and_cameras_combination(config, json_files_f, personsIDs_comb, P, tracked_keypoint_id, calib_params)
         
         # reID persons across frames by checking the distance from one frame to another
-        ##### TO DO
-        
-        error_min_tot.append(np.mean(errors_below_thresh))
-        cameras_off_count = np.count_nonzero([np.isnan(comb) for comb in comb_errors_below_thresh]) / len(comb_errors_below_thresh)
-        # print(cameras_off_count)
-        cameras_off_tot.append(cameras_off_count)
+        nb_persons_to_detect = max([len(Q_kpt_old), len(Q_kpt)])
+        Q_kpt, personsIDs_sorted = sort_people(Q_kpt_old, Q_kpt, nb_persons_to_detect)
+        errors_below_thresh = np.array(errors_below_thresh)[personsIDs_sorted]
+        comb_errors_below_thresh = np.array(comb_errors_below_thresh)[personsIDs_sorted]
         
         # rewrite json files with a single or multiple persons of interest
+        error_min_tot.append(np.mean(errors_below_thresh))
+        cameras_off_count = np.count_nonzero([np.isnan(comb) for comb in comb_errors_below_thresh]) / len(comb_errors_below_thresh)
+        cameras_off_tot.append(cameras_off_count)
         for cam in range(n_cams):
             with open(json_tracked_files_f[cam], 'w') as json_tracked_f:
                 with open(json_files_f[cam], 'r') as json_f:
