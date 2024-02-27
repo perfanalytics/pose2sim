@@ -31,6 +31,7 @@ from Pose2Sim.MarkerAugmenter.utils import TRC2numpy
 import json
 import glob
 import logging
+import keras
 
 
 ## AUTHORSHIP INFORMATION
@@ -183,7 +184,8 @@ def augmentTRC(config_dict):
             model = tf.keras.models.model_from_json(pretrainedModel_json)
             model.load_weights(os.path.join(augmenterModelDir, "weights.h5"))  
             outputs = model.predict(inputs)
-            
+            keras.backend.clear_session()
+
             # %% Post-process outputs.
             # Step 1: Reshape if necessary (eg, LSTM)
             if augmenterModelName == "LSTM":
