@@ -18,7 +18,7 @@
     
     Usage: 
     from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', '<output_format>', r'<output_file_root>')
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -o
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -o -u
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -d -o output_file_root
 '''
@@ -255,7 +255,7 @@ def reproj_from_trc_calib_func(**args):
     
     Usage: 
     from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(input_trc_file = r'<input_trc_file>', input_calib_file = r'<input_calib_file>', openpose_output=True, deeplabcut_output=True, undistort_points=True, output_file_root = r'<output_file_root>')
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -o
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file --openpose_output --deeplabcut_output --undistort_points --output_file_root output_file_root
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -o -O output_file_root
     '''
@@ -268,6 +268,8 @@ def reproj_from_trc_calib_func(**args):
     output_file_root = args.get('output_file_root')
     if output_file_root == None:
         output_file_root = input_trc_file.replace('.trc', '_reproj')
+    if not openpose_output and not deeplabcut_output:
+        raise ValueError('Output_format must be specified either "openpose_output" (-o) or "deeplabcut_output (-d)"') 
 
     # Extract data from trc file
     header_trc, data_trc = df_from_trc(input_trc_file)
