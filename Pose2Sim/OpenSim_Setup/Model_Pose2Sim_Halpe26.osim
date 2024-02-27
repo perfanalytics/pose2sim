@@ -21,7 +21,7 @@
 		<!--Acceleration due to gravity, expressed in ground.-->
 		<gravity>0 -9.8066499999999994 0</gravity>
 		<!--Credits (e.g., model author names) associated with the model.-->
-		<credits>Full-body model adapted from Beaucage-Gauvreau et al., with Rajagopal et al. knee angles. AlphaPose Halpe_26 markers. No muscles included. Free pelvis translation, unlocked subtalar angle, added ball joint between head and torso, locked arm pronation/supination, clamped hip flexion to 150° instead of 120°.</credits>
+		<credits>Full-body model adapted from Beaucage-Gauvreau et al., with Rajagopal et al. knee angles. AlphaPose Halpe_26 markers. No muscles included. Free pelvis translation, unlocked hip, knee, subtalar angle, added ball joint between head and torso, locked arm pronation/supination, clamped hip flexion to 150° instead of 120°.</credits>
 		<!--Publications and references associated with the model.-->
 		<publications>Pagnon, D., Domalain, M., Reveret, L. (2021). Pose2Sim: An End-to-End Workflow for 3D Markerless Sports Kinematics—Part 1: Robustness. Sensors, 21(19), 6530.</publications>
 		<!--Units for all lengths.-->
@@ -3154,7 +3154,7 @@
 							<!--The minimum and maximum values that the coordinate can range between. Rotational coordinate range in radians and Translational in meters.-->
 							<range>-0.87266463000000005 0.52359878000000004</range>
 							<!--Flag indicating whether or not the values of the coordinates should be limited to the range, above.-->
-							<clamped>true</clamped>
+							<clamped>false</clamped>
 							<!--Flag indicating whether or not the values of the coordinates should be constrained to the current (e.g. default) value, above.-->
 							<locked>false</locked>
 							<!--If specified, the coordinate can be prescribed by a function of time. It can be any OpenSim Function with valid second order derivatives.-->
@@ -3170,7 +3170,7 @@
 							<!--The minimum and maximum values that the coordinate can range between. Rotational coordinate range in radians and Translational in meters.-->
 							<range>-0.69813170000000002 0.69813170000000002</range>
 							<!--Flag indicating whether or not the values of the coordinates should be limited to the range, above.-->
-							<clamped>true</clamped>
+							<clamped>false</clamped>
 							<!--Flag indicating whether or not the values of the coordinates should be constrained to the current (e.g. default) value, above.-->
 							<locked>false</locked>
 							<!--If specified, the coordinate can be prescribed by a function of time. It can be any OpenSim Function with valid second order derivatives.-->
@@ -3293,7 +3293,7 @@
 							<!--The minimum and maximum values that the coordinate can range between. Rotational coordinate range in radians and Translational in meters.-->
 							<range>0 2.0943999999999998</range>
 							<!--Flag indicating whether or not the values of the coordinates should be limited to the range, above.-->
-							<clamped>true</clamped>
+							<clamped>false</clamped>
 							<!--Flag indicating whether or not the values of the coordinates should be constrained to the current (e.g. default) value, above.-->
 							<locked>false</locked>
 							<!--If specified, the coordinate can be prescribed by a function of time. It can be any OpenSim Function with valid second order derivatives.-->
@@ -3801,7 +3801,7 @@
 							<!--The minimum and maximum values that the coordinate can range between. Rotational coordinate range in radians and Translational in meters.-->
 							<range>-0.87266463000000005 0.52359878000000004</range>
 							<!--Flag indicating whether or not the values of the coordinates should be limited to the range, above.-->
-							<clamped>true</clamped>
+							<clamped>false</clamped>
 							<!--Flag indicating whether or not the values of the coordinates should be constrained to the current (e.g. default) value, above.-->
 							<locked>false</locked>
 							<!--If specified, the coordinate can be prescribed by a function of time. It can be any OpenSim Function with valid second order derivatives.-->
@@ -3817,7 +3817,7 @@
 							<!--The minimum and maximum values that the coordinate can range between. Rotational coordinate range in radians and Translational in meters.-->
 							<range>-0.69813170000000002 0.69813170000000002</range>
 							<!--Flag indicating whether or not the values of the coordinates should be limited to the range, above.-->
-							<clamped>true</clamped>
+							<clamped>false</clamped>
 							<!--Flag indicating whether or not the values of the coordinates should be constrained to the current (e.g. default) value, above.-->
 							<locked>false</locked>
 							<!--If specified, the coordinate can be prescribed by a function of time. It can be any OpenSim Function with valid second order derivatives.-->
@@ -3940,7 +3940,7 @@
 							<!--The minimum and maximum values that the coordinate can range between. Rotational coordinate range in radians and Translational in meters.-->
 							<range>0 2.0943999999999998</range>
 							<!--Flag indicating whether or not the values of the coordinates should be limited to the range, above.-->
-							<clamped>true</clamped>
+							<clamped>false</clamped>
 							<!--Flag indicating whether or not the values of the coordinates should be constrained to the current (e.g. default) value, above.-->
 							<locked>false</locked>
 							<!--If specified, the coordinate can be prescribed by a function of time. It can be any OpenSim Function with valid second order derivatives.-->
