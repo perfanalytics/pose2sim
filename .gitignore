@@ -5,3 +5,8 @@ logs.txt*
 dist/
 **/*.avi
 # **/*.mp4
+**/*.trc
+
+**/Calib_qualisys.toml
+**/pose-3d/
+**/pose-associated/
