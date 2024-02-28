@@ -445,7 +445,6 @@ def filter_all(config):
 
     # Read config
     project_dir = config.get('project').get('project_dir')
-    single_person = config.get('project').get('single_person')
     try:
         pose_tracked_dir = os.path.join(project_dir, 'pose-associated')
         os.listdir(pose_tracked_dir)

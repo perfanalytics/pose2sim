@@ -31,7 +31,6 @@ from Pose2Sim.MarkerAugmenter.utils import TRC2numpy
 import json
 import glob
 import logging
-import keras
 
 
 ## AUTHORSHIP INFORMATION
@@ -77,7 +76,7 @@ def augmentTRC(config_dict):
     if not type(subject_height) == list:
         subject_height = [subject_height]
         subject_mass = [subject_mass]
-    augmenterDir = os.path.join(session_dir, '..', '..', 'MarkerAugmenter')
+    augmenterDir = os.path.join(session_dir, '..', 'MarkerAugmenter')
     augmenterModelName = 'LSTM'
     augmenter_model = 'v0.3'
     offset = True
@@ -184,7 +183,7 @@ def augmentTRC(config_dict):
             model = tf.keras.models.model_from_json(pretrainedModel_json)
             model.load_weights(os.path.join(augmenterModelDir, "weights.h5"))  
             outputs = model.predict(inputs)
-            keras.backend.clear_session()
+            tf.keras.backend.clear_session()
 
             # %% Post-process outputs.
             # Step 1: Reshape if necessary (eg, LSTM)

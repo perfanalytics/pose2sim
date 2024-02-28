@@ -11,8 +11,8 @@
     Which is the one of interest?
     
     This module tries all possible triangulations of a chosen anatomical 
-    point. If "single_person" mode is used, it chooses the person for whom the 
-    reprojection error is smallest. If multi-person is used, it selects all 
+    point. If "multi_person" mode is not used, it chooses the person for
+    whom the reprojection error is smallest. Otherwise, it selects all 
     persons with a reprojection error smaller than a threshold, and then 
     associates them across time frames by minimizing the displacement speed.
     
@@ -168,9 +168,9 @@ def persons_combinations(json_files_framef):
 
 def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_combinations, projection_matrices, tracked_keypoint_id, calib_params):
     '''
-    - if single_person: Choose the right person among the multiple ones found by
+    - if multi_person: Choose all the combination of cameras that give a reprojection error below a threshold
+    - else: Chooses the right person among the multiple ones found by
     OpenPose & excludes cameras with wrong 2d-pose estimation.
-    - else: Choose all the combination of cameras that give a reprojection error below a threshold
     
     1. triangulate the tracked keypoint for all possible combinations of people,
     2. compute difference between reprojection & original openpose detection,
@@ -190,7 +190,7 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
     - comb_errors_below_thresh: list of arrays of ints
     '''
     
-    single_person = config.get('project').get('single_person')
+    multi_person = config.get('project').get('multi_person')
     error_threshold_tracking = config.get('personAssociation').get('reproj_error_threshold_association')
     likelihood_threshold = config.get('personAssociation').get('likelihood_threshold_association')
     min_cameras_for_triangulation = config.get('triangulation').get('min_cameras_for_triangulation')
@@ -270,23 +270,23 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
                     error_comb_per_cam.append( euclidean_distance(q_file, q_calc) )
                 error_comb.append( np.mean(error_comb_per_cam) )
             
-            if single_person:
+            if multi_person:
+                errors_below_thresh += [e for e in error_comb if e<error_threshold_tracking]
+                comb_errors_below_thresh += [combinations_with_cams_off[error_comb.index(e)] for e in error_comb if e<error_threshold_tracking]
+                Q_kpt += [Q_comb[error_comb.index(e)] for e in error_comb if e<error_threshold_tracking]
+            else:
                 error_min = np.nanmin(error_comb)
                 errors_below_thresh = [error_min]
                 comb_errors_below_thresh = [combinations_with_cams_off[np.argmin(error_comb)]]
                 Q_kpt = [Q_comb[np.argmin(error_comb)]]
                 if errors_below_thresh[0] < error_threshold_tracking:
                     break 
-            else:
-                errors_below_thresh += [e for e in error_comb if e<error_threshold_tracking]
-                comb_errors_below_thresh += [combinations_with_cams_off[error_comb.index(e)] for e in error_comb if e<error_threshold_tracking]
-                Q_kpt += [Q_comb[error_comb.index(e)] for e in error_comb if e<error_threshold_tracking]
         
         # print('\n', personsIDs_combinations)
         # print(errors_below_thresh)
         # print(comb_errors_below_thresh)
         # print(Q_kpt)
-        if not single_person:
+        if multi_person:
             # Remove indices already used for a person
             personsIDs_combinations = np.array([personsIDs_combinations[i] for i in range(len(personsIDs_combinations))
                                            if not np.array( 
@@ -371,7 +371,10 @@ def track_2d_all(config):
     undistort_points = config.get('triangulation').get('undistort_points')
     
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
-    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
+    try:
+        calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
+    except:
+        raise Exception(f'No .toml calibration file found in the {calib_dir}.')
     pose_dir = os.path.join(project_dir, 'pose')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
 
@@ -432,8 +435,8 @@ def track_2d_all(config):
         errors_below_thresh, comb_errors_below_thresh, Q_kpt = best_persons_and_cameras_combination(config, json_files_f, personsIDs_comb, P, tracked_keypoint_id, calib_params)
         
         # reID persons across frames by checking the distance from one frame to another
-        nb_persons_to_detect = max([len(Q_kpt_old), len(Q_kpt)])
-        Q_kpt, personsIDs_sorted = sort_people(Q_kpt_old, Q_kpt, nb_persons_to_detect)
+        nb_persons_to_detect_frame = max([len(Q_kpt_old), len(Q_kpt)])
+        Q_kpt, personsIDs_sorted = sort_people(Q_kpt_old, Q_kpt, nb_persons_to_detect_frame)
         errors_below_thresh = np.array(errors_below_thresh)[personsIDs_sorted]
         comb_errors_below_thresh = np.array(comb_errors_below_thresh)[personsIDs_sorted]
         

@@ -126,11 +126,11 @@ def make_trc(config, Q, keypoints_names, f_range, id_person=-1):
     # Read config
     project_dir = config.get('project').get('project_dir')
     frame_rate = config.get('project').get('frame_rate')
-    single_person = config.get('project').get('single_person')
-    if single_person:
-        seq_name = f'{os.path.basename(os.path.realpath(project_dir))}'
-    else:
+    multi_person = config.get('project').get('multi_person')
+    if multi_person:
         seq_name = f'{os.path.basename(os.path.realpath(project_dir))}_P{id_person+1}'
+    else:
+        seq_name = f'{os.path.basename(os.path.realpath(project_dir))}'
     pose3d_dir = os.path.join(project_dir, 'pose-3d')
 
     trc_f = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
@@ -160,6 +160,43 @@ def make_trc(config, Q, keypoints_names, f_range, id_person=-1):
         Q.to_csv(trc_o, sep='\t', index=True, header=None, lineterminator='\n')
 
     return trc_path
+
+
+def retrieve_right_trc_order(trc_paths):
+    '''
+    Lets the user input which static file correspond to each generated trc file.
+    
+    INPUT:
+    - trc_paths: list of strings
+    
+    OUTPUT:
+    - trc_id: list of integers
+    '''
+    
+    logging.info('\n\nReordering trc file IDs:')
+    logging.info(f'\nPlease visualize the generated trc files in Blender or OpenSim.\nTrc files are stored in {os.path.dirname(trc_paths[0])}.\n')
+    retry = True
+    while retry:
+        retry = False
+        logging.info('List of trc files:')
+        [logging.info(f'#{t_list}: {os.path.basename(trc_list)}') for t_list, trc_list in enumerate(trc_paths)]
+        trc_id = []
+        for t, trc_p in enumerate(trc_paths):
+            logging.info(f'\nStatic trial #{t} corresponds to trc number:')
+            trc_id += [input('Enter ID:')]
+        
+        # Check non int and duplicates
+        try:
+            trc_id = [int(t) for t in trc_id]
+            duplicates_in_input = (len(trc_id) != len(set(trc_id)))
+            if duplicates_in_input:
+                retry = True
+                print('\n\nWARNING: Same ID entered twice: please check IDs again.\n')
+        except:
+            print('\n\nWARNING: The ID must be an integer: please check IDs again.\n')
+            retry = True
+    
+    return trc_id
 
 
 def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, trc_path):
@@ -202,7 +239,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     nb_persons_to_detect = len(error)
     for n in range(nb_persons_to_detect):
         if nb_persons_to_detect > 1:
-            print(f'\n\nPARTICIPANT {n+1}\n')
+            logging.info(f'\n\nPARTICIPANT {n+1}\n')
         
         for idx, name in enumerate(keypoints_names):
             mean_error_keypoint_px = np.around(error[n].iloc[:,idx].mean(), decimals=1) # RMS à la place?
@@ -559,8 +596,10 @@ def triangulate_all(config):
     # Read config
     project_dir = config.get('project').get('project_dir')
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
+    multi_person = config.get('project').get('multi_person')
     pose_model = config.get('pose').get('pose_model')
     frame_range = config.get('project').get('frame_range')
+    reorder_trc = config.get('triangulation').get('reorder_trc')
     likelihood_threshold = config.get('triangulation').get('likelihood_threshold_triangulation')
     interpolation_kind = config.get('triangulation').get('interpolation')
     interp_gap_smaller_than = config.get('triangulation').get('interp_if_gap_smaller_than')
@@ -568,7 +607,10 @@ def triangulate_all(config):
     undistort_points = config.get('triangulation').get('undistort_points')
 
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
-    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
+    try:
+        calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
+    except:
+        raise Exception(f'No .toml calibration file found in the {calib_dir}.')
     pose_dir = os.path.join(project_dir, 'pose')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
     
@@ -722,6 +764,19 @@ def triangulate_all(config):
     
     # Create TRC file
     trc_paths = [make_trc(config, Q_tot[n], keypoints_names, f_range, id_person=n) for n in range(len(Q_tot))]
+
+    # Reorder TRC files
+    if multi_person and reorder_trc:
+        trc_id = retrieve_right_trc_order(trc_paths)
+        [os.rename(t, t+'.old') for t in trc_paths]
+        [os.rename(t+'.old', trc_paths[i]) for i, t in zip(trc_id,trc_paths)]
+        error_tot = [error_tot[i] for i in trc_id]
+        nb_cams_excluded_tot = [nb_cams_excluded_tot[i] for i in trc_id]
+        cam_excluded_count = [cam_excluded_count[i] for i in trc_id]
+        interp_frames = [interp_frames[i] for i in trc_id]
+        non_interp_frames = [non_interp_frames[i] for i in trc_id]
+        
+        logging.info('\nThe trc files have been renamed to match the order of the static sequences.')
     
     # Recap message
     recap_triangulate(config, error_tot, nb_cams_excluded_tot, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, trc_paths)
