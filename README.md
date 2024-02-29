@@ -198,7 +198,7 @@ You can also visualize your results with Blender as in [Demonstration Part-3](#d
 Set *[triangulation]* `reorder_trc = true` if you need to run OpenSim and to match the generated .trc files with the static trials.\
 Make sure that the order of *[markerAugmentation]* `participant_height` and `participant_mass` matches the order of the static trials.
 
-*N.B.:* Note that in the case of our floating ghost participant, marker augmentation worsens the results. In general, marker augmentation is not recommended for unusual moves and poses.
+*N.B.:* Note that in the case of our floating ghost participant, marker augmentation may worsen the results. See [Marker augmentation](#marker-augmentation) for instruction on when and when not to use it.
 
 
 </br></br>
