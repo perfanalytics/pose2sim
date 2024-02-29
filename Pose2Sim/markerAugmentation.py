@@ -86,6 +86,8 @@ def augmentTRC(config_dict):
 
     # Apply all trc files
     trc_files = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if 'filt' in f and '_LSTM' not in f]
+    if len(trc_files) == 0:
+        raise ValueError('No filtered trc files found.')
     for p, pathInputTRCFile in enumerate(trc_files):
         pathOutputTRCFile = os.path.splitext(pathInputTRCFile)[0] + '_LSTM.trc'
     
@@ -182,7 +184,7 @@ def augmentTRC(config_dict):
             json_file.close()
             model = tf.keras.models.model_from_json(pretrainedModel_json)
             model.load_weights(os.path.join(augmenterModelDir, "weights.h5"))  
-            outputs = model.predict(inputs)
+            outputs = model(inputs)
             tf.keras.backend.clear_session()
 
             # %% Post-process outputs.

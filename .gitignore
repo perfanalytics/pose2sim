@@ -6,6 +6,7 @@ dist/
 **/*.avi
 # **/*.mp4
 **/*.trc
+**.*.sto
 
 **/Calib_qualisys.toml
 **/pose-3d/

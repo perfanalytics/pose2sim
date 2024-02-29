@@ -61,7 +61,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
    2. [Demonstration Part-1: Triangulate OpenPose outputs](#demonstration-part-1-build-3d-trc-file-on-python)
    3. [Demonstration Part-2: Obtain 3D joint angles with OpenSim](#demonstration-part-2-obtain-3d-joint-angles-with-opensim)
    4. [Demonstration Part-3 (optional): Visualize your results with Blender](#demonstration-part-3-optional-visualize-your-results-with-blender)
-   5. [Demonstration Part-4 (optional): Try multi-person analysis](#demonstration-part-4-optional-try_multi-person-analysis)
+   5. [Demonstration Part-4 (optional): Try multi-person analysis](#demonstration-part-4-optional-try-multi-person-analysis)
 2. [Use on your own data](#use-on-your-own-data)
    1. [Setting your project up](#setting-your-project-up)
       1. [Retrieve the folder structure](#retrieve-the-folder-structure)
@@ -149,14 +149,17 @@ Pose2Sim.markerAugmentation()
 2. Open the provided `Model_Pose2Sim_LSTM.osim` model from `Pose2Sim/OpenSim_Setup`. *(File -> Open Model)*
 3. Load the provided `Scaling_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Scale model -> Load)*
 4. Run. You should see your skeletal model take the static pose.
+5. Save your scaled model in `S00_P00_OpenSim/Model_Pose2Sim_S00_P00_LSTM_scaled.osim`. *(File -> Save Model As)*
 
 ### Inverse kinematics
 1. Load the provided `IK_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Inverse kinematics -> Load)*
 2. Run. You should see your skeletal model move in the Vizualizer window.
+5. Your IK motion file will be saved in `S00_P00_OpenSim`.
 <br/>
 
 <p style="text-align: center;"><img src="Content/OpenSim.JPG" width="380"></p>
 
+</br>
 
 ## Demonstration Part-3 (optional): Visualize your results with Blender
 > _**Visualize your results and look in detail for potential areas of improvement (and more).**_ 
@@ -194,6 +197,8 @@ You can also visualize your results with Blender as in [Demonstration Part-3](#d
 *N.B.:* Set *[project]* `multi_person = true` for each trial that contains multiple persons.\
 Set *[triangulation]* `reorder_trc = true` if you need to run OpenSim and to match the generated .trc files with the static trials.\
 Make sure that the order of *[markerAugmentation]* `participant_height` and `participant_mass` matches the order of the static trials.
+
+*N.B.:* Note that in the case of our floating ghost participant, marker augmentation worsens the results. In general, marker augmentation is not recommended for unusual moves and poses.
 
 
 </br></br>
@@ -475,7 +480,7 @@ Output:\
 > _**Use the Stanford LSTM model to estimate the position of 47 virtual markers.**_\
 _**Note that inverse kinematic results are not necessarily better after marker augmentation.**_ Skip if results are not convincing.
 
-**Make sure that `participant_height` is correct in your `Config.toml` file.** `participant_mass` is mostly optional.\
+**Make sure that `participant_height` is correct in your `Config.toml` file.** `participant_mass` is mostly optional for IK.\
 Only works with models estimating at least the following keypoints (e.g., not COCO):
 ``` python
  ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
@@ -492,6 +497,9 @@ Type `ipython`.
 from Pose2Sim import Pose2Sim
 Pose2Sim.markerAugmentation()
 ```
+
+*N.B.:* Again, use marker augmentation with good care, as results are worse than without in about half of the cases.\
+Marker augmentation tends to give a more stable, but less precise output. In practice, it is mostly beneficial when using less than 4 cameras. 
 
 </br>
 
@@ -513,7 +521,7 @@ Pose2Sim.markerAugmentation()
 2. Open OpenSim.
 3. Load the provided `IK_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Inverse kinematics -> Load)*
 4. Replace the example .trc file with your own data, and specify the path to your angle kinematics output file.
-5. Run
+5. Run.
 
 <img src="Content/OpenSim.JPG" width="380">
 
