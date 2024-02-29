@@ -759,7 +759,10 @@ def triangulate_all(config):
     # Interpolate missing values
     if interpolation_kind != 'none':
         for n in range(nb_persons_to_detect):
-            Q_tot[n] = Q_tot[n].apply(interpolate_zeros_nans, axis=0, args = [interp_gap_smaller_than, interpolation_kind])
+            try:
+                Q_tot[n] = Q_tot[n].apply(interpolate_zeros_nans, axis=0, args = [interp_gap_smaller_than, interpolation_kind])
+            except:
+                logging.info(f'Interpolation was not possible for person {n}. This means that the not enough points are available, which is often due to a bad calibration.')
     # Q_tot.replace(np.nan, 0, inplace=True)
     
     # Create TRC file
