@@ -14,9 +14,9 @@
     coordinates on the original images.
     
     Usage: 
-    python -m json_display_without_img -j json_folder
-    python -m json_display_without_img -j json_folder -o output_img_folder -d True -s True
-    from Pose2Sim.Utilities import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>')
+    json_display_without_img -j json_folder -W 1920 -H 1080
+    json_display_without_img -j json_folder -o output_img_folder -d True -s True -W 1920 -H 1080 - 30
+    import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>', image_width=1920, image_height = 1080)
 '''
 
 
@@ -40,37 +40,16 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
-# ## CLASSES
-class BunchOFiles(FileMovieWriter):
-    '''
-    Borrowed from https://stackoverflow.com/a/41273312/12196632
-    '''
-
-    supported_formats = ['png', 'jpeg', 'bmp', 'svg', 'pdf']
-
-    def __init__(self, *args, extra_args=None, **kwargs):
-        # extra_args aren't used but we need to stop None from being passed
-        super().__init__(*args, extra_args=(), **kwargs)
-
-    def setup(self, fig, dpi, frame_prefix):
-        super().setup(fig, dpi, frame_prefix) #, clear_temp=False)
-        self.fname_format_str = '%s%%d.%s'
-        self.temp_prefix, self.frame_format = self.outfile.split('.')
-
-    def grab_frame(self, **savefig_kwargs):
-        '''
-        Grab the image information from the figure and save as a movie frame.
-        All keyword arguments in savefig_kwargs are passed on to the 'savefig' command that saves the figure.
-        '''
-        # Tell the figure to save its data to the sink, using the frame format and dpi.
-        with self._frame_sink() as myframesink:
-            self.fig.savefig(myframesink, format=self.frame_format, dpi=self.dpi, **savefig_kwargs)
-
-    def finish(self):
-        self._frame_sink().close()
-
-
 ## FUNCTIONS
+def save_inp_as_output(_img, c_name, dpi=100):
+    h, w, _ = _img.shape
+    fig, axes = plt.subplots(figsize=(h/dpi, w/dpi))
+    fig.subplots_adjust(top=1.0, bottom=0, right=1.0, left=0, hspace=0, wspace=0) 
+    axes.imshow(_img)
+    axes.axis('off')
+    plt.savefig(c_name, dpi=dpi, format='jpeg')
+
+
 def json_display_without_img_func(**args):
     '''
     This function lets you display 2D coordinates json files on an animated graph.
@@ -80,9 +59,9 @@ def json_display_without_img_func(**args):
     coordinates on the original images.
     
     Usage: 
-    json_display_without_img -j json_folder
-    json_display_without_img -j json_folder -o output_img_folder -d True -s True
-    import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>')
+    json_display_without_img -j json_folder -W 1920 -H 1080
+    json_display_without_img -j json_folder -o output_img_folder -d True -s True -W 1920 -H 1080
+    import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>', image_width=1920, image_height = 1080)
     '''
 
     json_folder = os.path.realpath(args.get('json_folder'))
@@ -92,6 +71,20 @@ def json_display_without_img_func(**args):
         output_img_folder = os.path.join(json_folder+'_img')
     else:
         output_img_folder =  os.path.realpath(output_img_folder)
+    image_width =  args.get('image_width')
+    if image_width==None: 
+        image_width = 2000
+    else:
+        image_width = int(image_width)
+    image_height =  args.get('image_height')
+    if image_height==None: 
+        image_height = 2000
+    else:
+        image_height = int(image_height)
+
+    frame_rate = int(args.get('frame_rate'))
+    if frame_rate==None:
+        frame_rate = 30
     display = args.get('display')
     if display==None: 
         display = True
@@ -103,7 +96,6 @@ def json_display_without_img_func(**args):
             os.mkdir(output_img_folder)
 
     # Données json
-    width, height = 2000,2000
     X,Y,CONF = [], [], []
     for json_fname in json_fnames:    
         xfrm, yfrm, conffrm = np.array([]), np.array([]), np.array([])    # Coordinates of all people in frame
@@ -123,28 +115,33 @@ def json_display_without_img_func(**args):
         if frame==len(json_fnames)-1:
             plt.close(fig)
         else:
-            scat.set_offsets(np.c_[X[frame], height-Y[frame]])
+            scat.set_offsets(np.c_[X[frame], image_height-Y[frame]])
             scat.set_array(CONF[frame])
+            if save == True or save=='True' or save == '1':
+                output_name = os.path.join(output_img_folder, f'{os.path.basename(output_img_folder)}_{frame}.png')
+                plt.savefig(output_name)
         return scat,
     
     fig = plt.figure()
-    ax = plt.axes(xlim = (0,width), ylim = (0,height))
-    scat = ax.scatter(X[0],height-Y[0], marker='+', cmap='RdYlGn', c=CONF[0])
-    anim = FuncAnimation(fig, update, interval=33, frames=np.arange(len(json_fnames)), repeat=False) #, blit=True
+    ax = plt.axes(xlim = (0,image_width), ylim = (0,image_height))
+    ax.set_aspect('equal', adjustable='box')
+    scat = ax.scatter(X[0],image_height-Y[0], marker='+', cmap='RdYlGn', c=CONF[0])
+    
+    interval_img = int(1000/frame_rate)
+    anim = FuncAnimation(fig, update, interval=interval_img, frames=np.arange(len(json_fnames)), repeat=False) #, blit=True
 
     # Display
     if display == True or display == 'True' or display =='1':    
         plt.show()
-
-    # Save
-    if save == True or save=='True' or save == '1':
-        anim.save(os.path.join(output_img_folder, 'image.png'), writer=BunchOFiles())
 
     plt.close('all')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-j', '--json_folder', required = True, help='folder of json 2D coordinate files')
+    parser.add_argument('-W', '--image_width', required = True, help='image width')
+    parser.add_argument('-H', '--image_height', required = True, help='image height')
+    parser.add_argument('-f', '--frame_rate', required = True, help='frame rate')
     parser.add_argument('-o', '--output_img_folder', required=False, help='custom folder name for coordinates overlayed on images')
     parser.add_argument('-d', '--display', default=True, required = False, help='display images with overlayed coordinates')
     parser.add_argument('-s', '--save', default=False, required = False, help='save images with overlayed 2D coordinates')
