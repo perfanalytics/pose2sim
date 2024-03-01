@@ -115,17 +115,16 @@ weights_kpt = [1,1] # Pris en compte uniquement si on a plusieurs keypoints
 
 
 [personAssociation]
-single_person = true # false for multi-person analysis (not supported yet), true for only triangulating the main person in scene. 
 tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
 # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
 reproj_error_threshold_association = 20 # px
-likelihood_threshold_association = 0.2
+likelihood_threshold_association = 0.05
 
 
 [triangulation]
 reorder_trc = false # only checked if multi_person analysis
 reproj_error_threshold_triangulation = 15 # px
-likelihood_threshold_triangulation = 0.3
+likelihood_threshold_triangulation= 0.05
 min_cameras_for_triangulation = 2
 interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
                         # 'none' if you don't want to interpolate missing points
