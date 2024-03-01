@@ -76,7 +76,7 @@ def augmentTRC(config_dict):
     if not type(subject_height) == list:
         subject_height = [subject_height]
         subject_mass = [subject_mass]
-    augmenterDir = os.path.join(session_dir, '..', 'MarkerAugmenter')
+    augmenterDir = os.path.dirname(utilsDataman.__file__)
     augmenterModelName = 'LSTM'
     augmenter_model = 'v0.3'
     offset = True
