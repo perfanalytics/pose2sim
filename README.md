@@ -415,10 +415,9 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 ### Associate persons across cameras
 
-> _**Track the person viewed by the most cameras, in case of several detections by OpenPose.**_ \
+> _**If `multi_person` is set to `false`, the algorithm chooses the person for whom the reprojection error is smallest.\
+  If `multi_person` is set to `true`, it selects all persons with a reprojection error smaller than a threshold, and then associates them across time frames by minimizing the displacement speed.**_ \
 ***N.B.:** Skip this step if only one person is in the field of view.*\
-> [Want to contribute?](#how-to-contribute) _**Allow for multiple person analysis.**_
-
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
 Type `ipython`.
@@ -480,6 +479,8 @@ Output:\
 > _**Use the Stanford LSTM model to estimate the position of 47 virtual markers.**_\
 _**Note that inverse kinematic results are not necessarily better after marker augmentation.**_ Skip if results are not convincing.
 
+*N.B.:* Marker augmentation tends to give a more stable, but less precise output. In practice, it is mostly beneficial when using less than 4 cameras. 
+
 **Make sure that `participant_height` is correct in your `Config.toml` file.** `participant_mass` is mostly optional for IK.\
 Only works with models estimating at least the following keypoints (e.g., not COCO):
 ``` python
@@ -497,9 +498,6 @@ Type `ipython`.
 from Pose2Sim import Pose2Sim
 Pose2Sim.markerAugmentation()
 ```
-
-*N.B.:* Again, use marker augmentation with good care, as results are worse than without in about half of the cases.\
-Marker augmentation tends to give a more stable, but less precise output. In practice, it is mostly beneficial when using less than 4 cameras. 
 
 </br>
 
@@ -696,7 +694,6 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 
 **Main to-do list**
 - Graphical User Interface
-- Multiple person triangulation
 - Synchronization
 - Self-calibration based on keypoint detection
 
@@ -774,9 +771,9 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#9634; **Tutorials:** Make video tutorials.
 &#9634; **Doc:** Use [Sphinx](https://www.sphinx-doc.org/en/master), [MkDocs](https://www.mkdocs.org), or (maybe better), [github.io](https://docs.github.com/fr/pages/quickstart) for clearer documentation.
 
-&#9634; **Catch errors**
 &#10004; **Pip package**
-&#9634; **Batch processing**
+&#10004; **Batch processing**
+&#10004; **Catch errors**
 &#9634; **Conda package** 
 &#9634; **Docker image**
 &#9634; Run pose estimation and OpenSim from within Pose2Sim
