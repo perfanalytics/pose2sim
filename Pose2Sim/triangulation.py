@@ -669,7 +669,7 @@ def triangulate_all(config):
     
     # Triangulation
     Q_tot, error_tot, nb_cams_excluded_tot,id_excluded_cams_tot = [], [], [], []
-    for f in tqdm(range(*f_range)):
+    for f in tqdm(range(frames_nb)):
         # Get x,y,likelihood values from files
         json_tracked_files_f = [json_tracked_files[c][f] for c in range(n_cams)]
         # print(json_tracked_files_f)
@@ -718,10 +718,10 @@ def triangulate_all(config):
         id_excluded_cams = [[id_excluded_cams[n][k] for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
         id_excluded_cams_tot.append(id_excluded_cams)
             
-    Q_tot = [pd.DataFrame([Q_tot[f][n] for f in range(*f_range)]) for n in range(nb_persons_to_detect)]
-    error_tot = [pd.DataFrame([error_tot[f][n] for f in range(*f_range)]) for n in range(nb_persons_to_detect)]
-    nb_cams_excluded_tot = [pd.DataFrame([nb_cams_excluded_tot[f][n] for f in range(*f_range)]) for n in range(nb_persons_to_detect)]
-    id_excluded_cams_tot = [pd.DataFrame([id_excluded_cams_tot[f][n] for f in range(*f_range)]) for n in range(nb_persons_to_detect)]
+    Q_tot = [pd.DataFrame([Q_tot[f][n] for f in range(frames_nb)]) for n in range(nb_persons_to_detect)]
+    error_tot = [pd.DataFrame([error_tot[f][n] for f in range(frames_nb)]) for n in range(nb_persons_to_detect)]
+    nb_cams_excluded_tot = [pd.DataFrame([nb_cams_excluded_tot[f][n] for f in range(frames_nb)]) for n in range(nb_persons_to_detect)]
+    id_excluded_cams_tot = [pd.DataFrame([id_excluded_cams_tot[f][n] for f in range(frames_nb)]) for n in range(nb_persons_to_detect)]
     
     for n in range(nb_persons_to_detect):
         error_tot[n]['mean'] = error_tot[n].mean(axis = 1)
@@ -769,7 +769,7 @@ def triangulate_all(config):
     trc_paths = [make_trc(config, Q_tot[n], keypoints_names, f_range, id_person=n) for n in range(len(Q_tot))]
 
     # Reorder TRC files
-    if multi_person and reorder_trc:
+    if multi_person and reorder_trc and len(trc_paths)>1:
         trc_id = retrieve_right_trc_order(trc_paths)
         [os.rename(t, t+'.old') for t in trc_paths]
         [os.rename(t+'.old', trc_paths[i]) for i, t in zip(trc_id,trc_paths)]

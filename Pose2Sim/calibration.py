@@ -319,14 +319,15 @@ def read_intrinsic_yml(intrinsic_path):
     N.B. : Size is calculated as twice the position of the optical center. Please correct in the .toml file if needed.
     '''
     intrinsic_yml = cv2.FileStorage(intrinsic_path, cv2.FILE_STORAGE_READ)
-    N = intrinsic_yml.getNode('names').size()
-    S, D, K = [], [], []
-    for i in range(N):
+    cam_number = intrinsic_yml.getNode('names').size()
+    N, S, D, K = [], [], [], []
+    for i in range(cam_number):
         name = intrinsic_yml.getNode('names').at(i).string()
+        N.append(name)
         K.append(intrinsic_yml.getNode(f'K_{name}').mat())
         D.append(intrinsic_yml.getNode(f'dist_{name}').mat().flatten()[:-1])
         S.append([K[i][0,2]*2, K[i][1,2]*2])
-    return S, K, D
+    return N, S, K, D
     
 
 def read_extrinsic_yml(extrinsic_path):
@@ -337,13 +338,14 @@ def read_extrinsic_yml(extrinsic_path):
     - T (extrinsic translation)
     '''
     extrinsic_yml = cv2.FileStorage(extrinsic_path, cv2.FILE_STORAGE_READ)
-    N = extrinsic_yml.getNode('names').size()
-    R, T = [], []
-    for i in range(N):
+    cam_number = extrinsic_yml.getNode('names').size()
+    N, R, T = [], [], []
+    for i in range(cam_number):
         name = extrinsic_yml.getNode('names').at(i).string()
+        N.append(name)
         R.append(extrinsic_yml.getNode(f'R_{name}').mat().flatten()) # R_1 pour Rodrigues, Rot_1 pour matrice
         T.append(extrinsic_yml.getNode(f'T_{name}').mat().flatten())
-    return R, T
+    return N, R, T
 
 
 def calib_easymocap_fun(files_to_convert_paths, binning_factor=1):
@@ -365,9 +367,8 @@ def calib_easymocap_fun(files_to_convert_paths, binning_factor=1):
     '''
 
     extrinsic_path, intrinsic_path = files_to_convert_paths
-    S, K, D = read_intrinsic_yml(intrinsic_path)
-    R, T = read_extrinsic_yml(extrinsic_path)
-    C = np.array(range(len(S)))
+    C, S, K, D = read_intrinsic_yml(intrinsic_path)
+    _, R, T = read_extrinsic_yml(extrinsic_path)
     ret = [np.nan]*len(C)
     
     return ret, C, S, D, K, R, T

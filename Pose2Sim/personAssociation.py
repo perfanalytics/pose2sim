@@ -59,6 +59,18 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def common_items_in_list(list1, list2):
+    '''
+    Do two lists have any items in common at the same index?
+    Returns True or False
+    '''
+    
+    for i, j in enumerate(list1):
+        if j == list2[i]:
+            return True
+    return False
+    
+
 def min_with_single_indices(L, T):
     '''
     Let L be a list (size s) with T associated tuple indices (size s).
@@ -121,6 +133,8 @@ def sort_people(Q_kpt_old, Q_kpt, nb_persons_to_detect):
     '''
     
     # Generate possible person correspondences across frames
+    if len(Q_kpt_old) < len(Q_kpt):
+        Q_kpt_old = np.concatenate((Q_kpt_old, [[0., 0., 0., 1.]]*(len(Q_kpt)-len(Q_kpt_old))))
     personsIDs_comb = sorted(list(it.product(range(len(Q_kpt_old)),range(len(Q_kpt)))))
     # Compute distance between persons from one frame to another
     frame_by_frame_dist = []
@@ -287,6 +301,27 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
         # print(comb_errors_below_thresh)
         # print(Q_kpt)
         if multi_person:
+            # sort combinations by error magnitude
+            errors_below_thresh_sorted = sorted(errors_below_thresh)
+            sorted_idx = np.array([errors_below_thresh.index(e) for e in errors_below_thresh_sorted])
+            comb_errors_below_thresh = np.array(comb_errors_below_thresh)[sorted_idx]
+            Q_kpt = np.array(Q_kpt)[sorted_idx]
+            # remove combinations with indices used several times for the same person 
+            comb_errors_below_thresh = [c.tolist() for c in comb_errors_below_thresh]
+            comb = comb_errors_below_thresh.copy()
+            comb_ok = np.array([comb[0]])
+            for i, c1 in enumerate(comb):
+                idx_ok = np.array([not(common_items_in_list(c1, c2)) for c2 in comb[1:]])
+                try:
+                    comb = np.array(comb[1:])[idx_ok]
+                    comb_ok = np.concatenate((comb_ok, [comb[0]]))
+                except:
+                    break
+            sorted_pruned_idx = [comb_errors_below_thresh.index(c.tolist()) for c in comb_ok]
+            errors_below_thresh = np.array(errors_below_thresh_sorted)[sorted_pruned_idx]
+            comb_errors_below_thresh = np.array(comb_errors_below_thresh)[sorted_pruned_idx]
+            Q_kpt = Q_kpt[sorted_pruned_idx]
+
             # Remove indices already used for a person
             personsIDs_combinations = np.array([personsIDs_combinations[i] for i in range(len(personsIDs_combinations))
                                            if not np.array( 
@@ -365,6 +400,7 @@ def track_2d_all(config):
     # Read config
     project_dir = config.get('project').get('project_dir')
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
+    multi_person = config.get('project').get('multi_person')
     pose_model = config.get('pose').get('pose_model')
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
     frame_range = config.get('project').get('frame_range')
@@ -377,6 +413,11 @@ def track_2d_all(config):
         raise Exception(f'No .toml calibration file found in the {calib_dir}.')
     pose_dir = os.path.join(project_dir, 'pose')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
+
+    if multi_person:
+        logging.info('\nMulti-person analysis selected. Note that you can set this option to false for faster runtime if you only need the main person in the scene.')
+    else:
+        logging.info('\nSingle-person analysis selected.')
 
     # projection matrix from toml calibration file
     P = computeP(calib_file, undistort=undistort_points)
