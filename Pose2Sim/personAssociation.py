@@ -317,10 +317,10 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
                     comb_ok = np.concatenate((comb_ok, [comb[0]]))
                 except:
                     break
-            sorted_pruned_idx = [comb_errors_below_thresh.index(c.tolist()) for c in comb_ok]
-            errors_below_thresh = np.array(errors_below_thresh_sorted)[sorted_pruned_idx]
-            comb_errors_below_thresh = np.array(comb_errors_below_thresh)[sorted_pruned_idx]
-            Q_kpt = Q_kpt[sorted_pruned_idx]
+            sorted_pruned_idx = [i for i, x in enumerate(comb_errors_below_thresh) for c in comb_ok if np.array_equal(x,c,equal_nan=True)]
+            errors_below_thresh = np.array(errors_below_thresh_sorted)[sorted_pruned_idx].tolist()
+            comb_errors_below_thresh = np.array(comb_errors_below_thresh)[sorted_pruned_idx].tolist()
+            Q_kpt = Q_kpt[sorted_pruned_idx].tolist()
 
             # Remove indices already used for a person
             personsIDs_combinations = np.array([personsIDs_combinations[i] for i in range(len(personsIDs_combinations))
