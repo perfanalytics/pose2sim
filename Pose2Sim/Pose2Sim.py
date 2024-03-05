@@ -254,7 +254,8 @@ def poseEstimation(config=None):
     #     pose_estimation_all(config_dict)
         
     #     end = time.time()
-    #     logging.info(f'Pose estimation took {end-start:.2f} s.')
+    #     elapsed = end-start 
+    #     logging.info(f'Pose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
 
 def synchronization(config=None):
@@ -300,7 +301,8 @@ def synchronization(config=None):
     #     synchronize_cams_all(config_dict)
     
     #     end = time.time()
-    #     logging.info(f'Synchronization took {end-start:.2f} s.')    
+    #     elapsed = end-start 
+    #     logging.info(f'Synchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
     
 def personAssociation(config=None):
@@ -346,7 +348,8 @@ def personAssociation(config=None):
         track_2d_all(config_dict)
     
         end = time.time()
-        logging.info(f'Associating persons took {end-start:.2f} s.')
+        elapsed = end-start 
+        logging.info(f'Associating persons took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
     
 def triangulation(config=None):
@@ -390,8 +393,9 @@ def triangulation(config=None):
         
         triangulate_all(config_dict)
     
-    end = time.time()
-    logging.info(f'\nTriangulation took {end-start:.2f} s.')
+        end = time.time()
+        elapsed = end-start 
+        logging.info(f'Triangulation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
  
     
 def filtering(config=None):
@@ -478,7 +482,8 @@ def markerAugmentation(config=None):
         augmentTRC(config_dict)
 
         end = time.time()
-        logging.info(f'\nAugmentation took {end - start:.2f} s.')
+        elapsed = end-start 
+        logging.info(f'Marker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
 
 
 def opensimProcessing(config=None):
@@ -530,5 +535,9 @@ def opensimProcessing(config=None):
     #     opensim_processing_all(config_dict)
     
     #     end = time.time()
-    #     logging.info(f'Model scaling took {end-start:.2f} s.')
+    #     elapsed = end-start 
+    #     # if static_file in project_dir: 
+    #     #     logging.info(f'Model scaling took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+    #     # else:
+    #     #     logging.info(f'Inverse kinematics took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
 
