@@ -417,7 +417,12 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 > _**If `multi_person` is set to `false`, the algorithm chooses the person for whom the reprojection error is smallest.\
   If `multi_person` is set to `true`, it selects all persons with a reprojection error smaller than a threshold, and then associates them across time frames by minimizing the displacement speed.**_ \
-***N.B.:** Skip this step if only one person is in the field of view.*\
+***N.B.:** Skip this step if only one person is in the field of view.*
+
+> ***N.B.:** The **multi-person** algorithm is not very efficient for now. I will try to improve it in the future, but if you are not satisfied with it, you can use [EasyMocap](https://github.com/zju3dv/EasyMocap?tab=readme-ov-file) for that stage.*
+> - [calib_toml_to_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_easymocap.py): Convert your Pose2Sim calibration file to the EasyMocap format
+> - Run EasyMocap
+> - [trc_from_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_easymocap.py): Convert EasyMocap results to .trc
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
 Type `ipython`.
@@ -558,11 +563,11 @@ Make sure to replace `py38np120` with your Python version (3.8 in this case) and
 </br>
 
 # Utilities
-A list of standalone tools (see [Utilities](https://github.com/perfanalytics/pose2sim/tree/main/Pose2Sim/Utilities)), which can be either run as scripts, or imported as functions. Check usage in the docstrings of each Python file. The figure below shows how some of these toolscan be used to further extend Pose2Sim usage.
+A list of standalone tools (see [Utilities](https://github.com/perfanalytics/pose2sim/tree/main/Pose2Sim/Utilities)), which can be either run as scripts, or imported as functions. Check usage in the docstring of each Python file. The figure below shows how some of these tools can be used to further extend Pose2Sim usage.
 
 
 <details>
-  <summary><b>Converting calibration files</b> (CLICK TO SHOW)</summary>
+  <summary><b>Converting pose files</b> (CLICK TO SHOW)</summary>
     <pre>
 
 [Blazepose_runsave.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/Blazepose_runsave.py)
@@ -573,6 +578,18 @@ Converts a DeepLabCut (h5) 2D pose estimation file into OpenPose (json) files.
 
 [AlphaPose_to_OpenPose.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/AlphaPose_to_OpenPose.py)
 Converts AlphaPose single json file to OpenPose frame-by-frame files.
+   </pre>
+</details>
+
+<details>
+  <summary><b>Converting calibration files</b> (CLICK TO SHOW)</summary>
+    <pre>
+
+[calib_toml_to_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_easymocap.py)
+Converts an OpenCV .toml calibration file to EasyMocap intrinsic and extrinsic .yml calibration files.
+
+[calib_easymocap_to_toml.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_easymocap_to_toml.py)
+Converts EasyMocap intrinsic and extrinsic .yml calibration files to an OpenCV .toml calibration file.
 
 [calib_from_checkerboard.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_from_checkerboard.py)
 Calibrates cameras with images or a video of a checkerboard, saves calibration in a Pose2Sim .toml calibration file.
@@ -583,12 +600,6 @@ Converts a Qualisys .qca.txt calibration file to the Pose2Sim .toml calibration 
 
 [calib_toml_to_qca.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_qca.py)
 Converts a Pose2Sim .toml calibration file (e.g., from a checkerboard) to a Qualisys .qca.txt calibration file.
-
-[calib_easymocap_to_toml.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_easymocap_to_toml.py)
-Converts EasyMocap intrinsic and extrinsic .yml calibration files to an OpenCV .toml calibration file.
-
-[calib_toml_to_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_easymocap.py)
-Converts an OpenCV .toml calibration file to EasyMocap intrinsic and extrinsic .yml calibration files.
 
 [calib_toml_to_opencap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_opencap.py)
 Converts an OpenCV .toml calibration file to OpenCap .pickle calibration files.
@@ -616,6 +627,9 @@ Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different ma
 <details>
   <summary><b>Other trc tools</b> (CLICK TO SHOW)</summary>
     <pre>
+
+[trc_from_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_easymocap.py) 
+Convert EasyMocap results keypoints3d json files to .trc.
 
 [c3d_to_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/c3d_to_trc.py)
 Converts 3D point data of a .c3d file to a .trc file compatible with OpenSim. No analog data (force plates, emg) nor computed data (angles, powers, etc.) are retrieved.
@@ -777,6 +791,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#9634; **Conda package** 
 &#9634; **Docker image**
 &#9634; Run pose estimation and OpenSim from within Pose2Sim
+&#9634; Real-time: Run Pose estimation, Person association, Triangulation, Kalman filter, IK frame by frame (instead of running each step for all frames)
 &#9634; **Run from command line via click or typer**
 &#9634; **Utilities**: Export other data from c3d files into .mot or .sto files (angles, powers, forces, moments, GRF, EMG...)
 &#9634; **Utilities**: Create trc_to_c3d.py script

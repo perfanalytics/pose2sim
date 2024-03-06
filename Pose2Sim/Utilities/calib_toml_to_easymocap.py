@@ -4,7 +4,7 @@
 
 '''
     ##################################################
-    ## EASYMOCAP CALIBRATION TO TOML CALIBRATION    ##
+    ## TOML CALIBRATION TO EASYMOCAP CALIBRATION    ##
     ##################################################
     
     Convert a Pose2Sim .toml calibration file 
