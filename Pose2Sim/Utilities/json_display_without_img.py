@@ -66,6 +66,8 @@ def json_display_without_img_func(**args):
 
     json_folder = os.path.realpath(args.get('json_folder'))
     json_fnames = [f for f in os.listdir(json_folder) if os.path.isfile(os.path.join(json_folder, f))]
+    json_fnames.sort(key=lambda f: int(f.split('_')[0])) # sort by frame number
+    
     output_img_folder =  args.get('output_img_folder')
     if output_img_folder==None: 
         output_img_folder = os.path.join(json_folder+'_img')
