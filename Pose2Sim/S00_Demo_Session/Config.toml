@@ -19,7 +19,7 @@
 
 [project]
 # multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
-# nb_persons_to_detect = 2 # checked only if multi_person is selected
+nb_persons_to_detect = 2 # checked only if multi_person is selected
 frame_rate = 60 # fps
 frame_range = [] # For example [10,300], or [] for all frames
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
