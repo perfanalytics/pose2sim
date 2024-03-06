@@ -1,12 +1,13 @@
 **/__pycache__/
 *.pyc
 logs.txt*
+**/*.log
 *.egg-info/
 dist/
 **/*.avi
 # **/*.mp4
 **/*.trc
-**.*.sto
+**/*.sto
 
 **/Calib_qualisys.toml
 **/pose-3d/
