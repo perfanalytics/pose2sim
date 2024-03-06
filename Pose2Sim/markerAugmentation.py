@@ -62,10 +62,8 @@ def get_midhip_data(trc_file):
 
 
 def augmentTRC(config_dict):
-
     # get parameters from Config.toml
     project_dir = config_dict.get('project').get('project_dir')
-    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     pathOutputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     pose_model = config_dict.get('pose').get('pose_model')
@@ -80,9 +78,6 @@ def augmentTRC(config_dict):
     augmenterModelName = 'LSTM'
     augmenter_model = 'v0.3'
     offset = True
-
-    if pose_model not in ['BODY_25', 'BODY_25B']:
-        raise ValueError('Marker augmentation is only supported with OpenPose BODY_25 and BODY_25B models.')
 
     # Apply all trc files
     trc_files = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if 'filt' in f and '_LSTM' not in f]
@@ -119,6 +114,13 @@ def augmentTRC(config_dict):
         except:
             raise ValueError('Cannot read TRC file. You may need to enable interpolation in Config.toml while triangulating.')
         
+        # Verify that all feature markers are present in the TRC file.
+        feature_markers_joined = set(feature_markers_all[0]+feature_markers_all[1])
+        trc_markers = set(trc_file.marker_names)
+        missing_markers = list(feature_markers_joined - trc_markers)
+        if len(missing_markers) > 0:
+            raise ValueError(f'Marker augmentation requires {missing_markers} markers and they are not present in the TRC file.')
+
         # Loop over augmenter types to handle separate augmenters for lower and
         # upper bodies.
         outputs_all = {}

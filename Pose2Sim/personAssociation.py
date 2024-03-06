@@ -117,7 +117,7 @@ def min_with_single_indices(L, T):
     return minL, argminL, T_minL
     
     
-def sort_people(Q_kpt_old, Q_kpt, nb_persons_to_detect):
+def sort_people(Q_kpt_old, Q_kpt):
     '''
     Associate persons across frames
     Persons' indices are sometimes swapped when changing frame
@@ -205,6 +205,7 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
     '''
     
     multi_person = config.get('project').get('multi_person')
+    nb_persons_to_detect = config.get('project').get('nb_persons_to_detect')
     error_threshold_tracking = config.get('personAssociation').get('reproj_error_threshold_association')
     likelihood_threshold = config.get('personAssociation').get('likelihood_threshold_association')
     min_cameras_for_triangulation = config.get('triangulation').get('min_cameras_for_triangulation')
@@ -213,7 +214,6 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
     n_cams = len(json_files_framef)
     error_min = np.inf 
     nb_cams_off = 0 # cameras will be taken-off until the reprojection error is under threshold
-    
     errors_below_thresh = []
     comb_errors_below_thresh = []
     Q_kpt = []
@@ -295,39 +295,39 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
                 Q_kpt = [Q_comb[np.argmin(error_comb)]]
                 if errors_below_thresh[0] < error_threshold_tracking:
                     break 
-        
-        # print('\n', personsIDs_combinations)
-        # print(errors_below_thresh)
-        # print(comb_errors_below_thresh)
-        # print(Q_kpt)
+                
         if multi_person:
-            # sort combinations by error magnitude
-            errors_below_thresh_sorted = sorted(errors_below_thresh)
-            sorted_idx = np.array([errors_below_thresh.index(e) for e in errors_below_thresh_sorted])
-            comb_errors_below_thresh = np.array(comb_errors_below_thresh)[sorted_idx]
-            Q_kpt = np.array(Q_kpt)[sorted_idx]
-            # remove combinations with indices used several times for the same person 
-            comb_errors_below_thresh = [c.tolist() for c in comb_errors_below_thresh]
-            comb = comb_errors_below_thresh.copy()
-            comb_ok = np.array([comb[0]])
-            for i, c1 in enumerate(comb):
-                idx_ok = np.array([not(common_items_in_list(c1, c2)) for c2 in comb[1:]])
-                try:
-                    comb = np.array(comb[1:])[idx_ok]
-                    comb_ok = np.concatenate((comb_ok, [comb[0]]))
-                except:
-                    break
-            sorted_pruned_idx = [i for i, x in enumerate(comb_errors_below_thresh) for c in comb_ok if np.array_equal(x,c,equal_nan=True)]
-            errors_below_thresh = np.array(errors_below_thresh_sorted)[sorted_pruned_idx].tolist()
-            comb_errors_below_thresh = np.array(comb_errors_below_thresh)[sorted_pruned_idx].tolist()
-            Q_kpt = Q_kpt[sorted_pruned_idx].tolist()
+            if len(errors_below_thresh)>0:
+                # sort combinations by error magnitude
+                errors_below_thresh_sorted = sorted(errors_below_thresh)
+                sorted_idx = np.array([errors_below_thresh.index(e) for e in errors_below_thresh_sorted])
+                comb_errors_below_thresh = np.array(comb_errors_below_thresh)[sorted_idx]
+                Q_kpt = np.array(Q_kpt)[sorted_idx]
+                # remove combinations with indices used several times for the same person 
+                comb_errors_below_thresh = [c.tolist() for c in comb_errors_below_thresh]
+                comb = comb_errors_below_thresh.copy()
+                comb_ok = np.array([comb[0]])
+                for i, c1 in enumerate(comb):
+                    idx_ok = np.array([not(common_items_in_list(c1, c2)) for c2 in comb[1:]])
+                    try:
+                        comb = np.array(comb[1:])[idx_ok]
+                        comb_ok = np.concatenate((comb_ok, [comb[0]]))
+                    except:
+                        break
+                sorted_pruned_idx = [i for i, x in enumerate(comb_errors_below_thresh) for c in comb_ok if np.array_equal(x,c,equal_nan=True)]
+                errors_below_thresh = np.array(errors_below_thresh_sorted)[sorted_pruned_idx].tolist()
+                comb_errors_below_thresh = np.array(comb_errors_below_thresh)[sorted_pruned_idx].tolist()
+                Q_kpt = Q_kpt[sorted_pruned_idx].tolist()
 
             # Remove indices already used for a person
             personsIDs_combinations = np.array([personsIDs_combinations[i] for i in range(len(personsIDs_combinations))
                                            if not np.array( 
                                                 [personsIDs_combinations[i,j]==comb[j] for comb in comb_errors_below_thresh for j in range(len(comb))]
                                                 ).any()])
-            if len(personsIDs_combinations) < len(errors_below_thresh):
+            if len(errors_below_thresh) >= len(personsIDs_combinations) or len(errors_below_thresh) >= nb_persons_to_detect: 
+                errors_below_thresh = errors_below_thresh[:nb_persons_to_detect]
+                comb_errors_below_thresh = comb_errors_below_thresh[:nb_persons_to_detect]
+                Q_kpt = Q_kpt[:nb_persons_to_detect]
                 break
 
         nb_cams_off += 1
@@ -450,8 +450,6 @@ def track_2d_all(config):
     json_tracked_files = [[os.path.join(poseTracked_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # person's tracking
-    json_files_flatten = [item for sublist in json_files for item in sublist]
-    nb_persons_to_detect = max([len(json.load(open(json_fname))['people']) for json_fname in json_files_flatten])
     f_range = [[min([len(j) for j in json_files])] if frame_range==[] else frame_range][0]
     n_cams = len(json_dirs_names)
     error_min_tot, cameras_off_tot = [], []
@@ -462,7 +460,7 @@ def track_2d_all(config):
                     Found {len(P)} cameras in the calibration file,\
                     and {n_cams} cameras based on the number of pose folders.')
     
-    Q_kpt = [np.array([0., 0., 0., 1.])] * nb_persons_to_detect
+    Q_kpt = [np.array([0., 0., 0., 1.])]
     for f in tqdm(range(*f_range)):
         # print(f'\nFrame {f}:')
         json_files_f = [json_files[c][f] for c in range(n_cams)]
@@ -476,8 +474,7 @@ def track_2d_all(config):
         errors_below_thresh, comb_errors_below_thresh, Q_kpt = best_persons_and_cameras_combination(config, json_files_f, personsIDs_comb, P, tracked_keypoint_id, calib_params)
         
         # reID persons across frames by checking the distance from one frame to another
-        nb_persons_to_detect_frame = max([len(Q_kpt_old), len(Q_kpt)])
-        Q_kpt, personsIDs_sorted = sort_people(Q_kpt_old, Q_kpt, nb_persons_to_detect_frame)
+        Q_kpt, personsIDs_sorted = sort_people(Q_kpt_old, Q_kpt)
         errors_below_thresh = np.array(errors_below_thresh)[personsIDs_sorted]
         comb_errors_below_thresh = np.array(comb_errors_below_thresh)[personsIDs_sorted]
         
