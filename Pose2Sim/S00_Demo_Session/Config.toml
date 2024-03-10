@@ -18,9 +18,8 @@
 
 
 [project]
-# multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
-nb_persons_to_detect = 2 # checked only if multi_person is selected
-frame_rate = 60 # fps
+# multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed. 
+frame_rate = 120 # fps
 frame_range = [] # For example [10,300], or [] for all frames
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
@@ -104,28 +103,25 @@ openpose_path = '' # only checked if OpenPose is used
 [synchronization]
 # COMING SOON! 
 reset_sync = true # Recalculate synchronization even if already done
-frames = [2850,3490] # Frames to use for synchronization, should point to a moment with fast motion.
-cut_off_frequency = 10 # cut-off frequency for a 4th order low-pass Butterworth filter
-# Vertical speeds (on X, Y, or Z axis, or 2D speeds)
-speed_kind = 'y' # 'x', 'y', 'z', or '2D'
-vmax = 20 # px/s
-cam1_nb = 4
-cam2_nb = 3
-id_kpt = [9,10] # Pour plus tard aller chercher numéro depuis keypoint name dans skeleton.py. 'RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
-weights_kpt = [1,1] # Pris en compte uniquement si on a plusieurs keypoints
+time = 3 # in sec, How long did it take you to go from raising your hand to quickly lowering your hand? (From raising your hand to standing clear.)
+lag_time = 10 # in sec, How long difference between the first camera to press the record button and the last camera to press the record button?
+speed_kind = 'y'
+vmax = 40 # px/s, If keypoint speed over vamx, it would replace nan value. 
+id_kpt = [10] # get the numbers from the keypoint names in skeleton.py: 'RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
+weights_kpt = [1] # only considered if there are multiple keypoints.
 
 
 [personAssociation]
 tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
 # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
 reproj_error_threshold_association = 20 # px
-likelihood_threshold_association = 0.3
+likelihood_threshold_association = 0.05
 
 
 [triangulation]
 reorder_trc = false # only checked if multi_person analysis
 reproj_error_threshold_triangulation = 15 # px
-likelihood_threshold_triangulation= 0.3
+likelihood_threshold_triangulation= 0.05
 min_cameras_for_triangulation = 2
 interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
                         # 'none' if you don't want to interpolate missing points
@@ -188,65 +184,65 @@ opensim_bin_path = 'C:\OpenSim 4.4\bin'
 name = "CHip"
 id = "None"
   [[pose.CUSTOM.children]]
-  name = "RHip"
   id = 12
+  name = "RHip"
      [[pose.CUSTOM.children.children]]
-     name = "RKnee"
      id = 14
+     name = "RKnee"
         [[pose.CUSTOM.children.children.children]]
-        name = "RAnkle"
         id = 16
+        name = "RAnkle"
            [[pose.CUSTOM.children.children.children.children]]
-           name = "RBigToe"
            id = 22
+           name = "RBigToe"
               [[pose.CUSTOM.children.children.children.children.children]]
-              name = "RSmallToe"
               id = 23
+              name = "RSmallToe"
            [[pose.CUSTOM.children.children.children.children]]
-           name = "RHeel"
            id = 24
+           name = "RHeel"
   [[pose.CUSTOM.children]]
-  name = "LHip"
   id = 11
+  name = "LHip"
      [[pose.CUSTOM.children.children]]
-     name = "LKnee"
      id = 13
+     name = "LKnee"
         [[pose.CUSTOM.children.children.children]]
-        name = "LAnkle"
         id = 15
+        name = "LAnkle"
            [[pose.CUSTOM.children.children.children.children]]
-           name = "LBigToe"
            id = 19
+           name = "LBigToe"
               [[pose.CUSTOM.children.children.children.children.children]]
-              name = "LSmallToe"
               id = 20
+              name = "LSmallToe"
            [[pose.CUSTOM.children.children.children.children]]
-           name = "LHeel"
            id = 21
+           name = "LHeel"
   [[pose.CUSTOM.children]]
-  name = "Neck"
   id = 17
+  name = "Neck"
      [[pose.CUSTOM.children.children]]
-     name = "Head"
      id = 18
+     name = "Head"
         [[pose.CUSTOM.children.children.children]]
-        name = "Nose"
         id = 0
+        name = "Nose"
      [[pose.CUSTOM.children.children]]
-     name = "RShoulder"
      id = 6
+     name = "RShoulder"
         [[pose.CUSTOM.children.children.children]]
-        name = "RElbow"
         id = 8
+        name = "RElbow"
            [[pose.CUSTOM.children.children.children.children]]
-           name = "RWrist"
            id = 10
+           name = "RWrist"
      [[pose.CUSTOM.children.children]]
-     name = "LShoulder"
      id = 5
+     name = "LShoulder"
         [[pose.CUSTOM.children.children.children]]
-        name = "LElbow"
         id = 7
+        name = "LElbow"
            [[pose.CUSTOM.children.children.children.children]]
-           name = "LWrist"
            id = 9
+           name = "LWrist"
