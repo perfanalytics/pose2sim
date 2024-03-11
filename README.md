@@ -313,7 +313,7 @@ Pose2Sim.synchronization()
 ```
 
 Reference camera (usally cam1) should start record at last between whole cameras.\
-Set fps, id_kpt, weight_kpt, reset_sync in Config.toml.
+Set fps, id_kpt, weight_kpt, reset_sync in Config.toml.\
 **How to get perfect sync point**
 1. Set cameras position where they can see person wrist clearly.
 2. Press record button, and what pressed last time to be reference camera.
