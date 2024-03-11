@@ -306,6 +306,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 
 > _**Cameras need to be synchronized, so that 2D points correspond to the same position across cameras.**_\
 ***N.B.:** Skip this step if your cameras are already synchronized.*
+
 ''' python
 from Pose2Sim import Pose2Sim
 Pose2Sim.synchronization()
@@ -313,11 +314,11 @@ Pose2Sim.synchronization()
 Reference camera (usally cam1) should start record at last between whole cameras.
 Set fps, id_kpt, weight_kpt, reset_sync in Config.toml
 ** How to get perfect sync point **
-1. Set cameras position where they can see person wrist clearly.\
-2. Press record button, and what pressed last time to be reference camera.\
-3. Walk to proper location. ( See 1 )\
-4. Raise your hands.\
-5. Downward your hand fastly.\
+1. Set cameras position where they can see person wrist clearly.
+2. Press record button, and what pressed last time to be reference camera.
+3. Walk to proper location( See 1 ).
+4. Raise your hands.
+5. Downward your hand fastly.
 
 Alternatively, use a flashlight or a clap to synchronize them. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors) or with a remote control (slightly less reliable).
 
