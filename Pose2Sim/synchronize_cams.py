@@ -132,6 +132,7 @@ def find_highest_wrist_position(df_coords, wrist_index):
     """
 
     start_frames = []
+    min_y_coords = []
     for df in df_coords:
         # Wrist y-coordinate column index (2n where n is the keypoint index)
         # Assuming wrist_index is a list and we want to use the first element
@@ -140,23 +141,54 @@ def find_highest_wrist_position(df_coords, wrist_index):
         # Replace 0 with NaN to avoid considering them and find the index of the lowest y-coordinate value
         min_y_coord = df.iloc[:, y_col_index].replace(0, np.nan).min()
         min_y_index = df.iloc[:, y_col_index].replace(0, np.nan).idxmin()
-        print(f"Lowest wrist position: {min_y_coord} at frame {min_y_index}")
         if min_y_coord <= 100: # if the wrist is too high, it is likely to be an outlier
             print("The wrist is too high. Please check the data for outliers.")
 
         start_frames.append(min_y_index)
+        min_y_coords.append(min_y_coord)
 
-    print(f"Lowest wrist position frames: {start_frames}")
+    return start_frames, min_y_coords
 
-    return start_frames
+def find_motion_end(df_coords, wrist_index, start_frame, lowest_y, fps):
+    """
+    Find the frame where hands down movement ends.
+    Hands down movement is defined as the time when the wrist moves down from the highest position.
 
-def find_fastest_frame(df_speed_list, fps, lag_time):
+    Args:
+    df_coord (DataFrame): The coordinate DataFrame of the reference camera.
+    wrist_index (int): The index of the wrist in the keypoint list.
+    start_frame (int): The frame where the hands down movement starts.
+    fps (int): The frame rate of the cameras in Hz.
+
+    Returns:
+    int: The index of the frame where hands down movement ends.
+    """
+    y_col_index = wrist_index * 2 + 1
+    wrist_y_values = df_coords.iloc[:, y_col_index].values # wrist y-coordinates
+    highest_y_value = lowest_y
+    highest_y_index = start_frame
+
+    # Find the highest y-coordinate value and its index
+    for i in range(highest_y_index + 1, len(wrist_y_values)):
+        if wrist_y_values[i] - highest_y_value >= 50:
+            start_increase_index = i
+            break
+    else:
+        raise ValueError("The wrist does not move down.")
+    
+    start = start_increase_index - start_frame
+    time = (start + fps) / fps
+
+    return time
+
+def find_fastest_frame(df_speed_list):
     """
     Find the frame with the highest speed in a list of speed DataFrames.
     Fastest frame should locate in after highest wrist position frame.
     
     Args:
     df_speed_list (list): List of speed DataFrames.
+    df_speed (DataFrame): The speed DataFrame of the reference camera.
     fps (int): The frame rate of the cameras in Hz.
     lag_time (float): The time lag in seconds.
 
@@ -167,11 +199,10 @@ def find_fastest_frame(df_speed_list, fps, lag_time):
     for speed_series in df_speed_list:
         max_speed = speed_series.abs().max()
         max_speed_index = speed_series.abs().idxmax()
-        print(f"Overall max speed: {max_speed}, Index: {max_speed_index}")
     
     if max_speed < 10:
         print(" !!Warning!! : The maximum speed is likely to be not representative of the actual movement. Consider increasing the time parameter in Config.toml.")
-    return max_speed_index
+    return max_speed_index, max_speed
 
 
 def plot_time_lagged_cross_corr(camx, camy, ax, fps, lag_time, camx_max_speed_index, camy_max_speed_index):
@@ -285,17 +316,10 @@ def synchronize_cams_all(config_dict):
     fps =  config_dict.get('project').get('frame_rate') # frame rate of the cameras (Hz)
     reset_sync = config_dict.get('synchronization').get('reset_sync')  # Start synchronization over each time it is run
 
-    # order = config_dict.get('synchronization').get('order') # order of the filter
-    # cut_off_frequency = config_dict.get('synchronization').get('cut_off_frequency') # cut-off frequency for a 4th order low-pass Butterworth filter
-
     # Vertical speeds (on 'Y')
     speed_kind = config_dict.get('synchronization').get('speed_kind') # this maybe fixed in the future
-    vmax = config_dict.get('synchronization').get('vmax') # px/s
-
     id_kpt =  config_dict.get('synchronization').get('id_kpt') #  get the numbers from the keypoint names in skeleton.py: 'RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
     weights_kpt = config_dict.get('synchronization').get('weights_kpt') # only considered if there are multiple keypoints.
-    time = config_dict.get('synchronization').get('time') # in seconds
-    lag_time = config_dict.get('synchronization').get('lag_time') # in seconds
 
     ######################################
     # 0. CONVERTING JSON FILES TO PANDAS #
@@ -313,13 +337,6 @@ def synchronize_cams_all(config_dict):
         df_coords.append(convert_json2csv(json_dir))
         df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
 
-    # save the coordinates in csv files
-    # for idx, df in enumerate(df_coords):
-    #     csv_file_name = f"df_coords_camera_{idx+1}.csv"  # 카메라 번호를 파일 이름에 포함
-    #     csv_file_path = os.path.join(pose_dir, csv_file_name)  # pose_dir 내에 저장
-    #     df.to_csv(csv_file_path, index=False)
-
-
     ## To save it and reopen it if needed
     with open(os.path.join(pose_dir, 'coords'), 'wb') as fp:
         pk.dump(df_coords, fp)
@@ -335,15 +352,6 @@ def synchronize_cams_all(config_dict):
     for i in range(len(json_dirs)):
         if speed_kind == 'y':
             df_speed.append(speed_vert(df_coords[i]))
-        df_speed[i] = df_speed[i].where(lambda x: (x <= vmax) & (x >= -vmax), other=np.nan)
-        df_speed[i] = df_speed[i].apply(interpolate_nans, axis=0, args = ['linear'])
-
-    # save the speeds in csv files
-    # for idx, df in enumerate(df_speed):
-    #     csv_file_name = f"df_speed_camera_{idx+1}.csv"
-    #     csv_file_path = os.path.join(pose_dir, csv_file_name)
-    #     df.to_csv(csv_file_path, index=False)
-        # print(f"Saved DataFrame to {csv_file_path}")
 
     #############################################
     # 2. PLOTTING PAIRED CORRELATIONS OF SPEEDS #
@@ -356,23 +364,41 @@ def synchronize_cams_all(config_dict):
     # or on a selection of weighted points
 
     # find the lowest position of the wrist
-    lowest_frames = find_highest_wrist_position(df_coords, id_kpt)
+    lowest_frames, lowest_y_coords = find_highest_wrist_position(df_coords, id_kpt)
 
     # set reference camera
     ref_cam_nb = 0
+    max_speeds = []
 
     for cam_nb in range(1, len(json_dirs)):
         # find the highest wrist position for each camera
         camx_start_frame = lowest_frames[ref_cam_nb]
         camy_start_frame = lowest_frames[cam_nb]
-        camx_end_frame = camx_start_frame + int(time * fps)
-        camy_end_frame = camy_start_frame + int(time * fps)
+
+        camx_lowest_y = lowest_y_coords[ref_cam_nb]
+        camy_lowest_y = lowest_y_coords[cam_nb]
+
+        camx_time = find_motion_end(df_coords[ref_cam_nb], id_kpt[0], camx_start_frame, camx_lowest_y, fps)
+        camy_time = find_motion_end(df_coords[cam_nb], id_kpt[0], camy_start_frame, camy_lowest_y, fps)
+
+        camx_end_frame = camx_start_frame + int(camx_time * fps)
+        camy_end_frame = camy_start_frame + int(camy_time * fps)
+
         camx_segment = df_speed[ref_cam_nb].iloc[camx_start_frame:camx_end_frame+1, id_kpt[0]]
         camy_segment = df_speed[cam_nb].iloc[camy_start_frame:camy_end_frame+1, id_kpt[0]]
 
+
+        # Find the fastest speed and the frame
+        camx_max_speed_index, camx_max_speed = find_fastest_frame([camx_segment])
+        camy_max_speed_index, camy_max_speed = find_fastest_frame([camy_segment])
+        max_speeds.append(camx_max_speed)
+        max_speeds.append(camy_max_speed)
+        vmax = max(max_speeds)
+
+        # Find automatically the best lag time
+        lag_time = round((camy_max_speed_index - camx_max_speed_index) / fps + 1)
+
         # FInd the fatest frame
-        camx_max_speed_index = find_fastest_frame([camx_segment], fps, lag_time)
-        camy_max_speed_index = find_fastest_frame([camy_segment], fps, lag_time)
         camx_start_frame = camx_max_speed_index - fps * (lag_time)
         camy_start_frame = camy_max_speed_index - fps * (lag_time)
         camx_end_frame = camx_max_speed_index + fps * (lag_time)
@@ -381,9 +407,6 @@ def synchronize_cams_all(config_dict):
         if len(id_kpt) == 1 and id_kpt[0] != 'all':
             camx = df_speed[ref_cam_nb].iloc[camx_start_frame:camx_end_frame+1, id_kpt[0]]
             camy = df_speed[cam_nb].iloc[camy_start_frame:camy_end_frame+1, id_kpt[0]]
-            ## save the camx and camy in csv files
-            # camx.to_csv(os.path.join(pose_dir, 'camx.csv'), index=False)
-            # camy.to_csv(os.path.join(pose_dir, 'camy.csv'), index=False)
         elif id_kpt == ['all']:
             camx = df_speed[ref_cam_nb].iloc[camx_start_frame:camx_end_frame+1].sum(axis=1)
             camy = df_speed[cam_nb].iloc[camy_start_frame:camy_end_frame+1].sum(axis=1)
@@ -395,6 +418,11 @@ def synchronize_cams_all(config_dict):
             camy = camy.iloc[camy_start_frame:camy_end_frame+1]
         else:
             raise ValueError('wrong values for id_kpt or weights_kpt')        
+        
+        # filter the speeds
+        camx = camx.where(lambda x: (x <= vmax) & (x >= -vmax), other=np.nan)
+        camy = camy.where(lambda x: (x <= vmax) & (x >= -vmax), other=np.nan)
+
         f, ax = plt.subplots(2,1)
 
         # speed
