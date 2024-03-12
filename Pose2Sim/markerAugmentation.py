@@ -155,16 +155,16 @@ def augmentTRC(config_dict):
                 
             # Step 3: Normalize with subject's height.
             norm2_trc_data_data = copy.deepcopy(norm_trc_data_data)
-            norm2_trc_data_data = norm2_trc_data_data / subject_height[p]
+            norm2_trc_data_data = norm2_trc_data_data / subject_height[0]
             
             # Step 4: Add remaining features.
             inputs = copy.deepcopy(norm2_trc_data_data)
             if featureHeight:    
                 inputs = np.concatenate(
-                    (inputs, subject_height[p]*np.ones((inputs.shape[0],1))), axis=1)
+                    (inputs, subject_height[0]*np.ones((inputs.shape[0],1))), axis=1)
             if featureWeight:    
                 inputs = np.concatenate(
-                    (inputs, subject_mass[p]*np.ones((inputs.shape[0],1))), axis=1)
+                    (inputs, subject_mass[0]*np.ones((inputs.shape[0],1))), axis=1)
                 
             # Step 5: Pre-process data
             pathMean = os.path.join(augmenterModelDir, "mean.npy")
@@ -195,7 +195,7 @@ def augmentTRC(config_dict):
                 outputs = np.reshape(outputs, (outputs.shape[1], outputs.shape[2]))
                 
             # Step 2: Un-normalize with subject's height.
-            unnorm_outputs = outputs * subject_height[p]
+            unnorm_outputs = outputs * subject_height[0]
             
             # Step 2: Un-normalize with reference marker position.
             unnorm2_outputs = np.zeros((unnorm_outputs.shape[0],
