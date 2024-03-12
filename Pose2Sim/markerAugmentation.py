@@ -17,7 +17,6 @@ INPUTS:
 
 OUTPUT: 
 - a filtered trc file
-
 '''
 
 
@@ -186,7 +185,7 @@ def augmentTRC(config_dict):
             json_file.close()
             model = tf.keras.models.model_from_json(pretrainedModel_json)
             model.load_weights(os.path.join(augmenterModelDir, "weights.h5"))  
-            outputs = model(inputs)
+            outputs = model.predict(inputs)
             tf.keras.backend.clear_session()
 
             # %% Post-process outputs.

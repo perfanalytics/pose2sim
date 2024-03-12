@@ -3,22 +3,21 @@
 
 
 '''
-    ###########################################################################
-    ## FILTER 3D COORDINATES                                                 ##
-    ###########################################################################
-    
-    Filter trc 3D coordinates.
+###########################################################################
+## FILTER 3D COORDINATES                                                 ##
+###########################################################################
 
-    Available filters: Butterworth, Butterworth on speed, Gaussian, LOESS, Median
-    Set your parameters in Config.toml
-        
-    INPUTS: 
-    - a trc file
-    - filtering parameters in Config.toml
+Filter trc 3D coordinates.
+
+Available filters: Butterworth, Butterworth on speed, Gaussian, LOESS, Median
+Set your parameters in Config.toml
     
-    OUTPUT: 
-    - a filtered trc file
-    
+INPUTS: 
+- a trc file
+- filtering parameters in Config.toml
+
+OUTPUT: 
+- a filtered trc file
 '''
 
 

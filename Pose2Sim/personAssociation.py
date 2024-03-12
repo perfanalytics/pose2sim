@@ -3,28 +3,27 @@
 
 
 '''
-    ###########################################################################
-    ## TRACKING OF PERSON OF INTEREST                                        ##
-    ###########################################################################
-    
-    Openpose detects all people in the field of view. 
-    Which is the one of interest?
-    
-    This module tries all possible triangulations of a chosen anatomical 
-    point. If "multi_person" mode is not used, it chooses the person for
-    whom the reprojection error is smallest. Otherwise, it selects all 
-    persons with a reprojection error smaller than a threshold, and then 
-    associates them across time frames by minimizing the displacement speed.
-    
-    INPUTS: 
-    - a calibration file (.toml extension)
-    - json files from each camera folders with several detected persons
-    - a Config.toml file
-    - a skeleton model
-    
-    OUTPUTS: 
-    - json files for each camera with only one person of interest
-    
+###########################################################################
+## TRACKING OF PERSON OF INTEREST                                        ##
+###########################################################################
+
+Openpose detects all people in the field of view. 
+Which is the one of interest?
+
+This module tries all possible triangulations of a chosen anatomical 
+point. If "multi_person" mode is not used, it chooses the person for
+whom the reprojection error is smallest. Otherwise, it selects all 
+persons with a reprojection error smaller than a threshold, and then 
+associates them across time frames by minimizing the displacement speed.
+
+INPUTS: 
+- a calibration file (.toml extension)
+- json files from each camera folders with several detected persons
+- a Config.toml file
+- a skeleton model
+
+OUTPUTS: 
+- json files for each camera with only one person of interest
 '''
 
 
