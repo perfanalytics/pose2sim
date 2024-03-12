@@ -196,7 +196,7 @@ def calibration(config=None):
     currentDateAndTime = datetime.now()
     
     # Run calibration
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower() ][0]
     logging.info("\n\n---------------------------------------------------------------------")
     logging.info("Camera calibration")
     logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")

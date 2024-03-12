@@ -355,7 +355,7 @@ def recap_tracking(config, error, nb_cams_excluded):
     tracked_keypoint = config.get('personAssociation').get('tracked_keypoint')
     error_threshold_tracking = config.get('personAssociation').get('reproj_error_threshold_association')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     
     # Error
@@ -405,7 +405,7 @@ def track_2d_all(config):
     frame_range = config.get('project').get('frame_range')
     undistort_points = config.get('triangulation').get('undistort_points')
     
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower() ][0]
     try:
         calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     except:
