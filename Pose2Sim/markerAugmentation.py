@@ -3,21 +3,21 @@
 
 
 '''
-    ###########################################################################
-    ## AUGMENT MARKER DATA                                                   ##
-    ###########################################################################
+###########################################################################
+## AUGMENT MARKER DATA                                                   ##
+###########################################################################
+
+Augment trc 3D coordinates. 
+
+Estimate the position of 43 additional markers.
     
-    Augment trc 3D coordinates. 
-    
-    Estimate the position of 43 additional markers.
-        
-    INPUTS: 
-    - a trc file
-    - filtering parameters in Config.toml
-    
-    OUTPUT: 
-    - a filtered trc file
-    
+INPUTS: 
+- a trc file
+- filtering parameters in Config.toml
+
+OUTPUT: 
+- a filtered trc file
+
 '''
 
 
