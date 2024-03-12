@@ -228,8 +228,8 @@ def plot_time_lagged_cross_corr(camx, camy, ax, fps, lag_time, camx_max_speed_in
     """
 
     # Initial shift of camy to match camx
-    initial_shift = -(camy_max_speed_index - camx_max_speed_index) + fps
-    camy = camy.shift(initial_shift).dropna()
+    # initial_shift = -(camy_max_speed_index - camx_max_speed_index) + fps
+    # camy = camy.shift(initial_shift).dropna()
     
     max_lag = int(fps * lag_time)
     pearson_r = []
@@ -251,16 +251,17 @@ def plot_time_lagged_cross_corr(camx, camy, ax, fps, lag_time, camx_max_speed_in
     pearson_r = np.array(pearson_r)
     max_corr = np.nanmax(pearson_r)  # Use nanmax to ignore NaNs
     offset = np.nanargmax(pearson_r) - max_lag  # Use nanargmax to find the index of the max correlation ignoring NaNs
-    real_offset = offset + initial_shift
+    # real_offset = offset + initial_shift
     
     # visualize
     ax.plot(lags, pearson_r)
     ax.axvline(offset, color='r', linestyle='--', label='Peak synchrony')
     plt.annotate(f'Max correlation={np.round(max_corr,2)}', xy=(0.05, 0.9), xycoords='axes fraction')
-    ax.set(title=f'Offset = {offset}{initial_shift} = {real_offset} frames', xlabel='Offset (frames)', ylabel='Pearson r')
+    # ax.set(title=f'Offset = {offset}{initial_shift} = {real_offset} frames', xlabel='Offset (frames)', ylabel='Pearson r')
+    ax.set(title=f'Offset = {offset} frames', xlabel='Offset (frames)', ylabel='Pearson r')
     plt.legend()
     
-    return real_offset, max_corr
+    return offset, max_corr
 
 
 def apply_offset(offset, json_dirs, reset_sync, cam1_nb, cam2_nb):
@@ -399,10 +400,14 @@ def synchronize_cams_all(config_dict):
         lag_time = round((camy_max_speed_index - camx_max_speed_index) / fps + 1)
 
         # FInd the fatest frame
-        camx_start_frame = camx_max_speed_index - fps * (lag_time)
-        camy_start_frame = camy_max_speed_index - fps * (lag_time)
-        camx_end_frame = camx_max_speed_index + fps * (lag_time)
-        camy_end_frame = camy_max_speed_index + fps * (lag_time)
+        camx_start_frame = camx_max_speed_index - (fps) * (lag_time)
+        if camx_start_frame < 0:
+            camx_start_frame = 0
+        else:
+            camx_start_frame = int(camx_start_frame)
+        camy_start_frame = camy_max_speed_index - (fps) * (lag_time)
+        camx_end_frame = camx_max_speed_index + (fps) * (lag_time)
+        camy_end_frame = camy_max_speed_index + (fps) * (lag_time)
 
         if len(id_kpt) == 1 and id_kpt[0] != 'all':
             camx = df_speed[ref_cam_nb].iloc[camx_start_frame:camx_end_frame+1, id_kpt[0]]
@@ -432,12 +437,12 @@ def synchronize_cams_all(config_dict):
         ax[0].legend()
   
         # time lagged cross-correlation
-        real_offset, max_corr = plot_time_lagged_cross_corr(camx, camy, ax[1], fps, lag_time, camx_max_speed_index, camy_max_speed_index)
+        offset, max_corr = plot_time_lagged_cross_corr(camx, camy, ax[1], fps, lag_time, camx_max_speed_index, camy_max_speed_index)
         f.tight_layout()
         plt.show()
-        print(f'Using number{id_kpt} keypoint, synchronized camera {ref_cam_nb+1} and camera {cam_nb+1}, with an offset of {real_offset} and a max correlation of {max_corr}.')
+        print(f'Using number{id_kpt} keypoint, synchronized camera {ref_cam_nb+1} and camera {cam_nb+1}, with an offset of {offset} and a max correlation of {max_corr}.')
 
         # apply offset
-        apply_offset(real_offset, json_dirs, reset_sync, ref_cam_nb, cam_nb)
+        apply_offset(offset, json_dirs, reset_sync, ref_cam_nb, cam_nb)
 
 
