@@ -218,7 +218,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     # Read config
     project_dir = config.get('project').get('project_dir')
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     calib = toml.load(calib_file)
     cam_names = np.array([calib[c].get('name') for c in list(calib.keys())])
@@ -606,7 +606,7 @@ def triangulate_all(config):
     show_interp_indices = config.get('triangulation').get('show_interp_indices')
     undistort_points = config.get('triangulation').get('undistort_points')
 
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
     try:
         calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     except:
