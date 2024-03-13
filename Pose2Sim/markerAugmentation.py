@@ -3,21 +3,20 @@
 
 
 '''
-    ###########################################################################
-    ## AUGMENT MARKER DATA                                                   ##
-    ###########################################################################
+###########################################################################
+## AUGMENT MARKER DATA                                                   ##
+###########################################################################
+
+Augment trc 3D coordinates. 
+
+Estimate the position of 43 additional markers.
     
-    Augment trc 3D coordinates. 
-    
-    Estimate the position of 43 additional markers.
-        
-    INPUTS: 
-    - a trc file
-    - filtering parameters in Config.toml
-    
-    OUTPUT: 
-    - a filtered trc file
-    
+INPUTS: 
+- a trc file
+- filtering parameters in Config.toml
+
+OUTPUT: 
+- a filtered trc file
 '''
 
 
@@ -186,7 +185,7 @@ def augmentTRC(config_dict):
             json_file.close()
             model = tf.keras.models.model_from_json(pretrainedModel_json)
             model.load_weights(os.path.join(augmenterModelDir, "weights.h5"))  
-            outputs = model(inputs)
+            outputs = model.predict(inputs)
             tf.keras.backend.clear_session()
 
             # %% Post-process outputs.

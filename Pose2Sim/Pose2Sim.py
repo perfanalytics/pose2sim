@@ -3,40 +3,39 @@
 
 
 '''
-    ###########################################################################
-    ## POSE2SIM                                                              ##
-    ###########################################################################
-    
-    This repository offers a way to perform markerless kinematics, and gives an 
-    example workflow from an Openpose input to an OpenSim result.
+###########################################################################
+## POSE2SIM                                                              ##
+###########################################################################
 
-    It offers tools for:
-    - 2D pose estimation,
-    - Cameras calibration,
-    - Tracking the person of interest,
-    - Robust triangulation,
-    - Filtration, 
-    - Marker augmentation,
-    - OpenSim scaling and inverse kinematics
+This repository offers a way to perform markerless kinematics, and gives an 
+example workflow from an Openpose input to an OpenSim result.
 
-    It has been tested on Windows, Linux and MacOS, and works for any Python version >= 3.8
-    
-    Installation: 
-    # Open Anaconda prompt. Type:
-    # - conda create -n Pose2Sim python=3.8
-    # - conda activate Pose2Sim
-    # - conda install Pose2Sim
+It offers tools for:
+- 2D pose estimation,
+- Cameras calibration,
+- Tracking the person of interest,
+- Robust triangulation,
+- Filtration, 
+- Marker augmentation,
+- OpenSim scaling and inverse kinematics
 
-    Usage: 
-    # First run Pose estimation and organize your directories (see Readme.md)
-    from Pose2Sim import Pose2Sim
-    Pose2Sim.calibration()
-    Pose2Sim.personAssociation()
-    Pose2Sim.triangulation()
-    Pose2Sim.filtering()
-    Pose2Sim.markerAugmentation()
-    # Then run OpenSim (see Readme.md)
-    
+It has been tested on Windows, Linux and MacOS, and works for any Python version >= 3.8
+
+Installation: 
+# Open Anaconda prompt. Type:
+# - conda create -n Pose2Sim python=3.8
+# - conda activate Pose2Sim
+# - conda install Pose2Sim
+
+Usage: 
+# First run Pose estimation and organize your directories (see Readme.md)
+from Pose2Sim import Pose2Sim
+Pose2Sim.calibration()
+Pose2Sim.personAssociation()
+Pose2Sim.triangulation()
+Pose2Sim.filtering()
+Pose2Sim.markerAugmentation()
+# Then run OpenSim (see Readme.md)
 '''
 
 
@@ -195,7 +194,7 @@ def calibration(config=None):
     setup_logging(session_dir)  
     
     # Run calibration
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower() ][0]
     logging.info("\n\n---------------------------------------------------------------------")
     logging.info("Camera calibration")
     logging.info("---------------------------------------------------------------------")

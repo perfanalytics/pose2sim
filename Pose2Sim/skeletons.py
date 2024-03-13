@@ -3,23 +3,23 @@
 
 
 '''
-    ###########################################################################
-    ## SKELETONS DEFINITIONS                                                 ##
-    ###########################################################################
-    
-    The definition and hierarchy of the following skeletons are available: 
-    - OpenPose BODY_25B, BODY_25, BODY_135, COCO, MPII
-    - Mediapipe BLAZEPOSE
-    - AlphaPose HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII 
-    (for COCO and MPII, AlphaPose must be run with the flag "--format cmu")
-    - DeepLabCut CUSTOM: the skeleton will be defined in Config.toml
-    
-    N.B.: Not all face and hand keypoints are reported in the skeleton architecture, 
-    since some are redundant for the orientation of some bodies.
+###########################################################################
+## SKELETONS DEFINITIONS                                                 ##
+###########################################################################
 
-    N.B.: The corresponding OpenSim model files are provided in the "Pose2Sim\Empty project" folder.
-    If you wish to use any other, you will need to adjust the markerset in the .osim model file, 
-    as well as in the scaling and IK setup files.
+The definition and hierarchy of the following skeletons are available: 
+- OpenPose BODY_25B, BODY_25, BODY_135, COCO, MPII
+- Mediapipe BLAZEPOSE
+- AlphaPose HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII 
+(for COCO and MPII, AlphaPose must be run with the flag "--format cmu")
+- DeepLabCut CUSTOM: the skeleton will be defined in Config.toml
+
+N.B.: Not all face and hand keypoints are reported in the skeleton architecture, 
+since some are redundant for the orientation of some bodies.
+
+N.B.: The corresponding OpenSim model files are provided in the "Pose2Sim\Empty project" folder.
+If you wish to use any other, you will need to adjust the markerset in the .osim model file, 
+as well as in the scaling and IK setup files.
 '''
 
 ## INIT

@@ -3,32 +3,31 @@
 
 
 '''
-    ###########################################################################
-    ## ROBUST TRIANGULATION  OF 2D COORDINATES                               ##
-    ###########################################################################
-    
-    This module triangulates 2D json coordinates and builds a .trc file readable 
-    by OpenSim.
-    
-    The triangulation is weighted by the likelihood of each detected 2D keypoint 
-    (if they meet the likelihood threshold). If the reprojection error is above a
-    threshold, right and left sides are swapped; if it is still above, a camera 
-    is removed for this point and this frame, until the threshold is met. If more 
-    cameras are removed than a predefined minimum, triangulation is skipped for 
-    the point and this frame. In the end, missing values are interpolated.
+###########################################################################
+## ROBUST TRIANGULATION  OF 2D COORDINATES                               ##
+###########################################################################
 
-    In case of multiple subjects detection, make sure you first run the 
-    personAssociation module.
+This module triangulates 2D json coordinates and builds a .trc file readable 
+by OpenSim.
 
-    INPUTS: 
-    - a calibration file (.toml extension)
-    - json files for each camera with only one person of interest
-    - a Config.toml file
-    - a skeleton model
-    
-    OUTPUTS: 
-    - a .trc file with 3D coordinates in Y-up system coordinates
-    
+The triangulation is weighted by the likelihood of each detected 2D keypoint 
+(if they meet the likelihood threshold). If the reprojection error is above a
+threshold, right and left sides are swapped; if it is still above, a camera 
+is removed for this point and this frame, until the threshold is met. If more 
+cameras are removed than a predefined minimum, triangulation is skipped for 
+the point and this frame. In the end, missing values are interpolated.
+
+In case of multiple subjects detection, make sure you first run the 
+personAssociation module.
+
+INPUTS: 
+- a calibration file (.toml extension)
+- json files for each camera with only one person of interest
+- a Config.toml file
+- a skeleton model
+
+OUTPUTS: 
+- a .trc file with 3D coordinates in Y-up system coordinates
 '''
 
 
@@ -44,7 +43,7 @@ import cv2
 import toml
 from tqdm import tqdm
 from scipy import interpolate
-from collections import Counter, OrderedDict
+from collections import Counter
 from anytree import RenderTree
 from anytree.importer import DictImporter
 import logging
@@ -218,7 +217,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     # Read config
     project_dir = config.get('project').get('project_dir')
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     calib = toml.load(calib_file)
     cam_names = np.array([calib[c].get('name') for c in list(calib.keys())])
@@ -606,7 +605,7 @@ def triangulate_all(config):
     show_interp_indices = config.get('triangulation').get('show_interp_indices')
     undistort_points = config.get('triangulation').get('undistort_points')
 
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if ('Calib' or 'calib') in c][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
     try:
         calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     except:
@@ -762,7 +761,7 @@ def triangulate_all(config):
             try:
                 Q_tot[n] = Q_tot[n].apply(interpolate_zeros_nans, axis=0, args = [interp_gap_smaller_than, interpolation_kind])
             except:
-                logging.info(f'Interpolation was not possible for person {n}. This means that the not enough points are available, which is often due to a bad calibration.')
+                logging.info(f'Interpolation was not possible for person {n}. This means that not enough points are available, which is often due to a bad calibration.')
     # Q_tot.replace(np.nan, 0, inplace=True)
     
     # Create TRC file

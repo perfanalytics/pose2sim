@@ -3,27 +3,27 @@
 
 
 '''
-    ###########################################################################
-    ## CAMERAS CALIBRATION                                                   ##
-    ###########################################################################
-    
-    Use this module to calibrate your cameras and save results to a .toml file.
-    
-    It either converts a Qualisys calibration .qca.txt file,
-    Or calibrates cameras from checkerboard images.
-    
-    Checkerboard calibration is based on 
-    https://docs.opencv.org/3.4.15/dc/dbb/tutorial_py_calibration.html.
-    /!\ Beware that corners must be detected on all frames, or else extrinsic 
-    parameters may be wrong. Set show_corner_detection to 1 to verify.
+###########################################################################
+## CAMERAS CALIBRATION                                                   ##
+###########################################################################
 
-    INPUTS: 
-    - a calibration file in the 'calibration' folder (.qca.txt extension)
-    - OR folders 'calibration\intrinsics' (populated with video or about 30 images) and 'calibration\extrinsics' (populated with video or one image)
-    - a Config.toml file in the 'User' folder
-    
-    OUTPUTS: 
-    - a calibration file in the 'calibration' folder (.toml extension)
+Use this module to calibrate your cameras and save results to a .toml file.
+
+It either converts a Qualisys calibration .qca.txt file,
+Or calibrates cameras from checkerboard images.
+
+Checkerboard calibration is based on 
+https://docs.opencv.org/3.4.15/dc/dbb/tutorial_py_calibration.html.
+/!\ Beware that corners must be detected on all frames, or else extrinsic 
+parameters may be wrong. Set show_corner_detection to 1 to verify.
+
+INPUTS: 
+- a calibration file in the 'calibration' folder (.qca.txt extension)
+- OR folders 'calibration\intrinsics' (populated with video or about 30 images) and 'calibration\extrinsics' (populated with video or one image)
+- a Config.toml file in the 'User' folder
+
+OUTPUTS: 
+- a calibration file in the 'calibration' folder (.toml extension)
 '''
 
 # TODO: DETECT WHEN WINDOW IS CLOSED
