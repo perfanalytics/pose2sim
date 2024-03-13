@@ -45,6 +45,7 @@ import os
 import time
 from copy import deepcopy
 import logging, logging.handlers
+from datetime import datetime
 
 
 ## AUTHORSHIP INFORMATION
@@ -192,11 +193,13 @@ def calibration(config=None):
 
     # Set up logging
     setup_logging(session_dir)  
+    currentDateAndTime = datetime.now()
     
     # Run calibration
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower() ][0]
     logging.info("\n\n---------------------------------------------------------------------")
     logging.info("Camera calibration")
+    logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
     logging.info("---------------------------------------------------------------------")
     logging.info(f"\nCalibration directory: {calib_dir}")
     start = time.time()
@@ -230,25 +233,28 @@ def poseEstimation(config=None):
 
     # # Set up logging
     # session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
-    # setup_logging(session_dir)    
+    # setup_logging(session_dir)
 
     # # Batch process all trials
     # for config_dict in config_dicts:
     #     start = time.time()
+    #     currentDateAndTime = datetime.now()
     #     project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
     #     seq_name = os.path.basename(project_dir)
     #     frame_range = config_dict.get('project').get('frame_range')
     #     frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
     #     logging.info("\n\n---------------------------------------------------------------------")
-    #     logging.info("Camera synchronization")
+    #     logging.info("Pose estimation")
+    #     logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
     #     logging.info("---------------------------------------------------------------------")
     #     logging.info(f"\nProject directory: {project_dir}")
     
     #     pose_estimation_all(config_dict)
         
     #     end = time.time()
-    #     logging.info(f'Pose estimation took {end-start:.2f} s.')
+    #     elapsed = end-start 
+    #     logging.info(f'Pose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
 
 def synchronization(config=None):
@@ -259,8 +265,8 @@ def synchronization(config=None):
     or a the directory path of a trial, participant, or session,
     or the function can be called without an argument, in which case it the config directory is the current one.
     '''   
-    # import function for synchronization
-
+    
+    # Import the function
     from Pose2Sim.synchronize_cams import synchronize_cams_all
 
     # Determine the level at which the function is called (session:3, participant:2, trial:1)
@@ -279,6 +285,7 @@ def synchronization(config=None):
     # Batch process all trials
     for config_dict in config_dicts:
         start = time.time()
+        currentDateAndTime = datetime.now()
         project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
         seq_name = os.path.basename(project_dir)
         frame_range = config_dict.get('project').get('frame_range')
@@ -286,13 +293,15 @@ def synchronization(config=None):
 
         logging.info("\n\n---------------------------------------------------------------------")
         logging.info("Camera synchronization")
+        logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
         logging.info("---------------------------------------------------------------------")
         logging.info(f"\nProject directory: {project_dir}")
         
         synchronize_cams_all(config_dict)
     
         end = time.time()
-        logging.info(f'Synchronization took {end-start:.2f} s.')    
+        elapsed = end-start 
+        logging.info(f'Synchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
     
 def personAssociation(config=None):
@@ -323,6 +332,7 @@ def personAssociation(config=None):
     # Batch process all trials
     for config_dict in config_dicts:
         start = time.time()
+        currentDateAndTime = datetime.now()
         project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
         seq_name = os.path.basename(project_dir)
         frame_range = config_dict.get('project').get('frame_range')
@@ -330,13 +340,15 @@ def personAssociation(config=None):
 
         logging.info("\n\n---------------------------------------------------------------------")
         logging.info(f"Associating persons for {seq_name}, for {frames}.")
+        logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
         logging.info("---------------------------------------------------------------------")
         logging.info(f"\nProject directory: {project_dir}")
     
         track_2d_all(config_dict)
     
         end = time.time()
-        logging.info(f'Associating persons took {end-start:.2f} s.')
+        elapsed = end-start 
+        logging.info(f'Associating persons took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
     
 def triangulation(config=None):
@@ -366,6 +378,7 @@ def triangulation(config=None):
     # Batch process all trials
     for config_dict in config_dicts:
         start = time.time()
+        currentDateAndTime = datetime.now()
         project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
         seq_name = os.path.basename(project_dir)
         frame_range = config_dict.get('project').get('frame_range')
@@ -373,13 +386,15 @@ def triangulation(config=None):
 
         logging.info("\n\n---------------------------------------------------------------------")
         logging.info(f"Triangulation of 2D points for {seq_name}, for {frames}.")
+        logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
         logging.info("---------------------------------------------------------------------")
         logging.info(f"\nProject directory: {project_dir}")
         
         triangulate_all(config_dict)
     
-    end = time.time()
-    logging.info(f'\nTriangulation took {end-start:.2f} s.')
+        end = time.time()
+        elapsed = end-start 
+        logging.info(f'Triangulation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
  
     
 def filtering(config=None):
@@ -412,6 +427,7 @@ def filtering(config=None):
 
     # Batch process all trials
     for config_dict in config_dicts:
+        currentDateAndTime = datetime.now()
         project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
         seq_name = os.path.basename(project_dir)
         frame_range = config_dict.get('project').get('frame_range')
@@ -419,6 +435,7 @@ def filtering(config=None):
     
         logging.info("\n\n---------------------------------------------------------------------")
         logging.info(f"Filtering 3D coordinates for {seq_name}, for {frames}.")
+        logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
         logging.info("---------------------------------------------------------------------")
         logging.info(f"\nProject directory: {project_dir}\n")
     
@@ -449,6 +466,7 @@ def markerAugmentation(config=None):
 
     for config_dict in config_dicts:
         start = time.time()
+        currentDateAndTime = datetime.now()
         project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
         seq_name = os.path.basename(project_dir)
         frame_range = config_dict.get('project').get('frame_range')
@@ -456,14 +474,15 @@ def markerAugmentation(config=None):
 
         logging.info("\n\n---------------------------------------------------------------------")
         logging.info(f"Augmentation process for {seq_name}, for {frames}.")
+        logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
         logging.info("---------------------------------------------------------------------")
         logging.info(f"\nProject directory: {project_dir}\n")
 
         augmentTRC(config_dict)
 
         end = time.time()
-        logging.info(f'\nAugmentation took {end - start:.2f} s.')
-
+        elapsed = end-start 
+        logging.info(f'Marker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
 
 
 def opensimProcessing(config=None):
@@ -496,6 +515,7 @@ def opensimProcessing(config=None):
 
     # # Batch process all trials
     # for config_dict in config_dicts:
+    #     currentDateAndTime = datetime.now()
     #     start = time.time()
     #     project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
     #     seq_name = os.path.basename(project_dir)
@@ -507,11 +527,16 @@ def opensimProcessing(config=None):
     #     #     logging.info(f"Scaling model with <STATIC TRC FILE>.")
     #     # else:
     #     #     logging.info(f"Running inverse kinematics <MOTION TRC FILE>.")
+    #     logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
     #     logging.info("---------------------------------------------------------------------")
     #     logging.info(f"\nOpenSim output directory: {project_dir}")
    
     #     opensim_processing_all(config_dict)
     
     #     end = time.time()
-    #     logging.info(f'Model scaling took {end-start:.2f} s.')
+    #     elapsed = end-start 
+    #     # if static_file in project_dir: 
+    #     #     logging.info(f'Model scaling took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+    #     # else:
+    #     #     logging.info(f'Inverse kinematics took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
 

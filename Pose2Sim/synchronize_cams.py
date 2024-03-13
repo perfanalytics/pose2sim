@@ -210,7 +210,7 @@ def plot_time_lagged_cross_corr(camx, camy, ax, fps, lag_time, camx_max_speed_in
     Calculate and plot the max correlation between two cameras with a time lag.
     How it works:
      1. Reference camera is camx and the other is camy. (Reference camera should record last. If not, the offset will be positive.)
-     2. The initial shift alppied to camy to match camx is calculated. ( This was not significantly different than before )
+     2. The initial shift alppied to camy to match camx is calculated.
      3. Additionally shift camy by max_lag frames to find the max correlation.
     
     Args:
