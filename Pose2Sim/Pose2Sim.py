@@ -265,43 +265,43 @@ def synchronization(config=None):
     or a the directory path of a trial, participant, or session,
     or the function can be called without an argument, in which case it the config directory is the current one.
     '''   
-
-    raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
     
-    # #TODO
-    # # Determine the level at which the function is called (session:3, participant:2, trial:1)
-    # level, config_dicts = read_config_files(config)
+    # Import the function
+    from Pose2Sim.synchronize_cams import synchronize_cams_all
 
-    # if type(config)==dict:
-    #     config_dict = config_dicts[0]
-    #     if config_dict.get('project').get('project_dir') == None:
-    #         raise ValueError('Please specify the project directory in config_dict:\n \
-    #                          config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+    # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    level, config_dicts = read_config_files(config)
 
-    # # Set up logging
-    # session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
-    # setup_logging(session_dir)    
+    if type(config)==dict:
+        config_dict = config_dicts[0]
+        if config_dict.get('project').get('project_dir') == None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
-    # # Batch process all trials
-    # for config_dict in config_dicts:
-    #     start = time.time()
-    #     currentDateAndTime = datetime.now()
-    #     project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
-    #     seq_name = os.path.basename(project_dir)
-    #     frame_range = config_dict.get('project').get('frame_range')
-    #     frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+    # Set up logging
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    setup_logging(session_dir)    
 
-    #     logging.info("\n\n---------------------------------------------------------------------")
-    #     logging.info("Camera synchronization")
-    #     logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
-    #     logging.info("---------------------------------------------------------------------")
-    #     logging.info(f"\nProject directory: {project_dir}")
+    # Batch process all trials
+    for config_dict in config_dicts:
+        start = time.time()
+        currentDateAndTime = datetime.now()
+        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        seq_name = os.path.basename(project_dir)
+        frame_range = config_dict.get('project').get('frame_range')
+        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+
+        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info("Camera synchronization")
+        logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
+        logging.info("---------------------------------------------------------------------")
+        logging.info(f"\nProject directory: {project_dir}")
         
-    #     synchronize_cams_all(config_dict)
+        synchronize_cams_all(config_dict)
     
-    #     end = time.time()
-    #     elapsed = end-start 
-    #     logging.info(f'Synchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        end = time.time()
+        elapsed = end-start 
+        logging.info(f'Synchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
     
 def personAssociation(config=None):

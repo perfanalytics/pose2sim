@@ -20,7 +20,7 @@
 [project]
 # multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
 nb_persons_to_detect = 2 # checked only if multi_person is selected
-frame_rate = 60 # fps
+frame_rate = 120 # fps
 frame_range = [] # For example [10,300], or [] for all frames
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
@@ -104,15 +104,9 @@ openpose_path = '' # only checked if OpenPose is used
 [synchronization]
 # COMING SOON! 
 reset_sync = true # Recalculate synchronization even if already done
-frames = [2850,3490] # Frames to use for synchronization, should point to a moment with fast motion.
-cut_off_frequency = 10 # cut-off frequency for a 4th order low-pass Butterworth filter
-# Vertical speeds (on X, Y, or Z axis, or 2D speeds)
-speed_kind = 'y' # 'x', 'y', 'z', or '2D'
-vmax = 20 # px/s
-cam1_nb = 4
-cam2_nb = 3
-id_kpt = [9,10] # Pour plus tard aller chercher numéro depuis keypoint name dans skeleton.py. 'RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
-weights_kpt = [1,1] # Pris en compte uniquement si on a plusieurs keypoints
+speed_kind = 'y' # 'y' showed best performance.
+id_kpt = [10] # number from keypoint name in skeleton.py. RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
+weights_kpt = [1] # Only taken into account if you have several keypoints (Currently only one keypoint is supported).
 
 
 [personAssociation]
