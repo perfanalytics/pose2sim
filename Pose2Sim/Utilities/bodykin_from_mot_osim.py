@@ -118,8 +118,12 @@ def bodykin_from_mot_osim_func(*args):
     for n in range(motion_data.getNumRows()):
         print(times[n], 's')
         # Set model struct in each time state
-        for c, coord in enumerate(coordinateNames):
-            model.getCoordinateSet().get(coord).setValue(state, motion_data_np[n,c])
+        for c, coord in enumerate(coordinateNames): ## PROBLEME QUAND HEADERS DE MOTION_DATA_NP ET COORDINATENAMES SONT PAS DANS LE MEME ORDRE
+            try:
+                model.getCoordinateSet().get(coord).setValue(state, motion_data_np[n,c], enforceContraints=False)
+            except:
+                pass
+        model.assemble(state)
         
         # Use state of model to get body coordinates in ground
         loc_rot_frame = []
