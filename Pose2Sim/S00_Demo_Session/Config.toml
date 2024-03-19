@@ -33,7 +33,7 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 [pose]
 pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
-pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
+pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII.
 						      #With mediapipe: BLAZEPOSE. 
 						      #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
 						      #With deeplabcut: CUSTOM. See example at the end of the file.
@@ -45,10 +45,9 @@ openpose_path = '' # only checked if OpenPose is used
 [synchronization]
 display_corr = true # true or false (lowercase)
 reset_sync = true # Recalculate synchronization even if already done
-# id_kpt = [10] # keypoint ID, to be found in skeleton.py. Example RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
-# weights_kpt = [1] # Only taken into account if you have several keypoints (Currently only one keypoint is supported).
-sync_frame_range = [] # For example [0,150], or [] for all frames (default)
-      # limit synchronization search (to the beginning or to the end of the capture for example)
+approx_time_maxspeed = 'auto' # Approximate time where to search for synchronization. Useful a sharp vertical movement is done (with any part of the body)
+                           # For example [1.0, 0.2, 0.8, 1.1] (in seconds, one value per camera)
+                           # If 'auto': automatic search (default)
 
 
 [calibration]

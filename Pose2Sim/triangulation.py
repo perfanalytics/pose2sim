@@ -96,7 +96,7 @@ def interpolate_zeros_nans(col, *args):
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, fill_value='extrapolate', bounds_error=False)
     col_interp = np.where(mask, col, f_interp(col.index)) #replace at false index with interpolated values
     
-    # Reintroduce nans if lenght of sequence > N
+    # Reintroduce nans if length of sequence > N
     idx_notgood = np.where(~mask)[0]
     gaps = np.where(np.diff(idx_notgood) > 1)[0] + 1 # where the indices of true are not contiguous
     sequences = np.split(idx_notgood, gaps)

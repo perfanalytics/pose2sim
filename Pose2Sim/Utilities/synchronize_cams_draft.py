@@ -210,26 +210,37 @@ else:
 # plt.show()
 
 for i in range(25):
+    df_coords[0].iloc[:,i*2+1].plot(label='0')
     df_coords[1].iloc[:,i*2+1].plot(label='1')
     df_coords[2].iloc[:,i*2+1].plot(label='2')
+    df_coords[3].iloc[:,i*2+1].plot(label='3')
     plt.title(i)
     plt.legend()
     plt.show()
 
 for i in range(25):
+    df_speed[0].iloc[:,i].plot(label='0')
     df_speed[1].iloc[:,i].plot(label='1')
     df_speed[2].iloc[:,i].plot(label='2')
+    df_speed[3].iloc[:,i].plot(label='3')
     plt.title(i)
     plt.legend()
     plt.show()
 
 for i in range(4):
     abs(df_speed[i]).sum(axis=1).plot(label=i)
+    # sum_speeds[i].plot(label=i)
 plt.legend()
 plt.show()
 
-df_speed[0].plot()  # --> remove janky points
-plt.show()
+
+for json_dir in json_dirs:
+    old_file_names = fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json.old')
+    for old in old_file_names:
+        old_path = os.path.join( json_dir, old)
+        os.rename(old_path, old_path[:-4])
+        print(old_path)
+
 
 
 
