@@ -234,6 +234,33 @@ plt.legend()
 plt.show()
 
 
+    # # Refine synchronization offset
+    # offset = []
+    # for cam_id in cam_list:
+    #     coords_nb = int(len(df_coords[cam_id].columns)/2)
+    #     lag_range = min(int(ref_frame_nb/2), fps)
+    #     offset_cam, corr_cam = [], []
+    #     for coord_id in range(coords_nb):
+    #         camx = df_speed[ref_cam_id][coord_id][search_sync_around_frame[ref_cam_id][0]:search_sync_around_frame[ref_cam_id][1]]
+    #         camy = df_speed[cam_id][coord_id][search_sync_around_frame[cam_id][0]:search_sync_around_frame[cam_id][1]]
+    #         offset_cam_coord, corr_cam_coord = time_lagged_cross_corr(camx, camy, lag_range, show=False)
+    #         offset_cam.append(offset_cam_coord)
+    #         corr_cam.append(corr_cam_coord)
+    #         # print(f'{coord_id} keypoint: offset = {offset_cam} frames and correlation = {corr_cam}.')
+    #     corr_cam = np.array(corr_cam)
+    #     offset_cam = np.array(offset_cam)
+    #     # take highest correlations and retrieve median offset
+    #     top_five_offset_coord = np.argpartition(-corr_cam, top_N_corr)[:top_N_corr]
+    #     top_five_offset_coord = top_five_offset_coord[np.argsort(corr_cam[top_five_offset_coord])][::-1]
+    #     top_five_corr_coord = corr_cam[top_five_offset_coord]
+    #     top_five_offset_coord = [c for i,c in enumerate(top_five_offset_coord) if top_five_corr_coord[i]>corr_threshold]
+    #     best_offset_cam = round(np.median(offset_cam[top_five_offset_coord]))
+    #     print('\n', best_offset_cam, offset_cam[top_five_offset_coord], corr_cam[top_five_offset_coord])
+    #     offset.append(best_offset_cam)
+    # print(offset)
+
+
+
 for json_dir in json_dirs:
     old_file_names = fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json.old')
     for old in old_file_names:

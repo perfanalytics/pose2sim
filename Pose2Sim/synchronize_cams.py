@@ -12,7 +12,7 @@
     - no ref cam (least amount of frames), no kpt selection
     - recap
     - whole sequence or around approx time (if long)
-    - somehow fix demo (offset 0 frames when 0 frames offset)
+    - somehow fix demo (offset 0 frames when 0 frames offset, right now [0,-2,-2]) -> min_conf = 0.4 (check problem with 0.0)
 
 
 
@@ -52,18 +52,18 @@ __status__ = "Development"
 
 
 # FUNCTIONS
-def convert_json2pandas(json_dir):
+def convert_json2pandas(json_dir, min_conf=0.6):
     '''
     Convert JSON files in a directory to a pandas DataFrame.
 
     INPUTS:
     - json_dir: str. The directory path containing the JSON files.
+    - min_conf: float. Drop values if confidence is below min_conf.
 
     OUTPUT:
     - df_json_coords: dataframe. Extracted coordinates in a pandas dataframe.
     '''
 
-    min_conf = 0.6
     nb_coord = 25 # int(len(json_data)/3)
     json_files_names = fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json') # modified ( 'json' to '*.json' )
     json_files_names = sort_stringlist_by_last_number(json_files_names)
@@ -386,11 +386,12 @@ def synchronize_cams_all(config_dict):
     fps =  config_dict.get('project').get('frame_rate')
     reset_sync = config_dict.get('synchronization').get('reset_sync') 
     approx_time_maxspeed = config_dict.get('synchronization').get('approx_time_maxspeed') 
+    min_conf = 0.4
     filter_order = 4
     filter_cutoff = 6
     # vmax = 4 # px/s # in average for each keypoint -> vmax sum = 100 px/s
-    corr_threshold = 0.8
-    top_N_corr = 10
+    # corr_threshold = 0.8
+    # top_N_corr = 10
 
     # List json files
     pose_listdirs_names = next(os.walk(pose_dir))[1]
@@ -403,7 +404,7 @@ def synchronize_cams_all(config_dict):
     df_coords = []
     b, a = signal.butter(filter_order/2, filter_cutoff/(fps/2), 'low', analog = False) 
     for i, json_dir in enumerate(json_dirs):
-        df_coords.append(convert_json2pandas(json_dir))
+        df_coords.append(convert_json2pandas(json_dir, min_conf=min_conf))
         df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
         df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args = ['linear'])
         df_coords[i] = df_coords[i].bfill().ffill()
@@ -472,7 +473,8 @@ def synchronize_cams_all(config_dict):
 
 
 
-    # Refine synchronization offset
+    # Refine synchronization offset: -> not needed
+    # Time-lagged cross-correlation for each keypoint, select top N highest correlations, take median offset
     offset = []
     for cam_id in cam_list:
         coords_nb = int(len(df_coords[cam_id].columns)/2)
@@ -498,12 +500,6 @@ def synchronize_cams_all(config_dict):
     print(offset)
 
 
-
-
-# def best_synchronization_offset(df_coords, fps, approx_time_maxspeed):
-#     '''
-#     '''
-#     pass
 
 
 
