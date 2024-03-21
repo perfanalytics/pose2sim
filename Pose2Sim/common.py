@@ -55,16 +55,17 @@ def retrieve_calib_params(calib_file):
     
     calib = toml.load(calib_file)
 
-    S, K, dist, optim_K, R, T = [], [], [], [], [], []
+    S, K, dist, optim_K, inv_K, R, T = [], [], [], [], [], [], []
     for c, cam in enumerate(calib.keys()):
         if cam != 'metadata':
             S.append(np.array(calib[cam]['size']))
             K.append(np.array(calib[cam]['matrix']))
             dist.append(np.array(calib[cam]['distortions']))
             optim_K.append(cv2.getOptimalNewCameraMatrix(K[c], dist[c], [int(s) for s in S[c]], 1, [int(s) for s in S[c]])[0])
+            inv_K.append(np.linalg.inv(K[c]))
             R.append(np.array(calib[cam]['rotation']))
             T.append(np.array(calib[cam]['translation']))
-    calib_params = {'S': S, 'K': K, 'dist': dist, 'optim_K': optim_K, 'R': R, 'T': T}
+    calib_params = {'S': S, 'K': K, 'dist': dist, 'inv_K': inv_K, 'optim_K': optim_K, 'R': R, 'T': T}
             
     return calib_params
 

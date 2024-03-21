@@ -8,7 +8,9 @@
 ###########################################################################
 
 Openpose detects all people in the field of view. 
-Which is the one of interest?
+- multi_person = false: Which is the one of interest?
+- multi_person = true: how to triangulate the same persons across views? (strongly inspired by easymocap)
+                       how to associate them across time frames?
 
 This module tries all possible triangulations of a chosen anatomical 
 point. If "multi_person" mode is not used, it chooses the person for
@@ -466,6 +468,9 @@ def track_2d_all(config):
         json_tracked_files_f = [json_tracked_files[c][f] for c in range(n_cams)]
         
         # all possible combinations of persons
+
+
+
         personsIDs_comb = persons_combinations(json_files_f) 
         
         # choose persons of interest and exclude cameras with bad pose estimation
