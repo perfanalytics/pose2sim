@@ -92,8 +92,10 @@ n_cams = len(json_files_f)
 
 
 margin_percent = 0.1
+likelihood_affinity_rejection_threshold = 0.1
+reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
 
-from Pose2Sim.common import world_to_camera_persp
+
 def retrieve_calib_params(calib_file):
     '''
     Compute projection matrices from toml calibration file.
@@ -175,57 +177,142 @@ def read_json(js_file):
     return json_data
 
 
-def compute_ray(json_coord, calib_params, cam_id):
+def compute_rays(json_coord, calib_params, cam_id):
     '''
-    json_coord: x, y, likelihood for a person seen from a camera (list of 3*joint_nb)
+    Plucker coordinates of rays from camera to each joint of a person
+    Plucker coordinates: camera to keypoint line direction (size 3) 
+                         moment: origin ^ line (size 3)
+                         additionally, confidence
+
+    INPUTS:
+    - json_coord: x, y, likelihood for a person seen from a camera (list of 3*joint_nb)
+    - calib_params: calibration parameters from retrieve_calib_params('calib.toml')
+    - cam_id: camera id (int)
+
+    OUTPUT:
+    - plucker: array. nb joints * (6 plucker coordinates + 1 likelihood)
     '''
+
     x = json_coord[0::3]
     y = json_coord[1::3]
+    likelihood = json_coord[2::3]
     
     inv_K = calib_params['inv_K'][cam_id]
     R_mat = calib_params['R_mat'][cam_id]
     T = calib_params['T'][cam_id]
 
+    cam_center = -R_mat.T @ T
+    plucker = []
     for i in range(len(x)):
         q = np.array([x[i], y[i], 1])
-        Q = R_mat.T @ (inv_K @ q -T)
+        norm_Q = R_mat.T @ (inv_K @ q -T)
+        
+        line = norm_Q - cam_center
+        norm_line = line/np.linalg.norm(line)
+        moment = np.cross(cam_center, norm_line)
+        plucker.append(np.concatenate([norm_line, moment, [likelihood[i]]]))
 
-    R_mat, T = world_to_camera_persp(calib_params['R_mat'][cam_id], calib_params['T'][cam_id])
+    return np.array(plucker)
 
 
-
-
-    pass
-
-def compute_affinity(all_json_data_f, calib_params):
+def broadcast_line_to_line_distance(p0, p1):
     '''
-    Compute the affinity between all the people in the different views
+    Compute the distance between two lines in 3D space.
+
+    see: https://faculty.sites.iastate.edu/jia/files/inline-files/plucker-coordinates.pdf
+    p0 = (l0,m0), p1 = (l1,m1)
+    dist = | (l0,m0) * (l1,m1) | / || l0 x l1 ||
+    (l0,m0) * (l1,m1) = l0 @ m1 + m0 @ l1 (reciprocal product)
+    
+    No need to divide by the norm of the cross product of the directions, since we
+    don't need the actual distance but whether the lines are close to intersecting or not
+    => dist = | (l0,m0) * (l1,m1) |
+
+    INPUTS:
+    - p0: array(nb_persons_detected * 1 * nb_joints * 7 coordinates)
+    - p1: array(1 * nb_persons_detected * nb_joints * 7 coordinates)
+
+    OUTPUT:
+    - dist: distances between the two lines (not normalized). 
+            array(nb_persons_0 * nb_persons_1 * nb_joints)
     '''
-    persons_per_view = [len(j) for j in all_json_data_f]
-    affinity = np.zeros((sum(persons_per_view), sum(persons_per_view)))
+
+    product = np.sum(p0[..., :3] * p1[..., 3:6], axis=-1) + np.sum(p1[..., :3] * p0[..., 3:6], axis=-1)
+    dist = np.abs(product)
+
+    return dist
+
+
+def compute_affinity(all_json_data_f, calib_params, reconstruction_error_threshold=0.1):
+    '''
+    Compute the affinity between all the people in the different views.
+
+    The affinity is defined as the distance between epipolar lines in each view 
+    (reciprocal product of Plucker coordinates).
+    Another approach would be to project one epipolar line onto the other camera
+    plane and compute the line to point distance, but it is more computationally 
+    intensive (simple dot product vs projection and distance calculation). 
+    
+    '''
+
+    # Compute plucker coordinates for all keypoints for each person in each view
+    # pluckers_f: dims=(camera, person, joint, 7 coordinates)
+    pluckers_f = []
     for cam_id, json_cam  in enumerate(all_json_data_f):
-        for person_id, json_coord in enumerate(json_cam):
-            compute_ray(json_coord, calib_params, cam_id)
+        pluckers = []
+        for json_coord in json_cam:
+            plucker = compute_rays(json_coord, calib_params, cam_id) # LIMIT TO 15 JOINTS? json_coord[:15*3]
+            pluckers.append(plucker)
+        pluckers = np.array(pluckers)
+        pluckers_f.append(pluckers)
+
+    # Compute affinity matrix
+    persons_per_view = [0] + [len(j) for j in all_json_data_f]
+    cum_persons_per_view = np.cumsum(persons_per_view)
+    distance = np.zeros((cum_persons_per_view[-1], cum_persons_per_view[-1])) + 2*reconstruction_error_threshold
+    for compared_cam0, compared_cam1 in it.combinations(range(len(all_json_data_f)), 2):
+        # skip when no detection for a camera
+        if cum_persons_per_view[compared_cam0] == cum_persons_per_view[compared_cam0+1] \
+            or cum_persons_per_view[compared_cam1] == cum_persons_per_view[compared_cam1 +1]:
+            continue
+
+        # compute distance
+        p0 = pluckers_f[compared_cam0][:,None] # add coordinate on second dimension
+        p1 = pluckers_f[compared_cam1][None,:] # add coordinate on first dimension
+        dist = broadcast_line_to_line_distance(p0, p1)
+        likelihood = np.sqrt(p0[..., -1] * p1[..., -1])
+        mean_weighted_dist = np.sum(dist*likelihood, axis=-1)/(1e-5 + likelihood.sum(axis=-1)) # array(nb_persons_0 * nb_persons_1)
+        
+        # populate distance matrix
+        distance[cum_persons_per_view[compared_cam0]:cum_persons_per_view[compared_cam0+1], \
+                 cum_persons_per_view[compared_cam1]:cum_persons_per_view[compared_cam1+1]] \
+                 = mean_weighted_dist
+        distance[cum_persons_per_view[compared_cam1]:cum_persons_per_view[compared_cam1+1], \
+                 cum_persons_per_view[compared_cam0]:cum_persons_per_view[compared_cam0+1]] \
+                 = mean_weighted_dist.T
+
+    # compute affinity matrix and clamp it to zero when distance > reconstruction_error_threshold
+    distance[distance > reconstruction_error_threshold] = reconstruction_error_threshold
+    affinity = 1 - distance / reconstruction_error_threshold
+    
+    return affinity
 
 
+# how many persons per view: [2, 3, 4, 3, 4, 0, 4, 5]
+# dimGroups: [0, 2, 5, 9, 12, 16, 16, 20, 25]
+# maptoview :  [0 0 1 1 1 2 2 2 2 3 3 3 4 4 4 4 6 6 6 6 7 7 7 7 7]
 
-        for p1, p2 in it.combinations(range(len(j)), 2):
-            affinity[p1+sum(persons_per_view[:c]), p2+sum(persons_per_view[:c])] = euclidean_distance(j[p1], j[p2])
     return affinity
 
 
 all_json_data_f = []
 for js_file in json_files_f:
     all_json_data_f.append(read_json(js_file))
-#TODO: remove people with average conf < 0.3, no full torso, less than 12 joints...
+#TODO: remove people with average likelihood < 0.3, no full torso, less than 12 joints...
 #print('filter2d commented by David in dataset/base.py L498')
 affinity = compute_affinity(all_json_data_f)
 #TODO: affinity without hand, face, feet
-
-
-dimGroupd, maptoview = 
-
-    bounding_boxes(js_file, margin_percent=margin_percent, around='extremities')
+# A person cannot be matched with 
 
 
 # python scripts/preprocess/extract_video.py D:\softs\github_david\EasyMocap\data\rugby_zak --openpose D:\softs\openpose-1.6.0-binaries-win64-gpu-flir-3d_recommended\openpose
@@ -240,17 +327,16 @@ dimGroupd, maptoview =
 # cams: camera basenames
 # affinity: from config/exp/mvmp1f.yml
 
-affinity_model(annots, images) -> see ComposetAffinity -> 
+affinity_model(annots, images) -> see ComposedAffinity -> 
+-> model -> mvmp1f.yml -> ray.Affinity
 -> see getDimGroupd, composeAff, SimpleConstrain, matchSVT
 
 out[key] = model(annots, dimGroups) -> __call__(self, annots, dimGroups)
 
 
-[2, 3, 4, 3, 4, 0, 4, 5]
+
  
-how many persons per view: [2,3,3,3,4,0,2,3]
-# dimGroups:  [0, 2, 5, 8, 11, 15, 15, 18, 21]
-# maptoview :  [0 0 1 1 1 2 2 2 3 3 3 4 4 4 4 6 6 6 7 7 7]
+
 
 
 
