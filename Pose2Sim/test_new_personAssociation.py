@@ -90,10 +90,20 @@ min_cameras_for_triangulation = config.get('triangulation').get('min_cameras_for
 n_cams = len(json_files_f)
 
 
+P_all = computeP(calib_file)
 
 margin_percent = 0.1
 likelihood_affinity_rejection_threshold = 0.1
 reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
+min_affinity = 0.2
+
+'''
+The new (March 2024) multi-person algorithm is largely inspired from Dong et al (2022) 
+"Fast and Robust Multi-Person 3D Pose Estimation and Tracking From Multiple Views"
+https://ieeexplore.ieee.org/document/9492024
+https://github.com/zju3dv/mvpose https://github.com/zju3dv/EasyMocap
+
+'''
 
 
 def retrieve_calib_params(calib_file):
@@ -243,15 +253,17 @@ def broadcast_line_to_line_distance(p0, p1):
     return dist
 
 
-def compute_affinity(all_json_data_f, calib_params, reconstruction_error_threshold=0.1):
+def compute_affinity(all_json_data_f, calib_params, cum_persons_per_view, reconstruction_error_threshold=0.1):
     '''
     Compute the affinity between all the people in the different views.
 
-    The affinity is defined as the distance between epipolar lines in each view 
-    (reciprocal product of Plucker coordinates).
+    The affinity is defined as 1 - distance/max_distance, with distance the
+    distance between epipolar lines in each view (reciprocal product of Plucker 
+    coordinates).
+
     Another approach would be to project one epipolar line onto the other camera
     plane and compute the line to point distance, but it is more computationally 
-    intensive (simple dot product vs projection and distance calculation). 
+    intensive (simple dot product vs. projection and distance calculation). 
     
     '''
 
@@ -267,8 +279,6 @@ def compute_affinity(all_json_data_f, calib_params, reconstruction_error_thresho
         pluckers_f.append(pluckers)
 
     # Compute affinity matrix
-    persons_per_view = [0] + [len(j) for j in all_json_data_f]
-    cum_persons_per_view = np.cumsum(persons_per_view)
     distance = np.zeros((cum_persons_per_view[-1], cum_persons_per_view[-1])) + 2*reconstruction_error_threshold
     for compared_cam0, compared_cam1 in it.combinations(range(len(all_json_data_f)), 2):
         # skip when no detection for a camera
@@ -294,15 +304,93 @@ def compute_affinity(all_json_data_f, calib_params, reconstruction_error_thresho
     # compute affinity matrix and clamp it to zero when distance > reconstruction_error_threshold
     distance[distance > reconstruction_error_threshold] = reconstruction_error_threshold
     affinity = 1 - distance / reconstruction_error_threshold
-    
+
     return affinity
+
+
+def circular_constraint(cum_persons_per_view):
+    '''
+    A person can be matched only with themselves in the same view, and with any 
+    person from other views
+
+    '''
+
+    circ_constraint = np.identity(cum_persons_per_view[-1])
+    for i in range(len(cum_persons_per_view)-1):
+        circ_constraint[cum_persons_per_view[i]:cum_persons_per_view[i+1], cum_persons_per_view[i+1]:cum_persons_per_view[-1]] = 1
+        circ_constraint[cum_persons_per_view[i+1]:cum_persons_per_view[-1], cum_persons_per_view[i]:cum_persons_per_view[i+1]] = 1
+    
+    return circ_constraint
+
+
+def SVT(matrix, threshold):
+    '''
+    Find a low-rank approximation of the matrix using Singular Value Thresholding.
+    '''
+    
+    U, s, Vt = np.linalg.svd(matrix) # decompose matrix
+    s_thresh = np.maximum(s - threshold, 0) # set smallest singular values to zero
+    matrix_thresh = U @ np.diag(s_thresh) @ Vt # recompose matrix
+
+    return matrix_thresh
+
+
+def matchSVT(affinity, cum_persons_per_view, circ_constraint, max_iter = 20, w_rank = 50, tol = 1e-4, w_sparse=0.1):
+    '''
+    Find low-rank approximation of 'affinity' while satisfying the circular constraint.
+    '''
+
+    new_aff = affinity.copy()
+    N = new_aff.shape[0]
+    index_diag = np.arange(N)
+    new_aff[index_diag, index_diag] = 0.
+    # new_aff = (new_aff + new_aff.T)/2 # symmetric by construction
+
+    Y = np.zeros_like(new_aff) # Initial deviation matrix / residual ()
+    W = w_sparse - new_aff # Initial sparse matrix / regularization (prevent overfitting)
+    mu = 64 # initial step size
+
+    for iter in range(max_iter):
+        new_aff0 = new_aff.copy()
+        
+        Q = new_aff + Y*1.0/mu
+        Q = SVT(Q,w_rank/mu)
+        new_aff = Q - (W + Y)/mu
+
+        # Project X onto dimGroups
+        for i in range(len(cum_persons_per_view) - 1):
+            ind1, ind2 = cum_persons_per_view[i], cum_persons_per_view[i + 1]
+            new_aff[ind1:ind2, ind1:ind2] = 0
+            
+        # Reset diagonal elements to one and ensure X is within valid range [0, 1]
+        new_aff[index_diag, index_diag] = 1.
+        new_aff[new_aff < 0] = 0
+        new_aff[new_aff > 1] = 1
+        
+        # Enforce circular constraint
+        new_aff = new_aff * circ_constraint
+        new_aff = (new_aff + new_aff.T) / 2 # kept just in case X loses its symmetry during optimization 
+        Y = Y + mu * (new_aff - Q)
+        
+        # Compute convergence criteria: break if new_aff is close enough to Q and no evolution anymore
+        pRes = np.linalg.norm(new_aff - Q) / N # primal residual (diff between new_aff and SVT result)
+        dRes = mu * np.linalg.norm(new_aff - new_aff0) / N # dual residual (diff between new_aff and previous new_aff)
+        if pRes < tol and dRes < tol:
+            break
+        if pRes > 10 * dRes: mu = 2 * mu
+        elif dRes > 10 * pRes: mu = mu / 2
+
+        iter +=1
+
+    return new_aff
+
+
 
 
 # how many persons per view: [2, 3, 4, 3, 4, 0, 4, 5]
 # dimGroups: [0, 2, 5, 9, 12, 16, 16, 20, 25]
 # maptoview :  [0 0 1 1 1 2 2 2 2 3 3 3 4 4 4 4 6 6 6 6 7 7 7 7 7]
 
-    return affinity
 
 
 all_json_data_f = []
@@ -310,10 +398,22 @@ for js_file in json_files_f:
     all_json_data_f.append(read_json(js_file))
 #TODO: remove people with average likelihood < 0.3, no full torso, less than 12 joints...
 #print('filter2d commented by David in dataset/base.py L498')
-affinity = compute_affinity(all_json_data_f)
-#TODO: affinity without hand, face, feet
-# A person cannot be matched with 
 
+persons_per_view = [0] + [len(j) for j in all_json_data_f]
+cum_persons_per_view = np.cumsum(persons_per_view)
+
+affinity = compute_affinity(all_json_data_f, calib_params, cum_persons_per_view, reconstruction_error_threshold=reconstruction_error_threshold)
+circ_constraint = circular_constraint(cum_persons_per_view)
+affinity = affinity * circ_constraint
+#TODO: affinity without hand, face, feet in ray.py L31
+affinity = matchSVT(affinity, cum_persons_per_view, circ_constraint, max_iter = 20, w_rank = 50, tol = 1e-4, w_sparse=0.1)
+affinity[affinity<min_affinity] = 0
+
+
+
+
+# annots: nview * n_persons * {bbox, keypoints, isKeyFrame, id}. keypoints: n_joints*(x,y,conf)
+# all_json_data_f = nview * n_persons * (x,y,conf)*n_joints
 
 # python scripts/preprocess/extract_video.py D:\softs\github_david\EasyMocap\data\rugby_zak --openpose D:\softs\openpose-1.6.0-binaries-win64-gpu-flir-3d_recommended\openpose
 # python apps/demo/mvmp.py D:\softs\github_david\EasyMocap\data\rugby_zak --out D:\softs\github_david\EasyMocap\data\rugby_zak/output --annot annots --cfg config/exp/mvmp1f.yml --undis --vis_det --vis_repro
@@ -327,25 +427,11 @@ affinity = compute_affinity(all_json_data_f)
 # cams: camera basenames
 # affinity: from config/exp/mvmp1f.yml
 
+'''
 affinity_model(annots, images) -> see ComposedAffinity -> 
 -> model -> mvmp1f.yml -> ray.Affinity
 -> see getDimGroupd, composeAff, SimpleConstrain, matchSVT
 
 out[key] = model(annots, dimGroups) -> __call__(self, annots, dimGroups)
 
-
-
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
+'''
