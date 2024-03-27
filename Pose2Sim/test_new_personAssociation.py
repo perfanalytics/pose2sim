@@ -76,7 +76,7 @@ if n_cams != len(P):
                 and {n_cams} cameras based on the number of pose folders.')
 
 Q_kpt = [np.array([0., 0., 0., 1.])]
-f=0
+f=1
 n_cams_off = 0
 
 json_files_f = [json_files[c][f] for c in range(n_cams)]
@@ -104,6 +104,16 @@ https://ieeexplore.ieee.org/document/9492024
 https://github.com/zju3dv/mvpose https://github.com/zju3dv/EasyMocap
 
 '''
+def common_items_in_list(list1, list2):
+    '''
+    Do two lists have any items in common at the same index?
+    Returns True or False
+    '''
+    
+    for i, j in enumerate(list1):
+        if j == list2[i]:
+            return True
+    return False
 
 
 def retrieve_calib_params(calib_file):
@@ -139,38 +149,6 @@ def retrieve_calib_params(calib_file):
     calib_params = {'S': S, 'K': K, 'dist': dist, 'inv_K': inv_K, 'optim_K': optim_K, 'R': R, 'R_mat': R_mat, 'T': T}
             
     return calib_params
-
-
-def bounding_boxes(js_file, margin_percent=0.1, around='extremities'):
-    '''
-    Compute the bounding boxes of the people in the json file.
-    Either around the extremities (with a margin)
-    or around the center of the person (with a margin).
-    '''
-
-    bounding_boxes = []
-    with open(js_file, 'r') as json_f:
-        js = json.load(json_f)
-        for people in range(len(js['people'])):
-            if len(js['people'][people]['pose_keypoints_2d']) < 3: continue
-            else:
-                x = js['people'][people]['pose_keypoints_2d'][0::3]
-                y = js['people'][people]['pose_keypoints_2d'][1::3]
-                x_min, x_max = min(x), max(x)
-                y_min, y_max = min(y), max(y)
-
-                if around == 'extremities':
-                    dx = (x_max - x_min) * margin_percent
-                    dy = (y_max - y_min) * margin_percent
-                    bounding_boxes.append([x_min-dx, y_min-dy, x_max+dx, y_max+dy])
-                
-                elif around == 'center':
-                    x_mean, y_mean = np.mean(x), np.mean(y)
-                    x_size = (x_max - x_min) * (1 + margin_percent)
-                    y_size = (y_max - y_min) * (1 + margin_percent)
-                    bounding_boxes.append([x_mean - x_size/2, y_mean - y_size/2, x_mean + x_size/2, y_mean + y_size/2])
-
-    return bounding_boxes   
 
 
 def read_json(js_file):
@@ -265,6 +243,15 @@ def compute_affinity(all_json_data_f, calib_params, cum_persons_per_view, recons
     plane and compute the line to point distance, but it is more computationally 
     intensive (simple dot product vs. projection and distance calculation). 
     
+    INPUTS:
+    - all_json_data_f: list of json data. For frame f, nb_views*nb_persons*(x,y,likelihood)*nb_joints
+    - calib_params: calibration parameters from retrieve_calib_params('calib.toml')
+    - cum_persons_per_view: cumulative number of persons per view
+    - reconstruction_error_threshold: maximum distance between epipolar lines to consider a match
+
+    OUTPUT:
+    - affinity: affinity matrix between all the people in the different views. 
+                (nb_views*nb_persons_per_view * nb_views*nb_persons_per_view)
     '''
 
     # Compute plucker coordinates for all keypoints for each person in each view
@@ -313,6 +300,11 @@ def circular_constraint(cum_persons_per_view):
     A person can be matched only with themselves in the same view, and with any 
     person from other views
 
+    INPUT:
+    - cum_persons_per_view: cumulative number of persons per view
+
+    OUTPUT:
+    - circ_constraint: circular constraint matrix
     '''
 
     circ_constraint = np.identity(cum_persons_per_view[-1])
@@ -326,6 +318,13 @@ def circular_constraint(cum_persons_per_view):
 def SVT(matrix, threshold):
     '''
     Find a low-rank approximation of the matrix using Singular Value Thresholding.
+
+    INPUTS:
+    - matrix: matrix to decompose
+    - threshold: threshold for singular values
+
+    OUTPUT:
+    - matrix_thresh: low-rank approximation of the matrix
     '''
     
     U, s, Vt = np.linalg.svd(matrix) # decompose matrix
@@ -338,6 +337,18 @@ def SVT(matrix, threshold):
 def matchSVT(affinity, cum_persons_per_view, circ_constraint, max_iter = 20, w_rank = 50, tol = 1e-4, w_sparse=0.1):
     '''
     Find low-rank approximation of 'affinity' while satisfying the circular constraint.
+
+    INPUTS:
+    - affinity: affinity matrix between all the people in the different views
+    - cum_persons_per_view: cumulative number of persons per view
+    - circ_constraint: circular constraint matrix
+    - max_iter: maximum number of iterations
+    - w_rank: threshold for singular values
+    - tol: tolerance for convergence
+    - w_sparse: regularization parameter
+
+    OUTPUT:
+    - new_aff: low-rank approximation of the affinity matrix
     '''
 
     new_aff = affinity.copy()
@@ -408,6 +419,137 @@ affinity = affinity * circ_constraint
 #TODO: affinity without hand, face, feet in ray.py L31
 affinity = matchSVT(affinity, cum_persons_per_view, circ_constraint, max_iter = 20, w_rank = 50, tol = 1e-4, w_sparse=0.1)
 affinity[affinity<min_affinity] = 0
+#TODO: PROPOSALS
+#TODO: SAVE IN JSON
+#TODO: INTEGRATE
+
+
+
+# tests
+# affinity = affinity[:12, :12]
+# cum_persons_per_view = cum_persons_per_view[:5]
+# n_cams = 4
+
+
+
+proposals, nb_detections = np.unique(affinity, axis=0, return_counts=True)
+proposals = proposals[np.argsort(nb_detections)[::-1]]
+# take the max of affinity for each group on each line
+# take the first proposal when the person is already assigned
+
+cam = 0
+
+
+
+# index of the max affinity for each group (-1 if no detection)
+proposals = []
+for row in range(affinity.shape[0]):
+    proposal_row = []
+    for cam in range(n_cams):
+        id_persons_per_view = affinity[row, cum_persons_per_view[cam]:cum_persons_per_view[cam+1]]
+        proposal_row += [np.argmax(id_persons_per_view) if (len(id_persons_per_view)>0 and max(id_persons_per_view)>0) else -1]
+    proposals.append(proposal_row)
+proposals = np.array(proposals, dtype=float)
+# remove duplicates and order
+proposals, nb_detections = np.unique(proposals, axis=0, return_counts=True)
+proposals = proposals[np.argsort(nb_detections)[::-1]]
+# remove row if any value is the same in previous rows at same index (nan!=nan so nan ignored)
+proposals[proposals==-1] = np.nan
+mask = np.ones(proposals.shape[0], dtype=bool)
+for i in range(1, len(proposals)):
+    mask[i] = ~np.any(proposals[i] == proposals[:i], axis=0).any()
+proposals = proposals[mask]
+
+
+    
+
+# verif que pas already assigned (à partir de ligne 6)
+
+
+
+
+
+
+views_cnt = (affinity>0.5).sum(axis=1) # person0 of view0 is seen view_cnt[0] times
+
+
+views_cnt = np.zeros((affinity.shape[0], n_cams))
+for cam in range(n_cams):
+    views_cnt[:, cam] = affinity[:, cum_persons_per_view[cam]:cum_persons_per_view[cam+1]].sum(axis=1)
+views_cnt = (views_cnt>0.5).sum(axis=1)
+sortidx = np.argsort(-views_cnt)
+p2dAssigned = np.zeros(cum_persons_per_view[-1], dtype=int) - 1
+indices_zero = np.zeros((n_cams), dtype=int) - 1
+for idx in sortidx:
+    if p2dAssigned[idx] != -1:
+        continue
+    proposals = [indices_zero.copy()]
+    for cam in range(n_cams):
+        match = np.where( 
+            (affinity[idx, cum_persons_per_view[cam]:cum_persons_per_view[cam+1]] > 0.) 
+            & (p2dAssigned[cum_persons_per_view[cam]:cum_persons_per_view[cam+1]] == -1) )[0]
+        if len(match) > 0:
+            match = match + cum_persons_per_view[cam]
+            for proposal in proposals:
+                proposal[cam] = match[0]
+        if len(match) > 1:
+            proposals_new = []
+            for proposal in proposals:
+                for col in match[1:]:
+                    p = proposal.copy()
+                    p[cam] = col
+                    proposals_new.append(p)
+            proposals += proposals_new
+    print('proposals: ', proposals)
+        # while len(proposals) > 0:
+        #     proposal = proposals.pop()
+        #     if (proposal != -1).sum() < min_cameras_for_triangulation:
+        #         continue
+                
+            keypoints2d, bboxes, Pused, Vused = set_keypoints2d(proposal, annots, Pall, dimGroups)
+
+
+            Vused = np.where(proposals!=-1)[0]
+            if len(Vused) < 1:
+                return [], [], [], []
+            keypoints2d = np.stack([annots[cam][proposals[cam]-cum_persons_per_view[cam]]['keypoints'].copy() for cam in Vused])
+            Pused = P_all[Vused]
+            return keypoints2d, bboxes, Pused, Vused
+
+
+
+# not used
+def bounding_boxes(js_file, margin_percent=0.1, around='extremities'):
+    '''
+    Compute the bounding boxes of the people in the json file.
+    Either around the extremities (with a margin)
+    or around the center of the person (with a margin).
+    '''
+
+    bounding_boxes = []
+    with open(js_file, 'r') as json_f:
+        js = json.load(json_f)
+        for people in range(len(js['people'])):
+            if len(js['people'][people]['pose_keypoints_2d']) < 3: continue
+            else:
+                x = js['people'][people]['pose_keypoints_2d'][0::3]
+                y = js['people'][people]['pose_keypoints_2d'][1::3]
+                x_min, x_max = min(x), max(x)
+                y_min, y_max = min(y), max(y)
+
+                if around == 'extremities':
+                    dx = (x_max - x_min) * margin_percent
+                    dy = (y_max - y_min) * margin_percent
+                    bounding_boxes.append([x_min-dx, y_min-dy, x_max+dx, y_max+dy])
+                
+                elif around == 'center':
+                    x_mean, y_mean = np.mean(x), np.mean(y)
+                    x_size = (x_max - x_min) * (1 + margin_percent)
+                    y_size = (y_max - y_min) * (1 + margin_percent)
+                    bounding_boxes.append([x_mean - x_size/2, y_mean - y_size/2, x_mean + x_size/2, y_mean + y_size/2])
+
+    return bounding_boxes   
+
 
 
 
