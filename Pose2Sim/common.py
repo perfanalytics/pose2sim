@@ -37,6 +37,58 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def common_items_in_list(list1, list2):
+    '''
+    Do two lists have any items in common at the same index?
+    Returns True or False
+    '''
+    
+    for i, j in enumerate(list1):
+        if j == list2[i]:
+            return True
+    return False
+
+
+def bounding_boxes(js_file, margin_percent=0.1, around='extremities'):
+    '''
+    Compute the bounding boxes of the people in the json file.
+    Either around the extremities (with a margin)
+    or around the center of the person (with a margin).
+
+    INPUTS:
+    - js_file: json file
+    - margin_percent: margin around the person
+    - around: 'extremities' or 'center'
+
+    OUTPUT:
+    - bounding_boxes: list of bounding boxes [x_min, y_min, x_max, y_max]
+    '''
+
+    bounding_boxes = []
+    with open(js_file, 'r') as json_f:
+        js = json.load(json_f)
+        for people in range(len(js['people'])):
+            if len(js['people'][people]['pose_keypoints_2d']) < 3: continue
+            else:
+                x = js['people'][people]['pose_keypoints_2d'][0::3]
+                y = js['people'][people]['pose_keypoints_2d'][1::3]
+                x_min, x_max = min(x), max(x)
+                y_min, y_max = min(y), max(y)
+
+                if around == 'extremities':
+                    dx = (x_max - x_min) * margin_percent
+                    dy = (y_max - y_min) * margin_percent
+                    bounding_boxes.append([x_min-dx, y_min-dy, x_max+dx, y_max+dy])
+                
+                elif around == 'center':
+                    x_mean, y_mean = np.mean(x), np.mean(y)
+                    x_size = (x_max - x_min) * (1 + margin_percent)
+                    y_size = (y_max - y_min) * (1 + margin_percent)
+                    bounding_boxes.append([x_mean - x_size/2, y_mean - y_size/2, x_mean + x_size/2, y_mean + y_size/2])
+
+    return bounding_boxes   
+
+
 def retrieve_calib_params(calib_file):
     '''
     Compute projection matrices from toml calibration file.
@@ -48,6 +100,7 @@ def retrieve_calib_params(calib_file):
     - S: (h,w) vectors as list of 2x1 arrays
     - K: intrinsic matrices as list of 3x3 arrays
     - dist: distortion vectors as list of 4x1 arrays
+    - inv_K: inverse intrinsic matrices as list of 3x3 arrays
     - optim_K: intrinsic matrices for undistorting points as list of 3x3 arrays
     - R: rotation rodrigue vectors as list of 3x1 arrays
     - T: translation vectors as list of 3x1 arrays
@@ -55,7 +108,7 @@ def retrieve_calib_params(calib_file):
     
     calib = toml.load(calib_file)
 
-    S, K, dist, optim_K, inv_K, R, T = [], [], [], [], [], [], []
+    S, K, dist, optim_K, inv_K, R, R_mat, T = [], [], [], [], [], [], [], []
     for c, cam in enumerate(calib.keys()):
         if cam != 'metadata':
             S.append(np.array(calib[cam]['size']))
@@ -64,8 +117,9 @@ def retrieve_calib_params(calib_file):
             optim_K.append(cv2.getOptimalNewCameraMatrix(K[c], dist[c], [int(s) for s in S[c]], 1, [int(s) for s in S[c]])[0])
             inv_K.append(np.linalg.inv(K[c]))
             R.append(np.array(calib[cam]['rotation']))
+            R_mat.append(cv2.Rodrigues(R[c])[0])
             T.append(np.array(calib[cam]['translation']))
-    calib_params = {'S': S, 'K': K, 'dist': dist, 'inv_K': inv_K, 'optim_K': optim_K, 'R': R, 'T': T}
+    calib_params = {'S': S, 'K': K, 'dist': dist, 'inv_K': inv_K, 'optim_K': optim_K, 'R': R, 'R_mat': R_mat, 'T': T}
             
     return calib_params
 

@@ -267,7 +267,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
         logging.info(f'In average, {mean_cam_excluded} cameras had to be excluded to reach these thresholds.')
         
         cam_excluded_count[n] = {i: v for i, v in zip(cam_names, cam_excluded_count[n].values())}
-        cam_excluded_count[n] = {i: cam_excluded_count[n][i] for i in sorted(cam_excluded_count[n].keys())}
+        cam_excluded_count[n] = {k: v for k, v in sorted(cam_excluded_count[n].items(), key=lambda item: item[1])[::-1]}
         str_cam_excluded_count = ''
         for i, (k, v) in enumerate(cam_excluded_count[n].items()):
             if i ==0:

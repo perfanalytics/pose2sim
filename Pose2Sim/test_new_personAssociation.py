@@ -76,7 +76,7 @@ if n_cams != len(P):
                 and {n_cams} cameras based on the number of pose folders.')
 
 Q_kpt = [np.array([0., 0., 0., 1.])]
-f=1
+f=3
 n_cams_off = 0
 
 json_files_f = [json_files[c][f] for c in range(n_cams)]
@@ -92,8 +92,6 @@ n_cams = len(json_files_f)
 
 P_all = computeP(calib_file)
 
-margin_percent = 0.1
-likelihood_affinity_rejection_threshold = 0.1
 reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
 min_affinity = 0.2
 
@@ -104,52 +102,6 @@ https://ieeexplore.ieee.org/document/9492024
 https://github.com/zju3dv/mvpose https://github.com/zju3dv/EasyMocap
 
 '''
-def common_items_in_list(list1, list2):
-    '''
-    Do two lists have any items in common at the same index?
-    Returns True or False
-    '''
-    
-    for i, j in enumerate(list1):
-        if j == list2[i]:
-            return True
-    return False
-
-
-def retrieve_calib_params(calib_file):
-    '''
-    Compute projection matrices from toml calibration file.
-    
-    INPUT:
-    - calib_file: calibration .toml file.
-    
-    OUTPUT:
-    - S: (h,w) vectors as list of 2x1 arrays
-    - K: intrinsic matrices as list of 3x3 arrays
-    - dist: distortion vectors as list of 4x1 arrays
-    - inv_K: inverse intrinsic matrices as list of 3x3 arrays
-    - optim_K: intrinsic matrices for undistorting points as list of 3x3 arrays
-    - R: rotation rodrigue vectors as list of 3x1 arrays
-    - T: translation vectors as list of 3x1 arrays
-    '''
-    
-    calib = toml.load(calib_file)
-
-    S, K, dist, optim_K, inv_K, R, R_mat, T = [], [], [], [], [], [], [], []
-    for c, cam in enumerate(calib.keys()):
-        if cam != 'metadata':
-            S.append(np.array(calib[cam]['size']))
-            K.append(np.array(calib[cam]['matrix']))
-            dist.append(np.array(calib[cam]['distortions']))
-            optim_K.append(cv2.getOptimalNewCameraMatrix(K[c], dist[c], [int(s) for s in S[c]], 1, [int(s) for s in S[c]])[0])
-            inv_K.append(np.linalg.inv(K[c]))
-            R.append(np.array(calib[cam]['rotation']))
-            R_mat.append(cv2.Rodrigues(R[c])[0])
-            T.append(np.array(calib[cam]['translation']))
-    calib_params = {'S': S, 'K': K, 'dist': dist, 'inv_K': inv_K, 'optim_K': optim_K, 'R': R, 'R_mat': R_mat, 'T': T}
-            
-    return calib_params
-
 
 def read_json(js_file):
     '''
@@ -396,12 +348,55 @@ def matchSVT(affinity, cum_persons_per_view, circ_constraint, max_iter = 20, w_r
     return new_aff
 
 
+def person_index_per_cam(affinity, min_cameras_for_triangulation):
+    '''
+    For each detected person, gives their index for each camera
+
+    INPUTS:
+    - affinity: affinity matrix between all the people in the different views
+    - min_cameras_for_triangulation: exclude proposals if less than N cameras see them
+
+    OUTPUT:
+    - proposals: 2D array: n_persons * n_cams
+    '''
+
+    # index of the max affinity for each group (-1 if no detection)
+    proposals = []
+    for row in range(affinity.shape[0]):
+        proposal_row = []
+        for cam in range(n_cams):
+            id_persons_per_view = affinity[row, cum_persons_per_view[cam]:cum_persons_per_view[cam+1]]
+            proposal_row += [np.argmax(id_persons_per_view) if (len(id_persons_per_view)>0 and max(id_persons_per_view)>0) else -1]
+        proposals.append(proposal_row)
+    proposals = np.array(proposals, dtype=float)
+
+    # remove duplicates and order
+    proposals, nb_detections = np.unique(proposals, axis=0, return_counts=True)
+    proposals = proposals[np.argsort(nb_detections)[::-1]]
+
+    # remove row if any value is the same in previous rows at same index (nan!=nan so nan ignored)
+    proposals[proposals==-1] = np.nan
+    mask = np.ones(proposals.shape[0], dtype=bool)
+    for i in range(1, len(proposals)):
+        mask[i] = ~np.any(proposals[i] == proposals[:i], axis=0).any()
+    proposals = proposals[mask]
+
+    # remove identifications if less than N cameras see them
+    nb_cams_per_person = [np.count_nonzero(~np.isnan(p)) for p in proposals]
+    proposals = np.array([p for (n,p) in zip(nb_cams_per_person, proposals) if n >= min_cameras_for_triangulation])
+
+    return proposals
 
 
-# how many persons per view: [2, 3, 4, 3, 4, 0, 4, 5]
-# dimGroups: [0, 2, 5, 9, 12, 16, 16, 20, 25]
-# maptoview :  [0 0 1 1 1 2 2 2 2 3 3 3 4 4 4 4 6 6 6 6 7 7 7 7 7]
 
+
+
+
+config = toml.load(r'D:\data\forceteck\Rugby_Lab_2022_02\Config.toml')
+project_dir = r'D:\data\forceteck\Rugby_Lab_2022_02\tackle_zak_01\tackle_zak_01_tackle'
+# 
+# config = toml.load(r'D:\softs\github_david\pose2sim\Pose2Sim\S00_Demo_Session\Config.toml')
+# project_dir = r'D:\softs\github_david\pose2sim\Pose2Sim\S00_Demo_Session\S00_P00_SingleParticipant\S00_P00_T01_BalancingTrial'
 
 
 all_json_data_f = []
@@ -419,143 +414,41 @@ affinity = affinity * circ_constraint
 #TODO: affinity without hand, face, feet in ray.py L31
 affinity = matchSVT(affinity, cum_persons_per_view, circ_constraint, max_iter = 20, w_rank = 50, tol = 1e-4, w_sparse=0.1)
 affinity[affinity<min_affinity] = 0
-#TODO: PROPOSALS
+proposals = person_index_per_cam(affinity, min_cameras_for_triangulation)
 #TODO: SAVE IN JSON
 #TODO: INTEGRATE
 
 
 
-# tests
-# affinity = affinity[:12, :12]
-# cum_persons_per_view = cum_persons_per_view[:5]
-# n_cams = 4
 
-
-
-proposals, nb_detections = np.unique(affinity, axis=0, return_counts=True)
-proposals = proposals[np.argsort(nb_detections)[::-1]]
-# take the max of affinity for each group on each line
-# take the first proposal when the person is already assigned
-
-cam = 0
-
-
-
-# index of the max affinity for each group (-1 if no detection)
-proposals = []
-for row in range(affinity.shape[0]):
-    proposal_row = []
-    for cam in range(n_cams):
-        id_persons_per_view = affinity[row, cum_persons_per_view[cam]:cum_persons_per_view[cam+1]]
-        proposal_row += [np.argmax(id_persons_per_view) if (len(id_persons_per_view)>0 and max(id_persons_per_view)>0) else -1]
-    proposals.append(proposal_row)
-proposals = np.array(proposals, dtype=float)
-# remove duplicates and order
-proposals, nb_detections = np.unique(proposals, axis=0, return_counts=True)
-proposals = proposals[np.argsort(nb_detections)[::-1]]
-# remove row if any value is the same in previous rows at same index (nan!=nan so nan ignored)
-proposals[proposals==-1] = np.nan
-mask = np.ones(proposals.shape[0], dtype=bool)
-for i in range(1, len(proposals)):
-    mask[i] = ~np.any(proposals[i] == proposals[:i], axis=0).any()
-proposals = proposals[mask]
-
-
-    
-
-# verif que pas already assigned (à partir de ligne 6)
-
-
-
-
-
-
-views_cnt = (affinity>0.5).sum(axis=1) # person0 of view0 is seen view_cnt[0] times
-
-
-views_cnt = np.zeros((affinity.shape[0], n_cams))
 for cam in range(n_cams):
-    views_cnt[:, cam] = affinity[:, cum_persons_per_view[cam]:cum_persons_per_view[cam+1]].sum(axis=1)
-views_cnt = (views_cnt>0.5).sum(axis=1)
-sortidx = np.argsort(-views_cnt)
-p2dAssigned = np.zeros(cum_persons_per_view[-1], dtype=int) - 1
-indices_zero = np.zeros((n_cams), dtype=int) - 1
-for idx in sortidx:
-    if p2dAssigned[idx] != -1:
-        continue
-    proposals = [indices_zero.copy()]
-    for cam in range(n_cams):
-        match = np.where( 
-            (affinity[idx, cum_persons_per_view[cam]:cum_persons_per_view[cam+1]] > 0.) 
-            & (p2dAssigned[cum_persons_per_view[cam]:cum_persons_per_view[cam+1]] == -1) )[0]
-        if len(match) > 0:
-            match = match + cum_persons_per_view[cam]
-            for proposal in proposals:
-                proposal[cam] = match[0]
-        if len(match) > 1:
-            proposals_new = []
-            for proposal in proposals:
-                for col in match[1:]:
-                    p = proposal.copy()
-                    p[cam] = col
-                    proposals_new.append(p)
-            proposals += proposals_new
-    print('proposals: ', proposals)
-        # while len(proposals) > 0:
-        #     proposal = proposals.pop()
-        #     if (proposal != -1).sum() < min_cameras_for_triangulation:
-        #         continue
-                
-            keypoints2d, bboxes, Pused, Vused = set_keypoints2d(proposal, annots, Pall, dimGroups)
+    with open(json_tracked_files_f[cam], 'w') as json_tracked_f:
+        with open(json_files_f[cam], 'r') as json_f:
+            js = json.load(json_f)
+            js_new = js.copy()
+            js_new['people'] = []
+            for new_comb in proposals:
+                if not np.isnan(new_comb[cam]):
+                    js_new['people'] += [js['people'][int(new_comb[cam])]]
+                else:
+                    js_new['people'] += [{}]
+        json_tracked_f.write(json.dumps(js_new))
 
 
-            Vused = np.where(proposals!=-1)[0]
-            if len(Vused) < 1:
-                return [], [], [], []
-            keypoints2d = np.stack([annots[cam][proposals[cam]-cum_persons_per_view[cam]]['keypoints'].copy() for cam in Vused])
-            Pused = P_all[Vused]
-            return keypoints2d, bboxes, Pused, Vused
+
+
 
 
 
 # not used
-def bounding_boxes(js_file, margin_percent=0.1, around='extremities'):
-    '''
-    Compute the bounding boxes of the people in the json file.
-    Either around the extremities (with a margin)
-    or around the center of the person (with a margin).
-    '''
 
-    bounding_boxes = []
-    with open(js_file, 'r') as json_f:
-        js = json.load(json_f)
-        for people in range(len(js['people'])):
-            if len(js['people'][people]['pose_keypoints_2d']) < 3: continue
-            else:
-                x = js['people'][people]['pose_keypoints_2d'][0::3]
-                y = js['people'][people]['pose_keypoints_2d'][1::3]
-                x_min, x_max = min(x), max(x)
-                y_min, y_max = min(y), max(y)
-
-                if around == 'extremities':
-                    dx = (x_max - x_min) * margin_percent
-                    dy = (y_max - y_min) * margin_percent
-                    bounding_boxes.append([x_min-dx, y_min-dy, x_max+dx, y_max+dy])
-                
-                elif around == 'center':
-                    x_mean, y_mean = np.mean(x), np.mean(y)
-                    x_size = (x_max - x_min) * (1 + margin_percent)
-                    y_size = (y_max - y_min) * (1 + margin_percent)
-                    bounding_boxes.append([x_mean - x_size/2, y_mean - y_size/2, x_mean + x_size/2, y_mean + y_size/2])
-
-    return bounding_boxes   
 
 
 
 
 
 # annots: nview * n_persons * {bbox, keypoints, isKeyFrame, id}. keypoints: n_joints*(x,y,conf)
-# all_json_data_f = nview * n_persons * (x,y,conf)*n_joints
+
 
 # python scripts/preprocess/extract_video.py D:\softs\github_david\EasyMocap\data\rugby_zak --openpose D:\softs\openpose-1.6.0-binaries-win64-gpu-flir-3d_recommended\openpose
 # python apps/demo/mvmp.py D:\softs\github_david\EasyMocap\data\rugby_zak --out D:\softs\github_david\EasyMocap\data\rugby_zak/output --annot annots --cfg config/exp/mvmp1f.yml --undis --vis_det --vis_repro
