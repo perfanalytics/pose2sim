@@ -105,8 +105,9 @@ openpose_path = '' # only checked if OpenPose is used
 # COMING SOON! 
 reset_sync = true # Recalculate synchronization even if already done
 speed_kind = 'y' # 'y' showed best performance.
+speed_threshold = 90 # If you miss a keypoint, the speed will increase dramatically in the next detected frame. To prevent this, we specify a threshold.
 time = 10 # The frame range in which the wrist finds its highest position. (time * fps)
-id_kpt = [10] # number from keypoint name in skeleton.py. RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
+id_kpt = [9] # number from keypoint name in skeleton.py. RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
 weights_kpt = [1] # Only taken into account if you have several keypoints (Currently only one keypoint is supported).
 
 
