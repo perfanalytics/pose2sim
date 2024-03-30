@@ -191,7 +191,7 @@ def find_motion_end(df_coords, wrist_index, start_frame, lowest_y, fps):
 
     return time
 
-def find_fastest_frame(df_speed_list):
+def find_fastest_frame(df_speed_list, speed_threshold):
     """
     Find the frame with the highest speed in a list of speed DataFrames.
     Fastest frame should locate in after highest wrist position frame.
