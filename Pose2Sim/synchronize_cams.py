@@ -118,7 +118,7 @@ def interpolate_nans(col, kind):
     return col_interp #, idx_notgood
 
 
-def find_highest_wrist_position(df_coords, wrist_index):
+def find_highest_wrist_position(df_coords, wrist_index, time, fps):
     """
     Find the frame with the highest wrist position in a list of coordinate DataFrames.
     Highest wrist position frame use for finding the fastest frame.
@@ -126,6 +126,8 @@ def find_highest_wrist_position(df_coords, wrist_index):
     Args:
     df_coords (list): List of coordinate DataFrames.
     wrist_index (int): The index of the wrist in the keypoint list.
+    start_frame (int): The frame where the hands down movement starts.
+    fps (int): The frame rate of the cameras in Hz.
     
     Returns:
     list: The index of the frame with the highest wrist position.
@@ -133,7 +135,14 @@ def find_highest_wrist_position(df_coords, wrist_index):
 
     start_frames = []
     min_y_coords = []
+
+    # Calculate the number of frames based on time and fps
+    num_frames = int(time * fps)
+    
     for df in df_coords:
+        # Filter the DataFrame to include only rows within the specified frame range
+        df_filtered = df.iloc[:num_frames+1]
+        
         # Wrist y-coordinate column index (2n where n is the keypoint index)
         # Assuming wrist_index is a list and we want to use the first element
         y_col_index = wrist_index[0] * 2 + 1
@@ -141,7 +150,8 @@ def find_highest_wrist_position(df_coords, wrist_index):
         # Replace 0 with NaN to avoid considering them and find the index of the lowest y-coordinate value
         min_y_coord = df.iloc[:, y_col_index].replace(0, np.nan).min()
         min_y_index = df.iloc[:, y_col_index].replace(0, np.nan).idxmin()
-        if min_y_coord <= 100: # if the wrist is too high, it is likely to be an outlier
+        
+        if min_y_coord <= 1: # if the wrist is too high, it is likely to be an outlier
             print("The wrist is too high. Please check the data for outliers.")
 
         start_frames.append(min_y_index)
@@ -195,13 +205,29 @@ def find_fastest_frame(df_speed_list):
     Returns:
     int: The index of the frame with the highest speed.
     """
+    
+    max_speed = 0
+    max_speed_index = None
 
     for speed_series in df_speed_list:
-        max_speed = speed_series.abs().max()
-        max_speed_index = speed_series.abs().idxmax()
+        # Filter out speeds above 200
+        speed_series = speed_series[speed_series.abs() < 200]
+
+        if not speed_series.empty:
+            current_max_speed = speed_series.abs().max()
+            current_max_speed_index = speed_series.abs().idxmax()
+
+            if current_max_speed > max_speed:
+                max_speed = current_max_speed
+                max_speed_index = current_max_speed_index
+
+    if max_speed_index is None:
+        print("!!Warning!! : No valid maximum speed found below 200. Consider adjusting the threshold or checking the data.")
+        return None, None
     
     if max_speed < 10:
-        print(" !!Warning!! : The maximum speed is likely to be not representative of the actual movement. Consider increasing the time parameter in Config.toml.")
+        print("!!Warning!! : The maximum speed is likely to be not representative of the actual movement. Consider increasing the time parameter in Config.toml.")
+
     return max_speed_index, max_speed
 
 
@@ -314,6 +340,8 @@ def synchronize_cams_all(config_dict):
     # get parameters from Config.toml
     project_dir = config_dict.get('project').get('project_dir')
     pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
+
+    time = config_dict.get('synchronization').get('time') # when your wrist has highest position ? 
     fps =  config_dict.get('project').get('frame_rate') # frame rate of the cameras (Hz)
     reset_sync = config_dict.get('synchronization').get('reset_sync')  # Start synchronization over each time it is run
 
@@ -365,7 +393,7 @@ def synchronize_cams_all(config_dict):
     # or on a selection of weighted points
 
     # find the lowest position of the wrist
-    lowest_frames, lowest_y_coords = find_highest_wrist_position(df_coords, id_kpt)
+    lowest_frames, lowest_y_coords = find_highest_wrist_position(df_coords, id_kpt, time, fps)
 
     # set reference camera
     ref_cam_nb = 0
