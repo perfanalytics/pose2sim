@@ -60,7 +60,7 @@ def json_display_without_img_func(**args):
     
     Usage: 
     json_display_without_img -j json_folder -W 1920 -H 1080
-    json_display_without_img -j json_folder -o output_img_folder -d True -s True -W 1920 -H 1080 6f 30
+    json_display_without_img -j json_folder -o output_img_folder -d True -s True -W 1920 -H 1080 -f 30
     import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>', image_width=1920, image_height = 1080)
     '''
 

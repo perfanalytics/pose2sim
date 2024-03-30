@@ -18,7 +18,7 @@
 
 
 [project]
-multi_person = true # If false, only the main person in scene is analyzed. 
+multi_person = false # If false, only the main person in scene is analyzed. 
 frame_rate = 60 # fps
 frame_range = [] # For example [10,300], or [] for all frames
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
