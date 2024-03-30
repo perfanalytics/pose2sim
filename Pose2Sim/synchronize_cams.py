@@ -223,7 +223,7 @@ def find_fastest_frame(df_speed_list, speed_threshold):
                 max_speed_index = current_max_speed_index
 
     if max_speed_index is None:
-        print("!!Warning!! : No valid maximum speed found below 200. Consider adjusting the threshold or checking the data.")
+        print(f"!!Warning!! : No valid maximum speed found below {speed_threshold}. Consider adjusting the threshold or checking the data.")
         return None, None
     
     if max_speed < 10:
