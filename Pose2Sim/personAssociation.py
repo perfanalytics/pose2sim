@@ -9,15 +9,16 @@
 
 Openpose detects all people in the field of view. 
 - multi_person = false: Which is the one of interest?
-- multi_person = true: How to triangulate the same persons across views? (strongly inspired by easymocap)
-                       How to associate them across time frames?
+- multi_person = true: How to triangulate the same persons across views?
+                       How to associate them across time frames? Done in the 
+                       triangulation stage.
 
 If multi_person = false, this module tries all possible triangulations of a chosen
 anatomical point, and chooses the person for whom the reprojection error is smallest. 
 
 If multi_person = true, it computes the distance between epipolar lines (camera to 
 keypoint lines) for all persons detected in all views, and selects the best correspondences. 
-It then associates people across time frames by minimizing the displacement speed.
+The computation of the affinity matrix from the distance is inspired from the EasyMocap approach.
 
 INPUTS: 
 - a calibration file (.toml extension)
@@ -531,7 +532,7 @@ def recap_tracking(config, error=0, nb_cams_excluded=0):
     
     else:
         logging.info('\nMulti-person analysis selected.')
-        logging.info(f'\n--> A person was reconstructed if the lines from cameras to their keypoints intersected within {reconstruction_error_threshold} m and if the calculated affinity stayed below {min_affinity}.')
+        logging.info(f'\n--> A person was reconstructed if the lines from cameras to their keypoints intersected within {reconstruction_error_threshold} m and if the calculated affinity stayed below {min_affinity} after excluding points with likelihood below {likelihood_threshold_association}.')
         logging.info(f'--> Beware that people were sorted across cameras, but not across frames. This will be done in the triangulation stage.')
 
     logging.info(f'\nTracked json files are stored in {os.path.realpath(poseTracked_dir)}.')

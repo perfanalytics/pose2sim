@@ -18,7 +18,8 @@ cameras are removed than a predefined minimum, triangulation is skipped for
 the point and this frame. In the end, missing values are interpolated.
 
 In case of multiple subjects detection, make sure you first run the 
-personAssociation module.
+personAssociation module. It will then associate people across frames by 
+measuring the frame-by-frame distance between them.
 
 INPUTS: 
 - a calibration file (.toml extension)
