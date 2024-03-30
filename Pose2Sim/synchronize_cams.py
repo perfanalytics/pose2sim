@@ -148,8 +148,8 @@ def find_highest_wrist_position(df_coords, wrist_index, time, fps):
         y_col_index = wrist_index[0] * 2 + 1
         
         # Replace 0 with NaN to avoid considering them and find the index of the lowest y-coordinate value
-        min_y_coord = df.iloc[:, y_col_index].replace(0, np.nan).min()
-        min_y_index = df.iloc[:, y_col_index].replace(0, np.nan).idxmin()
+        min_y_coord = df_filtered.iloc[:, y_col_index].replace(0, np.nan).min()
+        min_y_index = df_filtered.iloc[:, y_col_index].replace(0, np.nan).idxmin()
         
         if min_y_coord <= 1: # if the wrist is too high, it is likely to be an outlier
             print("The wrist is too high. Please check the data for outliers.")
