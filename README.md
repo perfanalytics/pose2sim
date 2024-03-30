@@ -17,7 +17,7 @@
 ##### N.B:. Please set undistort_points and handle_LR_swap to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
 
 > **_News_: Version 0.7:**\
-> **Multi-person analysis is now supported!**\
+> **Multi-person analysis is now supported!** Latest version is 100 times faster that the one before, and also more robust.\
 > Team sports, combat sports, and ballroom dancing can now take advantage of Pose2Sim full potential.\
 > **Other recently added features**: Automatic batch processing, Marker augmentation, Blender visualization.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
