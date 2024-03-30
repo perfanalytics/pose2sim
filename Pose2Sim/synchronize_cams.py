@@ -201,6 +201,7 @@ def find_fastest_frame(df_speed_list):
     df_speed (DataFrame): The speed DataFrame of the reference camera.
     fps (int): The frame rate of the cameras in Hz.
     lag_time (float): The time lag in seconds.
+    speed_threshold (float): The speed threshold in pixels/second.
 
     Returns:
     int: The index of the frame with the highest speed.
@@ -210,8 +211,8 @@ def find_fastest_frame(df_speed_list):
     max_speed_index = None
 
     for speed_series in df_speed_list:
-        # Filter out speeds above 200
-        speed_series = speed_series[speed_series.abs() < 200]
+        # Filter out speeds above speed_threshold
+        speed_series = speed_series[speed_series.abs() < speed_threshold]
 
         if not speed_series.empty:
             current_max_speed = speed_series.abs().max()
@@ -347,6 +348,7 @@ def synchronize_cams_all(config_dict):
 
     # Vertical speeds (on 'Y')
     speed_kind = config_dict.get('synchronization').get('speed_kind') # this maybe fixed in the future
+    speed_threshold = config_dict.get('synchronization').get('speed_threshold') # speed threshold to filter the data
     id_kpt =  config_dict.get('synchronization').get('id_kpt') #  get the numbers from the keypoint names in skeleton.py: 'RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
     weights_kpt = config_dict.get('synchronization').get('weights_kpt') # only considered if there are multiple keypoints.
 
@@ -418,8 +420,8 @@ def synchronize_cams_all(config_dict):
 
 
         # Find the fastest speed and the frame
-        camx_max_speed_index, camx_max_speed = find_fastest_frame([camx_segment])
-        camy_max_speed_index, camy_max_speed = find_fastest_frame([camy_segment])
+        camx_max_speed_index, camx_max_speed = find_fastest_frame([camx_segment], speed_threshold)
+        camy_max_speed_index, camy_max_speed = find_fastest_frame([camy_segment], speed_threshold)
         max_speeds.append(camx_max_speed)
         max_speeds.append(camy_max_speed)
         vmax = max(max_speeds)
