@@ -29,6 +29,8 @@ import fnmatch
 import pickle as pk
 import re
 
+from Pose2Sim.filtering import loess_filter_1d
+
 
 ## AUTHORSHIP INFORMATION
 __author__ = "HunMin Kim, David Pagnon"
@@ -335,6 +337,8 @@ def synchronize_cams_all(config_dict):
     pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
     fps =  config_dict.get('project').get('frame_rate') # frame rate of the cameras (Hz)
     reset_sync = config_dict.get('synchronization').get('reset_sync')  # Start synchronization over each time it is run
+    id_kpt = 4
+    weights_kpt = 1
     filter_order = 4
     filter_cutoff = 6
     vmax = 20 # px/s
