@@ -18,7 +18,8 @@ cameras are removed than a predefined minimum, triangulation is skipped for
 the point and this frame. In the end, missing values are interpolated.
 
 In case of multiple subjects detection, make sure you first run the 
-personAssociation module.
+personAssociation module. It will then associate people across frames by 
+measuring the frame-by-frame distance between them.
 
 INPUTS: 
 - a calibration file (.toml extension)
@@ -106,6 +107,96 @@ def interpolate_zeros_nans(col, *args):
                 col_interp[seq] = np.nan
     
     return col_interp
+
+
+def min_with_single_indices(L, T):
+    '''
+    Let L be a list (size s) with T associated tuple indices (size s).
+    Select the smallest values of L, considering that 
+    the next smallest value cannot have the same numbers 
+    in the associated tuple as any of the previous ones.
+
+    Example:
+    L = [  20,   27,  51,    33,   43,   23,   37,   24,   4,   68,   84,    3  ]
+    T = list(it.product(range(2),range(3)))
+      = [(0,0),(0,1),(0,2),(0,3),(1,0),(1,1),(1,2),(1,3),(2,0),(2,1),(2,2),(2,3)]
+
+    - 1st smallest value: 3 with tuple (2,3), index 11
+    - 2nd smallest value when excluding indices (2,.) and (.,3), i.e. [(0,0),(0,1),(0,2),X,(1,0),(1,1),(1,2),X,X,X,X,X]:
+    20 with tuple (0,0), index 0
+    - 3rd smallest value when excluding [X,X,X,X,X,(1,1),(1,2),X,X,X,X,X]:
+    23 with tuple (1,1), index 5
+    
+    INPUTS:
+    - L: list (size s)
+    - T: T associated tuple indices (size s)
+
+    OUTPUTS: 
+    - minL: list of smallest values of L, considering constraints on tuple indices
+    - argminL: list of indices of smallest values of L
+    - T_minL: list of tuples associated with smallest values of L
+    '''
+
+    minL = [np.nanmin(L)]
+    argminL = [np.nanargmin(L)]
+    T_minL = [T[argminL[0]]]
+    
+    mask_tokeep = np.array([True for t in T])
+    i=0
+    while mask_tokeep.any()==True:
+        mask_tokeep = mask_tokeep & np.array([t[0]!=T_minL[i][0] and t[1]!=T_minL[i][1] for t in T])
+        if mask_tokeep.any()==True:
+            indicesL_tokeep = np.where(mask_tokeep)[0]
+            minL += [np.nanmin(np.array(L)[indicesL_tokeep]) if not np.isnan(np.array(L)[indicesL_tokeep]).all() else np.nan]
+            argminL += [indicesL_tokeep[np.nanargmin(np.array(L)[indicesL_tokeep])] if not np.isnan(minL[-1]) else indicesL_tokeep[0]]
+            T_minL += (T[argminL[i+1]],)
+            i+=1
+    
+    return np.array(minL), np.array(argminL), np.array(T_minL)
+
+
+def sort_people(Q_kpt_old, Q_kpt):
+    '''
+    Associate persons across frames
+    Persons' indices are sometimes swapped when changing frame
+    A person is associated to another in the next frame when they are at a small distance
+    
+    INPUTS:
+    - Q_kpt_old: list of arrays of 3D coordinates [X, Y, Z, 1.] for the previous frame
+    - Q_kpt: idem Q_kpt_old, for current frame
+    
+    OUTPUT:
+    - Q_kpt_new: array with reordered persons
+    - personsIDs_sorted: index of reordered persons
+    '''
+    
+    # Generate possible person correspondences across frames
+    if len(Q_kpt_old) < len(Q_kpt):
+        Q_kpt_old = np.concatenate((Q_kpt_old, [[0., 0., 0., 1.]]*(len(Q_kpt)-len(Q_kpt_old))))
+    personsIDs_comb = sorted(list(it.product(range(len(Q_kpt_old)),range(len(Q_kpt)))))
+    
+    # Compute distance between persons from one frame to another
+    frame_by_frame_dist = []
+    for comb in personsIDs_comb:
+        frame_by_frame_dist += [euclidean_distance(Q_kpt_old[comb[0]][:3],Q_kpt[comb[1]][:3])]
+        
+    # sort correspondences by distance
+    minL, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
+    # print('Distances :', minL)
+    
+    # associate 3D points to same index across frames, nan if no correspondence
+    Q_kpt_new, personsIDs_sorted = [], []
+    for i in range(len(Q_kpt_old)):
+        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+        # print('id_in_old ', i, id_in_old)
+        if len(id_in_old) > 0:
+            personsIDs_sorted += id_in_old
+            Q_kpt_new += [Q_kpt[id_in_old[0]]]
+        else:
+            personsIDs_sorted += [-1]
+            Q_kpt_new += [Q_kpt_old[i]]
+    
+    return Q_kpt_new, personsIDs_sorted, associated_tuples
 
 
 def make_trc(config, Q, keypoints_names, f_range, id_person=-1):
@@ -267,7 +358,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
         logging.info(f'In average, {mean_cam_excluded} cameras had to be excluded to reach these thresholds.')
         
         cam_excluded_count[n] = {i: v for i, v in zip(cam_names, cam_excluded_count[n].values())}
-        cam_excluded_count[n] = {i: cam_excluded_count[n][i] for i in sorted(cam_excluded_count[n].keys())}
+        cam_excluded_count[n] = {k: v for k, v in sorted(cam_excluded_count[n].items(), key=lambda item: item[1])[::-1]}
         str_cam_excluded_count = ''
         for i, (k, v) in enumerate(cam_excluded_count[n].items()):
             if i ==0:
@@ -525,7 +616,7 @@ def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped
         Q = np.array([np.nan, np.nan, np.nan])
         
     return Q, error_min, nb_cams_excluded, id_excluded_cams
-                
+
 
 def extract_files_frame_f(json_tracked_files_f, keypoints_ids, nb_persons_to_detect):
     '''
@@ -584,7 +675,7 @@ def triangulate_all(config):
     
      INPUTS: 
     - a calibration file (.toml extension)
-    - json files for each camera with only one person of interest
+    - json files for each camera with indices matching the detected persons
     - a Config.toml file
     - a skeleton model
     
@@ -655,9 +746,7 @@ def triangulate_all(config):
     # Prep triangulation
     f_range = [[0,min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
     frames_nb = f_range[1]-f_range[0]
-    
     nb_persons_to_detect = max([len(json.load(open(json_fname))['people']) for json_fname in json_tracked_files[0]])
-    
     n_cams = len(json_dirs_names)
     
     # Check that camera number is consistent between calibration file and pose folders
@@ -667,8 +756,14 @@ def triangulate_all(config):
                     and {n_cams} cameras based on the number of pose folders.')
     
     # Triangulation
+    Q = [[[np.nan]*3]*keypoints_nb for n in range(nb_persons_to_detect)]
+    Q_old = [[[np.nan]*3]*keypoints_nb for n in range(nb_persons_to_detect)]
+    error = [[] for n in range(nb_persons_to_detect)]
+    nb_cams_excluded = [[] for n in range(nb_persons_to_detect)]
+    id_excluded_cams = [[] for n in range(nb_persons_to_detect)]
     Q_tot, error_tot, nb_cams_excluded_tot,id_excluded_cams_tot = [], [], [], []
     for f in tqdm(range(frames_nb)):
+        # print(f'\nFrame {f}:')        
         # Get x,y,likelihood values from files
         json_tracked_files_f = [json_tracked_files[c][f] for c in range(n_cams)]
         # print(json_tracked_files_f)
@@ -692,12 +787,19 @@ def triangulate_all(config):
                 y_files[n][likelihood_files[n] < likelihood_threshold] = np.nan
                 likelihood_files[n][likelihood_files[n] < likelihood_threshold] = np.nan
         
+        # Q_old = Q except when it has nan, otherwise it takes the Q_old value
+        nan_mask = np.isnan(Q)
+        Q_old = np.where(nan_mask, Q_old, Q)
+        error_old, nb_cams_excluded_old, id_excluded_cams_old = error.copy(), nb_cams_excluded.copy(), id_excluded_cams.copy()
         Q = [[] for n in range(nb_persons_to_detect)]
         error = [[] for n in range(nb_persons_to_detect)]
         nb_cams_excluded = [[] for n in range(nb_persons_to_detect)]
         id_excluded_cams = [[] for n in range(nb_persons_to_detect)]
+        
         for n in range(nb_persons_to_detect):
             for keypoint_idx in keypoints_idx:
+            # keypoints_nb = 2
+            # for keypoint_idx in range(2):
             # Triangulate cameras with min reprojection error
                 # print('\n', keypoints_names[keypoint_idx])
                 coords_2D_kpt = np.array( (x_files[n][:, keypoint_idx], y_files[n][:, keypoint_idx], likelihood_files[n][:, keypoint_idx]) )
@@ -709,7 +811,31 @@ def triangulate_all(config):
                 error[n].append(error_kpt)
                 nb_cams_excluded[n].append(nb_cams_excluded_kpt)
                 id_excluded_cams[n].append(id_excluded_cams_kpt)
-            
+        
+        if multi_person:
+            # reID persons across frames by checking the distance from one frame to another
+            # print('Q before ordering ', np.array(Q)[:,:2])
+            if f !=0:
+                Q, personsIDs_sorted, associated_tuples = sort_people(Q_old, Q)
+                # print('Q after ordering ', personsIDs_sorted, associated_tuples, np.array(Q)[:,:2])
+                
+                error_sorted, nb_cams_excluded_sorted, id_excluded_cams_sorted = [], [], []
+                for i in range(len(Q)):
+                    id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+                    if len(id_in_old) > 0:
+                        personsIDs_sorted += id_in_old
+                        error_sorted += [error[id_in_old[0]]]
+                        nb_cams_excluded_sorted += [nb_cams_excluded[id_in_old[0]]]
+                        id_excluded_cams_sorted += [id_excluded_cams[id_in_old[0]]]
+                    else:
+                        personsIDs_sorted += [-1]
+                        error_sorted += [error[i]]
+                        nb_cams_excluded_sorted += [nb_cams_excluded[i]]
+                        id_excluded_cams_sorted += [id_excluded_cams[i]]
+                error, nb_cams_excluded, id_excluded_cams = error_sorted, nb_cams_excluded_sorted, id_excluded_cams_sorted
+        
+        # TODO: if distance > threshold, new person
+        
         # Add triangulated points, errors and excluded cameras to pandas dataframes
         Q_tot.append([np.concatenate(Q[n]) for n in range(nb_persons_to_detect)])
         error_tot.append([error[n] for n in range(nb_persons_to_detect)])
@@ -717,6 +843,13 @@ def triangulate_all(config):
         id_excluded_cams = [[id_excluded_cams[n][k] for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
         id_excluded_cams_tot.append(id_excluded_cams)
             
+    # fill values for if a person that was not initially detected has entered the frame 
+    Q_tot = [list(tpl) for tpl in zip(*it.zip_longest(*Q_tot, fillvalue=[np.nan]*keypoints_nb*3))]
+    error_tot = [list(tpl) for tpl in zip(*it.zip_longest(*error_tot, fillvalue=[np.nan]*keypoints_nb*3))]
+    nb_cams_excluded_tot = [list(tpl) for tpl in zip(*it.zip_longest(*nb_cams_excluded_tot, fillvalue=[np.nan]*keypoints_nb*3))]
+    id_excluded_cams_tot = [list(tpl) for tpl in zip(*it.zip_longest(*id_excluded_cams_tot, fillvalue=[np.nan]*keypoints_nb*3))]
+
+    # dataframes for each person
     Q_tot = [pd.DataFrame([Q_tot[f][n] for f in range(frames_nb)]) for n in range(nb_persons_to_detect)]
     error_tot = [pd.DataFrame([error_tot[f][n] for f in range(frames_nb)]) for n in range(nb_persons_to_detect)]
     nb_cams_excluded_tot = [pd.DataFrame([nb_cams_excluded_tot[f][n] for f in range(frames_nb)]) for n in range(nb_persons_to_detect)]

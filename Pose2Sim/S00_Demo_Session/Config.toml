@@ -18,9 +18,8 @@
 
 
 [project]
-# multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
-nb_persons_to_detect = 2 # checked only if multi_person is selected
-frame_rate = 120 # fps
+multi_person = false # If false, only the main person in scene is analyzed. 
+frame_rate = 60 # fps
 frame_range = [] # For example [10,300], or [] for all frames
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
@@ -29,6 +28,26 @@ frame_range = [] # For example [10,300], or [] for all frames
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 # Take heart, calibration is not that complicated once you get the hang of it!
+
+
+[pose]
+pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
+pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
+						      #With mediapipe: BLAZEPOSE. 
+						      #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
+						      #With deeplabcut: CUSTOM. See example at the end of the file.
+# What follows has not been implemented yet
+overwrite_pose = false
+openpose_path = '' # only checked if OpenPose is used
+
+
+[synchronization]
+display_corr = true # true or false (lowercase)
+reset_sync = true # Recalculate synchronization even if already done
+# id_kpt = [10] # keypoint ID, to be found in skeleton.py. Example RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
+# weights_kpt = [1] # Only taken into account if you have several keypoints (Currently only one keypoint is supported).
+sync_frame_range = [] # For example [0,150], or [] for all frames (default)
+      # limit synchronization search (to the beginning or to the end of the capture for example)
 
 
 [calibration]
@@ -90,30 +109,17 @@ calibration_type = 'convert' # 'convert' or 'calculate'
          # Coming soon!
 
 
-[pose]
-pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
-pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
-						      #With mediapipe: BLAZEPOSE. 
-						      #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
-						      #With deeplabcut: CUSTOM. See example at the end of the file.
-# What follows has not been implemented yet
-overwrite_pose = false
-openpose_path = '' # only checked if OpenPose is used
-
-
-[synchronization]
-# COMING SOON! 
-reset_sync = true # Recalculate synchronization even if already done
-speed_kind = 'y' # 'y' showed best performance.
-id_kpt = [10] # number from keypoint name in skeleton.py. RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
-weights_kpt = [1] # Only taken into account if you have several keypoints (Currently only one keypoint is supported).
-
-
 [personAssociation]
-tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
-# and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
-reproj_error_threshold_association = 20 # px
-likelihood_threshold_association = 0.3
+   likelihood_threshold_association = 0.3
+
+   [personAssociation.single_person]
+   reproj_error_threshold_association = 20 # px
+   tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
+               # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
+   
+   [personAssociation.multi_person]
+   reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
+   min_affinity = 0.2 # affinity below which a correspondence is ignored
 
 
 [triangulation]

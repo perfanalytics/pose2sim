@@ -114,10 +114,10 @@ def interpolate_nans(col, kind):
 
 def plot_time_lagged_cross_corr(camx, camy, ax):
     pearson_r = [camx.corr(camy.shift(lag)) for lag in range(-2*fps, 2*fps)] # lag -2 sec à +2 sec
-    offset = int(np.floor(len(pearson_r)*2)-np.argmax(pearson_r))
+    offset = int(np.floor(len(pearson_r)/2)-np.argmax(pearson_r))
     max_corr = np.max(pearson_r)
     ax.plot(list(range(-2*fps, 2*fps)), pearson_r)
-    ax.axvline(np.ceil(len(pearson_r)*2)-2*fps,color='k',linestyle='--')
+    ax.axvline(np.ceil(len(pearson_r)/2)-2*fps,color='k',linestyle='--')
     ax.axvline(np.argmax(pearson_r)-2*fps,color='r',linestyle='--',label='Peak synchrony')
     plt.annotate(f'Max correlation={np.round(max_corr,2)}', xy=(0.05, 0.9), xycoords='axes fraction')
     ax.set(title=f'Offset = {offset} frames', xlabel='Offset (frames)',ylabel='Pearson r')
@@ -154,7 +154,6 @@ with open(os.path.join(pose_dir, 'coords'), 'wb') as fp:
 #############################
 # 1. COMPUTING SPEEDS       #
 #############################
-
 
 
 # Vitesse verticale    
@@ -197,6 +196,41 @@ elif len(id_kpt)==1 and len(id_kpt)==len(weights_kpt): # ex id_kpt1=9 set to 10,
     camy = camy.loc[range(np.array(frames))]
 else:
     raise ValueError('wrong values for id_kpt or weights_kpt')
+
+
+
+# camx = df_speed[1][16]
+# camy = df_speed[2][16]
+# camx = df_speed[1][10]
+# camy = df_speed[2][10]
+# camx = df_speed[1].sum(axis=1)
+# camy = df_speed[2].sum(axis=1)
+# camx.plot()
+# camy.plot()
+# plt.show()
+
+for i in range(25):
+    df_coords[1].iloc[:,i*2+1].plot(label='1')
+    df_coords[2].iloc[:,i*2+1].plot(label='2')
+    plt.title(i)
+    plt.legend()
+    plt.show()
+
+for i in range(25):
+    df_speed[1].iloc[:,i].plot(label='1')
+    df_speed[2].iloc[:,i].plot(label='2')
+    plt.title(i)
+    plt.legend()
+    plt.show()
+
+for i in range(4):
+    abs(df_speed[i]).sum(axis=1).plot(label=i)
+plt.legend()
+plt.show()
+
+df_speed[0].plot()  # --> remove janky points
+plt.show()
+
 
 
 f, ax = plt.subplots(2,1)
