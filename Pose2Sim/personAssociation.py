@@ -92,6 +92,60 @@ def persons_combinations(json_files_framef):
     return personsIDs_comb
 
 
+def triangulate_comb(comb, coords, P_all, calib_params, config):
+    '''
+    Triangulate 2D points and compute reprojection error for a combination of cameras.
+    INPUTS:
+    - comb: list of ints: combination of persons' ids for each camera
+    - coords: array: x, y, likelihood for each camera
+    - P_all: list of arrays: projection matrices for each camera
+    - calib_params: dict: calibration parameters
+    - config: dictionary from Config.toml file
+    OUTPUTS:
+    - error_comb: float: reprojection error
+    - comb: list of ints: combination of persons' ids for each camera
+    - Q_comb: array: 3D coordinates of the triangulated point
+    ''' 
+
+    undistort_points = config.get('triangulation').get('undistort_points')
+    likelihood_threshold = config.get('personAssociation').get('likelihood_threshold_association')
+
+    # Replace likelihood by 0. if under likelihood_threshold
+    coords[:,2][coords[:,2] < likelihood_threshold] = 0.
+    comb[coords[:,2] == 0.] = np.nan
+
+    # Filter coords and projection_matrices containing nans
+    coords_filt = [coords[i] for i in range(len(comb)) if not np.isnan(comb[i])]
+    projection_matrices_filt = [P_all[i] for i in range(len(comb)) if not np.isnan(comb[i])]
+    if undistort_points:
+        calib_params_R_filt = [calib_params['R'][i] for i in range(len(comb)) if not np.isnan(comb[i])]
+        calib_params_T_filt = [calib_params['T'][i] for i in range(len(comb)) if not np.isnan(comb[i])]
+        calib_params_K_filt = [calib_params['K'][i] for i in range(len(comb)) if not np.isnan(comb[i])]
+        calib_params_dist_filt = [calib_params['dist'][i] for i in range(len(comb)) if not np.isnan(comb[i])]
+
+    # Triangulate 2D points
+    x_files_filt, y_files_filt, likelihood_files_filt = np.array(coords_filt).T
+    Q_comb = weighted_triangulation(projection_matrices_filt, x_files_filt, y_files_filt, likelihood_files_filt)
+
+    # Reprojection
+    if undistort_points:
+        coords_2D_kpt_calc_filt = [cv2.projectPoints(np.array(Q_comb[:-1]), calib_params_R_filt[i], calib_params_T_filt[i], calib_params_K_filt[i], calib_params_dist_filt[i])[0] for i in range(len(Q_comb))]
+        x_calc = [coords_2D_kpt_calc_filt[i][0,0,0] for i in range(len(Q_comb))]
+        y_calc = [coords_2D_kpt_calc_filt[i][0,0,1] for i in range(len(Q_comb))]
+    else:
+        x_calc, y_calc = reprojection(projection_matrices_filt, Q_comb)
+
+    # Reprojection error
+    error_comb_per_cam = []
+    for cam in range(len(x_calc)):
+        q_file = (x_files_filt[cam], y_files_filt[cam])
+        q_calc = (x_calc[cam], y_calc[cam])
+        error_comb_per_cam.append( euclidean_distance(q_file, q_calc) )
+    error_comb = np.mean(error_comb_per_cam)
+
+    return error_comb, comb, Q_comb
+
+
 def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_combinations, projection_matrices, tracked_keypoint_id, calib_params):
     '''
     Chooses the right person among the multiple ones found by
