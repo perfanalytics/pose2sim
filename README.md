@@ -17,7 +17,7 @@
 ##### N.B:. Please set undistort_points and handle_LR_swap to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
 
 > **_News_: Version 0.7:**\
-> **Multi-person analysis is now supported!** Latest version is 100 times faster that the one before, and also more robust.\
+> **Multi-person analysis is now supported!** Latest version is much faster and more robust.\
 > Team sports, combat sports, and ballroom dancing can now take advantage of Pose2Sim full potential.\
 > **Other recently added features**: Automatic batch processing, Marker augmentation, Blender visualization.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
@@ -436,13 +436,8 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 ### Associate persons across cameras
 
 > _**If `multi_person` is set to `false`, the algorithm chooses the person for whom the reprojection error is smallest.\
-  If `multi_person` is set to `true`, it selects all persons with a reprojection error smaller than a threshold, and then associates them across time frames by minimizing the displacement speed.**_ \
+  If `multi_person` is set to `true`, it associates across views the people for whom the distances between epipolar lines are the smallest. People are then associated across frames according to their displacement speed.**_ \
 ***N.B.:** Skip this step if only one person is in the field of view.*
-
-> ***N.B.:** The **multi-person** algorithm is not very efficient for now. I will try to improve it in the future, but if you are not satisfied with it, you can use [EasyMocap](https://github.com/zju3dv/EasyMocap?tab=readme-ov-file) for that stage.*
-> - [calib_toml_to_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_easymocap.py): Convert your Pose2Sim calibration file to the EasyMocap format
-> - Run EasyMocap
-> - [trc_from_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_easymocap.py): Convert EasyMocap results to .trc
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
 Type `ipython`.
@@ -460,8 +455,8 @@ Output:\
 
 ### Triangulating keypoints
 > _**Triangulate your 2D coordinates in a robust way.**_ \
-> The triangulation is weighted by the likelihood of each detected 2D keypoint, provided that they meet a likelihood threshold.\
-  If the reprojection error is above a threshold, right and left sides are swapped; if it is still above, cameras are removed until the threshold is met. If more cameras are removed than threshold, triangulation is skipped for this point and this frame. In the end, missing values are interpolated.
+> The triangulation is weighted by the likelihood of each detected 2D keypoint, provided that they this likelihood is above a threshold.\
+  If the reprojection error is above another threshold, right and left sides are swapped; if it is still above, cameras are removed until the threshold is met. If more cameras are removed than a predefined number, triangulation is skipped for this point and this frame. In the end, missing values are interpolated.
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
 Type `ipython`.
