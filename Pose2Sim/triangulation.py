@@ -241,6 +241,7 @@ def make_trc(config, Q, keypoints_names, f_range, id_person=-1):
     #Add Frame# and Time columns
     Q.index = np.array(range(0, f_range[1]-f_range[0])) + 1
     Q.insert(0, 't', Q.index / frame_rate)
+    # Q = Q.fillna(' ')
 
     #Write file
     if not os.path.exists(pose3d_dir): os.mkdir(pose3d_dir)
