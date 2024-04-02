@@ -79,9 +79,18 @@ def augmentTRC(config_dict):
     offset = True
 
     # Apply all trc files
-    trc_files = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if 'filt' in f and '_LSTM' not in f]
-    if len(trc_files) == 0:
-        raise ValueError('No filtered trc files found.')
+    all_trc_files = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if '_LSTM' not in f]
+    trc_no_filtering = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if
+                        '_LSTM' not in f and 'filt' not in f]
+    trc_filtering = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if '_LSTM' not in f and 'filt' in f]
+
+    if len(all_trc_files) == 0:
+        raise ValueError('No trc files found.')
+    if len(trc_filtering) > 0:
+        trc_files = trc_filtering
+    else:
+        trc_files = trc_no_filtering
+
     for p, pathInputTRCFile in enumerate(trc_files):
         pathOutputTRCFile = os.path.splitext(pathInputTRCFile)[0] + '_LSTM.trc'
     
