@@ -718,7 +718,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             # H_cam = np.block([[r_mat,t.reshape(3,1)], [np.zeros(3), 1 ]])
             # P_cam = Kh_cam @ H_cam
             # proj_obj = [ ( P_cam[0] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)),  P_cam[1] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)) ) for o in objp]
-            proj_obj = np.squeeze(cv2.projectPoints(objp,r,t,mtx,dist)[0])
+            proj_obj = np.squeeze(cv2.projectPoints(np.array(objp),r,t,mtx,dist)[0])
 
             # Check calibration results
             if show_reprojection_error:
@@ -966,85 +966,123 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
         Detect click position on image
         If right click, last point is removed
         '''
-        
-        global imgp_confirmed, objp_confirmed, objp_confirmed_notok, scat, ax_3d, fig_3d, events, count, xydata
-        
-        # Left click: Add clicked point to imgp_confirmed
-        # Display it on image and on 3D plot
-        if event.button == 1: 
-            # To remember the event to cancel after right click
-            if 'events' in globals():
-                events.append(event)
-            else:
-                events = [event]
 
-            # Add clicked point to image
-            xydata = scat.get_offsets()
-            new_xydata = np.concatenate((xydata,[[event.xdata,event.ydata]]))
-            scat.set_offsets(new_xydata)
-            imgp_confirmed = np.expand_dims(scat.get_offsets(), axis=1)    
-            plt.draw()
+        global imgp_confirmed, objp_confirmed, objp_confirmed_notok, scat, ax_3d, fig_3d, events, count, xydata, in_prompt
+        # To avoid to much click during the prompt
+        in_prompt_not_exist = "in_prompt" not in globals()
 
-            # Add clicked point to 3D object points if given
-            if len(objp) != 0:
-                count = [0 if 'count' not in globals() else count+1][0]
-                if count==0:
-                    # retrieve objp_confirmed and plot 3D
-                    objp_confirmed = [objp[count]]
-                    ax_3d.scatter(*objp[count], marker='o', color='g')
-                    fig_3d.canvas.draw()
-                elif count == len(objp)-1:
-                    # close all
-                    plt.close('all')
-                    # retrieve objp_confirmed
-                    objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])
-                    imgp_confirmed = np.array(imgp_confirmed, np.float32)
-                    # delete all
-                    for var_to_delete in ['events', 'count', 'scat', 'scat_3d', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
-                        if var_to_delete in globals():
-                            del globals()[var_to_delete]
+        if in_prompt_not_exist or not in_prompt:
+            # Left click: Add clicked point to imgp_confirmed
+            # Display it on image and on 3D plot
+            if event.button == 1:
+                # To remember the event to cancel after right click
+                if 'events' in globals():
+                    events.append(event)
                 else:
-                    # retrieve objp_confirmed and plot 3D
-                    objp_confirmed = [[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0]
-                    ax_3d.scatter(*objp[count], marker='o', color='g')
-                    fig_3d.canvas.draw()
-                
+                    events = [event]
 
-        # Right click: 
-        # If last event was left click, remove last point and if objp given, from objp_confirmed
-        # If last event was 'H' and objp given, remove last point from objp_confirmed_notok
-        elif event.button == 3: # right click
-            if 'events' in globals():
-                # If last event was left click: 
-                if 'button' in dir(events[-1]):
-                    if events[-1].button == 1: 
-                        # Remove lastpoint from image
-                        new_xydata = scat.get_offsets()[:-1]
-                        scat.set_offsets(new_xydata)
-                        plt.draw()
-                        # Remove last point from imgp_confirmed
-                        imgp_confirmed = imgp_confirmed[:-1]
+                # Add clicked point to image
+                xydata = scat.get_offsets()
+                new_xydata = np.concatenate((xydata, [[event.xdata, event.ydata]]))
+                scat.set_offsets(new_xydata)
+                imgp_confirmed = np.expand_dims(scat.get_offsets(), axis=1)
+                plt.draw()
+
+                # Add clicked point to 3D object points if given
+                if len(objp) != 0:
+                    count = [0 if 'count' not in globals() else count + 1][0]
+                    if count == 0:
+                        # retrieve objp_confirmed and plot 3D
+                        objp_confirmed = [objp[count]]
+                        ax_3d.scatter(*objp[count], marker='o', color='g')
+                        fig_3d.canvas.draw()
+                        print(count)
+                    elif count == len(objp) - 1:
+                        in_prompt = True
+                        objp_confirmed = \
+                            [[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed + [objp[count]]][0]
+                        ax_3d.scatter(*objp[count], marker='o', color='g')
+                        fig_3d.canvas.draw()
+                        msg_box = tkinter.messagebox.askquestion(
+                            "Validate Calibration", "Are you satisfied with point positioning ? ", icon="warning"
+                        )
+                        if msg_box.lower() == "yes":
+                            # close all
+                            plt.close('all')
+                            # retrieve objp_confirmed
+                            # objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])
+                            imgp_confirmed = np.array(imgp_confirmed, np.float32)
+                            # delete all
+                            in_prompt = False
+                            for var_to_delete in ['events', 'count', 'scat', 'scat_3d', 'fig_3d', 'ax_3d',
+                                                  'objp_confirmed_notok']:
+                                if var_to_delete in globals():
+                                    del globals()[var_to_delete]
+                        elif msg_box.lower() == "no":
+                            in_prompt = False
+                            # If last event was left click:
+                            if 'button' in dir(events[-1]):
+                                if events[-1].button == 1:
+                                    # Remove lastpoint from image
+                                    new_xydata = scat.get_offsets()[:-1]
+                                    scat.set_offsets(new_xydata)
+                                    plt.draw()
+                                    # Remove last point from imgp_confirmed
+                                    imgp_confirmed = imgp_confirmed[:-1]
+                                    if len(objp) != 0:
+                                        if count >= 0:
+                                            count -= 1
+                                        # Remove last point from objp_confirmed
+                                        objp_confirmed = objp_confirmed[:-1]
+                                        # remove from plot
+                                        if len(ax_3d.collections) > len(objp):
+                                            ax_3d.collections[-1].remove()
+                                            fig_3d.canvas.draw()
+
+                    else:
+                        # retrieve objp_confirmed and plot 3D
+                        objp_confirmed = \
+                        [[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed + [objp[count]]][0]
+                        ax_3d.scatter(*objp[count], marker='o', color='g')
+                        fig_3d.canvas.draw()
+                        print(count)
+
+
+            # Right click:
+            # If last event was left click, remove last point and if objp given, from objp_confirmed
+            # If last event was 'H' and objp given, remove last point from objp_confirmed_notok
+            elif event.button == 3:  # right click
+                if 'events' in globals():
+                    # If last event was left click:
+                    if 'button' in dir(events[-1]):
+                        if events[-1].button == 1:
+                            # Remove lastpoint from image
+                            new_xydata = scat.get_offsets()[:-1]
+                            scat.set_offsets(new_xydata)
+                            plt.draw()
+                            # Remove last point from imgp_confirmed
+                            imgp_confirmed = imgp_confirmed[:-1]
+                            if len(objp) != 0:
+                                if count >= 0:
+                                    count -= 1
+                                # Remove last point from objp_confirmed
+                                objp_confirmed = objp_confirmed[:-1]
+                                # remove from plot
+                                if len(ax_3d.collections) > len(objp):
+                                    ax_3d.collections[-1].remove()
+                                    fig_3d.canvas.draw()
+
+                    # If last event was 'h' key
+                    elif events[-1].key == 'h':
                         if len(objp) != 0:
-                            if count >= 0: 
-                                count -= 1
-                            # Remove last point from objp_confirmed
-                            objp_confirmed = objp_confirmed[:-1]
-                            # remove from plot 
+                            if count >= 1: count -= 1
+                            # Remove last point from objp_confirmed_notok
+                            objp_confirmed_notok = objp_confirmed_notok[:-1]
+                            # remove from plot
                             if len(ax_3d.collections) > len(objp):
                                 ax_3d.collections[-1].remove()
                                 fig_3d.canvas.draw()
-                            
-                # If last event was 'h' key
-                elif events[-1].key == 'h':
-                    if len(objp) != 0:
-                        if count >= 1: count -= 1
-                        # Remove last point from objp_confirmed_notok
-                        objp_confirmed_notok = objp_confirmed_notok[:-1]
-                        # remove from plot  
-                        if len(ax_3d.collections) > len(objp):
-                            ax_3d.collections[-1].remove()
-                            fig_3d.canvas.draw()                
-    
+
 
     def set_axes_equal(ax):
         '''
