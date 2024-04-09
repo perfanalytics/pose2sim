@@ -50,6 +50,7 @@ from mpl_interactions import zoom_factory, panhandler
 from PIL import Image
 from contextlib import contextmanager,redirect_stderr,redirect_stdout
 from os import devnull
+import tkinter
 
 
 ## AUTHORSHIP INFORMATION
