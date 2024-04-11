@@ -197,7 +197,14 @@ elif len(id_kpt)==1 and len(id_kpt)==len(weights_kpt): # ex id_kpt1=9 set to 10,
 else:
     raise ValueError('wrong values for id_kpt or weights_kpt')
 
-
+# for i in range(25):
+#     df_coords[0].iloc[:,i*2+1].plot(label='0')
+#     df_coords[1].iloc[:,i*2+1].plot(label='1')
+#     df_coords[2].iloc[:,i*2+1].plot(label='2')
+#     df_coords[3].iloc[:,i*2+1].plot(label='3')
+#     plt.title(i)
+#     plt.legend()
+#     plt.show()
 
 # camx = df_speed[1][16]
 # camy = df_speed[2][16]
@@ -235,6 +242,9 @@ plt.show()
 
 
     # # Refine synchronization offset
+    # vmax = 4 # px/s # in average for each keypoint
+    # corr_threshold = 0.8
+    # top_N_corr = 10
     # offset = []
     # for cam_id in cam_list:
     #     coords_nb = int(len(df_coords[cam_id].columns)/2)

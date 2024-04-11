@@ -13,7 +13,7 @@
     - recap
     - whole sequence or around approx time (if long)
     - somehow fix demo (offset 0 frames when 0 frames offset, right now [0,-2,-2]) -> min_conf = 0.4 (check problem with 0.0)
-
+    - switch to other person if jump in json_data, [0,0,0] if no person without jump
 
 
 
@@ -38,6 +38,9 @@ import os
 import fnmatch
 import pickle as pk
 import re
+from anytree import RenderTree
+from anytree.importer import DictImporter
+from Pose2Sim.skeletons import *
 
 
 ## AUTHORSHIP INFORMATION
@@ -52,13 +55,29 @@ __status__ = "Development"
 
 
 # FUNCTIONS
-def convert_json2pandas(json_dir, min_conf=0.6):
+def sort_stringlist_by_last_number(string_list):
+    '''
+    Sort a list of strings based on the last number in the string.
+    Works if other numbers in the string, if strings after number. Ignores alphabetical order.
+
+    Example: ['json1', 'js4on2.b', 'eypoints_0000003.json', 'ajson0', 'json10']
+    gives: ['ajson0', 'json1', 'js4on2.b', 'eypoints_0000003.json', 'json10']
+    '''
+    
+    def sort_by_last_number(s):
+        return int(re.findall(r'\d+', s)[-1])
+    
+    return sorted(string_list, key=sort_by_last_number)
+
+
+def convert_json2pandas(json_dir, min_conf=0.6, frame_range=[]):
     '''
     Convert JSON files in a directory to a pandas DataFrame.
 
     INPUTS:
     - json_dir: str. The directory path containing the JSON files.
     - min_conf: float. Drop values if confidence is below min_conf.
+    - frame_range: select files within frame_range.
 
     OUTPUT:
     - df_json_coords: dataframe. Extracted coordinates in a pandas dataframe.
@@ -67,6 +86,8 @@ def convert_json2pandas(json_dir, min_conf=0.6):
     nb_coord = 25 # int(len(json_data)/3)
     json_files_names = fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json') # modified ( 'json' to '*.json' )
     json_files_names = sort_stringlist_by_last_number(json_files_names)
+    if len(frame_range) == 2:
+        json_files_names = np.array(json_files_names)[range(frame_range[0], frame_range[1])].tolist()
     json_files_path = [os.path.join(json_dir, j_f) for j_f in json_files_names]
     json_coords = []
 
@@ -78,7 +99,7 @@ def convert_json2pandas(json_dir, min_conf=0.6):
                 json_data = np.array([[json_data[3*i],json_data[3*i+1],json_data[3*i+2]] if json_data[3*i+2]>min_conf else [0.,0.,0.] for i in range(nb_coord)]).ravel().tolist()
             except:
                 # print(f'No person found in {os.path.basename(json_dir)}, frame {i}')
-                json_data = [0] * 25*3
+                json_data = [np.nan] * 25*3
         json_coords.append(json_data)
     df_json_coords = pd.DataFrame(json_coords)
 
@@ -150,7 +171,10 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True):
     '''
     '''
 
-    pearson_r = [camx.corr(camy.shift(lag)) for lag in range(-lag_range, lag_range)]
+    if isinstance(lag_range, int):
+        lag_range = [-lag_range, lag_range]
+
+    pearson_r = [camx.corr(camy.shift(lag)) for lag in range(lag_range[0], lag_range[1])]
     offset = int(np.floor(len(pearson_r)/2)-np.argmax(pearson_r))
     if not np.isnan(pearson_r).all():
         max_corr = np.nanmax(pearson_r)
@@ -163,9 +187,9 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True):
             ax[0].set(xlabel='Frame', ylabel='Speed (px/frame)')
             ax[0].legend()
             # time lagged cross-correlation
-            ax[1].plot(list(range(-lag_range, lag_range)), pearson_r)
-            ax[1].axvline(np.ceil(len(pearson_r)/2) - lag_range,color='k',linestyle='--')
-            ax[1].axvline(np.argmax(pearson_r) - lag_range,color='r',linestyle='--',label='Peak synchrony')
+            ax[1].plot(list(range(lag_range[0], lag_range[1])), pearson_r)
+            ax[1].axvline(np.ceil(len(pearson_r)/2) + lag_range[0],color='k',linestyle='--')
+            ax[1].axvline(np.argmax(pearson_r) + lag_range[0],color='r',linestyle='--',label='Peak synchrony')
             plt.annotate(f'Max correlation={np.round(max_corr,2)}', xy=(0.05, 0.9), xycoords='axes fraction')
             ax[1].set(title=f'Offset = {offset} frames', xlabel='Offset (frames)',ylabel='Pearson r')
             
@@ -179,148 +203,6 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True):
             # print('No good values to interpolate')
             pass
 
-    return offset, max_corr
-
-
-def find_highest_wrist_position(df_coords, wrist_index):
-    '''
-    Find the frame with the highest wrist position in a list of coordinate DataFrames.
-    Highest wrist position frame use for finding the fastest frame.
-    
-    INPUT:
-    - df_coords (list): List of coordinate DataFrames.
-    - wrist_index (int): The index of the wrist in the keypoint list.
-    
-    OUTPUT:
-    - list: The index of the frame with the highest wrist position.
-    '''
-
-    start_frames = []
-    min_y_coords = []
-    for df in df_coords:
-        # Wrist y-coordinate column index (2n where n is the keypoint index)
-        # Assuming wrist_index is a list and we want to use the first element
-        y_col_index = wrist_index[0] * 2 + 1
-        
-        # Replace 0 with NaN to avoid considering them and find the index of the lowest y-coordinate value
-        min_y_coord = df.iloc[:, y_col_index].replace(0, np.nan).min()
-        min_y_index = df.iloc[:, y_col_index].replace(0, np.nan).idxmin()
-        if min_y_coord <= 100: # if the wrist is too high, it is likely to be an outlier
-            print("The wrist is too high. Please check the data for outliers.")
-
-        start_frames.append(min_y_index)
-        min_y_coords.append(min_y_coord)
-
-    return start_frames, min_y_coords
-
-
-def find_motion_end(df_coords, wrist_index, start_frame, lowest_y, fps):
-    '''
-    Find the frame where hands down movement ends.
-    Hands down movement is defined as the time when the wrist moves down from the highest position.
-
-    INPUT:
-    - df_coord (DataFrame): The coordinate DataFrame of the reference camera.
-    - wrist_index (int): The index of the wrist in the keypoint list.
-    - start_frame (int): The frame where the hands down movement starts.
-    - fps (int): The frame rate of the cameras in Hz.
-
-    OUTPUT:
-    - int: The index of the frame where hands down movement ends.
-    '''
-
-    y_col_index = wrist_index * 2 + 1
-    wrist_y_values = df_coords.iloc[:, y_col_index].values # wrist y-coordinates
-    highest_y_value = lowest_y
-    highest_y_index = start_frame
-
-    # Find the highest y-coordinate value and its index
-    for i in range(highest_y_index + 1, len(wrist_y_values)):
-        if wrist_y_values[i] - highest_y_value >= 50:
-            start_increase_index = i
-            break
-    else:
-        raise ValueError("The wrist does not move down.")
-    
-    start = start_increase_index - start_frame
-    time = (start + fps) / fps
-
-    return time
-
-
-def find_fastest_frame(df_speed_list):
-    '''
-    Find the frame with the highest speed in a list of speed DataFrames.
-    Fastest frame should locate in after highest wrist position frame.
-    
-    INPUT:
-    - df_speed_list (list): List of speed DataFrames.
-    - df_speed (DataFrame): The speed DataFrame of the reference camera.
-    - fps (int): The frame rate of the cameras in Hz.
-    - lag_time (float): The time lag in seconds.
-
-    OUTPUT:
-    - int: The index of the frame with the highest speed.
-    '''
-
-    for speed_series in df_speed_list:
-        max_speed = speed_series.abs().max()
-        max_speed_index = speed_series.abs().idxmax()
-    
-    if max_speed < 10:
-        print(" !!Warning!! : The maximum speed is likely to be not representative of the actual movement. Consider increasing the time parameter in Config.toml.")
-    return max_speed_index, max_speed
-
-
-def plot_time_lagged_cross_corr(camx, camy, ax, fps, lag_time):
-    '''
-    Calculate and plot the max correlation between two cameras with a time lag.
-    How it works:
-     1. Reference camera is camx and the other is camy. (Reference camera should record last. If not, the offset will be positive.)
-     2. The initial shift alppied to camy to match camx is calculated.
-     3. Additionally shift camy by max_lag frames to find the max correlation.
-    
-    INPUT:
-    - camx: pd.Series. Speed series of the reference camera.
-    - camy: pd.Series). Speed series of the other camera.
-    - ax: plt.axis. Plot correlation on second axis.
-    - fps: int. Framerate of the cameras in Hz.
-    - lag_time: float. Time lag in seconds.
-
-    OUTPUT:
-    - offset: int. Offset value to apply to synchronize the cameras.
-    - max_corr: float. Maximum correlation value.
-    '''
-
-    max_lag = int(fps * lag_time)
-    pearson_r = []
-    lags = range(-max_lag, 1)
-    
-    for lag in lags:
-        if lag < 0:
-            shifted_camy = camy.shift(lag).dropna() # shift the camy segment by lag
-            corr = camx.corr(shifted_camy) # calculate the correlation between the camx segment and the shifted camy segment
-        elif lag == 0:
-            corr = camx.corr(camy)
-        else:
-            continue 
-        pearson_r.append(corr)
-
-
-   # Handle NaN values in pearson_r and find the max correlation ignoring NaNs
-    pearson_r = np.array(pearson_r)
-    max_corr = np.nanmax(pearson_r)  # Use nanmax to ignore NaNs
-    offset = np.nanargmax(pearson_r) - max_lag  # Use nanargmax to find the index of the max correlation ignoring NaNs
-    # real_offset = offset + initial_shift
-    
-    # visualize
-    ax.plot(lags, pearson_r)
-    ax.axvline(offset, color='r', linestyle='--', label='Peak synchrony')
-    plt.annotate(f'Max correlation={np.round(max_corr,2)}', xy=(0.05, 0.9), xycoords='axes fraction')
-    # ax.set(title=f'Offset = {offset}{initial_shift} = {real_offset} frames', xlabel='Offset (frames)', ylabel='Pearson r')
-    ax.set(title=f'Offset = {offset} frames', xlabel='Offset (frames)', ylabel='Pearson r')
-    plt.legend()
-    
     return offset, max_corr
 
 
@@ -360,63 +242,84 @@ def apply_offset(offset, json_dirs, reset_sync, cam1_nb, cam2_nb):
                 os.rename(os.path.join(json_dir_to_offset, json_files[i]), os.path.join(json_dir_to_offset, json_files[i] + '.del'))
 
 
-def sort_stringlist_by_last_number(string_list):
-    '''
-    Sort a list of strings based on the last number in the string.
-    Works if other numbers in the string, if strings after number. Ignores alphabetical order.
-
-    Example: ['json1', 'js4on2.b', 'eypoints_0000003.json', 'ajson0', 'json10']
-    gives: ['ajson0', 'json1', 'js4on2.b', 'eypoints_0000003.json', 'json10']
-    '''
-    
-    def sort_by_last_number(s):
-        return int(re.findall(r'\d+', s)[-1])
-    
-    return sorted(string_list, key=sort_by_last_number)
-
 
 def synchronize_cams_all(config_dict):
     '''
     
     '''
     
-    # get parameters from Config.toml
+    # Get parameters from Config.toml
     project_dir = config_dict.get('project').get('project_dir')
     pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
+    pose_model = config_dict.get('pose').get('pose_model')
     fps =  config_dict.get('project').get('frame_rate')
     reset_sync = config_dict.get('synchronization').get('reset_sync') 
+    keypoints_to_consider = config_dict.get('synchronization').get('keypoints_to_consider')
     approx_time_maxspeed = config_dict.get('synchronization').get('approx_time_maxspeed') 
+
+    lag_range = 500 # frames
     min_conf = 0.4
     filter_order = 4
     filter_cutoff = 6
-    # vmax = 4 # px/s # in average for each keypoint -> vmax sum = 100 px/s
-    # corr_threshold = 0.8
-    # top_N_corr = 10
+
+    # Retrieve keypoints from model
+    try: # from skeletons.py
+        model = eval(pose_model)
+    except:
+        try: # from Config.toml
+            model = DictImporter().import_(config_dict.get('pose').get(pose_model))
+            if model.id == 'None':
+                model.id = None
+        except:
+            raise NameError('Model not found in skeletons.py nor in Config.toml')
+    keypoints_ids = [node.id for _, _, node in RenderTree(model) if node.id!=None]
+    keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
 
     # List json files
     pose_listdirs_names = next(os.walk(pose_dir))[1]
     pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     json_dirs = [os.path.join(pose_dir, j_d) for j_d in json_dirs_names] # list of json directories in pose_dir
+    nb_frames_per_cam = [len(fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json')) for json_dir in json_dirs]
     cam_nb = len(json_dirs)
+    cam_list = list(range(cam_nb))
+
+    # Determine frames to consider for synchronization
+    if isinstance(approx_time_maxspeed, list): # search around max speed
+        approx_frame_maxspeed = [int(fps * t) for t in approx_time_maxspeed]
+        search_around_frames = [[a-lag_range if a-lag_range>0 else 0, a+lag_range if a+lag_range<nb_frames_per_cam[i] else nb_frames_per_cam[i]] for i,a in enumerate(approx_frame_maxspeed)]
+    elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
+        search_around_frames = [[0, nb_frames_per_cam[i]] for i in range(cam_nb)]
+    else:
+        raise ValueError('approx_time_maxspeed should be a list of floats or "auto"')
 
     # Extract, interpolate, and filter keypoint coordinates
     df_coords = []
     b, a = signal.butter(filter_order/2, filter_cutoff/(fps/2), 'low', analog = False) 
     for i, json_dir in enumerate(json_dirs):
-        df_coords.append(convert_json2pandas(json_dir, min_conf=min_conf))
+        df_coords.append(convert_json2pandas(json_dir, min_conf=min_conf, frame_range=search_around_frames[i]))
         df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
+        if keypoints_to_consider == 'right':
+            kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k.startswith('R') or k.startswith('right')]
+            kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
+            df_coords[i] = df_coords[i][kpt_indices]
+        elif keypoints_to_consider == 'left':
+            kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k.startswith('L') or k.startswith('left')]
+            kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
+            df_coords[i] = df_coords[i][kpt_indices]
+        elif isinstance(keypoints_to_consider, list):
+            kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k in keypoints_to_consider]
+            kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
+            df_coords[i] = df_coords[i][kpt_indices]
+        elif keypoints_to_consider == 'all':
+            pass
+        else:
+            raise ValueError('keypoints_to_consider should be "all", "right", "left", or a list of keypoint names.\n\
+                             If you specified keypoints, make sure that they exist in your pose_model.')
+
         df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args = ['linear'])
         df_coords[i] = df_coords[i].bfill().ffill()
         df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0))
-    # for i in range(25):
-    #     df_coords[0].iloc[:,i*2+1].plot(label='0')
-    #     df_coords[1].iloc[:,i*2+1].plot(label='1')
-    #     df_coords[2].iloc[:,i*2+1].plot(label='2')
-    #     df_coords[3].iloc[:,i*2+1].plot(label='3')
-    #     plt.title(i)
-    #     plt.legend()
-    #     plt.show()
 
     # Save keypoint coordinates to pickle
     # with open(os.path.join(pose_dir, 'coords'), 'wb') as fp:
@@ -424,190 +327,33 @@ def synchronize_cams_all(config_dict):
     # with open(os.path.join(pose_dir, 'coords'), 'rb') as fp:
     #     df_coords = pk.load(fp)
 
-    # Set reference camera (with least amount of frames)
-    nb_frames_per_cam = [len(d) for d in df_coords]
-    ref_cam_id = nb_frames_per_cam.index(min(nb_frames_per_cam))
+    # Compute sum of speeds
+    df_speed = []
+    sum_speeds = []
+    for i in range(cam_nb):
+        df_speed.append(vert_speed(df_coords[i]))
+        sum_speeds.append(abs(df_speed[i]).sum(axis=1))
+        # nb_coord = df_speed[i].shape[1]
+        # sum_speeds[i][ sum_speeds[i]>vmax*nb_coord ] = 0
+        sum_speeds[i] = pd.DataFrame(signal.filtfilt(b, a, sum_speeds[i], axis=0)).squeeze()
+
+    # Compute offset for best synchronization:
+    # Highest correlation of sum of absolute speeds for each cam compared to reference cam
+    ref_cam_id = nb_frames_per_cam.index(min(nb_frames_per_cam)) # ref cam: least amount of frames
     ref_frame_nb = len(df_coords[ref_cam_id])
-    cam_list = list(range(cam_nb))
+    lag_range = int(ref_frame_nb/2)
     cam_list.pop(ref_cam_id)
-
-
-    # Detect best moment for synchronization search (highest correlation for sum of speeds for each camera)
-    approx_offset, approx_frame_maxspeed, search_sync_around_frame = [], [], []
-    # If auto approx_time_maxspeed, search approximate synchronization offset on the whole video sequence
-    if approx_time_maxspeed == 'auto':
-        # compute vertical speed
-        df_speed = []
-        sum_speeds = []
-        lag_range = int(ref_frame_nb/2)
-        for i in range(cam_nb):
-            df_speed.append(vert_speed(df_coords[i]))
-            # nb_coord = df_speed[i].shape[1]
-            sum_speeds.append(abs(df_speed[i]).sum(axis=1))
-            # sum_speeds[i][ sum_speeds[i]>vmax*nb_coord ] = 0
-            sum_speeds[i] = pd.DataFrame(signal.filtfilt(b, a, sum_speeds[i], axis=0)).squeeze()
-        approx_frame_maxspeed_ref = np.argmax(sum_speeds[ref_cam_id])
-
-        # frame with highest correlation of sum of absolute speeds for each cam compared to reference cam
-        for cam_id in cam_list:
-            frame_nb = len(sum_speeds[cam_id])
-            approx_offset_cam, _ = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=True)
-            approx_offset.append(approx_offset_cam)
-            approx_frame_maxspeed.append(approx_frame_maxspeed_ref+approx_offset_cam)
-            search_sync_around_frame.append([max(0,approx_frame_maxspeed_ref+approx_offset_cam-fps), min(frame_nb, approx_frame_maxspeed_ref+approx_offset_cam+fps)])
-
-    # Else search best synchronization offset around the time specified +/- 2 sec
-    else:
-        approx_frame_maxspeed_ref = int(fps * approx_time_maxspeed[ref_cam_id])
-        for cam_id in cam_list:
-            frame_nb = len(df_coords[cam_id])
-            approx_frame_maxspeed_cam = int(fps * approx_time_maxspeed[cam_id])
-            approx_frame_maxspeed.append(approx_frame_maxspeed_cam)
-            search_sync_around_frame.append([max(0,approx_frame_maxspeed_cam-2*fps), min(frame_nb, approx_frame_maxspeed_cam+2*fps)])
-            approx_offset.append(approx_frame_maxspeed_ref-approx_frame_maxspeed_cam)
-
-    approx_frame_maxspeed.insert(ref_cam_id, approx_frame_maxspeed_ref)
-    search_sync_around_frame.insert(ref_cam_id, [max(0,approx_frame_maxspeed_ref-2*fps), min(ref_frame_nb, approx_frame_maxspeed_ref+2*fps)])
-    approx_offset.insert(ref_cam_id, 0)
-
-
-
-
-    # Refine synchronization offset: -> not needed
-    # Time-lagged cross-correlation for each keypoint, select top N highest correlations, take median offset
     offset = []
     for cam_id in cam_list:
-        coords_nb = int(len(df_coords[cam_id].columns)/2)
-        lag_range = min(int(ref_frame_nb/2), fps)
-        offset_cam, corr_cam = [], []
-        for coord_id in range(coords_nb):
-            camx = df_speed[ref_cam_id][coord_id][search_sync_around_frame[ref_cam_id][0]:search_sync_around_frame[ref_cam_id][1]]
-            camy = df_speed[cam_id][coord_id][search_sync_around_frame[cam_id][0]:search_sync_around_frame[cam_id][1]]
-            offset_cam_coord, corr_cam_coord = time_lagged_cross_corr(camx, camy, lag_range, show=False)
-            offset_cam.append(offset_cam_coord)
-            corr_cam.append(corr_cam_coord)
-            # print(f'{coord_id} keypoint: offset = {offset_cam} frames and correlation = {corr_cam}.')
-        corr_cam = np.array(corr_cam)
-        offset_cam = np.array(offset_cam)
-        # take highest correlations and retrieve median offset
-        top_five_offset_coord = np.argpartition(-corr_cam, top_N_corr)[:top_N_corr]
-        top_five_offset_coord = top_five_offset_coord[np.argsort(corr_cam[top_five_offset_coord])][::-1]
-        top_five_corr_coord = corr_cam[top_five_offset_coord]
-        top_five_offset_coord = [c for i,c in enumerate(top_five_offset_coord) if top_five_corr_coord[i]>corr_threshold]
-        best_offset_cam = round(np.median(offset_cam[top_five_offset_coord]))
-        print('\n', best_offset_cam, offset_cam[top_five_offset_coord], corr_cam[top_five_offset_coord])
-        offset.append(best_offset_cam)
-    print(offset)
+        offset_cam, max_corr_cam = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=True)
+        print(f'Camera {ref_cam_id} and camera {cam_id} have a max correlation of {round(max_corr_cam, 2)} with an offset of {offset_cam} frames.')
+        offset.append(offset_cam)
+    offset.insert(ref_cam_id, 0)
 
 
 
 
-
-    # test time-lagged c-c for sum_speeds
-    search_sync_min_frame_nb = min([(s[1]-s[0]) for s in search_sync_around_frame])
-    lag_range = min(int(search_sync_min_frame_nb/2), 2*fps)
-    ref_cam_selected = sum_speeds[ref_cam_id][search_sync_around_frame[ref_cam_id][0]:search_sync_around_frame[ref_cam_id][1]]
     for cam_id in cam_list:
-        cam_selected = sum_speeds[cam_id][search_sync_around_frame[cam_id][0]:search_sync_around_frame[cam_id][1]].reset_index(drop=True)
-        lag_index = int((search_sync_around_frame[cam_id][1] - search_sync_around_frame[cam_id][0]) / 2)
-        offset, max_corr = time_lagged_cross_corr(ref_cam_selected, cam_selected, lag_index, show=True)
-        print(f'Camera {ref_cam_id} and camera {cam_id} have a max correlation of {max_corr} with an offset of {offset} frames.')
-    
-    # time-lagged cross-correlation for each point, weighted by corr
-    
-
-
-    #############################################
-    # 2. PLOTTING PAIRED CORRELATIONS OF SPEEDS #
-    #############################################
-
-    # Do this on all cam pairs
-    # Choose pair with highest correlation
-
-    # on a particular point (typically the wrist on a vertical movement)
-    # or on a selection of weighted points
-
-    # find the lowest position of the wrist
-    lowest_frames, lowest_y_coords = find_highest_wrist_position(df_coords, id_kpt)
-
-
-    
-    
-    max_speeds = []
-
-    
-    cam_list = list(range(cam_nb))
-    cam_list.pop(ref_cam_id)
-    for cam_id in cam_list:
-        # find the highest wrist position for each camera
-        camx_start_frame = lowest_frames[ref_cam_id]
-        camy_start_frame = lowest_frames[cam_id]
-
-        camx_lowest_y = lowest_y_coords[ref_cam_id]
-        camy_lowest_y = lowest_y_coords[cam_id]
-
-        camx_time = find_motion_end(df_coords[ref_cam_id], id_kpt[0], camx_start_frame, camx_lowest_y, fps)
-        camy_time = find_motion_end(df_coords[cam_id], id_kpt[0], camy_start_frame, camy_lowest_y, fps)
-
-        camx_end_frame = camx_start_frame + int(camx_time * fps)
-        camy_end_frame = camy_start_frame + int(camy_time * fps)
-
-        camx_segment = df_speed[ref_cam_id].iloc[camx_start_frame:camx_end_frame+1, id_kpt[0]]
-        camy_segment = df_speed[cam_id].iloc[camy_start_frame:camy_end_frame+1, id_kpt[0]]
-
-        # Find the fastest speed and the frame
-        camx_max_speed_index, camx_max_speed = find_fastest_frame([camx_segment])
-        camy_max_speed_index, camy_max_speed = find_fastest_frame([camy_segment])
-        max_speeds.append(camx_max_speed)
-        max_speeds.append(camy_max_speed)
-        vmax = max(max_speeds)
-
-        # Find automatically the best lag time
-        lag_time = round((camy_max_speed_index - camx_max_speed_index) / fps + 1)
-
-        # FInd the fatest frame
-        camx_start_frame = camx_max_speed_index - (fps) * (lag_time)
-        if camx_start_frame < 0:
-            camx_start_frame = 0
-        else:
-            camx_start_frame = int(camx_start_frame)
-        camy_start_frame = camy_max_speed_index - (fps) * (lag_time)
-        camx_end_frame = camx_max_speed_index + (fps) * (lag_time)
-        camy_end_frame = camy_max_speed_index + (fps) * (lag_time)
-
-        if len(id_kpt) == 1 and id_kpt[0] != 'all':
-            camx = df_speed[ref_cam_id].iloc[camx_start_frame:camx_end_frame+1, id_kpt[0]]
-            camy = df_speed[cam_id].iloc[camy_start_frame:camy_end_frame+1, id_kpt[0]]
-        elif id_kpt == ['all']:
-            camx = df_speed[ref_cam_id].iloc[camx_start_frame:camx_end_frame+1].sum(axis=1)
-            camy = df_speed[cam_id].iloc[camy_start_frame:camy_end_frame+1].sum(axis=1)
-        elif len(id_kpt) == 1 and len(id_kpt) == len(weights_kpt):
-            dict_id_weights = {i:w for i, w in zip(id_kpt, weights_kpt)}
-            camx = df_speed[ref_cam_id] @ pd.Series(dict_id_weights).reindex(df_speed[ref_cam_id].columns, fill_value=0)
-            camy = df_speed[cam_id] @ pd.Series(dict_id_weights).reindex(df_speed[cam_id].columns, fill_value=0)
-            camx = camx.iloc[camx_start_frame:camx_end_frame+1]
-            camy = camy.iloc[camy_start_frame:camy_end_frame+1]
-        else:
-            raise ValueError('wrong values for id_kpt or weights_kpt')        
-        
-        # filter the speeds
-        camx = camx.where(lambda x: (x <= vmax) & (x >= -vmax), other=np.nan)
-        camy = camy.where(lambda x: (x <= vmax) & (x >= -vmax), other=np.nan)
-
-        f, ax = plt.subplots(2,1)
-
-        # speed
-        camx.plot(ax=ax[0], label = f'cam {ref_cam_id+1}')
-        camy.plot(ax=ax[0], label = f'cam {cam_id+1}')
-        ax[0].set(xlabel='Frame',ylabel='Speed (pxframe)')
-        ax[0].legend()
-  
-        # time lagged cross-correlation
-        offset, max_corr = plot_time_lagged_cross_corr(camx, camy, ax[1], fps, lag_time, camx_max_speed_index, camy_max_speed_index)
-        f.tight_layout()
-        plt.show()
-        print(f'Using number{id_kpt} keypoint, synchronized camera {ref_cam_id+1} and camera {cam_id+1}, with an offset of {offset} and a max correlation of {max_corr}.')
-
         # apply offset
         apply_offset(offset, json_dirs, reset_sync, ref_cam_id, cam_id)
 
