@@ -15,8 +15,8 @@
     
     Usage: 
     python -m json_display_without_img -j json_folder -W 1920 -H 1080
-    python -m json_display_without_img -j json_folder -o output_img_folder -d True -s True -W 1920 -H 1080 -f 30
-    import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>', image_width=1920, image_height = 1080)
+    python -m json_display_without_img -j json_folder -o output_img_folder -d True -s True -W 1920 -H 1080 --id_persons 1 2
+    import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>', image_width=1920, image_height = 1080, id_persons=(1,2))
 '''
 
 
@@ -59,9 +59,9 @@ def json_display_without_img_func(**args):
     coordinates on the original images.
     
     Usage: 
-    json_display_without_img -j json_folder -W 1920 -H 1080
-    json_display_without_img -j json_folder -o output_img_folder -d True -s True -W 1920 -H 1080 -f 30
-    import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>', image_width=1920, image_height = 1080)
+    python -m json_display_without_img -j json_folder -W 1920 -H 1080
+    python -m json_display_without_img -j json_folder -o output_img_folder -d True -s True -W 1920 -H 1080 --id_persons 1 2
+    import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>', image_width=1920, image_height = 1080, id_persons=(1,2))
     '''
 
     json_folder = os.path.realpath(args.get('json_folder'))
@@ -76,15 +76,13 @@ def json_display_without_img_func(**args):
     image_width =  args.get('image_width')
     if image_width==None: 
         image_width = 2000
-    else:
-        image_width = int(image_width)
     image_height =  args.get('image_height')
     if image_height==None: 
         image_height = 2000
-    else:
-        image_height = int(image_height)
-
-    frame_rate = int(args.get('frame_rate'))
+    id_persons =  args.get('id_persons')
+    if id_persons == None:
+        id_persons = 'all'
+    frame_rate = args.get('frame_rate')
     if frame_rate==None:
         frame_rate = 30
     display = args.get('display')
@@ -103,11 +101,23 @@ def json_display_without_img_func(**args):
         xfrm, yfrm, conffrm = np.array([]), np.array([]), np.array([])    # Coordinates of all people in frame
         with open(os.path.join(json_folder,json_fname)) as json_f:
             json_file = json.load(json_f)
-            for ppl in range(len(json_file['people'])):  
-                keypt = np.asarray(json_file['people'][ppl]['pose_keypoints_2d']).reshape(-1,3)                
-                xfrm = np.concatenate((xfrm,keypt[:,0]))
-                yfrm = np.concatenate((yfrm,keypt[:,1]))
-                conffrm = np.concatenate((conffrm,keypt[:,2]))
+            if id_persons == 'all':
+                for ppl in range(len(json_file['people'])):  
+                    keypt = np.asarray(json_file['people'][ppl]['pose_keypoints_2d']).reshape(-1,3)
+                    xfrm = np.concatenate((xfrm,keypt[:,0]))
+                    yfrm = np.concatenate((yfrm,keypt[:,1]))
+                    conffrm = np.concatenate((conffrm,keypt[:,2]))
+            elif isinstance(id_persons, list):
+                for ppl in id_persons:  
+                    try:
+                        keypt = np.asarray(json_file['people'][ppl]['pose_keypoints_2d']).reshape(-1,3)
+                        xfrm = np.concatenate((xfrm,keypt[:,0]))
+                        yfrm = np.concatenate((yfrm,keypt[:,1]))
+                        conffrm = np.concatenate((conffrm,keypt[:,2]))
+                    except:
+                        xfrm = np.concatenate((xfrm,[]))
+                        yfrm = np.concatenate((yfrm,[]))
+                        conffrm = np.concatenate((conffrm,[]))
         X += [xfrm]
         Y += [yfrm]
         CONF += [conffrm]
@@ -142,9 +152,10 @@ def json_display_without_img_func(**args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-j', '--json_folder', required = True, help='folder of json 2D coordinate files')
-    parser.add_argument('-W', '--image_width', required = False, help='image width')
-    parser.add_argument('-H', '--image_height', required = False, help='image height')
-    parser.add_argument('-f', '--frame_rate', required = False, help='frame rate')
+    parser.add_argument('-i', '--id_persons', required = False, nargs="+", type=int, help='ids of the persons you want to display')
+    parser.add_argument('-W', '--image_width', required = False, type=int, help='image width')
+    parser.add_argument('-H', '--image_height', required = False, type=int, help='image height')
+    parser.add_argument('-f', '--frame_rate', required = False, type=float, help='frame rate')
     parser.add_argument('-o', '--output_img_folder', required=False, help='custom folder name for coordinates overlayed on images')
     parser.add_argument('-d', '--display', default=True, required = False, help='display images with overlayed coordinates')
     parser.add_argument('-s', '--save', default=False, required = False, help='save images with overlayed 2D coordinates')
