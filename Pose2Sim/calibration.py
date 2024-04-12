@@ -523,12 +523,6 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
             raise Exception(f'Error: The number of cameras is not consistent:\
                     Found {nb_cams_intrinsics} cameras based on the number of intrinsic folders or on calibration file data,\
                     and {nb_cams_extrinsics} cameras based on the number of extrinsic folders.')
-
-        ret, C, S, D, K, R, T = calibrate_intrinsics(calib_dir, intrinsics_config_dict)
-
-    # calculate extrinsics
-    if calculate_extrinsics:
-        logging.info(f'\nCalculating extrinsic parameters...')
         ret, C, S, D, K, R, T = calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D)
     else:
         logging.info(f'\nExtrinsic parameters won\'t be calculated. Set "calculate_extrinsics" to true in Config.toml to calculate them.')
