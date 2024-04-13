@@ -44,7 +44,7 @@ from Pose2Sim.skeletons import *
 
 
 ## AUTHORSHIP INFORMATION
-__author__ = "HunMin Kim, David Pagnon"
+__author__ = "David Pagnon, HunMin Kim"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
@@ -206,41 +206,27 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True):
     return offset, max_corr
 
 
-def apply_offset(offset, json_dirs, reset_sync, cam1_nb, cam2_nb):
+def apply_offset(json_dir, offset_cam):
+    json_files_names = fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json')
+    json_files_names = sort_stringlist_by_last_number(json_files_names)
+    json_files_path = [os.path.join(json_dir, j_f) for j_f in json_files_names]
+    [os.rename(f, f+'.del') for f in json_files_path[:offset_cam]]
+
+
+def reset_offset(json_dir):
     '''
-    Apply the offset to synchronize the cameras.
-    Offset is always applied to the second camera.
-    Offset would be always negative if the first camera is the last to start recording.
-    Delete the camy json files from initial frame to offset frame.
+    Reset offset by renaming .json.del files to .json
 
-    INPUT:
-    - offset (int): The offset value to apply to synchronize the cameras.
-    - json_dirs (list): List of directories containing the JSON files for each camera.
-    - reset_sync (bool): Whether to reset the synchronization by deleting the .del files.
-    - cam1_nb (int): The number of the reference camera.
-    - cam2_nb (int): The number of the other camera.
-    ''' 
+    INPUTS:
+    - json_dir: str. The directory path containing the JSON files.
 
-    if offset == 0:
-        print(f"Cams {cam1_nb} and {cam2_nb} are already synchronized. No offset applied.")
-        json_dir_to_offset = json_dirs[cam2_nb]
-    elif offset > 0 and not reset_sync:
-        print(f"Consider adjusting the lag time.")
-        raise ValueError(f"Are you sure the reference camera is the last to start recording?")
-    else:
-        offset = abs(offset)
-        json_dir_to_offset = json_dirs[cam2_nb]
+    OUTPUT:
+    - Renamed files in the directory.
+    '''
 
-    json_files = sorted(fnmatch.filter(os.listdir(json_dir_to_offset), '*.json'), key=lambda x: int(re.findall('\d+', x)[0]))
-
-    if reset_sync:
-        del_files = fnmatch.filter(os.listdir(json_dir_to_offset), '*.del')
-        for del_file in del_files:
-            os.rename(os.path.join(json_dir_to_offset, del_file), os.path.join(json_dir_to_offset, del_file[:-4]))
-    else:
-            for i in range(offset):
-                os.rename(os.path.join(json_dir_to_offset, json_files[i]), os.path.join(json_dir_to_offset, json_files[i] + '.del'))
-
+    del_files_names = fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json.del')
+    del_files_path = [os.path.join(json_dir, f) for f in del_files_names]
+    [os.rename(f, f[:-4]) for f in del_files_path]
 
 
 def synchronize_cams_all(config_dict):
@@ -254,6 +240,7 @@ def synchronize_cams_all(config_dict):
     pose_model = config_dict.get('pose').get('pose_model')
     fps =  config_dict.get('project').get('frame_rate')
     reset_sync = config_dict.get('synchronization').get('reset_sync') 
+    display_sync_plots = config_dict.get('synchronization').get('display_sync_plots')
     keypoints_to_consider = config_dict.get('synchronization').get('keypoints_to_consider')
     approx_time_maxspeed = config_dict.get('synchronization').get('approx_time_maxspeed') 
 
@@ -283,78 +270,84 @@ def synchronize_cams_all(config_dict):
     nb_frames_per_cam = [len(fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json')) for json_dir in json_dirs]
     cam_nb = len(json_dirs)
     cam_list = list(range(cam_nb))
-
-    # Determine frames to consider for synchronization
-    if isinstance(approx_time_maxspeed, list): # search around max speed
-        approx_frame_maxspeed = [int(fps * t) for t in approx_time_maxspeed]
-        search_around_frames = [[a-lag_range if a-lag_range>0 else 0, a+lag_range if a+lag_range<nb_frames_per_cam[i] else nb_frames_per_cam[i]] for i,a in enumerate(approx_frame_maxspeed)]
-    elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
-        search_around_frames = [[0, nb_frames_per_cam[i]] for i in range(cam_nb)]
+    
+    # Reset previous synchronization attempts
+    if reset_sync:
+        [reset_offset(json_dir) for json_dir in json_dirs]
+    
+    # Synchronize cameras
     else:
-        raise ValueError('approx_time_maxspeed should be a list of floats or "auto"')
-
-    # Extract, interpolate, and filter keypoint coordinates
-    df_coords = []
-    b, a = signal.butter(filter_order/2, filter_cutoff/(fps/2), 'low', analog = False) 
-    for i, json_dir in enumerate(json_dirs):
-        df_coords.append(convert_json2pandas(json_dir, min_conf=min_conf, frame_range=search_around_frames[i]))
-        df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
-        if keypoints_to_consider == 'right':
-            kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k.startswith('R') or k.startswith('right')]
-            kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
-            df_coords[i] = df_coords[i][kpt_indices]
-        elif keypoints_to_consider == 'left':
-            kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k.startswith('L') or k.startswith('left')]
-            kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
-            df_coords[i] = df_coords[i][kpt_indices]
-        elif isinstance(keypoints_to_consider, list):
-            kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k in keypoints_to_consider]
-            kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
-            df_coords[i] = df_coords[i][kpt_indices]
-        elif keypoints_to_consider == 'all':
-            pass
+        # Determine frames to consider for synchronization
+        if isinstance(approx_time_maxspeed, list): # search around max speed
+            approx_frame_maxspeed = [int(fps * t) for t in approx_time_maxspeed]
+            nb_frames_per_cam_excludingdel = [len(fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json'))-len(fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json.del')) for json_dir in json_dirs]
+            search_around_frames = [[a-lag_range if a-lag_range>0 else 0, a+lag_range if a+lag_range<nb_frames_per_cam_excludingdel[i] else nb_frames_per_cam_excludingdel[i]] for i,a in enumerate(approx_frame_maxspeed)]
+        elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
+            search_around_frames = [[0, nb_frames_per_cam[i]] for i in range(cam_nb)]
         else:
-            raise ValueError('keypoints_to_consider should be "all", "right", "left", or a list of keypoint names.\n\
-                             If you specified keypoints, make sure that they exist in your pose_model.')
+            raise ValueError('approx_time_maxspeed should be a list of floats or "auto"')
 
-        df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args = ['linear'])
-        df_coords[i] = df_coords[i].bfill().ffill()
-        df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0))
+        # Extract, interpolate, and filter keypoint coordinates
+        df_coords = []
+        b, a = signal.butter(filter_order/2, filter_cutoff/(fps/2), 'low', analog = False) 
+        for i, json_dir in enumerate(json_dirs):
+            df_coords.append(convert_json2pandas(json_dir, min_conf=min_conf, frame_range=search_around_frames[i]))
+            df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
+            if keypoints_to_consider == 'right':
+                kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k.startswith('R') or k.startswith('right')]
+                kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
+                df_coords[i] = df_coords[i][kpt_indices]
+            elif keypoints_to_consider == 'left':
+                kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k.startswith('L') or k.startswith('left')]
+                kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
+                df_coords[i] = df_coords[i][kpt_indices]
+            elif isinstance(keypoints_to_consider, list):
+                kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k in keypoints_to_consider]
+                kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
+                df_coords[i] = df_coords[i][kpt_indices]
+            elif keypoints_to_consider == 'all':
+                pass
+            else:
+                raise ValueError('keypoints_to_consider should be "all", "right", "left", or a list of keypoint names.\n\
+                                If you specified keypoints, make sure that they exist in your pose_model.')
 
-    # Save keypoint coordinates to pickle
-    # with open(os.path.join(pose_dir, 'coords'), 'wb') as fp:
-    #     pk.dump(df_coords, fp)
-    # with open(os.path.join(pose_dir, 'coords'), 'rb') as fp:
-    #     df_coords = pk.load(fp)
+            df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args = ['linear'])
+            df_coords[i] = df_coords[i].bfill().ffill()
+            df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0))
 
-    # Compute sum of speeds
-    df_speed = []
-    sum_speeds = []
-    for i in range(cam_nb):
-        df_speed.append(vert_speed(df_coords[i]))
-        sum_speeds.append(abs(df_speed[i]).sum(axis=1))
-        # nb_coord = df_speed[i].shape[1]
-        # sum_speeds[i][ sum_speeds[i]>vmax*nb_coord ] = 0
-        sum_speeds[i] = pd.DataFrame(signal.filtfilt(b, a, sum_speeds[i], axis=0)).squeeze()
+        # Save keypoint coordinates to pickle
+        # with open(os.path.join(pose_dir, 'coords'), 'wb') as fp:
+        #     pk.dump(df_coords, fp)
+        # with open(os.path.join(pose_dir, 'coords'), 'rb') as fp:
+        #     df_coords = pk.load(fp)
 
-    # Compute offset for best synchronization:
-    # Highest correlation of sum of absolute speeds for each cam compared to reference cam
-    ref_cam_id = nb_frames_per_cam.index(min(nb_frames_per_cam)) # ref cam: least amount of frames
-    ref_frame_nb = len(df_coords[ref_cam_id])
-    lag_range = int(ref_frame_nb/2)
-    cam_list.pop(ref_cam_id)
-    offset = []
-    for cam_id in cam_list:
-        offset_cam, max_corr_cam = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=True)
-        print(f'Camera {ref_cam_id} and camera {cam_id} have a max correlation of {round(max_corr_cam, 2)} with an offset of {offset_cam} frames.')
-        offset.append(offset_cam)
-    offset.insert(ref_cam_id, 0)
+        # Compute sum of speeds
+        df_speed = []
+        sum_speeds = []
+        for i in range(cam_nb):
+            df_speed.append(vert_speed(df_coords[i]))
+            sum_speeds.append(abs(df_speed[i]).sum(axis=1))
+            # nb_coord = df_speed[i].shape[1]
+            # sum_speeds[i][ sum_speeds[i]>vmax*nb_coord ] = 0
+            sum_speeds[i] = pd.DataFrame(signal.filtfilt(b, a, sum_speeds[i], axis=0)).squeeze()
+
+        # Compute offset for best synchronization:
+        # Highest correlation of sum of absolute speeds for each cam compared to reference cam
+        ref_cam_id = nb_frames_per_cam.index(min(nb_frames_per_cam)) # ref cam: least amount of frames
+        ref_frame_nb = len(df_coords[ref_cam_id])
+        lag_range = int(ref_frame_nb/2)
+        cam_list.pop(ref_cam_id)
+        offset = []
+        for cam_id in cam_list:
+            offset_cam, max_corr_cam = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=display_sync_plots)
+            print(f'Camera {ref_cam_id} and camera {cam_id} have a max correlation of {round(max_corr_cam, 2)} with an offset of {offset_cam} frames.')
+            apply_offset(json_dirs[cam_id], offset_cam)
+            offset.append(offset_cam)
+        offset.insert(ref_cam_id, 0)
 
 
 
 
-    for cam_id in cam_list:
-        # apply offset
-        apply_offset(offset, json_dirs, reset_sync, ref_cam_id, cam_id)
+
 
 

@@ -125,12 +125,16 @@ def read_config_files(config):
         
         # Trial level
         if level == 1: 
-            session_config_dict = toml.load(os.path.join(config_dir, '..','..','Config.toml'))
-            participant_config_dict = toml.load(os.path.join(config_dir, '..','Config.toml'))
-            trial_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
-                
-            session_config_dict = recursive_update(session_config_dict,participant_config_dict)
-            session_config_dict = recursive_update(session_config_dict,trial_config_dict)
+            try:
+                # if batch
+                session_config_dict = toml.load(os.path.join(config_dir, '..','..','Config.toml'))
+                participant_config_dict = toml.load(os.path.join(config_dir, '..','Config.toml'))
+                session_config_dict = recursive_update(session_config_dict,participant_config_dict)
+                trial_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
+                session_config_dict = recursive_update(session_config_dict,trial_config_dict)
+            except:
+                # if single trial
+                session_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
             session_config_dict.get("project").update({"project_dir":config_dir})
             config_dicts = [session_config_dict]
         
@@ -267,7 +271,7 @@ def synchronization(config=None):
     '''   
     
     # Import the function
-    from Pose2Sim.synchronize_cams import synchronize_cams_all
+    from Pose2Sim.synchronization import synchronize_cams_all
 
     # Determine the level at which the function is called (session:3, participant:2, trial:1)
     level, config_dicts = read_config_files(config)

@@ -43,7 +43,7 @@ openpose_path = '' # only checked if OpenPose is used
 
 
 [synchronization]
-display_corr = true # true or false (lowercase)
+display_sync_plots = true # true or false (lowercase)
 keypoints_to_consider = 'all' # 'all' if all points should be considered (default)
                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify the keypoints to consider
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
