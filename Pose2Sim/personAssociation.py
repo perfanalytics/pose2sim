@@ -8,10 +8,9 @@
 ###########################################################################
 
 Openpose detects all people in the field of view. 
-- multi_person = false: Which is the one of interest?
-- multi_person = true: How to triangulate the same persons across views?
-                       How to associate them across time frames? Done in the 
-                       triangulation stage.
+- multi_person = false: Triangulates the most prominent person
+- multi_person = true: Triangulates persons across views
+                       Tracking them across time frames is done in the triangulation stage.
 
 If multi_person = false, this module tries all possible triangulations of a chosen
 anatomical point, and chooses the person for whom the reprojection error is smallest. 
@@ -46,7 +45,7 @@ from anytree.importer import DictImporter
 import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
-    reprojection, euclidean_distance, natural_sort
+    reprojection, euclidean_distance, sort_stringlist_by_last_number
 from Pose2Sim.skeletons import *
 
 
@@ -124,8 +123,11 @@ def triangulate_comb(comb, coords, P_all, calib_params, config):
         calib_params_dist_filt = [calib_params['dist'][i] for i in range(len(comb)) if not np.isnan(comb[i])]
 
     # Triangulate 2D points
-    x_files_filt, y_files_filt, likelihood_files_filt = np.array(coords_filt).T
-    Q_comb = weighted_triangulation(projection_matrices_filt, x_files_filt, y_files_filt, likelihood_files_filt)
+    try:
+        x_files_filt, y_files_filt, likelihood_files_filt = np.array(coords_filt).T
+        Q_comb = weighted_triangulation(projection_matrices_filt, x_files_filt, y_files_filt, likelihood_files_filt)
+    except:
+        Q_comb = [np.nan, np.nan, np.nan, 1.]
 
     # Reprojection
     if undistort_points:
@@ -662,10 +664,10 @@ def track_2d_all(config):
     
     # 2d-pose files selection
     pose_listdirs_names = next(os.walk(pose_dir))[1]
-    pose_listdirs_names = natural_sort(pose_listdirs_names)
+    pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
-    json_files_names = [natural_sort(j) for j in json_files_names]
+    json_files_names = [sort_stringlist_by_last_number(j) for j in json_files_names]
     json_files = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # 2d-pose-associated files creation

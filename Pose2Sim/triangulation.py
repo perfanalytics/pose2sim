@@ -50,7 +50,7 @@ from anytree.importer import DictImporter
 import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
-    reprojection, euclidean_distance, natural_sort, zup2yup
+    reprojection, euclidean_distance, sort_stringlist_by_last_number, zup2yup
 from Pose2Sim.skeletons import *
 
 
@@ -739,15 +739,15 @@ def triangulate_all(config):
     
     # 2d-pose files selection
     pose_listdirs_names = next(os.walk(pose_dir))[1]
-    pose_listdirs_names = natural_sort(pose_listdirs_names)
+    pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     try: 
         json_files_names = [fnmatch.filter(os.listdir(os.path.join(poseTracked_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
-        json_files_names = [natural_sort(j) for j in json_files_names]
+        json_files_names = [sort_stringlist_by_last_number(j) for j in json_files_names]
         json_tracked_files = [[os.path.join(poseTracked_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     except:
         json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
-        json_files_names = [natural_sort(j) for j in json_files_names]
+        json_files_names = [sort_stringlist_by_last_number(j) for j in json_files_names]
         json_tracked_files = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # Prep triangulation

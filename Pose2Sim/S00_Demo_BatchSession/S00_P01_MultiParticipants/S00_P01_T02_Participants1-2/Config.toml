@@ -30,97 +30,98 @@ nb_persons_to_detect = 2 # checked only if multi_person is selected
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
 
-## Take heart, calibration is not that complicated once you get the hang of it!
-# [calibration]
-# calibration_type = 'convert' # 'convert' or 'calculate'
-
-   # [calibration.convert]
-   # convert_from = 'qualisys' # 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', or 'biocv'
-      # [calibration.convert.qualisys]
-      # binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
-      # [calibration.convert.optitrack]  # See readme for instructions
-      # [calibration.convert.vicon]      # No parameter needed
-      # [calibration.convert.opencap]    # No parameter needed
-      # [calibration.convert.easymocap]  # No parameter needed
-      # [calibration.convert.biocv]      # No parameter needed
-      # [calibration.convert.anipose]    # No parameter needed
-      # [calibration.convert.freemocap]  # No parameter needed
-  
-
-   # [calibration.calculate] 
-      ## Camera properties, theoretically need to be calculated only once in a camera lifetime
-      # [calibration.calculate.intrinsics]
-      # overwrite_intrinsics = false # overwrite (or not) if they have already been calculated?
-      # show_detection_intrinsics = true # true or false (lowercase)
-      # intrinsics_extension = 'jpg' # any video or image extension
-      # extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
-      # intrinsics_corners_nb = [4,7] 
-      # intrinsics_square_size = 60 # mm
-
-      ## Camera placements, need to be done before every session
-      # [calibration.calculate.extrinsics]
-      # extrinsics_method = 'scene' # 'board', 'scene', 'keypoints'
-      ## 'board' should be large enough to be detected when laid on the floor. Not recommended.
-      ## 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out.
-      ## 'keypoints' uses automatic pose estimation of a person freely walking and waving arms in the scene. Slighlty less accurate, requires synchronized cameras.
-
-      # moving_cameras = false # Not implemented yet
-      # calculate_extrinsics = true # true or false (lowercase) 
-
-         # [calibration.calculate.extrinsics.board]
-         # show_reprojection_error = true # true or false (lowercase)
-         # extrinsics_extension = 'png' # any video or image extension
-         # extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
-         # extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
-
-         # [calibration.calculate.extrinsics.scene]
-         # show_reprojection_error = true # true or false (lowercase)
-         # extrinsics_extension = 'png' # any video or image extension
-         ## list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
-         ## in m -> unlike for intrinsics, NOT in mm!
-         # object_coords_3d =   [[-2.0,  0.3,  0.0], 
-         #                      [-2.0 , 0.0,  0.0], 
-         #                      [-2.0, 0.0,  0.05], 
-         #                      [-2.0, -0.3 ,  0.0], 
-         #                      [0.0,  0.3,  0.0], 
-         #                      [0.0, 0.0,  0.0], 
-         #                      [0.0, 0.0,  0.05], 
-         #                      [0.0, -0.3,  0.0]]
-        
-         # [calibration.calculate.extrinsics.keypoints]
-         ## Coming soon!
-
-
 # [pose]
 # pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
-# pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII,
+# pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII.
 # 						      #With mediapipe: BLAZEPOSE. 
 # 						      #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
 # 						      #With deeplabcut: CUSTOM. See example at the end of the file.
-## What follows has not been implemented yet
+# # What follows has not been implemented yet
 # overwrite_pose = false
 # openpose_path = '' # only checked if OpenPose is used
 
 
 # [synchronization]
-## COMING SOON! 
-# reset_sync = true # Recalculate synchronization even if already done
-# frames = [2850,3490] # Frames to use for synchronization, should point to a moment with fast motion.
-# cut_off_frequency = 10 # cut-off frequency for a 4th order low-pass Butterworth filter
-## Vertical speeds (on X, Y, or Z axis, or 2D speeds)
-# speed_kind = 'y' # 'x', 'y', 'z', or '2D'
-# vmax = 20 # px/s
-# cam1_nb = 4
-# cam2_nb = 3
-# id_kpt = [9,10] # Pour plus tard aller chercher numéro depuis keypoint name dans skeleton.py. 'RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
-# weights_kpt = [1,1] # Pris en compte uniquement si on a plusieurs keypoints
+# display_sync_plots = true # true or false (lowercase)
+# keypoints_to_consider = 'all' # 'all' if all points should be considered (default)
+#                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify the keypoints to consider
+# approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
+#                            # [1.0, 0.2, 0.8, 1.1] list of times in seconds, one value per camera if you want to specify an approximate time where to search for synchronization.
+#                            # Best times: only one person is in the scene, who performs a sharp vertical movement (with keypoints_to_consider).
+# reset_sync = false # Revert to state before synchronization. Won't attempt to synchronize unless set to false.
+
+
+## Take heart, calibration is not that complicated once you get the hang of it!
+# [calibration]
+# calibration_type = 'convert' # 'convert' or 'calculate'
+
+#    [calibration.convert]
+#    convert_from = 'qualisys' # 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
+#       [calibration.convert.qualisys]
+#       binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
+#       [calibration.convert.optitrack]  # See readme for instructions
+#       [calibration.convert.vicon]      # No parameter needed
+#       [calibration.convert.opencap]    # No parameter needed
+#       [calibration.convert.easymocap]  # No parameter needed
+#       [calibration.convert.biocv]      # No parameter needed
+#       [calibration.convert.anipose]    # No parameter needed
+#       [calibration.convert.freemocap]  # No parameter needed
+  
+
+#    [calibration.calculate] 
+#       # Camera properties, theoretically need to be calculated only once in a camera lifetime
+#       [calibration.calculate.intrinsics]
+#       overwrite_intrinsics = false #  # set to false if you don't want to recalculate intrinsic parameters
+#       show_detection_intrinsics = true # true or false (lowercase)
+#       intrinsics_extension = 'jpg' # any video or image extension
+#       extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
+#       intrinsics_corners_nb = [4,7] 
+#       intrinsics_square_size = 60 # mm
+
+#       # Camera placements, need to be done before every session
+#       [calibration.calculate.extrinsics]
+#       calculate_extrinsics = true # true or false (lowercase) 
+#       extrinsics_method = 'scene' # 'board', 'scene', 'keypoints'
+#       # 'board' should be large enough to be detected when laid on the floor. Not recommended.
+#       # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out.
+#       # 'keypoints' uses automatic pose estimation of a person freely walking and waving arms in the scene. Slighlty less accurate, requires synchronized cameras.
+#       moving_cameras = false # Not implemented yet
+
+#          [calibration.calculate.extrinsics.board]
+#          show_reprojection_error = true # true or false (lowercase)
+#          extrinsics_extension = 'png' # any video or image extension
+#          extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
+#          extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
+
+#          [calibration.calculate.extrinsics.scene]
+#          show_reprojection_error = true # true or false (lowercase)
+#          extrinsics_extension = 'png' # any video or image extension
+#          # list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
+#          # in m -> unlike for intrinsics, NOT in mm!
+#          object_coords_3d =   [[-2.0,  0.3,  0.0], 
+#                               [-2.0 , 0.0,  0.0], 
+#                               [-2.0, 0.0,  0.05], 
+#                               [-2.0, -0.3 ,  0.0], 
+#                               [0.0,  0.3,  0.0], 
+#                               [0.0, 0.0,  0.0], 
+#                               [0.0, 0.0,  0.05], 
+#                               [0.0, -0.3,  0.0]]
+        
+#          [calibration.calculate.extrinsics.keypoints]
+#          # Coming soon!
 
 
 # [personAssociation]
-# tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
-## and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
-# reproj_error_threshold_association = 20 # px
-# likelihood_threshold_association = 0.05
+#    likelihood_threshold_association = 0.3
+
+#    [personAssociation.single_person]
+#    reproj_error_threshold_association = 20 # px
+#    tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
+#                # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
+   
+#    [personAssociation.multi_person]
+#    reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
+#    min_affinity = 0.2 # affinity below which a correspondence is ignored
 
 
 [triangulation]

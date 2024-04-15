@@ -28,7 +28,6 @@ frame_range = [] # For example [10,300], or [] for all frames
 
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
-# Take heart, calibration is not that complicated once you get the hang of it!
 
 
 [pose]
@@ -49,9 +48,10 @@ keypoints_to_consider = 'all' # 'all' if all points should be considered (defaul
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
                            # [1.0, 0.2, 0.8, 1.1] list of times in seconds, one value per camera if you want to specify an approximate time where to search for synchronization.
                            # Best times: only one person is in the scene, who performs a sharp vertical movement (with keypoints_to_consider).
-reset_sync = true # Revert to state before synchronization. Won't attempt to synchronize unless set to false.
+reset_sync = false # Revert to state before synchronization. Won't attempt to synchronize unless set to false.
 
 
+# Take heart, calibration is not that complicated once you get the hang of it!
 [calibration]
 calibration_type = 'convert' # 'convert' or 'calculate'
 
