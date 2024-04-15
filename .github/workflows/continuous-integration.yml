@@ -55,5 +55,5 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       - name: Test with pytest
         run: |
-          cd Pose2Sim/S00_Demo_Session
+          cd Pose2Sim/S00_Demo_BatchSession
           pytest -v tests.py
