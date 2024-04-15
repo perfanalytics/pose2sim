@@ -40,10 +40,9 @@ from scipy import interpolate
 import json
 import os
 import fnmatch
-import pickle as pk
-import re
 from anytree import RenderTree
 from anytree.importer import DictImporter
+import logging
 
 from Pose2Sim.common import sort_stringlist_by_last_number
 from Pose2Sim.skeletons import *
@@ -325,7 +324,9 @@ def synchronize_cams_all(config_dict):
 
     # Reset previous synchronization attempts
     if reset_sync:
+        logging.info('Resetting synchronization...')
         [reset_offset(json_dir) for json_dir in json_dirs]
+        logging.info('Synchronization reset.')
     
     # Synchronize cameras
     else:
@@ -394,9 +395,9 @@ def synchronize_cams_all(config_dict):
             offset_cam_section, max_corr_cam = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=display_sync_plots)
             offset_cam = offset_cam_section - (search_around_frames[ref_cam_id][0] - search_around_frames[cam_id][0])
             if isinstance(approx_time_maxspeed, list):
-                print(f'Camera {ref_cam_id} and camera {cam_id} have a max correlation of {round(max_corr_cam, 2)} with an offset of {offset_cam} frames ({offset_cam_section} on the selected section).')
+                logging.info(f'--> Camera {ref_cam_id} and {cam_id}: {offset_cam} frames offset ({offset_cam_section} on the selected section), correlation {round(max_corr_cam, 2)}.')
             else:
-                print(f'Camera {ref_cam_id} and camera {cam_id} have a max correlation of {round(max_corr_cam, 2)} with an offset of {offset_cam} frames.')
+                logging.info(f'--> Camera {ref_cam_id} and {cam_id}: {offset_cam} frames offset, correlation {round(max_corr_cam, 2)}.')
             apply_offset(json_dirs[cam_id], offset_cam)
             offset.append(offset_cam)
         offset.insert(ref_cam_id, 0)

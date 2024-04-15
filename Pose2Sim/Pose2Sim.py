@@ -211,7 +211,7 @@ def calibration(config=None):
     calibrate_cams_all(config_dict)
     
     end = time.time()
-    logging.info(f'Calibration took {end-start:.2f} s.')
+    logging.info(f'\nCalibration took {end-start:.2f} s.')
 
 
 def poseEstimation(config=None):
@@ -302,7 +302,7 @@ def synchronization(config=None):
     
         end = time.time()
         elapsed = end-start 
-        logging.info(f'Synchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nSynchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
     
 def personAssociation(config=None):
@@ -349,7 +349,7 @@ def personAssociation(config=None):
     
         end = time.time()
         elapsed = end-start 
-        logging.info(f'Associating persons took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nAssociating persons took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
     
 def triangulation(config=None):
@@ -395,7 +395,7 @@ def triangulation(config=None):
     
         end = time.time()
         elapsed = end-start 
-        logging.info(f'Triangulation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nTriangulation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
  
     
 def filtering(config=None):
@@ -483,7 +483,7 @@ def markerAugmentation(config=None):
 
         end = time.time()
         elapsed = end-start 
-        logging.info(f'Marker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nMarker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
 
 
 def opensimProcessing(config=None):

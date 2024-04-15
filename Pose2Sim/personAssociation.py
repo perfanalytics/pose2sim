@@ -641,11 +641,6 @@ def track_2d_all(config):
     pose_dir = os.path.join(project_dir, 'pose')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
 
-    if multi_person:
-        logging.info('\nMulti-person analysis selected. Note that you can set this option to false if you only need the main person in the scene.')
-    else:
-        logging.info('\nSingle-person analysis selected.')
-
     # projection matrix from toml calibration file
     P_all = computeP(calib_file, undistort=undistort_points)
     calib_params = retrieve_calib_params(calib_file)
