@@ -125,12 +125,16 @@ def read_config_files(config):
         
         # Trial level
         if level == 1: 
-            session_config_dict = toml.load(os.path.join(config_dir, '..','..','Config.toml'))
-            participant_config_dict = toml.load(os.path.join(config_dir, '..','Config.toml'))
-            trial_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
-                
-            session_config_dict = recursive_update(session_config_dict,participant_config_dict)
-            session_config_dict = recursive_update(session_config_dict,trial_config_dict)
+            try:
+                # if batch
+                session_config_dict = toml.load(os.path.join(config_dir, '..','..','Config.toml'))
+                participant_config_dict = toml.load(os.path.join(config_dir, '..','Config.toml'))
+                session_config_dict = recursive_update(session_config_dict,participant_config_dict)
+                trial_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
+                session_config_dict = recursive_update(session_config_dict,trial_config_dict)
+            except:
+                # if single trial
+                session_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
             session_config_dict.get("project").update({"project_dir":config_dir})
             config_dicts = [session_config_dict]
         
@@ -207,7 +211,7 @@ def calibration(config=None):
     calibrate_cams_all(config_dict)
     
     end = time.time()
-    logging.info(f'Calibration took {end-start:.2f} s.')
+    logging.info(f'\nCalibration took {end-start:.2f} s.')
 
 
 def poseEstimation(config=None):
@@ -267,7 +271,7 @@ def synchronization(config=None):
     '''   
     
     # Import the function
-    from Pose2Sim.synchronize_cams import synchronize_cams_all
+    from Pose2Sim.synchronization import synchronize_cams_all
 
     # Determine the level at which the function is called (session:3, participant:2, trial:1)
     level, config_dicts = read_config_files(config)
@@ -298,7 +302,7 @@ def synchronization(config=None):
     
         end = time.time()
         elapsed = end-start 
-        logging.info(f'Synchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nSynchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
     
 def personAssociation(config=None):
@@ -345,7 +349,7 @@ def personAssociation(config=None):
     
         end = time.time()
         elapsed = end-start 
-        logging.info(f'Associating persons took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nAssociating persons took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
     
 def triangulation(config=None):
@@ -391,7 +395,7 @@ def triangulation(config=None):
     
         end = time.time()
         elapsed = end-start 
-        logging.info(f'Triangulation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nTriangulation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
  
     
 def filtering(config=None):
@@ -479,7 +483,7 @@ def markerAugmentation(config=None):
 
         end = time.time()
         elapsed = end-start 
-        logging.info(f'Marker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nMarker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
 
 
 def opensimProcessing(config=None):

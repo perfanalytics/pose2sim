@@ -50,7 +50,7 @@ from anytree.importer import DictImporter
 import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
-    reprojection, euclidean_distance, natural_sort, zup2yup
+    reprojection, euclidean_distance, sort_stringlist_by_last_number, zup2yup
 from Pose2Sim.skeletons import *
 
 
@@ -308,7 +308,10 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
 
     # Read config
     project_dir = config.get('project').get('project_dir')
+    # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
+    # if single trial
+    session_dir = os.getcwd() if not 'Config.toml' in session_dir else session_dir
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     calib = toml.load(calib_file)
@@ -686,7 +689,10 @@ def triangulate_all(config):
     
     # Read config
     project_dir = config.get('project').get('project_dir')
+    # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
+    # if single trial
+    session_dir = os.getcwd() if not 'Config.toml' in session_dir else session_dir
     multi_person = config.get('project').get('multi_person')
     pose_model = config.get('pose').get('pose_model')
     frame_range = config.get('project').get('frame_range')
@@ -733,15 +739,15 @@ def triangulate_all(config):
     
     # 2d-pose files selection
     pose_listdirs_names = next(os.walk(pose_dir))[1]
-    pose_listdirs_names = natural_sort(pose_listdirs_names)
+    pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     try: 
         json_files_names = [fnmatch.filter(os.listdir(os.path.join(poseTracked_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
-        json_files_names = [natural_sort(j) for j in json_files_names]
+        json_files_names = [sort_stringlist_by_last_number(j) for j in json_files_names]
         json_tracked_files = [[os.path.join(poseTracked_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     except:
         json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
-        json_files_names = [natural_sort(j) for j in json_files_names]
+        json_files_names = [sort_stringlist_by_last_number(j) for j in json_files_names]
         json_tracked_files = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # Prep triangulation
