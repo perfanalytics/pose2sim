@@ -18,8 +18,7 @@
 
 
 [project]
-# multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
-nb_persons_to_detect = 2 # checked only if multi_person is selected
+multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
 frame_rate = 60 # fps
 frame_range = [] # For example [10,300], or [] for all frames
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
@@ -71,7 +70,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
    [calibration.calculate] 
       # Camera properties, theoretically need to be calculated only once in a camera lifetime
       [calibration.calculate.intrinsics]
-      overwrite_intrinsics = false #  # set to false if you don't want to recalculate intrinsic parameters
+      overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
       show_detection_intrinsics = true # true or false (lowercase)
       intrinsics_extension = 'jpg' # any video or image extension
       extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
