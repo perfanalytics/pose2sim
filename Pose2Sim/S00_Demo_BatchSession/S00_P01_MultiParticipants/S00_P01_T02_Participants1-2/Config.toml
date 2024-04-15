@@ -102,17 +102,13 @@ multi_person = true # true for trials with multiple participants. If false, only
 
 
 # [synchronization]
-## COMING SOON! 
-# reset_sync = true # Recalculate synchronization even if already done
-# frames = [2850,3490] # Frames to use for synchronization, should point to a moment with fast motion.
-# cut_off_frequency = 10 # cut-off frequency for a 4th order low-pass Butterworth filter
-## Vertical speeds (on X, Y, or Z axis, or 2D speeds)
-# speed_kind = 'y' # 'x', 'y', 'z', or '2D'
-# vmax = 20 # px/s
-# cam1_nb = 4
-# cam2_nb = 3
-# id_kpt = [9,10] # Pour plus tard aller chercher numéro depuis keypoint name dans skeleton.py. 'RWrist' BLAZEPOSE 16, BODY_25B 10, BODY_25 4 ; 'LWrist' BLAZEPOSE 15, BODY_25B 9, BODY_25 7
-# weights_kpt = [1,1] # Pris en compte uniquement si on a plusieurs keypoints
+# display_sync_plots = true # true or false (lowercase)
+# keypoints_to_consider = 'all' # 'all' if all points should be considered (default)
+#                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify the keypoints to consider
+# approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
+#                            # [1.0, 0.2, 0.8, 1.1] list of times in seconds, one value per camera if you want to specify an approximate time where to search for synchronization.
+#                            # Best times: only one person is in the scene, who performs a sharp vertical movement (with keypoints_to_consider).
+# reset_sync = false # Revert to state before synchronization. Won't attempt to synchronize unless set to false.
 
 
 # [personAssociation]

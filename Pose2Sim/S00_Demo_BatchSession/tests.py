@@ -107,6 +107,7 @@ def test_workflow():
     # STATIC TRIAL
     project_dir = os.path.join("S00_P00_SingleParticipant","S00_P00_T00_StaticTrial")
     config_dict.get("project").update({"project_dir":project_dir})
+    config_dict.get("synchronization").update({"reset_sync":True})
     # Pose2Sim.poseEstimation(config_dict)
     Pose2Sim.synchronization(config_dict)
     Pose2Sim.personAssociation(config_dict)
@@ -180,7 +181,9 @@ def test_workflow():
     
     config_dict = toml.load('../S01_Demo_SingleTrial/Config.toml')
     project_dir = os.path.join("../S01_Demo_SingleTrial")
+    os.chdir(project_dir)
     config_dict.get("project").update({"project_dir":project_dir})
+    config_dict.get("synchronization").update({"display_sync_plots":False})
     config_dict['filtering']['display_figures'] = False
     Pose2Sim.calibration(config_dict)
     # Pose2Sim.poseEstimation(config_dict)

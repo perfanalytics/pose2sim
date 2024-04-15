@@ -27,7 +27,6 @@ frame_range = [] # For example [10,300], or [] for all frames
 
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
-# Take heart, calibration is not that complicated once you get the hang of it!
 
 
 [pose]
@@ -51,6 +50,7 @@ approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture
 reset_sync = false # Revert to state before synchronization. Won't attempt to synchronize unless set to false.
 
 
+# Take heart, calibration is not that complicated once you get the hang of it!
 [calibration]
 calibration_type = 'convert' # 'convert' or 'calculate'
 
