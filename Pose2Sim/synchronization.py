@@ -18,7 +18,7 @@ All frames can be considered, or only those around a specific time (typically,
 the time when there is a single participant in the scene performing a clear vertical motion).
 Has also been successfully tested for synchronizing random walkswith random walks.
 
-If synchronization results are not satisfying, it can be reset to the original 
+If synchronization results are not satisfying, they can be reset to the original 
 state and tried again with different parameters.
 
 INPUTS: 

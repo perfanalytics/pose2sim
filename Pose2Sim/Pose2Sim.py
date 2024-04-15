@@ -192,7 +192,11 @@ def calibration(config=None):
 
     level, config_dicts = read_config_files(config)
     config_dict = config_dicts[0]
-    session_dir = os.path.realpath([os.getcwd() if level==3 else os.path.join(os.getcwd(), '..') if level==2 else os.path.join(os.getcwd(), '..', '..')][0])
+    try:
+        session_dir = os.path.realpath([os.getcwd() if level==3 else os.path.join(os.getcwd(), '..') if level==2 else os.path.join(os.getcwd(), '..', '..')][0])
+        [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower() ][0]
+    except:
+        session_dir = os.path.realpath(os.getcwd())
     config_dict.get("project").update({"project_dir":session_dir})
 
     # Set up logging
