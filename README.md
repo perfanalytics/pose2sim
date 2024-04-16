@@ -40,8 +40,8 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 </br>
 
 **Pose2Sim releases:**
-- [x] **v0.1** *(09/2021)*: Published online
-- [x] **v0.2** *(09/2022)*: Published associated paper
+- [x] **v0.1** *(08/2021)*: Published paper
+- [x] **v0.2** *(01/2022)*: Published code
 - [x] **v0.3** *(01/2023)*: Supported other pose estimation algorithms
 - [x] **v0.4** *(07/2023)*: New calibration tool based on scene measurements
 - [x] **v0.5** *(12/2023)*: Automatic batch processing
