@@ -134,12 +134,13 @@ interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
 show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
 undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
-make_c3d = false # save triangulated data in c3d format in addition to trc # Coming soon!
+make_c3d = false # save triangulated data in c3d format in addition to trc
 
 
 [filtering]
 type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
 display_figures = false # true or false (lowercase)
+make_c3d = false # also save triangulated data in c3d format
 
    [filtering.butterworth]
    order = 4 

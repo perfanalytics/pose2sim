@@ -40,14 +40,14 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 </br>
 
 **Pose2Sim releases:**
-- [x] v0.1: Published online
-- [x] v0.2: Published associated paper
-- [x] v0.3: Supported other pose estimation algorithms
-- [x] v0.4: New calibration tool based on scene measurements
-- [x] v0.5: Automatic batch processing
-- [x] v0.6: Marker augmentation, Blender visualizer
-- [x] v0.7: Multi-person analysis
-- [x] **v0.8: New synchronization tool**
+- [x] **v0.1** *(09/2021)*: Published online
+- [x] **v0.2** *(09/2022)*: Published associated paper
+- [x] **v0.3** *(01/2023)*: Supported other pose estimation algorithms
+- [x] **v0.4** *(07/2023)*: New calibration tool based on scene measurements
+- [x] **v0.5** *(12/2023)*: Automatic batch processing
+- [x] **v0.6** *(02/2024)*: Marker augmentation, Blender visualizer
+- [x] **v0.7** *(03/2024)*: Multi-person analysis
+- [x] **v0.8 *(04/2024)*: New synchronization tool**
 - [ ] v0.9: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
 - [ ] v0.10: Graphical User Interface
 - [ ] v1.0: First accomplished release
@@ -375,7 +375,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 > _**Calculate calibration parameters with a checkerboard, with measurements on the scene, or automatically with detected keypoints.**_\
 > Take heart, it is not that complicated once you get the hang of it!
 
-  > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S01_Demo_SingleTrial/Config.toml).\
+  > *N.B.:* Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S00_Demo_BatchSession/Config.toml).\
   For the sake of practicality, there are voluntarily few board images for intrinsic calibration, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm#:~:text=Angle%20results%20were,Table%203).).
   
   - **Calculate intrinsic parameters with a checkerboard:**
@@ -385,7 +385,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
     - Create a folder for each camera in your `Calibration\intrinsics` folder.
     - For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
-    - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S01_Demo_SingleTrial/Config.toml) file.
+    - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S00_Demo_BatchSession/Config.toml) file.
     - Make sure that the board:
       - is filmed from different angles, covers a large part of the video frame, and is in focus.
       - is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
@@ -403,7 +403,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
   - Create a folder for each camera in your `Calibration\extrinsics` folder.
   - Once your cameras are in place, shortly film either a board laid on the floor, or the raw scene\
   (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format).
-  - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S01_Demo_SingleTrial/Config.toml) file.
+  - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S00_Demo_BatchSession/Config.toml) file.
   - Then,
     - **With a checkerboard:**\
       Make sure that it is seen by all cameras. \
