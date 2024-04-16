@@ -10,8 +10,6 @@
     Converts c3d files to trc files.
     Beware that it only allows you to retrieve 3D points, you won't get analog data nor computed data such as angles or powers with this code. 
     
-    N.B.: First install c3d: `pip install c3d`
-    
     Usage: 
     from Pose2Sim.Utilities import c3d_to_trc; c3d_to_trc.c3d_to_trc_func(r'<input_c3d_file>')
     python -m c3d_to_trc -i input_c3d_file

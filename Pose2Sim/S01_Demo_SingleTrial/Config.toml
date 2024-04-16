@@ -164,6 +164,7 @@ make_c3d = false # save triangulated data in c3d format in addition to trc
 ## Only works on BODY_25 and BODY_25B models
 participant_height = 1.72 # m # float if single person, list of float if multi-person (same order as the Static trials)
 participant_mass = 70.0 # kg
+make_c3d = false # save triangulated data in c3d format in addition to trc
 
 
 [opensim]

@@ -129,13 +129,13 @@ reorder_trc = true # only checked if multi_person analysis
 # show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 # handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
 # undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
-# make_c3d = false # save triangulated data in c3d format in addition to trc
+make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
-# [filtering]
+[filtering]
 # type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
 # display_figures = false # true or false (lowercase)
-# make_c3d = false # save triangulated data in c3d format in addition to trc
+make_c3d = true # save triangulated data in c3d format in addition to trc
 
    # [filtering.butterworth]
    # order = 4 
@@ -159,10 +159,11 @@ reorder_trc = true # only checked if multi_person analysis
 ## Only works on BODY_25 and BODY_25B models
 participant_height = [1.21, 1.72] # m # float if single person, list of float if multi-person (same order as the Static trials)
 participant_mass = [25.0, 70.0] # kg
+make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
 # [opensim]
-# static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
+# static_trial = [# static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
 #              # If this Config.toml file is at the Trial level, set to true or false (lowercase);
 #              # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
 #              # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']

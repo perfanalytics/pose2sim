@@ -23,13 +23,14 @@ OUTPUT:
 ## INIT
 import os
 import numpy as np
-from Pose2Sim.MarkerAugmenter import utilsDataman
 import copy
 import tensorflow as tf
-from Pose2Sim.MarkerAugmenter.utils import TRC2numpy
-import json
 import glob
 import logging
+
+from Pose2Sim.MarkerAugmenter import utilsDataman
+from Pose2Sim.MarkerAugmenter.utils import TRC2numpy
+from Pose2Sim.common import convert_to_c3d
 
 
 ## AUTHORSHIP INFORMATION
@@ -65,7 +66,6 @@ def augmentTRC(config_dict):
     project_dir = config_dict.get('project').get('project_dir')
     pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     pathOutputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    pose_model = config_dict.get('pose').get('pose_model')
     subject_height = config_dict.get('markerAugmentation').get('participant_height')
     if subject_height is None or subject_height == 0 or subject_height==0:
         raise ValueError("Subject height is not set or invalid in the config file.")
@@ -73,6 +73,7 @@ def augmentTRC(config_dict):
     if not type(subject_height) == list:
         subject_height = [subject_height]
         subject_mass = [subject_mass]
+    make_c3d = config_dict.get('markerAugmentation').get('make_c3d')
     augmenterDir = os.path.dirname(utilsDataman.__file__)
     augmenterModelName = 'LSTM'
     augmenter_model = 'v0.3'
@@ -151,8 +152,6 @@ def augmentTRC(config_dict):
             trc_data_data = trc_data[:,1:]
 
             # Step 2: Normalize with reference marker position.
-            with open(os.path.join(augmenterModelDir, "metadata.json"), 'r') as f:
-                metadata = json.load(f)
             referenceMarker_data = midhip_data  # instead of trc_file.marker(referenceMarker) # change by HunMin
             norm_trc_data_data = np.zeros((trc_data_data.shape[0],
                                         trc_data_data.shape[1]))
@@ -245,7 +244,15 @@ def augmentTRC(config_dict):
         # %% Return augmented .trc file   
         trc_file.write(pathOutputTRCFile)
 
-        logging.info(f'Augmented marker coordinates are stored at {pathOutputTRCFile}.\n')
+        logging.info(f'Augmented marker coordinates are stored at {pathOutputTRCFile}.')
+
+        # Save c3d
+        if make_c3d:
+            print(pathOutputTRCFile)
+            convert_to_c3d(pathOutputTRCFile)
+            logging.info(f'Augmented trc files have been converted to c3d.')
+        
+        logging.info('\n')
     
     return min_y_pos
 

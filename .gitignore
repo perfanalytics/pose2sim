@@ -8,6 +8,7 @@ dist/
 # **/*.mp4
 **/*.trc
 **/*.sto
+**/*.c3d
 
 **/Calib_qualisys.toml
 **/pose-3d/

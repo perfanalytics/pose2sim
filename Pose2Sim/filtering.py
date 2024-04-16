@@ -37,7 +37,7 @@ from filterpy.kalman import KalmanFilter, rts_smoother
 from filterpy.common import Q_discrete_white_noise
 
 from Pose2Sim.common import plotWindow
-from Pose2Sim.common import trc_to_c3d
+from Pose2Sim.common import convert_to_c3d
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -416,6 +416,7 @@ def recap_filter3d(config, trc_path):
     gaussian_filter_sigma_kernel = int(config.get('filtering').get('gaussian').get('sigma_kernel'))
     loess_filter_nb_values = config.get('filtering').get('LOESS').get('nb_values_used')
     median_filter_kernel_size = config.get('filtering').get('median').get('kernel_size')
+    make_c3d = config.get('filtering').get('make_c3d')
     
     # Recap
     filter_mapping_recap = {
@@ -428,6 +429,8 @@ def recap_filter3d(config, trc_path):
     }
     logging.info(filter_mapping_recap[filter_type])
     logging.info(f'Filtered 3D coordinates are stored at {trc_path}.\n')
+    if make_c3d:
+        logging.info('All filtered trc files have been converted to c3d.')
 
 
 def filter_all(config):
@@ -497,10 +500,11 @@ def filter_all(config):
             # Q_filt = Q_filt.fillna(' ')
             Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
 
+        # Save c3d
+        if make_c3d:
+            convert_to_c3d(t_out)
+
         # Recap
         recap_filter3d(config, t_out)
 
-        # Save c3d
-        if make_c3d == True:
-            trc_to_c3d(project_dir, frame_rate, called_from='filtering')
 

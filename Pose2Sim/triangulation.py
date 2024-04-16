@@ -50,8 +50,7 @@ from anytree.importer import DictImporter
 import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
-    reprojection, euclidean_distance, sort_stringlist_by_last_number, zup2yup
-from Pose2Sim.common import trc_to_c3d
+    reprojection, euclidean_distance, sort_stringlist_by_last_number, zup2yup, convert_to_c3d
 from Pose2Sim.skeletons import *
 
 
@@ -312,7 +311,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     # if single trial
-    session_dir = os.getcwd() if not 'Config.toml' in session_dir else session_dir
+    session_dir = os.getcwd() if not 'Config.toml' in os.listdir(session_dir) else session_dir
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     calib = toml.load(calib_file)
@@ -322,6 +321,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     likelihood_threshold = config.get('triangulation').get('likelihood_threshold_triangulation')
     show_interp_indices = config.get('triangulation').get('show_interp_indices')
     interpolation_kind = config.get('triangulation').get('interpolation')
+    make_c3d = config.get('triangulation').get('make_c3d')
     handle_LR_swap = config.get('triangulation').get('handle_LR_swap')
     undistort_points = config.get('triangulation').get('undistort_points')
     
@@ -374,8 +374,11 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
                 str_cam_excluded_count += f'Camera {k}: {int(np.round(v*100))}%, '
         logging.info(str_cam_excluded_count)
         logging.info(f'\n3D coordinates are stored at {trc_path[n]}.')
-    
-    logging.info(f'\n\nLimb swapping was {"handled" if handle_LR_swap else "not handled"}.')
+        
+    logging.info('\n\n')
+    if make_c3d:
+        logging.info('All trc files have been converted to c3d.')
+    logging.info(f'Limb swapping was {"handled" if handle_LR_swap else "not handled"}.')
     logging.info(f'Lens distortions were {"taken into account" if undistort_points else "not taken into account"}.')
 
 
@@ -693,7 +696,7 @@ def triangulate_all(config):
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     # if single trial
-    session_dir = os.getcwd() if not 'Config.toml' in session_dir else session_dir
+    session_dir = os.getcwd() if not 'Config.toml' in os.listdir(session_dir) else session_dir
     multi_person = config.get('project').get('multi_person')
     pose_model = config.get('pose').get('pose_model')
     frame_range = config.get('project').get('frame_range')
@@ -705,7 +708,7 @@ def triangulate_all(config):
     undistort_points = config.get('triangulation').get('undistort_points')
     make_c3d = config.get('triangulation').get('make_c3d')
     frame_rate = config.get('project').get('frame_rate')
-
+    
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
     try:
         calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
@@ -909,23 +912,25 @@ def triangulate_all(config):
     
     # Create TRC file
     trc_paths = [make_trc(config, Q_tot[n], keypoints_names, f_range, id_person=n) for n in range(len(Q_tot))]
-
+    if make_c3d:
+        c3d_paths = [convert_to_c3d(t) for t in trc_paths]
+        
     # Reorder TRC files
     if multi_person and reorder_trc and len(trc_paths)>1:
         trc_id = retrieve_right_trc_order(trc_paths)
         [os.rename(t, t+'.old') for t in trc_paths]
         [os.rename(t+'.old', trc_paths[i]) for i, t in zip(trc_id,trc_paths)]
+        if make_c3d:
+            [os.rename(c, c+'.old') for c in c3d_paths]
+            [os.rename(c+'.old', c3d_paths[i]) for i, c in zip(trc_id,c3d_paths)]
         error_tot = [error_tot[i] for i in trc_id]
         nb_cams_excluded_tot = [nb_cams_excluded_tot[i] for i in trc_id]
         cam_excluded_count = [cam_excluded_count[i] for i in trc_id]
         interp_frames = [interp_frames[i] for i in trc_id]
         non_interp_frames = [non_interp_frames[i] for i in trc_id]
         
-        logging.info('\nThe trc files have been renamed to match the order of the static sequences.')
-    
+        logging.info('\nThe trc and c3d files have been renamed to match the order of the static sequences.')
+
+
     # Recap message
     recap_triangulate(config, error_tot, nb_cams_excluded_tot, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, trc_paths)
-
-    # Save c3d
-    if make_c3d == True:
-            trc_to_c3d(project_dir, frame_rate, called_from='triangulation')

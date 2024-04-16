@@ -163,10 +163,11 @@
 ## Only works on BODY_25 and BODY_25B models
 # participant_height = 1.72 # m # float if single person, list of float if multi-person (same order as the Static trials)
 # participant_mass = 70.0 # kg
+# make_c3d = false # save triangulated data in c3d format in addition to trc
 
 
 # [opensim]
-# static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
+# static_trial = [# static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
 #            # If this Config.toml file is at the Trial level, set to true or false (lowercase);
 #            # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
 #            # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']
