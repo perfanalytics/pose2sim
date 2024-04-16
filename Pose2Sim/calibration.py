@@ -689,7 +689,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             # Find corners or label by hand
             if extrinsics_method == 'board':
                 imgp, objp_not_used = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=object_coords_3d, show=show_reprojection_error)
-                if imgp == []:
+                if len(imgp) == 0:
                     logging.exception('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
                     raise ValueError('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
 
