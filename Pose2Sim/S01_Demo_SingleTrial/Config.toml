@@ -52,7 +52,7 @@ reset_sync = false # Revert to state before synchronization. Won't attempt to sy
 
 # Take heart, calibration is not that complicated once you get the hang of it!
 [calibration]
-calibration_type = 'calculate' # 'convert' or 'calculate'
+calibration_type = 'convert' # 'convert' or 'calculate'
 
    [calibration.convert]
    convert_from = 'qualisys' # 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
