@@ -524,13 +524,6 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
 
         ret, C, S, D, K, R, T = calibrate_intrinsics(calib_dir, intrinsics_config_dict)
 
-    # calculate extrinsics
-    if calculate_extrinsics:
-        logging.info(f'\nCalculating extrinsic parameters...')
-        ret, C, S, D, K, R, T = calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D)
-    else:
-        logging.info(f'\nExtrinsic parameters won\'t be calculated. Set "calculate_extrinsics" to true in Config.toml to calculate them.')
-
     return ret, C, S, D, K, R, T
 
 
