@@ -928,5 +928,4 @@ def triangulate_all(config):
 
     # Save c3d
     if make_c3d == True:
-            print(f"save to c3d !!")
             trc_to_c3d(project_dir, frame_rate, called_from='triangulation')
