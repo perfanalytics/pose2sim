@@ -982,7 +982,6 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                         elif is_key_h:
                             ax_3d.scatter(*objp_confirmed_notok, marker='o', color='r')
                         fig_3d.canvas.draw()
-                        print(count)
 
                     elif count == len(objp) - 1:
                         in_prompt = True
