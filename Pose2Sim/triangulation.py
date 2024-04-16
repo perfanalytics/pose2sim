@@ -703,7 +703,7 @@ def triangulate_all(config):
     interp_gap_smaller_than = config.get('triangulation').get('interp_if_gap_smaller_than')
     show_interp_indices = config.get('triangulation').get('show_interp_indices')
     undistort_points = config.get('triangulation').get('undistort_points')
-    make_trc = config.get('triangulation').get('make_trc')
+    make_c3d = config.get('triangulation').get('make_c3d')
     frame_rate = config.get('project').get('frame_rate')
 
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
@@ -927,5 +927,5 @@ def triangulate_all(config):
     recap_triangulate(config, error_tot, nb_cams_excluded_tot, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, trc_paths)
 
     # Save c3d
-    if make_trc == True:
+    if make_c3d == True:
             trc_to_c3d(project_dir, frame_rate, called_from='triangulation')
