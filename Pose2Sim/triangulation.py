@@ -51,6 +51,7 @@ import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
     reprojection, euclidean_distance, sort_stringlist_by_last_number, zup2yup
+from Pose2Sim.common import trc_to_c3d
 from Pose2Sim.skeletons import *
 
 
@@ -702,6 +703,8 @@ def triangulate_all(config):
     interp_gap_smaller_than = config.get('triangulation').get('interp_if_gap_smaller_than')
     show_interp_indices = config.get('triangulation').get('show_interp_indices')
     undistort_points = config.get('triangulation').get('undistort_points')
+    make_trc = config.get('triangulation').get('make_trc')
+    frame_rate = config.get('project').get('frame_rate')
 
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
     try:
@@ -922,3 +925,7 @@ def triangulate_all(config):
     
     # Recap message
     recap_triangulate(config, error_tot, nb_cams_excluded_tot, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, trc_paths)
+
+    # Save c3d
+    if make_trc == True:
+            trc_to_c3d(project_dir, frame_rate, called_from='triangulation')

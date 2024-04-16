@@ -37,6 +37,7 @@ from filterpy.kalman import KalmanFilter, rts_smoother
 from filterpy.common import Q_discrete_white_noise
 
 from Pose2Sim.common import plotWindow
+from Pose2Sim.common import trc_to_c3d
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -415,7 +416,7 @@ def recap_filter3d(config, trc_path):
     gaussian_filter_sigma_kernel = int(config.get('filtering').get('gaussian').get('sigma_kernel'))
     loess_filter_nb_values = config.get('filtering').get('LOESS').get('nb_values_used')
     median_filter_kernel_size = config.get('filtering').get('median').get('kernel_size')
-
+    
     # Recap
     filter_mapping_recap = {
         'kalman': f'--> Filter type: Kalman {kalman_filter_smooth_str}. Measurements trusted {kalman_filter_trustratio} times as much as previous data, assuming a constant acceleration process.', 
@@ -455,6 +456,8 @@ def filter_all(config):
     display_figures = config.get('filtering').get('display_figures')
     filter_type = config.get('filtering').get('type')
     seq_name = os.path.basename(os.path.realpath(project_dir))
+    make_c3d = config.get('filtering').get('make_c3d')
+    frame_rate = config.get('project').get('frame_rate')
     
     # Frames range
     pose_listdirs_names = next(os.walk(pose_dir))[1]
@@ -496,3 +499,8 @@ def filter_all(config):
 
         # Recap
         recap_filter3d(config, t_out)
+
+        # Save c3d
+        if make_c3d == True:
+            trc_to_c3d(project_dir, frame_rate, called_from='filtering')
+
