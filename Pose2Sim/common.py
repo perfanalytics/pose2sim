@@ -449,18 +449,16 @@ def trc_to_c3d(project_dir, frame_rate, called_from):
         'filtering' for.trc files from filtering step
         
     '''
-    # Get the last folder name of project_dir
-    last_folder_name = os.path.basename(project_dir)
-
+    # Determine the 3D pose folder
     pose3d_dir = os.path.join(project_dir, 'pose-3d')
 
     # Determine the .trc file name to read
     trc_files = []
     if called_from == 'triangulation':
-        trc_pattern = f"{last_folder_name}_*.trc"
+        trc_pattern = "*.trc"
         trc_files = [os.path.basename(f) for f in glob.glob(os.path.join(pose3d_dir, trc_pattern)) if 'filt' not in f]
     elif called_from == 'filtering':
-        trc_pattern = f"{last_folder_name}*_filt_*.trc"
+        trc_pattern = "*_filt_*.trc"
         trc_files = [os.path.basename(f) for f in glob.glob(os.path.join(pose3d_dir, trc_pattern))]
     else:
         print("Invalid called_from value.")
