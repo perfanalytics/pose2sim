@@ -599,6 +599,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
 
         # calculate intrinsics
         img = cv2.imread(str(img_path))
+        objpoints = np.array(objpoints)
         ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
                                     None, None, flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_PRINCIPAL_POINT))
         h, w = [np.float32(i) for i in img.shape[:-1]]
