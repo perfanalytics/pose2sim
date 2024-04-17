@@ -659,10 +659,13 @@ Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different ma
     <pre>
 
 [trc_from_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_easymocap.py) 
-Convert EasyMocap results keypoints3d json files to .trc.
+Convert EasyMocap results keypoints3d .json files to .trc.
 
 [c3d_to_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/c3d_to_trc.py)
-Converts 3D point data of a .c3d file to a .trc file compatible with OpenSim. No analog data (force plates, emg) nor computed data (angles, powers, etc.) are retrieved.
+Converts 3D point data from a .c3d file to a .trc file compatible with OpenSim. No analog data (force plates, emg) nor computed data (angles, powers, etc.) are retrieved.
+
+[trc_to_c3d.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_to_c3d.py)
+Converts 3D point data from a .trc file to a .c3d file compatible with Visual3D.
 
 [trc_desample.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_desample.py)
 Undersamples a trc file.
