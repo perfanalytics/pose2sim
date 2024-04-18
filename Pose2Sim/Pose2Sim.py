@@ -146,7 +146,7 @@ def read_config_files(config):
             # Create config dictionaries for all trials of the participant
             for (root,dirs,files) in os.walk(config_dir):
                 if 'Config.toml' in files and root != config_dir:
-                    trial_config_dict = toml.load(os.path.join(root, files[0]))
+                    trial_config_dict = toml.load(os.path.join(root, "Config.toml"))
                     # deep copy, otherwise session_config_dict is modified at each iteration within the config_dicts list
                     temp_dict = deepcopy(session_config_dict)
                     temp_dict = recursive_update(temp_dict,participant_config_dict)
@@ -164,10 +164,10 @@ def read_config_files(config):
                 if 'Config.toml' in files and root != config_dir:
                     # participant
                     if determine_level(root) == 2:
-                        participant_config_dict = toml.load(os.path.join(root, files[0]))
+                        participant_config_dict = toml.load(os.path.join(root, "Config.toml"))
                     # trial 
                     elif determine_level(root) == 1: 
-                        trial_config_dict = toml.load(os.path.join(root, files[0]))
+                        trial_config_dict = toml.load(os.path.join(root, "Config.toml"))
                         # deep copy, otherwise session_config_dict is modified at each iteration within the config_dicts list
                         temp_dict = deepcopy(session_config_dict)
                         temp_dict = recursive_update(temp_dict,participant_config_dict)
@@ -204,7 +204,7 @@ def calibration(config=None):
     currentDateAndTime = datetime.now()
     
     # Run calibration
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower() ][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and 'calib' in c.lower() ][0]
     logging.info("\n\n---------------------------------------------------------------------")
     logging.info("Camera calibration")
     logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")

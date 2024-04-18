@@ -178,7 +178,7 @@ def sort_people(Q_kpt_old, Q_kpt):
     # Compute distance between persons from one frame to another
     frame_by_frame_dist = []
     for comb in personsIDs_comb:
-        frame_by_frame_dist += [euclidean_distance(Q_kpt_old[comb[0]],Q_kpt[comb[1]])]
+        frame_by_frame_dist += [euclidean_distance(Q_kpt_old[comb[0]][:3],Q_kpt[comb[1]][:3])]
         
     # sort correspondences by distance
     minL, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
@@ -312,7 +312,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     # if single trial
     session_dir = os.getcwd() if not 'Config.toml' in os.listdir(session_dir) else session_dir
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and 'calib' in c.lower()][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     calib = toml.load(calib_file)
     cam_names = np.array([calib[c].get('name') for c in list(calib.keys())])
@@ -709,7 +709,7 @@ def triangulate_all(config):
     make_c3d = config.get('triangulation').get('make_c3d')
     frame_rate = config.get('project').get('frame_rate')
     
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
     try:
         calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     except:
