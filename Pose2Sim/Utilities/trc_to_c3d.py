@@ -34,7 +34,7 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def extract_marker_data(trc_path):
+def extract_trc_data(trc_path):
     '''
     Extract marker names and coordinates from a trc file.
 
@@ -78,6 +78,7 @@ def create_c3d_file(c3d_path, marker_names, trc_data_np):
     # write c3d file
     writer = c3d.Writer(point_rate=frame_rate, analog_rate=0, point_scale=1.0, point_units='mm', gen_scale=-1.0)
     writer.set_point_labels(marker_names)
+    writer.set_screen_axis(X='+Z', Y='+Y')
     
     for frame in trc_data_np:
         residuals = np.full((len(marker_names), 1), 0.0)
@@ -113,8 +114,10 @@ def trc_to_c3d_func(*args):
         trc_path = args[0] # invoked as a function
         c3d_path = trc_path.replace('.trc', '.c3d')
 
-    marker_names, trc_data_np = extract_marker_data(trc_path)
+    marker_names, trc_data_np = extract_trc_data(trc_path)
     create_c3d_file(c3d_path, marker_names, trc_data_np)
+
+    print(f'Converted trc file to {c3d_path}')
 
 
 if __name__ == '__main__':

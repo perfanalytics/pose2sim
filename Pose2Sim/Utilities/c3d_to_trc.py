@@ -115,6 +115,9 @@ def c3d_to_trc_func(*args):
             c3d_line_markers = c3d_line[index_data_markers]
             trc_line = '{i}\t{t}\t'.format(i=i, t=trc_time[n]) + '\t'.join(map(str,c3d_line_markers))
             trc_o.write(trc_line+'\n')
+
+    print(f'Converted c3d file to {trc_path}')
+    
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

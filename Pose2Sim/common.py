@@ -428,6 +428,7 @@ def create_c3d_file(c3d_path, marker_names, trc_data_np):
     # write c3d file
     writer = c3d.Writer(point_rate=frame_rate, analog_rate=0, point_scale=1.0, point_units='mm', gen_scale=-1.0)
     writer.set_point_labels(marker_names)
+    writer.set_screen_axis(X='+Z', Y='+Y')
     
     for frame in trc_data_np:
         residuals = np.full((len(marker_names), 1), 0.0)
