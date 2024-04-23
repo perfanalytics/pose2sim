@@ -24,6 +24,7 @@
 import os
 import numpy as np
 import json
+import re
 import matplotlib.pyplot as plt 
 from matplotlib.animation import FuncAnimation, FileMovieWriter 
 import argparse
@@ -41,6 +42,21 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def sort_stringlist_by_last_number(string_list):
+    '''
+    Sort a list of strings based on the last number in the string.
+    Works if other numbers in the string, if strings after number. Ignores alphabetical order.
+
+    Example: ['json1', 'js4on2.b', 'eypoints_0000003.json', 'ajson0', 'json10']
+    gives: ['ajson0', 'json1', 'js4on2.b', 'eypoints_0000003.json', 'json10']
+    '''
+    
+    def sort_by_last_number(s):
+        return int(re.findall(r'\d+', s)[-1])
+    
+    return sorted(string_list, key=sort_by_last_number)
+
+
 def save_inp_as_output(_img, c_name, dpi=100):
     h, w, _ = _img.shape
     fig, axes = plt.subplots(figsize=(h/dpi, w/dpi))
@@ -66,7 +82,7 @@ def json_display_without_img_func(**args):
 
     json_folder = os.path.realpath(args.get('json_folder'))
     json_fnames = [f for f in os.listdir(json_folder) if os.path.isfile(os.path.join(json_folder, f))]
-    json_fnames.sort(key=lambda f: int(f.split('_')[0])) # sort by frame number
+    json_fnames = sort_stringlist_by_last_number(json_fnames)
     
     output_img_folder =  args.get('output_img_folder')
     if output_img_folder==None: 
