@@ -59,7 +59,7 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = '0.6'
+__version__ = "0.8.2"
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
@@ -311,7 +311,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     # if single trial
-    session_dir = os.getcwd() if not 'Config.toml' in os.listdir(session_dir) else session_dir
+    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     calib = toml.load(calib_file)
@@ -696,7 +696,7 @@ def triangulate_all(config):
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     # if single trial
-    session_dir = os.getcwd() if not 'Config.toml' in os.listdir(session_dir) else session_dir
+    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     multi_person = config.get('project').get('multi_person')
     pose_model = config.get('pose').get('pose_model')
     frame_range = config.get('project').get('frame_range')

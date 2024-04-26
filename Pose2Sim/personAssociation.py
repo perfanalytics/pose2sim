@@ -54,7 +54,7 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = '0.6'
+__version__ = "0.8.2"
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
@@ -560,7 +560,7 @@ def recap_tracking(config, error=0, nb_cams_excluded=0):
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     # if single trial
-    session_dir = os.getcwd() if not 'Config.toml' in session_dir else session_dir
+    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     multi_person = config.get('project').get('multi_person')
     likelihood_threshold_association = config.get('personAssociation').get('likelihood_threshold_association')
     tracked_keypoint = config.get('personAssociation').get('single_person').get('tracked_keypoint')
@@ -622,7 +622,7 @@ def track_2d_all(config):
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     # if single trial
-    session_dir = os.getcwd() if not 'Config.toml' in session_dir else session_dir
+    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     multi_person = config.get('project').get('multi_person')
     pose_model = config.get('pose').get('pose_model')
     tracked_keypoint = config.get('personAssociation').get('single_person').get('tracked_keypoint')
