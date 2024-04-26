@@ -811,19 +811,20 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#9634; **OpenSim:** Do not require a separate scaling trial: scale on the 10 slowest frames of the moving trial instead.
 &#9634; **OpenSim:** Implement optimal fixed-interval Kalman smoothing for inverse kinematics ([this OpenSim fork](https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp)), or [Biorbd](https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp))
 
-&#10004; **GUI:** Blender add-on (cf [MPP2SOS](https://blendermarket.com/products/mocap-mpp2soss)), or webapp (e.g., with [Napari](https://napari.org/stable). See my draft project [Maya-Mocap](https://github.com/davidpagnon/Maya-Mocap) and [BlendOsim](https://github.com/JonathanCamargo/BlendOsim).
+&#10004; **GUI:** Blender add-on (cf [MPP2SOS](https://blendermarket.com/products/mocap-mpp2soss)), [Maya-Mocap](https://github.com/davidpagnon/Maya-Mocap) and [BlendOsim](https://github.com/JonathanCamargo/BlendOsim).
+&#9634; **GUI:** App or webapp (e.g., with [Napari](https://napari.org/stable).
 &#9634; **GUI:** 3D plot of cameras and of triangulated keypoints.
 &#9634; **GUI:** Demo on Google Colab (see [Sports2D](https://bit.ly/Sports2D_Colab) for OpenPose and Python package installation on Google Drive).
 
 &#10004; **Demo:** Provide Demo data for users to test the code.
-&#9634; **Demo:** Add videos for users to experiment with other pose detection frameworks
-&#9634; **Demo:** Time shift videos and json to demonstrate synchronization
-&#9634; **Demo:** Add another virtual person to demonstrate personAssociation
+&#10004; **Demo:** Add videos for users to experiment with other pose detection frameworks
+&#10004; **Demo:** Time shift videos and json to demonstrate synchronization
+&#10004; **Demo:** Add another virtual person to demonstrate personAssociation
 &#9634; **Tutorials:** Make video tutorials.
 &#9634; **Doc:** Use [Sphinx](https://www.sphinx-doc.org/en/master), [MkDocs](https://www.mkdocs.org), or (maybe better), [github.io](https://docs.github.com/fr/pages/quickstart) for clearer documentation.
 
 &#10004; **Pip package**
-&#10004; **Batch processing**
+&#10004; **Batch processing** (also enable non-batch processing)
 &#10004; **Catch errors**
 &#9634; **Conda package** 
 &#9634; **Docker image**
