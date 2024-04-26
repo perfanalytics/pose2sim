@@ -97,7 +97,7 @@ def interpolate_zeros_nans(col, *args):
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, fill_value='extrapolate', bounds_error=False)
     col_interp = np.where(mask, col, f_interp(col.index)) #replace at false index with interpolated values
     
-    # Reintroduce nans if lenght of sequence > N
+    # Reintroduce nans if length of sequence > N
     idx_notgood = np.where(~mask)[0]
     gaps = np.where(np.diff(idx_notgood) > 1)[0] + 1 # where the indices of true are not contiguous
     sequences = np.split(idx_notgood, gaps)
@@ -321,6 +321,7 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
     likelihood_threshold = config.get('triangulation').get('likelihood_threshold_triangulation')
     show_interp_indices = config.get('triangulation').get('show_interp_indices')
     interpolation_kind = config.get('triangulation').get('interpolation')
+    interp_gap_smaller_than = config.get('triangulation').get('interp_if_gap_smaller_than')
     make_c3d = config.get('triangulation').get('make_c3d')
     handle_LR_swap = config.get('triangulation').get('handle_LR_swap')
     undistort_points = config.get('triangulation').get('undistort_points')
@@ -343,14 +344,14 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
             logging.info(f'Mean reprojection error for {name} is {mean_error_keypoint_px} px (~ {mean_error_keypoint_m} m), reached with {mean_cam_excluded_keypoint} excluded cameras. ')
             if show_interp_indices:
                 if interpolation_kind != 'none':
-                    if len(list(interp_frames[n][idx])) ==0:
+                    if len(list(interp_frames[n][idx])) == 0 and len(list(non_interp_frames[n][idx])) == 0:
                         logging.info(f'  No frames needed to be interpolated.')
-                    else: 
+                    if len(list(interp_frames[n][idx]))>0: 
                         interp_str = str(interp_frames[n][idx]).replace(":", " to ").replace("'", "").replace("]", "").replace("[", "")
                         logging.info(f'  Frames {interp_str} were interpolated.')
                     if len(list(non_interp_frames[n][idx]))>0:
                         noninterp_str = str(non_interp_frames[n][idx]).replace(":", " to ").replace("'", "").replace("]", "").replace("[", "")
-                        logging.info(f'  Frames {non_interp_frames[n][idx]} could not be interpolated: consider adjusting thresholds.')
+                        logging.info(f'  Frames {noninterp_str} were not interpolated.')
                 else:
                     logging.info(f'  No frames were interpolated because \'interpolation_kind\' was set to none. ')
         
@@ -360,6 +361,8 @@ def recap_triangulate(config, error, nb_cams_excluded, keypoints_names, cam_excl
 
         logging.info(f'\n--> Mean reprojection error for all points on all frames is {mean_error_px} px, which roughly corresponds to {mean_error_mm} mm. ')
         logging.info(f'Cameras were excluded if likelihood was below {likelihood_threshold} and if the reprojection error was above {error_threshold_triangulation} px.') 
+        if interpolation_kind != 'none':
+            logging.info(f'Gaps were interpolated with {interpolation_kind} method if smaller than {interp_gap_smaller_than} frames.') 
         logging.info(f'In average, {mean_cam_excluded} cameras had to be excluded to reach these thresholds.')
         
         cam_excluded_count[n] = {i: v for i, v in zip(cam_names, cam_excluded_count[n].values())}
@@ -707,7 +710,6 @@ def triangulate_all(config):
     show_interp_indices = config.get('triangulation').get('show_interp_indices')
     undistort_points = config.get('triangulation').get('undistort_points')
     make_c3d = config.get('triangulation').get('make_c3d')
-    frame_rate = config.get('project').get('frame_rate')
     
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
     try:
@@ -803,7 +805,6 @@ def triangulate_all(config):
         # Q_old = Q except when it has nan, otherwise it takes the Q_old value
         nan_mask = np.isnan(Q)
         Q_old = np.where(nan_mask, Q_old, Q)
-        error_old, nb_cams_excluded_old, id_excluded_cams_old = error.copy(), nb_cams_excluded.copy(), id_excluded_cams.copy()
         Q = [[] for n in range(nb_persons_to_detect)]
         error = [[] for n in range(nb_persons_to_detect)]
         nb_cams_excluded = [[] for n in range(nb_persons_to_detect)]
@@ -908,7 +909,10 @@ def triangulate_all(config):
                 Q_tot[n] = Q_tot[n].apply(interpolate_zeros_nans, axis=0, args = [interp_gap_smaller_than, interpolation_kind])
             except:
                 logging.info(f'Interpolation was not possible for person {n}. This means that not enough points are available, which is often due to a bad calibration.')
-    # Q_tot.replace(np.nan, 0, inplace=True)
+    # Fill non-interpolated values with last valid one
+    for n in range(nb_persons_to_detect): 
+        Q_tot[n] = Q_tot[n].ffill(axis=0).bfill(axis=0)
+        # Q_tot[n].replace(np.nan, 0, inplace=True)
     
     # Create TRC file
     trc_paths = [make_trc(config, Q_tot[n], keypoints_names, f_range, id_person=n) for n in range(len(Q_tot))]
