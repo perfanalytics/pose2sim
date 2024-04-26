@@ -568,7 +568,7 @@ def recap_tracking(config, error=0, nb_cams_excluded=0):
     reconstruction_error_threshold = config.get('personAssociation').get('multi_person').get('reconstruction_error_threshold')
     min_affinity = config.get('personAssociation').get('multi_person').get('min_affinity')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower()][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     
     if not multi_person:
@@ -633,7 +633,7 @@ def track_2d_all(config):
     frame_range = config.get('project').get('frame_range')
     undistort_points = config.get('triangulation').get('undistort_points')
     
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower() ][0]
+    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
     try:
         calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     except:
