@@ -73,7 +73,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
    4. [Camera calibration](#camera-calibration)
       1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
-   5. [Synchronization, Tracking, Triangulating, Filtering](#synchronization-tracking-triangulating-filtering)
+   5. [Synchronizing, Tracking, Triangulating, Filtering](#synchronizing-tracking-triangulating-filtering)
       1. [Synchronization](#synchronization)
       2. [Associate persons across cameras](#associate-persons-across-cameras)
       3. [Triangulating keypoints](#triangulating-keypoints)
@@ -96,7 +96,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 1. **Install OpenPose** (instructions [there](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/installation/0_index.md)). \
 *Windows portable demo is enough.*
 2. **Install OpenSim 4.x** ([there](https://simtk.org/frs/index.php?group_id=91)). \
-*Tested up to v4.4-beta on Windows. Has to be compiled from source on Linux (see [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Linux+Support)).*
+*Tested up to v4.5 on Windows. Has to be compiled from source on Linux (see [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Linux+Support)).*
 3. ***Optional.*** *Install Anaconda or [Miniconda](https://docs.conda.io/en/latest/miniconda.html). \
    Open an Anaconda terminal and create a virtual environment with typing:*
    <pre><i>conda create -n Pose2Sim python=3.8 -y 
@@ -136,8 +136,11 @@ Pose2Sim.markerAugmentation()
 ```
 3D results are stored as .trc files in each trial folder in the `pose-3d` directory.
 
-*N.B.:* Default parameters have been provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S01_Demo_SingleTrial/Config.toml) but can be edited.\
-*N.B.:* *Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` (more info [there](#calculate-from-scratch)).*
+*N.B.:* Default parameters have been provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S01_Demo_SingleTrial/Config.toml) but can be edited.
+
+</br>
+
+__*Go further:*__ Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S01_Demo_SingleTrial/Config.toml) (more info [there](#calculate-from-scratch)).
 
 <br/>
 
@@ -153,7 +156,7 @@ Pose2Sim.markerAugmentation()
 
 ### Inverse kinematics
 1. Load the provided `IK_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Inverse kinematics -> Load)*
-2. Run. You should see your skeletal model move in the Vizualizer window.
+2. Run. You should see your skeletal model move in the Visualizer window.
 5. Your IK motion file will be saved in `S00_P00_OpenSim`.
 <br/>
 
@@ -792,7 +795,6 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Triangulation:** [Undistort](https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga887960ea1bde84784e7f1710a922b93c) 2D points before triangulating (and [distort](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301) them before computing reprojection error).
 &#10004; **Triangulation:** Offer the possibility to augment the triangulated data with [the OpenCap LSTM](https://github.com/stanfordnmbl/opencap-core/blob/main/utilsAugmenter.py). Create "BODY_25_AUGMENTED" model, Scaling_setup, IK_Setup. 
 &#10004; **Triangulation:** Multiple person kinematics (output multiple .trc coordinates files). Triangulate all persons with reprojection error above threshold, and identify them by minimizing their displacement across frames.
-&#9634; **Triangulation:** If the gap is larger than the interpolation threshold, fill it with previous frames instead of leaving it blank. 
 &#9634; **Triangulation:** Pre-compile weighted_triangulation and reprojection with @jit(nopython=True, parallel=True) for faster execution.
 &#9634; **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).
 &#9634; **Triangulation:** Implement normalized DLT and RANSAC triangulation, Outlier rejection (sliding z-score?), as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).
