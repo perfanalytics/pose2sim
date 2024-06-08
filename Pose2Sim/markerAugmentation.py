@@ -34,7 +34,7 @@ from Pose2Sim.common import convert_to_c3d
 
 
 ## AUTHORSHIP INFORMATION
-__author__ = "Antoine Falisse, adapted by HunMin Kim"
+__author__ = "Antoine Falisse, adapted by HunMin Kim and David Pagnon"
 __copyright__ = "Copyright 2022, OpenCap"
 __credits__ = ["Antoine Falisse", "HunMin Kim"]
 __license__ = "Apache-2.0 License"
@@ -46,7 +46,7 @@ __status__ = "Development"
 
 ## FUNCTIONS
 # subject_height must be in meters
-def get_midhip_data(trc_file):
+def check_midhip_data(trc_file):
     try:
         # Find MidHip data
         midhip_data = trc_file.marker("CHip")
@@ -57,8 +57,25 @@ def get_midhip_data(trc_file):
         rhip_data = trc_file.marker("RHip")
         lhip_data = trc_file.marker("LHip")
         midhip_data = (rhip_data + lhip_data) / 2
+        trc_file.add_marker('CHip', *midhip_data.T)
 
-    return midhip_data
+    return trc_file
+
+
+def check_neck_data(trc_file):
+    try:
+        # Find Neck data
+        neck_data = trc_file.marker("Neck")
+        if neck_data is None or len(neck_data) == 0:
+            raise ValueError("Neck data is empty")
+    except (KeyError, ValueError):
+        # If Neck data is not found, calculate it from RShoulder and LShoulder
+        rshoulder_data = trc_file.marker("RShoulder")
+        lshoulder_data = trc_file.marker("LShoulder")
+        neck_data = (rshoulder_data + lshoulder_data) / 2
+        trc_file.add_marker('Neck', *neck_data.T)
+
+    return trc_file
 
 
 def augmentTRC(config_dict):
@@ -123,6 +140,11 @@ def augmentTRC(config_dict):
         except:
             raise ValueError('Cannot read TRC file. You may need to enable interpolation in Config.toml while triangulating.')
         
+        # add neck and midhip data if not in file
+        trc_file = check_midhip_data(trc_file)
+        trc_file = check_neck_data(trc_file)
+        trc_file.write(pathInputTRCFile)
+        
         # Verify that all feature markers are present in the TRC file.
         feature_markers_joined = set(feature_markers_all[0]+feature_markers_all[1])
         trc_markers = set(trc_file.marker_names)
@@ -145,14 +167,10 @@ def augmentTRC(config_dict):
             # %% Pre-process inputs.
             # Step 1: import .trc file with OpenPose marker trajectories.  
             trc_data = TRC2numpy(pathInputTRCFile, feature_markers)
-
-            # Calculate the midHip marker as the average of RHip and LHip
-            midhip_data = get_midhip_data(trc_file)
-
             trc_data_data = trc_data[:,1:]
 
             # Step 2: Normalize with reference marker position.
-            referenceMarker_data = midhip_data  # instead of trc_file.marker(referenceMarker) # change by HunMin
+            referenceMarker_data = trc_file.marker("CHip")  # instead of trc_file.marker(referenceMarker) # change by HunMin
             norm_trc_data_data = np.zeros((trc_data_data.shape[0],
                                         trc_data_data.shape[1]))
             for i in range(0,trc_data_data.shape[1],3):
