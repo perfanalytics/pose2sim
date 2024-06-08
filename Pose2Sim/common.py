@@ -230,7 +230,7 @@ def euclidean_distance(q1, q2):
     q2 = np.array(q2)
     dist = q2 - q1
     
-    euc_dist = np.sqrt(np.sum( [d**2 for d in dist]))
+    euc_dist = np.sqrt(np.nansum( [d**2 for d in dist]))
     
     return euc_dist
 
