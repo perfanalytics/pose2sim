@@ -109,7 +109,8 @@ def augmentTRC(config_dict):
     else:
         trc_files = trc_no_filtering
 
-    for p, pathInputTRCFile in enumerate(trc_files):
+    for p in range(len(subject_mass)):
+        pathInputTRCFile = trc_files[p]
         pathOutputTRCFile = os.path.splitext(pathInputTRCFile)[0] + '_LSTM.trc'
     
         # This is by default - might need to be adjusted in the future.
