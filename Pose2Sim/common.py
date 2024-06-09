@@ -229,6 +229,9 @@ def euclidean_distance(q1, q2):
     q1 = np.array(q1)
     q2 = np.array(q2)
     dist = q2 - q1
+    if np.isnan(dist).all():
+        dist =  np.empty_like(dist)
+        dist[...] = np.inf
     
     euc_dist = np.sqrt(np.nansum( [d**2 for d in dist]))
     
