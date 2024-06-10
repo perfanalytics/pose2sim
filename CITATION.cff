@@ -6,10 +6,10 @@ authors:
   orcid: "https://orcid.org/0000-0002-6891-8331"
 title: "Pose2Sim - Markerless kinematics, from OpenPose to OpenSim"
 version: 0.3.6
-doi: ''
+doi: '10.3390/s21196530'
 date-released: 2023-05-05
 url: "https://github.com/perfanalytics/pose2sim"
-journal: "GitHub repository"
+journal: "Sensors"
 preferred-citation:
   type: article
   authors:
@@ -23,7 +23,7 @@ preferred-citation:
     given-names: "Lionel"
     orcid: "https://orcid.org/0000-0002-0810-5187"
   doi: "10.3390/s21196530"
-  journal: "Journal Title"
+  journal: "Sensors"
   month: 9
   start: 6530 # First page number
   end: 6557 # Last page number
