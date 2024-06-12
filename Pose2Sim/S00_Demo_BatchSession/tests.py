@@ -8,7 +8,7 @@
     ########################################
     
     - BATCH SESSION:
-        - Calibration
+        - Calibration conversion from .qca.txt
         - Single person:
             - synchronization
             - person association
@@ -29,6 +29,11 @@
         - triangulation
         - filtering
         - marker augmentation
+
+    N.B.: Calibration from scene dimensions is not tested, as it requires the 
+    user to click points on the image. 
+    Not all possible configuration parameters are extensively tested.
+    Pose estimation, scaling, inverse kinematics are not tested yet.
     
     Usage: 
     from Pose2Sim.S00_Demo_BatchSession import tests; tests.test_workflow()
@@ -77,7 +82,12 @@ def test_workflow():
         - triangulation
         - filtering
         - marker augmentation
-        
+
+    N.B.: Calibration from scene dimensions is not tested, as it requires the 
+    user to click points on the image. 
+    Not all possible configuration parameters are extensively tested.
+    Pose estimation, scaling, inverse kinematics are not tested yet.
+    
     Usage: 
     from Pose2Sim.S00_Demo_BatchSession import tests; tests.test_workflow()
     python tests.py 
