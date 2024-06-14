@@ -265,6 +265,7 @@ Try uncommenting `[project]` and set `frame_range = [10,300]` for a Participant 
 
 ## 2D pose estimation
 > _**Estimate 2D pose from images with Openpose or another pose estimation solution.**_ \
+N.B.: OpenPose model files are apparently not available on their website anymore. Send me an email at dp2032@bath.ac.uk if you want me to forward them to you!\
 N.B.: First film a short static pose that will be used for scaling the OpenSim model (A-pose for example), and then film your motions of interest.\
 N.B.: Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json'.
 
