@@ -48,8 +48,9 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 - [x] **v0.6** *(02/2024)*: Marker augmentation, Blender visualizer
 - [x] **v0.7** *(03/2024)*: Multi-person analysis
 - [x] **v0.8 *(04/2024)*: New synchronization tool**
-- [ ] v0.9: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
-- [ ] v0.10: Graphical User Interface
+- [ ] v0.9: Integration of pose estimation and OpenSim in the pipeline
+- [ ] v0.10: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
+- [ ] v0.11: Graphical User Interface
 - [ ] v1.0: First accomplished release
 
 </br>
