@@ -394,7 +394,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     - Make sure that the board:
       - is filmed from different angles, covers a large part of the video frame, and is in focus.
       - is flat, without reflections, surrounded by a wide white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even). Go to [calib.io](https://calib.io/pages/camera-calibration-pattern-generator) to generate a suitable checkerboard.
-    - A common error is to specify the external, instead of the internal number of corners. This may be one less than you would intuitively think. 
+    - A common error is to specify the external, instead of the internal number of corners (one less than the count from calib.io). This may be one less than you would intuitively think. 
     
     <img src="Content/Calib_int.png" width="600">
 
