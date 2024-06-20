@@ -393,7 +393,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S00_Demo_BatchSession/Config.toml) file.
     - Make sure that the board:
       - is filmed from different angles, covers a large part of the video frame, and is in focus.
-      - is flat, without reflections, surrounded by a white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even).
+      - is flat, without reflections, surrounded by a wide white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even). Go to [calib.io](https://calib.io/pages/camera-calibration-pattern-generator) to generate a suitable checkerboard.
     - A common error is to specify the external, instead of the internal number of corners. This may be one less than you would intuitively think. 
     
     <img src="Content/Calib_int.png" width="600">
