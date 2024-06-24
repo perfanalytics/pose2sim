@@ -122,19 +122,23 @@ def read_qca(qca_path, binning_factor):
 
     root = etree.parse(qca_path).getroot()
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
+    res = []
     vid_id = []
     
     # Camera name
     for i, tag in enumerate(root.findall('cameras/camera')):
         ret += [float(tag.attrib.get('avg-residual'))]
         C += [tag.attrib.get('serial')]
+        res += [int(tag.attrib.get('video_resolution')[:-1]) if tag.attrib.get('video_resolution') is not None else 1080]
         if tag.attrib.get('model') in ('Miqus Video', 'Miqus Video UnderWater', 'none'):
             vid_id += [i]
     
     # Image size
-    for tag in root.findall('cameras/camera/fov_video'):
-        w = (float(tag.attrib.get('right')) - float(tag.attrib.get('left')) +1) /binning_factor
-        h = (float(tag.attrib.get('bottom')) - float(tag.attrib.get('top')) +1) /binning_factor
+    for i, tag in enumerate(root.findall('cameras/camera/fov_video')):
+        w = (float(tag.attrib.get('right')) - float(tag.attrib.get('left')) +1) /binning_factor \
+            / (1080/res[i]) 
+        h = (float(tag.attrib.get('bottom')) - float(tag.attrib.get('top')) +1) /binning_factor \
+            / (1080/res[i])
         S += [[w, h]]
     
     # Intrinsic parameters: distorsion and intrinsic matrix
@@ -145,12 +149,16 @@ def read_qca(qca_path, binning_factor):
         p2 = float(tag.get('tangentalDistortion2'))/64/binning_factor
         D+= [np.array([k1, k2, p1, p2])]
         
-        fu = float(tag.get('focalLengthU'))/64/binning_factor
-        fv = float(tag.get('focalLengthV'))/64/binning_factor
-        cu = float(tag.get('centerPointU'))/64/binning_factor \
-            - float(root.findall('cameras/camera/fov_video')[i].attrib.get('left'))
-        cv = float(tag.get('centerPointV'))/64/binning_factor \
-            - float(root.findall('cameras/camera/fov_video')[i].attrib.get('top'))
+        fu = float(tag.get('focalLengthU'))/64/binning_factor \
+            / (1080/res[i])
+        fv = float(tag.get('focalLengthV'))/64/binning_factor \
+            / (1080/res[i])
+        cu = (float(tag.get('centerPointU'))/64/binning_factor \
+            - float(root.findall('cameras/camera/fov_video')[i].attrib.get('left'))) \
+            / (1080/res[i])
+        cv = (float(tag.get('centerPointV'))/64/binning_factor \
+            - float(root.findall('cameras/camera/fov_video')[i].attrib.get('top'))) \
+            / (1080/res[i])
         K += [np.array([fu, 0., cu, 0., fv, cv, 0., 0., 1.]).reshape(3,3)]
 
     # Extrinsic parameters: rotation matrix and translation vector
@@ -696,7 +704,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
                     logging.exception('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
                     raise ValueError('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
                 if len(objp) < 10:
-                    logging.info(f'Only {len(objp)} reference points for camera {cam}. Calibration of extrinsic parameters may not be accurate with fewer than 10 reference points, as spread out as possible.')
+                    logging.info(f'Only {len(objp)} reference points for camera {cam}. Calibration of extrinsic parameters may not be accurate with fewer than 10 reference points, as spread out in the captured volume as possible.')
             
             elif extrinsics_method == 'keypoints':
                 logging.info('Calibration based on keypoints is not available yet.')
