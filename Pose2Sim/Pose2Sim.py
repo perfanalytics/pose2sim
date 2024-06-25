@@ -227,42 +227,40 @@ def poseEstimation(config=None):
     or the function can be called without an argument, in which case it the config directory is the current one.
     '''
     
-    raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
+    from Pose2Sim.poseEstimation import rtm_estimator
+
+    level, config_dicts = read_config_files(config)
+
+    if isinstance(config, dict):
+        config_dict = config_dicts[0]
+        if config_dict.get('project').get('project_dir') is None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+
+    # Set up logging
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    setup_logging(session_dir)
+
+    # Batch process all trials
+    for config_dict in config_dicts:
+        start = time.time()
+        currentDateAndTime = datetime.now()
+        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        seq_name = os.path.basename(project_dir)
+        frame_range = config_dict.get('project').get('frame_range')
+        frames = ["all frames" if not frame_range else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+
+        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info("Pose estimation")
+        logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
+        logging.info("---------------------------------------------------------------------")
+        logging.info(f"\nProject directory: {project_dir}")
     
-    # # TODO
-    # # Determine the level at which the function is called (session:3, participant:2, trial:1)
-    # level, config_dicts = read_config_files(config)
-
-    # if type(config)==dict:
-    #     config_dict = config_dicts[0]
-    #     if config_dict.get('project').get('project_dir') == None:
-    #         raise ValueError('Please specify the project directory in config_dict:\n \
-    #                          config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
-
-    # # Set up logging
-    # session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
-    # setup_logging(session_dir)
-
-    # # Batch process all trials
-    # for config_dict in config_dicts:
-    #     start = time.time()
-    #     currentDateAndTime = datetime.now()
-    #     project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
-    #     seq_name = os.path.basename(project_dir)
-    #     frame_range = config_dict.get('project').get('frame_range')
-    #     frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
-
-    #     logging.info("\n\n---------------------------------------------------------------------")
-    #     logging.info("Pose estimation")
-    #     logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
-    #     logging.info("---------------------------------------------------------------------")
-    #     logging.info(f"\nProject directory: {project_dir}")
-    
-    #     pose_estimation_all(config_dict)
+        rtm_estimator(config_dict)
         
-    #     end = time.time()
-    #     elapsed = end-start 
-    #     logging.info(f'Pose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        end = time.time()
+        elapsed = end - start 
+        logging.info(f'Pose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
 
 def synchronization(config=None):
