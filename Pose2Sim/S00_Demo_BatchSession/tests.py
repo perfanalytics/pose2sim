@@ -94,7 +94,7 @@ def test_workflow():
     '''
     
     config_dict = toml.load('Config.toml')
-    
+    config_dict['device'] = 'cpu'
     
     #################
     # BATCH SESSION #
