@@ -42,13 +42,15 @@ openpose_path = '' # only checked if OpenPose is used
 [pose_demo]
 data_type = "video"
 device = "cpu"
-backend = "onnxruntime"
-det_frequency = 10
-to_openpose = false
+backend = "openvino"
+det_frequency = 100
+to_openpose = true
 mode = "performance"
 tracking = false
 save_video = true
 realtime_vis = true
+skeleton_type = "body_and_feet" # body, wholebody, body_and_feet
+
 
 [synchronization]
 display_sync_plots = true # true or false (lowercase)
