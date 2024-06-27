@@ -1,0 +1,254 @@
+###############################################################################
+## PROJECT PARAMETERS                                                        ##
+###############################################################################
+
+
+# Configure your project parameters here. 
+# 
+# IMPORTANT:
+# If a parameter is not found here, Pose2Sim will look for its value in the 
+# Config.toml file of the level above. This way, you can set global 
+# instructions for the Session and alter them for specific Participants or Trials.
+#
+# If you wish to overwrite a parameter for a specific trial or participant,  
+# edit its Config.toml file by uncommenting its key (e.g., [project])
+# and editing its value (e.g., frame_range = [10,300]). Or else, uncomment 
+# [filtering.butterworth] and set cut_off_frequency = 10, etc.
+
+
+# [project]
+# multi_person = true # If false, only the main person in scene is analyzed. 
+# frame_rate = 60 # fps
+# frame_range = [] # For example [10,300], or [] for all frames
+## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
+## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
+## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
+
+# exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
+## e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
+
+
+# [pose]
+# pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
+# pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
+# 						      #With mediapipe: BLAZEPOSE. 
+# 						      #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
+# 						      #With deeplabcut: CUSTOM. See example at the end of the file.
+# # What follows has not been implemented yet
+# overwrite_pose = false
+# openpose_path = '' # only checked if OpenPose is used
+
+
+# [synchronization]
+# display_sync_plots = true # true or false (lowercase)
+# keypoints_to_consider = 'all' # 'all' if all points should be considered (default)
+#                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify the keypoints to consider
+# approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
+#                            # [1.0, 0.2, 0.8, 1.1] list of times in seconds, one value per camera if you want to specify an approximate time where to search for synchronization.
+#                            # Best times: only one person is in the scene, who performs a sharp vertical movement (with keypoints_to_consider).
+# reset_sync = false # Revert to state before synchronization. Won't attempt to synchronize unless set to false.
+
+
+## Take heart, calibration is not that complicated once you get the hang of it!
+# [calibration]
+# calibration_type = 'convert' # 'convert' or 'calculate'
+
+#    [calibration.convert]
+#    convert_from = 'qualisys' # 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
+#       [calibration.convert.qualisys]
+#       binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
+#       [calibration.convert.optitrack]  # See readme for instructions
+#       [calibration.convert.vicon]      # No parameter needed
+#       [calibration.convert.opencap]    # No parameter needed
+#       [calibration.convert.easymocap]  # No parameter needed
+#       [calibration.convert.biocv]      # No parameter needed
+#       [calibration.convert.anipose]    # No parameter needed
+#       [calibration.convert.freemocap]  # No parameter needed
+  
+
+#    [calibration.calculate] 
+#       # Camera properties, theoretically need to be calculated only once in a camera lifetime
+#       [calibration.calculate.intrinsics]
+#       overwrite_intrinsics = false #  # set to false if you don't want to recalculate intrinsic parameters
+#       show_detection_intrinsics = true # true or false (lowercase)
+#       intrinsics_extension = 'jpg' # any video or image extension
+#       extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
+#       intrinsics_corners_nb = [4,7] 
+#       intrinsics_square_size = 60 # mm
+
+#       # Camera placements, need to be done before every session
+#       [calibration.calculate.extrinsics]
+#       calculate_extrinsics = true # true or false (lowercase) 
+#       extrinsics_method = 'scene' # 'board', 'scene', 'keypoints'
+#       # 'board' should be large enough to be detected when laid on the floor. Not recommended.
+#       # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out.
+#       # 'keypoints' uses automatic pose estimation of a person freely walking and waving arms in the scene. Slighlty less accurate, requires synchronized cameras.
+#       moving_cameras = false # Not implemented yet
+
+#          [calibration.calculate.extrinsics.board]
+#          show_reprojection_error = true # true or false (lowercase)
+#          extrinsics_extension = 'png' # any video or image extension
+#          extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
+#          extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
+
+#          [calibration.calculate.extrinsics.scene]
+#          show_reprojection_error = true # true or false (lowercase)
+#          extrinsics_extension = 'png' # any video or image extension
+#          # list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
+#          # in m -> unlike for intrinsics, NOT in mm!
+#          object_coords_3d =   [[-2.0,  0.3,  0.0], 
+#                               [-2.0 , 0.0,  0.0], 
+#                               [-2.0, 0.0,  0.05], 
+#                               [-2.0, -0.3 ,  0.0], 
+#                               [0.0,  0.3,  0.0], 
+#                               [0.0, 0.0,  0.0], 
+#                               [0.0, 0.0,  0.05], 
+#                               [0.0, -0.3,  0.0]]
+        
+#          [calibration.calculate.extrinsics.keypoints]
+#          # Coming soon!
+
+
+# [personAssociation]
+#    likelihood_threshold_association = 0.3
+
+#    [personAssociation.single_person]
+#    reproj_error_threshold_association = 20 # px
+#    tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
+#                # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
+   
+#    [personAssociation.multi_person]
+#    reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
+#    min_affinity = 0.2 # affinity below which a correspondence is ignored
+
+
+# [triangulation]
+# reorder_trc = false # only checked if multi_person analysis
+# reproj_error_threshold_triangulation = 15 # px
+# likelihood_threshold_triangulation= 0.3
+# min_cameras_for_triangulation = 2
+# interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
+#                         # 'none' if you don't want to interpolate missing points
+# interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
+# show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
+# handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
+# undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
+# make_c3d = false # save triangulated data in c3d format in addition to trc
+
+
+# [filtering]
+# type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
+# display_figures = false # true or false (lowercase)
+# make_c3d = false # save triangulated data in c3d format in addition to trc
+
+#    [filtering.butterworth]
+#    order = 4 
+#    cut_off_frequency = 6 # Hz
+#    [filtering.kalman]
+#    # How much more do you trust triangulation results (measurements), than previous data (process assuming constant acceleration)?
+#    trust_ratio = 100 # = measurement_trust/process_trust ~= process_noise/measurement_noise
+#    smooth = true # should be true, unless you need real-time filtering
+#    [filtering.butterworth_on_speed]
+#    order = 4 
+#    cut_off_frequency = 10 # Hz
+#    [filtering.gaussian]
+#    sigma_kernel = 2 #px
+#    [filtering.LOESS]
+#    nb_values_used = 30 # = fraction of data used * nb frames
+#    [filtering.median]
+#    kernel_size = 9
+
+
+# [markerAugmentation] 
+## Only works on BODY_25 and BODY_25B models
+# participant_height = 1.72 # m # float if single person, list of float if multi-person (same order as the Static trials)
+# participant_mass = 70.0 # kg
+# make_c3d = false # save triangulated data in c3d format in addition to trc
+
+
+# [opensim]
+# static_trial = [# static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
+#            # If this Config.toml file is at the Trial level, set to true or false (lowercase);
+#            # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
+#            # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']
+# opensim_bin_path = 'C:\OpenSim 4.4\bin'
+
+
+
+## CUSTOM skeleton, if you trained your own DeepLabCut model for example. 
+## Make sure the node ids correspond to the column numbers of the 2D pose file, starting from zero.
+## 
+## If you want to perform inverse kinematics, you will also need to create an OpenSim model
+## and add to its markerset the location where you expect the triangulated keypoints to be detected.
+## 
+## In this example, CUSTOM reproduces the BODY_25B skeleton  (default skeletons are stored in skeletons.py).
+## You can create as many custom skeletons as you want, just add them further down and rename them.
+## 
+## Check your model hierarchy with:  for pre, _, node in RenderTree(model): 
+##                                      print(f'{pre}{node.name} id={node.id}')
+# [pose.CUSTOM]
+# name = "CHip"
+# id = "None"
+#   [[pose.CUSTOM.children]]
+#   name = "RHip"
+#   id = 12
+#      [[pose.CUSTOM.children.children]]
+#      name = "RKnee"
+#      id = 14
+#         [[pose.CUSTOM.children.children.children]]
+#         name = "RAnkle"
+#         id = 16
+#            [[pose.CUSTOM.children.children.children.children]]
+#            name = "RBigToe"
+#            id = 22
+#               [[pose.CUSTOM.children.children.children.children.children]]
+#               name = "RSmallToe"
+#               id = 23
+#            [[pose.CUSTOM.children.children.children.children]]
+#            name = "RHeel"
+#            id = 24
+#   [[pose.CUSTOM.children]]
+#   name = "LHip"
+#   id = 11
+#      [[pose.CUSTOM.children.children]]
+#      name = "LKnee"
+#      id = 13
+#         [[pose.CUSTOM.children.children.children]]
+#         name = "LAnkle"
+#         id = 15
+#            [[pose.CUSTOM.children.children.children.children]]
+#            name = "LBigToe"
+#            id = 19
+#               [[pose.CUSTOM.children.children.children.children.children]]
+#               name = "LSmallToe"
+#               id = 20
+#            [[pose.CUSTOM.children.children.children.children]]
+#            name = "LHeel"
+#            id = 21
+#   [[pose.CUSTOM.children]]
+#   name = "Neck"
+#   id = 17
+#      [[pose.CUSTOM.children.children]]
+#      name = "Head"
+#      id = 18
+#         [[pose.CUSTOM.children.children.children]]
+#         name = "Nose"
+#         id = 0
+#      [[pose.CUSTOM.children.children]]
+#      name = "RShoulder"
+#      id = 6
+#         [[pose.CUSTOM.children.children.children]]
+#         name = "RElbow"
+#         id = 8
+#            [[pose.CUSTOM.children.children.children.children]]
+#            name = "RWrist"
+#            id = 10
+#      [[pose.CUSTOM.children.children]]
+#      name = "LShoulder"
+#      id = 5
+#         [[pose.CUSTOM.children.children.children]]
+#         name = "LElbow"
+#         id = 7
+#            [[pose.CUSTOM.children.children.children.children]]
+#            name = "LWrist"
+#            id = 9
