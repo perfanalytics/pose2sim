@@ -6,18 +6,21 @@ import toml
 from tqdm import tqdm
 from rtmlib import PoseTracker, Body, Wholebody, Body_and_Feet, draw_skeleton
 import glob
+import re
 
-def process_video(video_path, output_path, json_output_dir, wholebody, save_video, skeleton_type, realtime_vis):
+def natural_sort_key(s):
+    return [int(c) if c.isdigit() else c.lower() for c in re.split('(\d+)', s)]
+
+def process_video(video_path, output_path, json_output_dir, wholebody, save_video, realtime_vis, openpose_skeleton):
     """
     Process a video file for pose estimation.
     
     Args:
         video_path (str): Path to the input video file
-        output_path (str): Path to save the output video (if save_video is True)
+        output_path (str): Path to save the output video (if save_video is True)pip
         json_output_dir (str): Directory to save JSON output files
         wholebody (PoseTracker): Initialized pose tracker object
         save_video (bool): Whether to save the output video
-        skeleton_type (str): Type of skeleton to draw ('coco', 'openpose', or 'halpe')
         realtime_vis (bool): Whether to show real-time visualization
     """
     cap = cv2.VideoCapture(video_path)
@@ -81,8 +84,8 @@ def process_video(video_path, output_path, json_output_dir, wholebody, save_vide
             img_show = draw_skeleton(img_show,
                                      keypoints,
                                      scores,
-                                     skeleton_type=skeleton_type,
-                                     kpt_thr=0.1)
+                                     kpt_thr=0.1,
+                                     openpose_skeleton=openpose_skeleton)
 
             if save_video:
                 out.write(img_show)
@@ -102,7 +105,7 @@ def process_video(video_path, output_path, json_output_dir, wholebody, save_vide
     if realtime_vis:
         cv2.destroyAllWindows()
 
-def process_images(image_folder, json_output_dir, pose_tracker, skeleton_type, realtime_vis):
+def process_images(image_folder, json_output_dir, pose_tracker, realtime_vis, openpose_skeleton):
     """
     Process a folder of image files for pose estimation.
     
@@ -110,10 +113,11 @@ def process_images(image_folder, json_output_dir, pose_tracker, skeleton_type, r
         image_folder (str): Path to the folder containing input images
         json_output_dir (str): Directory to save JSON output files
         pose_tracker (PoseTracker): Initialized pose tracker object
-        skeleton_type (str): Type of skeleton to draw ('coco', 'openpose', or 'halpe')
         realtime_vis (bool): Whether to show real-time visualization
+        openpose_skeleton (bool): Whether to use OpenPose skeleton format
     """
-    image_files = sorted(glob.glob(os.path.join(image_folder, '*.[jp][pn]g')))  # supports jpg, jpeg, png
+    image_files = glob.glob(os.path.join(image_folder, '*.[jp][pn]g'))  # supports jpg, jpeg, png
+    image_files.sort(key=natural_sort_key)
     
     if realtime_vis:
         cv2.namedWindow("Pose Estimation", cv2.WINDOW_NORMAL)
@@ -147,8 +151,11 @@ def process_images(image_folder, json_output_dir, pose_tracker, skeleton_type, r
             ]
         }
         
+        # Extract frame number from the filename
+        frame_number = int(re.search(r'\d+', os.path.basename(image_file)).group())
+        
         # Save JSON output for each image
-        json_file_path = os.path.join(json_output_dir, f"frame_{idx:05d}.json")
+        json_file_path = os.path.join(json_output_dir, f"frame_{frame_number:05d}.json")
         with open(json_file_path, 'w') as json_file:
             json.dump(json_output, json_file, indent=4)
 
@@ -157,8 +164,8 @@ def process_images(image_folder, json_output_dir, pose_tracker, skeleton_type, r
         img_show = draw_skeleton(img_show,
                                  keypoints,
                                  scores,
-                                 skeleton_type=skeleton_type,
-                                 kpt_thr=0.1)
+                                 kpt_thr=0.1,
+                                 openpose_skeleton=openpose_skeleton)
 
         if realtime_vis:
             cv2.imshow("Pose Estimation", img_show)
@@ -192,6 +199,7 @@ def rtm_estimator(config_dict):
     skeleton_type = config_dict['pose_demo']['skeleton_type']
     mode = config_dict['pose_demo']['mode']
     tracking = config_dict['pose_demo']['tracking']
+    openpose_skeleton = config_dict['pose_demo']['to_openpose']
     realtime_vis = config_dict['pose_demo']['realtime_vis']
 
     # Select the appropriate model based on the model_type
@@ -211,7 +219,8 @@ def rtm_estimator(config_dict):
         mode=mode,
         backend=backend,
         device=device,
-        tracking=tracking)
+        tracking=tracking,
+        to_openpose=openpose_skeleton)
 
     if data_type == "video":
         # Process video files
@@ -225,7 +234,7 @@ def rtm_estimator(config_dict):
             if not os.path.exists(json_output_dir):
                 os.makedirs(json_output_dir)
 
-            process_video(video_file, output_video_path, json_output_dir, pose_tracker, save_video, skeleton_type, realtime_vis)
+            process_video(video_file, output_video_path, json_output_dir, pose_tracker, save_video, realtime_vis, openpose_skeleton)
 
     elif data_type == "image":
         # Process image folders
@@ -237,6 +246,6 @@ def rtm_estimator(config_dict):
             if not os.path.exists(json_output_dir):
                 os.makedirs(json_output_dir)
 
-            process_images(image_folder_path, json_output_dir, pose_tracker, skeleton_type, realtime_vis)
+            process_images(image_folder_path, json_output_dir, pose_tracker, realtime_vis, openpose_skeleton)
     else:
         raise ValueError("Invalid data type. Must be 'video' or 'image'.")
