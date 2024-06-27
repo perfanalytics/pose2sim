@@ -16,19 +16,21 @@ def draw_bbox(img, bboxes, color=(0, 255, 0)):
 def draw_skeleton(img,
                   keypoints,
                   scores,
-                  openpose_skeleton=False,
+                  skeleton_type='coco',
                   kpt_thr=0.5,
                   radius=2,
                   line_width=2):
     num_keypoints = keypoints.shape[1]
 
-    if openpose_skeleton:
+    if skeleton_type == 'openpose':
         if num_keypoints == 18:
             skeleton = 'openpose18'
         elif num_keypoints == 134:
             skeleton = 'openpose134'
         else:
             raise NotImplementedError
+    elif skeleton_type == 'halpe':
+        skeleton = 'halpe26'
     else:
         if num_keypoints == 17:
             skeleton = 'coco17'
@@ -48,7 +50,7 @@ def draw_skeleton(img,
         scores = scores[None, :, :]
 
     num_instance = keypoints.shape[0]
-    if skeleton in ['coco17', 'coco133', 'hand21']:
+    if skeleton in ['coco17', 'coco133', 'hand21', 'halpe26']:
         for i in range(num_instance):
             img = draw_mmpose(img, keypoints[i], scores[i], keypoint_info,
                               skeleton_info, kpt_thr, radius, line_width)

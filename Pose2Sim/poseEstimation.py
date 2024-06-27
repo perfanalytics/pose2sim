@@ -198,6 +198,8 @@ def rtm_estimator(config_dict):
     mode = config_dict['pose_demo']['mode']
     tracking = config_dict['pose_demo']['tracking']
     realtime_vis = config_dict['pose_demo']['realtime_vis']
+    detector = config_dict['pose_demo']['detector']
+    poseEstimator = config_dict['pose_demo']['poseEstimator']
 
     # Initialize pose tracker
     wholebody = PoseTracker(
