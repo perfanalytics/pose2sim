@@ -49,7 +49,7 @@ mode = "lightweight" # 'performance', 'lightweight', 'balanced'
 tracking = false # Assign person id
 save_video = true
 realtime_vis = true
-skeleton_type = "body_and_feet" # body, wholebody, body_and_feetcccc
+skeleton_type = "body_and_feet" # body, wholebody, body_and_feet
 
 
 [synchronization]

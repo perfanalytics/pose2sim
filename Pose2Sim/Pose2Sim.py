@@ -227,7 +227,7 @@ def poseEstimation(config=None):
     or the function can be called without an argument, in which case it the config directory is the current one.
     '''
     
-    from Pose2Sim.poseEstimation import rtm_estimator
+    from Pose2Sim.poseEstimation import rtm_estimator # The name of the function might change
 
     level, config_dicts = read_config_files(config)
 
