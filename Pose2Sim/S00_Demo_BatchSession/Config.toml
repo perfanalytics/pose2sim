@@ -39,6 +39,18 @@ pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII.
 overwrite_pose = false
 openpose_path = '' # only checked if OpenPose is used
 
+[pose_demo]
+data_type = "video" # video or image
+device = "cpu" # cpu or gpu
+backend = "openvino" # opencv, onnxruntime, openvino
+det_frequency = 100 # How often do you detect people in a scene?
+to_openpose = false # Do not use when skeleton type = "body_and_feet"(already has a neck keypoint).
+mode = "lightweight" # 'performance', 'lightweight', 'balanced'
+tracking = false # Assign person id
+save_video = true
+realtime_vis = true
+skeleton_type = "body_and_feet" # body, wholebody, body_and_feet
+
 
 [synchronization]
 display_sync_plots = true # true or false (lowercase)

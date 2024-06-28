@@ -18,7 +18,7 @@
 
 
 [project]
-multi_person = false # If false, only the main person in scene is analyzed. 
+multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
 frame_rate = 60 # fps
 frame_range = [] # For example [10,300], or [] for all frames
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
@@ -38,6 +38,18 @@ pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII.
 # What follows has not been implemented yet
 overwrite_pose = false
 openpose_path = '' # only checked if OpenPose is used
+
+[pose_demo]
+data_type = "video" # video or image
+device = "cpu" # cpu or gpu
+backend = "openvino" # opencv, onnxruntime, openvino
+det_frequency = 100 # How often do you detect people in a scene?
+to_openpose = false # Do not use when skeleton type = "body_and_feet"(already has a neck keypoint).
+mode = "lightweight" # 'performance', 'lightweight', 'balanced'
+tracking = false # Assign person id
+save_video = true
+realtime_vis = true
+skeleton_type = "body_and_feet" # body, wholebody, body_and_feetcccc
 
 
 [synchronization]
@@ -70,7 +82,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
    [calibration.calculate] 
       # Camera properties, theoretically need to be calculated only once in a camera lifetime
       [calibration.calculate.intrinsics]
-      overwrite_intrinsics = true # set to false if you don't want to recalculate intrinsic parameters
+      overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
       show_detection_intrinsics = true # true or false (lowercase)
       intrinsics_extension = 'jpg' # any video or image extension
       extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
@@ -134,13 +146,13 @@ interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
 show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
 undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
-make_c3d = false # save triangulated data in c3d format in addition to trc # Coming soon!
+make_c3d = false # save triangulated data in c3d format in addition to trc
 
 
 [filtering]
 type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
 display_figures = false # true or false (lowercase)
-make_c3d = false # save triangulated data in c3d format in addition to trc
+make_c3d = false # also save triangulated data in c3d format
 
    [filtering.butterworth]
    order = 4 
