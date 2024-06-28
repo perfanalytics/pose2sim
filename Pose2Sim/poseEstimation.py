@@ -87,7 +87,7 @@ def process_video(video_path, output_path, json_output_dir, pose_tracker, save_v
             img_show = draw_skeleton(img_show,
                                      keypoints,
                                      scores,
-                                     kpt_thr=0.1 # maybe change this value if 0.1 is too low.,
+                                     kpt_thr=0.1, # maybe change this value if 0.1 is too low.
                                      openpose_skeleton=openpose_skeleton)
 
             if save_video:
@@ -167,7 +167,7 @@ def process_images(image_folder, json_output_dir, pose_tracker, realtime_vis, op
         img_show = draw_skeleton(img_show,
                                  keypoints,
                                  scores,
-                                 kpt_thr=0.1 # maybe change this value if 0.1 is too low.,
+                                 kpt_thr=0.1, # maybe change this value if 0.1 is too low.
                                  openpose_skeleton=openpose_skeleton)
 
         if realtime_vis:
