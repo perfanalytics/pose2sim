@@ -50,7 +50,7 @@ jobs:
           activate-environment: pose2sim
 
       - name: Install OpenSim with conda
-        run: conda install -c opensim-org opensim-moco -y
+        run: conda install opensim-org::opensim -y
 
       - name: Install dependencies
         run: |
