@@ -41,17 +41,22 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: ${{ matrix.python-version }}
-          activate-environment: pose2sim
+
+      - name: Create and activate environment
+        run: |
+          conda create -n pose2sim python=${{ matrix.python-version }} -y
+          echo "conda activate pose2sim" >> $GITHUB_ENV
+          source $GITHUB_ENV
+          conda install -n pose2sim -c conda-forge -c defaults pip -y
 
       - name: Install OpenSim with conda
         run: |
-          conda create -n pose2sim python=${{ matrix.python-version }} -y
-          conda install -n pose2sim -c conda-forge -c defaults pip
+          source $GITHUB_ENV
           conda install opensim-org::opensim -y
-
+      
       - name: Install pip dependencies
         run: |
+          source $GITHUB_ENV
           conda run -n pose2sim python -m pip install --upgrade pip
           conda run -n pose2sim python -m pip install flake8 pytest
           conda run -n pose2sim python -m pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
