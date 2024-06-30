@@ -45,9 +45,12 @@ jobs:
           activate-environment: pose2sim
 
       - name: Install OpenSim with conda
-        run: conda install opensim-org::opensim -y
+        run: |
+          conda create -n pose2sim python=${{ matrix.python-version }} -y
+          conda install -n pose2sim -c conda-forge -c defaults pip
+          conda install opensim-org::opensim -y
 
-      - name: Install dependencies
+      - name: Install pip dependencies
         run: |
           conda run -n pose2sim python -m pip install --upgrade pip
           conda run -n pose2sim python -m pip install flake8 pytest
