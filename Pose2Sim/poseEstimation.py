@@ -1,148 +1,86 @@
-import time
-import cv2
-import json
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+
+'''
+###########################################################################
+## POSE ESTIMATION                                                       ##
+###########################################################################
+
+    Estimate pose from a video file or a folder of images and 
+    write the results to JSON files, videos, and/or images.
+    Results can optionally be displayed in real time.
+
+    Supported models: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands), COCO_17 (body)
+    Supported modes: lightweight, balanced, performance (edit paths at rtmlib/tools/solutions if you 
+    need nother detection or pose models)
+
+    Optionally gives consistent person ID across frames (slower but good for 2D analysis)
+    Optionally runs detection every n frames and inbetween tracks points (faster but less accurate).
+
+    If a valid cuda installation is detected, uses the GPU with the ONNXRuntime backend. Otherwise, 
+    uses the CPU with the OpenVINO backend.
+
+    INPUTS:
+    - videos or image folders from the video directory
+    - a Config.toml file
+
+    OUTPUTS:
+    - JSON files with the detected keypoints and confidence scores in the OpenPose format
+    - Optionally, videos and/or image files with the detected keypoints 
+'''
+
+
+## INIT
 import os
-import toml
-from tqdm import tqdm
-from rtmlib import PoseTracker, Body, Wholebody, Body_and_Feet, draw_skeleton
 import glob
-import re
+import json
+import logging
+from tqdm import tqdm
+import cv2
+import torch
+import onnxruntime as ort
 
-def natural_sort_key(s):
-    """
-    Key for natural sorting of strings containing numbers.
-    """
-    return [int(c) if c.isdigit() else c.lower() for c in re.split('(\d+)', s)]
+from rtmlib import PoseTracker, Body, Wholebody, BodyWithFeet, draw_skeleton
+from Pose2Sim.common import natural_sort_key
 
-def process_video(video_path, output_path, json_output_dir, pose_tracker, save_video, realtime_vis, openpose_skeleton):
-    """
-    Process a video file for pose estimation.
-    
-    Args:
-        video_path (str): Path to the input video file
-        output_path (str): Path to save the output video (if save_video is True)pip
-        json_output_dir (str): Directory to save JSON output files
-        pose_tracker (PoseTracker): Initialized pose tracker object
-        save_video (bool): Whether to save the output video
-        realtime_vis (bool): Whether to show real-time visualization
-    """
-    cap = cv2.VideoCapture(video_path)
 
-    if save_video:
-        # Set up video writer if saving video is enabled
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
-        fps = cap.get(cv2.CAP_PROP_FPS) # Get the frame rate from the raw video
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) # Get the width from the raw video
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) # Get the height from the raw video
-        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height)) # Create the output video file
+## AUTHORSHIP INFORMATION
+__author__ = "HunMin Kim"
+__copyright__ = "Copyright 2021, Pose2Sim"
+__credits__ = ["HunMin Kim", "David Pagnon"]
+__license__ = "BSD 3-Clause License"
+__version__ = "0.8.5"
+__maintainer__ = "David Pagnon"
+__email__ = "contact@david-pagnon.com"
+__status__ = "Development"
 
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    frame_idx = 0
 
-    if realtime_vis:
-        # Create a window for real-time visualization
-        cv2.namedWindow("Pose Estimation", cv2.WINDOW_NORMAL) # window name can be changed "Pose Estimation" to anything else
+## FUNCTIONS
+def save_to_openpose(json_file_path, keypoints, scores):
+    '''
+    Save the keypoints and scores to a JSON file in the OpenPose format
 
-    with tqdm(total=total_frames, desc="Processing Frames", leave=False, ncols=100) as pbar:
-        while cap.isOpened():
-            success, frame = cap.read()
-            frame_idx += 1
+    INPUTS:
+    - json_file_path: Path to save the JSON file
+    - keypoints: Detected keypoints
+    - scores: Confidence scores for each keypoint
 
-            if not success:
-                break
+    OUTPUTS:
+    - JSON file with the detected keypoints and confidence scores in the OpenPose format
+    '''
 
-            # Perform pose estimation on the frame
-            keypoints, scores = pose_tracker(frame)
-            
-            # Prepare keypoints with confidence scores for JSON output
-            keypoints_with_confidence = []
-            for kp, score in zip(keypoints[0], scores[0]):
-                keypoints_with_confidence.extend([kp[0].item(), kp[1].item(), score.item()])
-
-            # Create JSON output structure
-            json_output = {
-                "version": 1.3,
-                "people": [
-                    {
-                        "person_id": [-1],
-                        "pose_keypoints_2d": keypoints_with_confidence,
-                        "face_keypoints_2d": [],
-                        "hand_left_keypoints_2d": [],
-                        "hand_right_keypoints_2d": [],
-                        "pose_keypoints_3d": [],
-                        "face_keypoints_3d": [],
-                        "hand_left_keypoints_3d": [],
-                        "hand_right_keypoints_3d": []
-                    }
-                ]
-            }
-            
-            # Save JSON output for each frame
-            json_file_path = os.path.join(json_output_dir, f"frame_{frame_idx:04d}.json")
-            with open(json_file_path, 'w') as json_file:
-                json.dump(json_output, json_file, indent=4)
-
-            # Draw skeleton on the frame
-            img_show = frame.copy()
-            img_show = draw_skeleton(img_show,
-                                     keypoints,
-                                     scores,
-                                     kpt_thr=0.1, # maybe change this value if 0.1 is too low.
-                                     openpose_skeleton=openpose_skeleton)
-
-            if save_video:
-                out.write(img_show)
-
-            if realtime_vis:
-                # Show real-time visualization
-                cv2.imshow("Pose Estimation", img_show)
-                # Break the loop if 'q' is pressed (also closes the window and stops the process)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-
-            pbar.update(1)
-
-    cap.release()
-    if save_video:
-        out.release()
-    if realtime_vis:
-        cv2.destroyAllWindows()
-
-def process_images(image_folder, json_output_dir, pose_tracker, realtime_vis, openpose_skeleton):
-    """
-    Process a folder of image files for pose estimation.
-    
-    Args:
-        image_folder (str): Path to the folder containing input images
-        json_output_dir (str): Directory to save JSON output files
-        pose_tracker (PoseTracker): Initialized pose tracker object
-        realtime_vis (bool): Whether to show real-time visualization
-        openpose_skeleton (bool): Whether to use OpenPose skeleton format
-    """
-    image_files = glob.glob(os.path.join(image_folder, '*.[jp][pn]g'))  # supports jpg, jpeg, png
-    image_files.sort(key=natural_sort_key)
-    
-    if realtime_vis:
-        cv2.namedWindow("Pose Estimation", cv2.WINDOW_NORMAL) # window name can be changed "Pose Estimation" to anything else
-
-    for idx, image_file in enumerate(tqdm(image_files, desc="Processing Images", ncols=100)):
-        frame = cv2.imread(image_file)
-        
-        # Perform pose estimation on the image
-        keypoints, scores = pose_tracker(frame)
-        
-        # Prepare keypoints with confidence scores for JSON output
-        keypoints_with_confidence = []
-        for kp, score in zip(keypoints[0], scores[0]):
-            keypoints_with_confidence.extend([kp[0].item(), kp[1].item(), score.item()])
-
-        # Create JSON output structure
-        json_output = {
-            "version": 1.3,
-            "people": [
-                {
+    # Prepare keypoints with confidence scores for JSON output
+    nb_detections = len(keypoints)
+    # print('results: ', keypoints, scores)
+    detections = []
+    for i in range(nb_detections): # nb of detected people
+        keypoints_with_confidence_i = []
+        for kp, score in zip(keypoints[i], scores[i]):
+            keypoints_with_confidence_i.extend([kp[0].item(), kp[1].item(), score.item()])
+        detections.append({
                     "person_id": [-1],
-                    "pose_keypoints_2d": keypoints_with_confidence,
+                    "pose_keypoints_2d": keypoints_with_confidence_i,
                     "face_keypoints_2d": [],
                     "hand_left_keypoints_2d": [],
                     "hand_right_keypoints_2d": [],
@@ -150,73 +88,246 @@ def process_images(image_folder, json_output_dir, pose_tracker, realtime_vis, op
                     "face_keypoints_3d": [],
                     "hand_left_keypoints_3d": [],
                     "hand_right_keypoints_3d": []
-                }
-            ]
-        }
-        
-        # Extract frame number from the filename
-        frame_number = int(re.search(r'\d+', os.path.basename(image_file)).group())
-        
-        # Save JSON output for each image
-        json_file_path = os.path.join(json_output_dir, f"frame_{frame_number:04d}.json")
-        with open(json_file_path, 'w') as json_file:
-            json.dump(json_output, json_file, indent=4)
+                })
+            
+    # Create JSON output structure
+    json_output = {"version": 1.3, "people": detections}
+    
+    # Save JSON output for each frame
+    json_output_dir = os.path.abspath(os.path.join(json_file_path, '..'))
+    if not os.path.isdir(json_output_dir): os.makedirs(json_output_dir)
+    with open(json_file_path, 'w') as json_file:
+        json.dump(json_output, json_file)
 
-        # Draw skeleton on the image
-        img_show = frame.copy()
-        img_show = draw_skeleton(img_show,
-                                 keypoints,
-                                 scores,
-                                 kpt_thr=0.1, # maybe change this value if 0.1 is too low.
-                                 openpose_skeleton=openpose_skeleton)
 
-        if realtime_vis:
-            cv2.imshow("Pose Estimation", img_show)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+def process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range):
+    '''
+    Estimate pose from a video file
+    
+    INPUTS:
+    - video_path: str. Path to the input video file
+    - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
+    - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
+    - save_video: bool. Whether to save the output video
+    - save_images: bool. Whether to save the output images
+    - display_detection: bool. Whether to show real-time visualization
+    - frame_range: list. Range of frames to process
+
+    OUTPUTS:
+    - JSON files with the detected keypoints and confidence scores in the OpenPose format
+    - if save_video: Video file with the detected keypoints and confidence scores drawn on the frames
+    - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
+    '''
+
+    try:
+        cap = cv2.VideoCapture(video_path)
+        cap.read()
+        if cap.read()[0] == False:
+            raise
+    except:
+        raise NameError(f"{video_path} is not a video. Images must be put in one subdirectory per camera.")
+    
+    pose_dir = os.path.abspath(os.path.join(video_path, '..', '..', 'pose'))
+    if not os.path.isdir(pose_dir): os.makedirs(pose_dir)
+    video_name_wo_ext = os.path.splitext(os.path.basename(video_path))[0]
+    json_output_dir = os.path.join(pose_dir, f'{video_name_wo_ext}_json')
+    output_video_path = os.path.join(pose_dir, f'{video_name_wo_ext}_pose.mp4')
+    img_output_dir = os.path.join(pose_dir, f'{video_name_wo_ext}_img')
+    
+    if save_video: # Set up video writer
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
+        fps = cap.get(cv2.CAP_PROP_FPS) # Get the frame rate from the raw video
+        W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) # Get the width and height from the raw video
+        out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
+        
+    if display_detection:
+        cv2.namedWindow("Pose Estimation", cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
+
+    frame_idx = 0
+    cap = cv2.VideoCapture(video_path)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    f_range = [[total_frames] if frame_range==[] else frame_range][0]
+    with tqdm(total=total_frames, desc=f'Processing {os.path.basename(video_path)}') as pbar:
+        while cap.isOpened():
+            success, frame = cap.read()
+            if not success:
                 break
+            
+            if frame_idx in range(*f_range):
+                # Perform pose estimation on the frame
+                keypoints, scores = pose_tracker(frame)
 
-    if realtime_vis:
+                # Save to json
+                if 'openpose' in output_format:
+                    json_file_path = os.path.join(json_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.json')
+                    save_to_openpose(json_file_path, keypoints, scores)
+
+                # Draw skeleton on the frame
+                if display_detection or save_video or save_images:
+                    img_show = frame.copy()
+                    img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+                
+                if display_detection:
+                    cv2.imshow("Pose Estimation", img_show)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+
+                if save_video:
+                    out.write(img_show)
+
+                if save_images:
+                    if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
+                    cv2.imwrite(os.path.join(img_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.png'), img_show)
+
+            frame_idx += 1
+            pbar.update(1)
+
+    cap.release()
+    if save_video:
+        out.release()
+    if display_detection:
         cv2.destroyAllWindows()
 
+
+def process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, save_video, save_images, display_detection, frame_range):
+    '''
+    Estimate pose estimation from a folder of images
+    
+    INPUTS:
+    - image_folder_path: str. Path to the input image folder
+    - vid_img_extension: str. Extension of the image files
+    - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
+    - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
+    - save_video: bool. Whether to save the output video
+    - save_images: bool. Whether to save the output images
+    - display_detection: bool. Whether to show real-time visualization
+    - frame_range: list. Range of frames to process
+
+    OUTPUTS:
+    - JSON files with the detected keypoints and confidence scores in the OpenPose format
+    - if save_video: Video file with the detected keypoints and confidence scores drawn on the frames
+    - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
+    '''    
+
+    pose_dir = os.path.abspath(os.path.join(image_folder_path, '..', '..', 'pose'))
+    if not os.path.isdir(pose_dir): os.makedirs(pose_dir)
+    json_output_dir = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_json')
+    output_video_path = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_pose.mp4')
+    img_output_dir = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_img')
+
+    image_files = glob.glob(os.path.join(image_folder_path, '*'+vid_img_extension))
+    sorted(image_files, key=natural_sort_key)
+
+    if save_video: # Set up video writer
+        fps = 30 # Edit if you want a different output frame rate
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
+        W, H = cv2.imread(image_files[0]).shape[:2][::-1] # Get the width and height from the first image (assuming all images have the same size)
+        out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
+
+    if display_detection:
+        cv2.namedWindow("Pose Estimation", cv2.WINDOW_NORMAL)
+    
+    f_range = [[len(image_files)] if frame_range==[] else frame_range][0]
+    for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'Processing {os.path.basename(img_output_dir)}')):
+        if frame_idx in range(*f_range):
+
+            try:
+                frame = cv2.imread(image_file)
+            except:
+                raise NameError(f"{image_file} is not an image. Videos must be put in the video directory, not in subdirectories.")
+            
+            # Perform pose estimation on the image
+            keypoints, scores = pose_tracker(frame)
+            
+            # Extract frame number from the filename
+            if 'openpose' in output_format:
+                json_file_path = os.path.join(json_output_dir, f"{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.json")
+                save_to_openpose(json_file_path, keypoints, scores)
+
+            # Draw skeleton on the image
+            if display_detection or save_video or save_images:
+                img_show = frame.copy()
+                img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+
+            if display_detection:
+                cv2.imshow("Pose Estimation", img_show)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+
+            if save_video:
+                out.write(img_show)
+
+            if save_images:
+                if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
+                cv2.imwrite(os.path.join(img_output_dir, f'{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.png'), img_show)
+
+    if display_detection:
+        cv2.destroyAllWindows()
+
+
 def rtm_estimator(config_dict):
-    """
-    Main function to run the pose estimation process based on the configuration.
-    
-    Args:
-        config_dict (dict): Configuration dictionary loaded from TOML file
-    """
-    # Read configuration
+    '''
+    Estimate pose from a video file or a folder of images and 
+    write the results to JSON files, videos, and/or images.
+    Results can optionally be displayed in real time.
+
+    Supported models: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands), COCO_17 (body)
+    Supported modes: lightweight, balanced, performance (edit paths at rtmlib/tools/solutions if you 
+    need nother detection or pose models)
+
+    Optionally gives consistent person ID across frames (slower but good for 2D analysis)
+    Optionally runs detection every n frames and inbetween tracks points (faster but less accurate).
+
+    If a valid cuda installation is detected, uses the GPU with the ONNXRuntime backend. Otherwise, 
+    uses the CPU with the OpenVINO backend.
+
+    INPUTS:
+    - videos or image folders from the video directory
+    - a Config.toml file
+
+    OUTPUTS:
+    - JSON files with the detected keypoints and confidence scores in the OpenPose format
+    - Optionally, videos and/or image files with the detected keypoints 
+    '''
+
+    # Read config
     project_dir = config_dict['project']['project_dir']
-    raw_path = os.path.join(project_dir, 'pose_raw') # 'pose_raw' could be changed to something else. It is just demo.
-    output_base_dir = os.path.abspath(os.path.join(raw_path, '..', 'pose'))
+    # if batch
+    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
+    # if single trial
+    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
+    frame_range = config_dict.get('project').get('frame_range')
+    video_dir = os.path.join(project_dir, 'videos')
+
+    pose_model = config_dict['pose']['pose_model']
+    mode = config_dict['pose']['mode'] # lightweight, balanced, performance
+    vid_img_extension = config_dict['pose']['vid_img_extension']
     
-    if not os.path.exists(output_base_dir):
-        os.makedirs(output_base_dir)
+    output_format = config_dict['pose']['output_format']
+    save_video = True if 'to_video' in config_dict['pose']['save_video'] else False
+    save_images = True if 'to_images' in config_dict['pose']['save_video'] else False
+    display_detection = config_dict['pose']['display_detection']
 
-    # Extract configuration parameters
-    """
-    Should refine the alignment of the parameters with the configuration file.
-    """
-    data_type = config_dict['pose_demo']['data_type'] # video, image
-    save_video = config_dict['pose_demo']['save_video']
-    device = config_dict['pose_demo']['device'] # cpu, gpu
-    backend = config_dict['pose_demo']['backend'] # onnxruntime, openvino, opencv(It seems not supported yet.)
-    det_frequency = config_dict['pose_demo']['det_frequency']
-    skeleton_type = config_dict['pose_demo']['skeleton_type'] # Body, Wholebody, Body_and_Feet
-    mode = config_dict['pose_demo']['mode'] # performance, balanced, lightweight
-    tracking = config_dict['pose_demo']['tracking']
-    openpose_skeleton = config_dict['pose_demo']['to_openpose']
-    realtime_vis = config_dict['pose_demo']['realtime_vis']
+    det_frequency = config_dict['pose']['det_frequency']
+    tracking = config_dict['pose']['tracking']
 
-    # Select the appropriate model based on the model_type
-    if skeleton_type == 'Body' or skeleton_type == 'body':
-        ModelClass = Body # 17 keypoints
-    elif skeleton_type == 'Wholebody' or skeleton_type == 'wholebody':
-        ModelClass = Wholebody # 133 keypoints
-    elif skeleton_type == 'Body_and_Feet' or skeleton_type == 'body_and_feet':
-        ModelClass = Body_and_Feet # 26 keypoints(halpe26)
+    # If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
+    if 'CUDAExecutionProvider' in ort.get_available_providers() and torch.cuda.is_available():
+        device = 'cuda'
+        backend = 'onnxruntime'
     else:
-        raise ValueError(f"Invalid model_type: {skeleton_type}. Must be 'Body', 'Wholebody', or 'Body_and_Feet'.")
+        device = 'cpu'
+        backend = 'openvino'
+    
+    # Select the appropriate model based on the model_type
+    if pose_model.upper() == 'HALPE_26':
+        ModelClass = BodyWithFeet
+    elif pose_model.upper() == 'COCO_133':
+        ModelClass = Wholebody
+    elif pose_model.upper() == 'COCO_17':
+        ModelClass = Body # 26 keypoints(halpe26)
+    else:
+        raise ValueError(f"Invalid model_type: {pose_model}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
 
     # Initialize the pose tracker
     pose_tracker = PoseTracker(
@@ -226,33 +337,17 @@ def rtm_estimator(config_dict):
         backend=backend,
         device=device,
         tracking=tracking,
-        to_openpose=openpose_skeleton)
+        to_openpose=False)
 
-    if data_type == "video":
+    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+    if not len(video_files) == 0: 
         # Process video files
-        video_files = glob.glob(os.path.join(raw_path, '*.mp4')) + glob.glob(os.path.join(raw_path, '*.avi'))
-        for video_file in video_files:
-            video_name = os.path.basename(video_file)
-            video_name_wo_ext = os.path.splitext(video_name)[0]
-            output_video_path = os.path.join(output_base_dir, f"{video_name_wo_ext}_pose.avi")
-            json_output_dir = os.path.join(output_base_dir, video_name_wo_ext)
+        for video_path in video_files:
+            process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range)
 
-            if not os.path.exists(json_output_dir):
-                os.makedirs(json_output_dir)
-
-            process_video(video_file, output_video_path, json_output_dir, pose_tracker, save_video, realtime_vis, openpose_skeleton)
-
-    elif data_type == "image":
-        # Process image folders
-        image_folders = [f for f in os.listdir(raw_path) if os.path.isdir(os.path.join(raw_path, f))]
-        for image_folder in image_folders:
-            image_folder_path = os.path.join(raw_path, image_folder)
-            json_output_dir = os.path.join(output_base_dir, image_folder)
-            # Could add a save image option here if needed!
-
-            if not os.path.exists(json_output_dir):
-                os.makedirs(json_output_dir)
-
-            process_images(image_folder_path, json_output_dir, pose_tracker, realtime_vis, openpose_skeleton)
     else:
-        raise ValueError("Invalid data type. Must be 'video' or 'image'.")
+        # Process image folders
+        image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
+        for image_folder in image_folders:
+            image_folder_path = os.path.join(video_dir, image_folder)
+            process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, save_video, save_images, display_detection, frame_range)

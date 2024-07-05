@@ -30,10 +30,11 @@
         - filtering
         - marker augmentation
 
-    N.B.: Calibration from scene dimensions is not tested, as it requires the 
+    N.B.: 
+    1. Calibration from scene dimensions is not tested, as it requires the 
     user to click points on the image. 
-    Not all possible configuration parameters are extensively tested.
-    Pose estimation, scaling, inverse kinematics are not tested yet.
+    2. OpenSim scaling and IK are not tested yet
+    3. Not all possible configuration parameters are extensively tested.
     
     Usage: 
     from Pose2Sim.S00_Demo_BatchSession import tests; tests.test_workflow()
@@ -116,8 +117,9 @@ def test_workflow():
     # STATIC TRIAL
     project_dir = os.path.join("S00_P00_SingleParticipant","S00_P00_T00_StaticTrial")
     config_dict.get("project").update({"project_dir":project_dir})
+    config_dict.get("pose").update({"mode":'lightweight'})
     config_dict.get("synchronization").update({"reset_sync":True})
-    # Pose2Sim.poseEstimation(config_dict)
+    Pose2Sim.poseEstimation(config_dict)
     Pose2Sim.synchronization(config_dict)
     Pose2Sim.personAssociation(config_dict)
     Pose2Sim.triangulation(config_dict)
@@ -128,8 +130,9 @@ def test_workflow():
     # BALANCING TRIAL
     project_dir = os.path.join("S00_P00_SingleParticipant","S00_P00_T01_BalancingTrial")
     config_dict.get("project").update({"project_dir":project_dir})
+    config_dict.get("pose").update({"mode":'lightweight'})
     config_dict['filtering']['display_figures'] = False
-    # Pose2Sim.poseEstimation(config_dict)
+    Pose2Sim.poseEstimation(config_dict)
     Pose2Sim.synchronization(config_dict)
     Pose2Sim.personAssociation(config_dict)
     Pose2Sim.triangulation(config_dict)
@@ -145,9 +148,10 @@ def test_workflow():
     # STATIC TRIAL PERSON 1
     project_dir = os.path.join("S00_P01_MultiParticipants","S00_P01_T00_StaticTrialParticipant1")
     config_dict.get("project").update({"project_dir":project_dir})
+    config_dict.get("pose").update({"mode":'lightweight'})
     config_dict.get("markerAugmentation").update({"participant_height":1.21})
     config_dict.get("markerAugmentation").update({"participant_mass":25.0})
-    # Pose2Sim.poseEstimation(config_dict)
+    Pose2Sim.poseEstimation(config_dict)
     Pose2Sim.synchronization(config_dict)
     Pose2Sim.personAssociation(config_dict)
     Pose2Sim.triangulation(config_dict)
@@ -158,9 +162,10 @@ def test_workflow():
     # STATIC TRIAL PERSON 2
     project_dir = os.path.join("S00_P01_MultiParticipants","S00_P01_T01_StaticTrialParticipant2")
     config_dict.get("project").update({"project_dir":project_dir})
+    config_dict.get("pose").update({"mode":'lightweight'})
     config_dict.get("markerAugmentation").update({"participant_height":1.72})
     config_dict.get("markerAugmentation").update({"participant_mass":70.0})
-    # Pose2Sim.poseEstimation(config_dict)
+    Pose2Sim.poseEstimation(config_dict)
     Pose2Sim.synchronization(config_dict)
     Pose2Sim.personAssociation(config_dict)
     Pose2Sim.triangulation(config_dict)
@@ -172,10 +177,11 @@ def test_workflow():
     project_dir = os.path.join("S00_P01_MultiParticipants","S00_P01_T02_Participants1-2")
     config_dict.get("project").update({"project_dir":project_dir})
     config_dict.get("project").update({"multi_person":True})
+    config_dict.get("pose").update({"mode":'lightweight'})
     config_dict.get("markerAugmentation").update({"participant_height":[1.21, 1.72]})
     config_dict.get("markerAugmentation").update({"participant_mass":[25.0, 70.0]})
     config_dict['triangulation']['reorder_trc'] = False
-    # Pose2Sim.poseEstimation(config_dict)
+    Pose2Sim.poseEstimation(config_dict)
     Pose2Sim.synchronization(config_dict)
     Pose2Sim.personAssociation(config_dict)
     Pose2Sim.triangulation(config_dict)
@@ -192,10 +198,11 @@ def test_workflow():
     project_dir = os.path.join("../S01_Demo_SingleTrial")
     os.chdir(project_dir)
     config_dict.get("project").update({"project_dir":project_dir})
+    config_dict.get("pose").update({"mode":'lightweight'})
     config_dict.get("synchronization").update({"display_sync_plots":False})
     config_dict['filtering']['display_figures'] = False
     Pose2Sim.calibration(config_dict)
-    # Pose2Sim.poseEstimation(config_dict)
+    Pose2Sim.poseEstimation(config_dict)
     Pose2Sim.synchronization(config_dict)
     Pose2Sim.personAssociation(config_dict)
     Pose2Sim.triangulation(config_dict)

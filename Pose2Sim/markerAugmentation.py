@@ -210,7 +210,10 @@ def augmentTRC(config_dict):
             json_file = open(os.path.join(augmenterModelDir, "model.json"), 'r')
             pretrainedModel_json = json_file.read()
             json_file.close()
-            model = tf.keras.models.model_from_json(pretrainedModel_json)
+            model = tf.keras.models.model_from_json(pretrainedModel_json, custom_objects={
+                                    'Sequential': tf.keras.models.Sequential,
+                                    'Dense': tf.keras.layers.Dense
+                                    })
             model.load_weights(os.path.join(augmenterModelDir, "weights.h5"))  
             outputs = model.predict(inputs)
             tf.keras.backend.clear_session()

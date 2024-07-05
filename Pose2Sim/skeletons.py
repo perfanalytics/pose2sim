@@ -210,8 +210,9 @@ BLAZEPOSE = Node("root", id=None, children=[
 ])
 
 
-'''HALPE_26 (full-body without hands, from AlphaPose)
-https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md'''
+'''HALPE_26 (full-body without hands, from AlphaPose, MMPose, etc.)
+https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md
+https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose'''
 HALPE_26 = Node("Hip", id=19, children=[
     Node("RHip", id=12, children=[
         Node("RKnee", id=14, children=[
@@ -251,7 +252,7 @@ HALPE_26 = Node("Hip", id=19, children=[
 ])
 
 
-'''HALPE_68 (full-body with hands without face, from AlphaPose)
+'''HALPE_68 (full-body with hands without face, from AlphaPose, MMPose, etc.)
 https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md'''
 HALPE_68 = Node("Hip", id=19, children=[
     Node("RHip", id=12, children=[
@@ -298,7 +299,7 @@ HALPE_68 = Node("Hip", id=19, children=[
 ])
 
 
-'''HALPE_136 (full-body with hands and face, from AlphaPose)
+'''HALPE_136 (full-body with hands and face, from AlphaPose, MMPose, etc.)
 https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md'''
 HALPE_136 = Node("Hip", id=19, children=[
     Node("RHip", id=12, children=[
@@ -345,9 +346,10 @@ HALPE_136 = Node("Hip", id=19, children=[
 ])
 
 
-'''COCO_133 (full-body with hands and face, from AlphaPose)
-https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md'''
-COCO_133 = Node("Hip", id=None, children=[
+'''COCO_133 (full-body with hands and face, from AlphaPose, MMPose, etc.)
+https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md
+https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose'''
+COCO_133 = Node("CHip", id=None, children=[
     Node("RHip", id=12, children=[
         Node("RKnee", id=14, children=[
             Node("RAnkle", id=16, children=[
@@ -395,7 +397,7 @@ COCO_133 = Node("Hip", id=None, children=[
 ])
 
 
-'''COCO (full-body without hands and feet, from OpenPose, AlphaPose, OpenPifPaf, YOLO-pose, etc)
+'''COCO (full-body without hands and feet, from OpenPose, AlphaPose, OpenPifPaf, YOLO-pose, MMPose, etc.)
 https://github.com/CMU-Perceptual-Computing-Lab/openpose/tree/master/models'''
 COCO = Node("CHip", id=None, children=[
     Node("RHip", id=8, children=[
@@ -424,7 +426,7 @@ COCO = Node("CHip", id=None, children=[
 ])
 
 
-'''MPII (full-body without hands and feet, from OpenPose, AlphaPose, OpenPifPaf, YOLO-pose, etc)
+'''MPII (full-body without hands and feet, from OpenPose, AlphaPose, OpenPifPaf, YOLO-pose, MMPose, etc.)
 https://github.com/CMU-Perceptual-Computing-Lab/openpose/tree/master/models'''
 MPII = Node("CHip", id=14, children=[
     Node("RHip", id=8, children=[
@@ -447,6 +449,35 @@ MPII = Node("CHip", id=14, children=[
         Node("LShoulder", id=5, children=[
             Node("LElbow", id=6, children=[
                 Node("LWrist", id=7),
+            ]),
+        ]),
+    ]),
+])
+
+
+'''COCO_17 (full-body without hands and feet, from OpenPose, AlphaPose, OpenPifPaf, YOLO-pose, MMPose, etc.)
+https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose'''
+COCO_17 = Node("CHip", id=None, children=[
+    Node("RHip", id=12, children=[
+        Node("RKnee", id=14, children=[
+            Node("RAnkle", id=16),
+        ]),
+    ]),
+    Node("LHip", id=11, children=[
+        Node("LKnee", id=13, children=[
+            Node("LAnkle", id=15),
+        ]),
+    ]),
+    Node("Neck", id=None, children=[
+        Node("Nose", id=0),
+        Node("RShoulder", id=6, children=[
+            Node("RElbow", id=8, children=[
+                Node("RWrist", id=10),
+            ]),
+        ]),
+        Node("LShoulder", id=5, children=[
+            Node("LElbow", id=7, children=[
+                Node("LWrist", id=9),
             ]),
         ]),
     ]),

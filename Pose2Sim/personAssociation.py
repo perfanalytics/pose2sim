@@ -34,6 +34,7 @@ OUTPUTS:
 import os
 import glob
 import fnmatch
+import re
 import numpy as np
 import json
 import itertools as it
@@ -78,10 +79,13 @@ def persons_combinations(json_files_framef):
     # amount of persons detected for each cam
     nb_persons_per_cam = []
     for c in range(n_cams):
-        with open(json_files_framef[c], 'r') as js:
-            nb_persons_per_cam += [len(json.load(js)['people'])]
+        try:
+            with open(json_files_framef[c], 'r') as js:
+                nb_persons_per_cam += [len(json.load(js)['people'])]
+        except:
+            nb_persons_per_cam += [0]
     
-    # persons_combinations
+    # persons combinations
     id_no_detect = [i for i, x in enumerate(nb_persons_per_cam) if x == 0]  # ids of cameras that have not detected any person
     nb_persons_per_cam = [x if x != 0 else 1 for x in nb_persons_per_cam] # temporarily replace persons count by 1 when no detection
     range_persons_per_cam = [range(nb_persons_per_cam[c]) for c in range(n_cams)] 
@@ -91,7 +95,7 @@ def persons_combinations(json_files_framef):
     return personsIDs_comb
 
 
-def triangulate_comb(comb, coords, P_all, calib_params, config):
+def triangulate_comb(comb, coords, P_all, calib_params, config_dict):
     '''
     Triangulate 2D points and compute reprojection error for a combination of cameras.
     INPUTS:
@@ -99,15 +103,15 @@ def triangulate_comb(comb, coords, P_all, calib_params, config):
     - coords: array: x, y, likelihood for each camera
     - P_all: list of arrays: projection matrices for each camera
     - calib_params: dict: calibration parameters
-    - config: dictionary from Config.toml file
+    - config_dict: dictionary from Config.toml file
     OUTPUTS:
     - error_comb: float: reprojection error
     - comb: list of ints: combination of persons' ids for each camera
     - Q_comb: array: 3D coordinates of the triangulated point
     ''' 
 
-    undistort_points = config.get('triangulation').get('undistort_points')
-    likelihood_threshold = config.get('personAssociation').get('likelihood_threshold_association')
+    undistort_points = config_dict.get('triangulation').get('undistort_points')
+    likelihood_threshold = config_dict.get('personAssociation').get('likelihood_threshold_association')
 
     # Replace likelihood by 0. if under likelihood_threshold
     coords[:,2][coords[:,2] < likelihood_threshold] = 0.
@@ -148,7 +152,7 @@ def triangulate_comb(comb, coords, P_all, calib_params, config):
     return error_comb, comb, Q_comb
 
 
-def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_combinations, projection_matrices, tracked_keypoint_id, calib_params):
+def best_persons_and_cameras_combination(config_dict, json_files_framef, personsIDs_combinations, projection_matrices, tracked_keypoint_id, calib_params):
     '''
     Chooses the right person among the multiple ones found by
     OpenPose & excludes cameras with wrong 2d-pose estimation.
@@ -171,16 +175,13 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
     - comb_errors_below_thresh: list of arrays of ints
     '''
     
-    error_threshold_tracking = config.get('personAssociation').get('single_person').get('reproj_error_threshold_association')
-    likelihood_threshold = config.get('personAssociation').get('likelihood_threshold_association')
-    min_cameras_for_triangulation = config.get('triangulation').get('min_cameras_for_triangulation')
-    undistort_points = config.get('triangulation').get('undistort_points')
+    error_threshold_tracking = config_dict.get('personAssociation').get('single_person').get('reproj_error_threshold_association')
+    min_cameras_for_triangulation = config_dict.get('triangulation').get('min_cameras_for_triangulation')
+    undistort_points = config_dict.get('triangulation').get('undistort_points')
 
     n_cams = len(json_files_framef)
     error_min = np.inf 
     nb_cams_off = 0 # cameras will be taken-off until the reprojection error is under threshold
-    errors_below_thresh = []
-    comb_errors_below_thresh = []
     Q_kpt = []
     while error_min > error_threshold_tracking and n_cams - nb_cams_off >= min_cameras_for_triangulation:
         # Try all persons combinations
@@ -211,7 +212,7 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
             # Try all subsets
             error_comb_all, comb_all, Q_comb_all = [], [], []
             for comb in combinations_with_cams_off:
-                error_comb, comb, Q_comb = triangulate_comb(comb, coords, projection_matrices, calib_params, config)
+                error_comb, comb, Q_comb = triangulate_comb(comb, coords, projection_matrices, calib_params, config_dict)
                 error_comb_all.append(error_comb)
                 comb_all.append(comb)
                 Q_comb_all.append(Q_comb)
@@ -231,13 +232,16 @@ def read_json(js_file):
     '''
     Read OpenPose json file
     '''
-    with open(js_file, 'r') as json_f:
-        js = json.load(json_f)
+    try:
+        with open(js_file, 'r') as json_f:
+            js = json.load(json_f)
+            json_data = []
+            for people in range(len(js['people'])):
+                if len(js['people'][people]['pose_keypoints_2d']) < 3: continue
+                else:
+                    json_data.append(js['people'][people]['pose_keypoints_2d'])
+    except:
         json_data = []
-        for people in range(len(js['people'])):
-            if len(js['people'][people]['pose_keypoints_2d']) < 3: continue
-            else:
-                json_data.append(js['people'][people]['pose_keypoints_2d'])
     return json_data
 
 
@@ -527,20 +531,23 @@ def rewrite_json_files(json_tracked_files_f, json_files_f, proposals, n_cams):
     '''
 
     for cam in range(n_cams):
-        with open(json_tracked_files_f[cam], 'w') as json_tracked_f:
-            with open(json_files_f[cam], 'r') as json_f:
-                js = json.load(json_f)
-                js_new = js.copy()
-                js_new['people'] = []
-                for new_comb in proposals:
-                    if not np.isnan(new_comb[cam]):
-                        js_new['people'] += [js['people'][int(new_comb[cam])]]
-                    else:
-                        js_new['people'] += [{}]
-            json_tracked_f.write(json.dumps(js_new))
+        try:
+            with open(json_tracked_files_f[cam], 'w') as json_tracked_f:
+                with open(json_files_f[cam], 'r') as json_f:
+                    js = json.load(json_f)
+                    js_new = js.copy()
+                    js_new['people'] = []
+                    for new_comb in proposals:
+                        if not np.isnan(new_comb[cam]):
+                            js_new['people'] += [js['people'][int(new_comb[cam])]]
+                        else:
+                            js_new['people'] += [{}]
+                json_tracked_f.write(json.dumps(js_new))
+        except:
+            os.remove(json_tracked_files_f[cam])
 
 
-def recap_tracking(config, error=0, nb_cams_excluded=0):
+def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
     '''
     Print a message giving statistics on reprojection errors (in pixel and in m)
     as well as the number of cameras that had to be excluded to reach threshold
@@ -555,18 +562,18 @@ def recap_tracking(config, error=0, nb_cams_excluded=0):
     - Message in console
     '''
     
-    # Read config
-    project_dir = config.get('project').get('project_dir')
+    # Read config_dict
+    project_dir = config_dict.get('project').get('project_dir')
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-    multi_person = config.get('project').get('multi_person')
-    likelihood_threshold_association = config.get('personAssociation').get('likelihood_threshold_association')
-    tracked_keypoint = config.get('personAssociation').get('single_person').get('tracked_keypoint')
-    error_threshold_tracking = config.get('personAssociation').get('single_person').get('reproj_error_threshold_association')
-    reconstruction_error_threshold = config.get('personAssociation').get('multi_person').get('reconstruction_error_threshold')
-    min_affinity = config.get('personAssociation').get('multi_person').get('min_affinity')
+    multi_person = config_dict.get('project').get('multi_person')
+    likelihood_threshold_association = config_dict.get('personAssociation').get('likelihood_threshold_association')
+    tracked_keypoint = config_dict.get('personAssociation').get('single_person').get('tracked_keypoint')
+    error_threshold_tracking = config_dict.get('personAssociation').get('single_person').get('reproj_error_threshold_association')
+    reconstruction_error_threshold = config_dict.get('personAssociation').get('multi_person').get('reconstruction_error_threshold')
+    min_affinity = config_dict.get('personAssociation').get('multi_person').get('min_affinity')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
@@ -574,7 +581,7 @@ def recap_tracking(config, error=0, nb_cams_excluded=0):
     if not multi_person:
         logging.info('\nSingle-person analysis selected.')
         # Error
-        mean_error_px = np.around(np.mean(error), decimals=1)
+        mean_error_px = np.around(np.nanmean(error), decimals=1)
         
         calib = toml.load(calib_file)
         calib_cam1 = calib[list(calib.keys())[0]]
@@ -597,7 +604,7 @@ def recap_tracking(config, error=0, nb_cams_excluded=0):
     logging.info(f'\nTracked json files are stored in {os.path.realpath(poseTracked_dir)}.')
     
 
-def track_2d_all(config):
+def track_2d_all(config_dict):
     '''
     For each frame,
     - Find all possible combinations of detected persons
@@ -617,29 +624,33 @@ def track_2d_all(config):
     - json files for each camera with only one person of interest    
     '''
     
-    # Read config
-    project_dir = config.get('project').get('project_dir')
+    # Read config_dict
+    project_dir = config_dict.get('project').get('project_dir')
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-    multi_person = config.get('project').get('multi_person')
-    pose_model = config.get('pose').get('pose_model')
-    tracked_keypoint = config.get('personAssociation').get('single_person').get('tracked_keypoint')
-    likelihood_threshold = config.get('personAssociation').get('likelihood_threshold_association')
-    min_cameras_for_triangulation = config.get('triangulation').get('min_cameras_for_triangulation')
-    reconstruction_error_threshold = config.get('personAssociation').get('multi_person').get('reconstruction_error_threshold')
-    min_affinity = config.get('personAssociation').get('multi_person').get('min_affinity')
-    frame_range = config.get('project').get('frame_range')
-    undistort_points = config.get('triangulation').get('undistort_points')
+    multi_person = config_dict.get('project').get('multi_person')
+    pose_model = config_dict.get('pose').get('pose_model')
+    tracked_keypoint = config_dict.get('personAssociation').get('single_person').get('tracked_keypoint')
+    likelihood_threshold = config_dict.get('personAssociation').get('likelihood_threshold_association')
+    min_cameras_for_triangulation = config_dict.get('triangulation').get('min_cameras_for_triangulation')
+    reconstruction_error_threshold = config_dict.get('personAssociation').get('multi_person').get('reconstruction_error_threshold')
+    min_affinity = config_dict.get('personAssociation').get('multi_person').get('min_affinity')
+    frame_range = config_dict.get('project').get('frame_range')
+    undistort_points = config_dict.get('triangulation').get('undistort_points')
     
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
+    try:
+        calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
+    except:
+        raise Exception(f'No .toml calibration direcctory found.')
     try:
         calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     except:
         raise Exception(f'No .toml calibration file found in the {calib_dir}.')
     pose_dir = os.path.join(project_dir, 'pose')
-    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
+    poseSync_dir = os.path.join(project_dir, 'pose_sync')
+    poseTracked_dir = os.path.join(project_dir, 'pose_associated')
 
     # projection matrix from toml calibration file
     P_all = computeP(calib_file, undistort=undistort_points)
@@ -650,7 +661,7 @@ def track_2d_all(config):
         model = eval(pose_model)
     except:
         try: # from Config.toml
-            model = DictImporter().import_(config.get('pose').get(pose_model))
+            model = DictImporter().import_(config_dict.get('pose').get(pose_model))
             if model.id == 'None':
                 model.id = None
         except:
@@ -661,41 +672,46 @@ def track_2d_all(config):
     pose_listdirs_names = next(os.walk(pose_dir))[1]
     pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
-    json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+    try: 
+        json_files_names = [fnmatch.filter(os.listdir(os.path.join(poseSync_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+    except:
+        json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
     json_files_names = [sort_stringlist_by_last_number(j) for j in json_files_names]
-    json_files = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # 2d-pose-associated files creation
     if not os.path.exists(poseTracked_dir): os.mkdir(poseTracked_dir)   
     try: [os.mkdir(os.path.join(poseTracked_dir,k)) for k in json_dirs_names]
     except: pass
-    json_tracked_files = [[os.path.join(poseTracked_dir, j_dir, j_file) for j_file in json_files_names[j]] for j, j_dir in enumerate(json_dirs_names)]
     
-    f_range = [[min([len(j) for j in json_files])] if frame_range==[] else frame_range][0]
-    n_cams = len(json_dirs_names)
     error_min_tot, cameras_off_tot = [], []
-    
+    f_range = [[0,max([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
+    n_cams = len(json_dirs_names)
+
     # Check that camera number is consistent between calibration file and pose folders
     if n_cams != len(P_all):
         raise Exception(f'Error: The number of cameras is not consistent:\
                     Found {len(P_all)} cameras in the calibration file,\
                     and {n_cams} cameras based on the number of pose folders.')
     
-    Q_kpt = [np.array([0., 0., 0., 1.])]
     for f in tqdm(range(*f_range)):
         # print(f'\nFrame {f}:')
-        json_files_f = [json_files[c][f] for c in range(n_cams)]
-        json_tracked_files_f = [json_tracked_files[c][f] for c in range(n_cams)]
-        Q_kpt_old = Q_kpt
+        json_files_names_f = [[j for j in json_files_names[c] if int(re.split('(\d+)',j)[-2])==f] for c in range(n_cams)]
+        json_files_names_f = [j for j_list in json_files_names_f for j in (j_list or ['none'])]
+        try:
+            json_files_f = [os.path.join(poseSync_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
+        except:
+            json_files_f = [os.path.join(pose_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
+        json_tracked_files_f = [os.path.join(poseTracked_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
 
         if not multi_person:
             # all possible combinations of persons
             personsIDs_comb = persons_combinations(json_files_f) 
             
             # choose persons of interest and exclude cameras with bad pose estimation
-            error_proposals, proposals, Q_kpt = best_persons_and_cameras_combination(config, json_files_f, personsIDs_comb, P_all, tracked_keypoint_id, calib_params)
+            error_proposals, proposals, Q_kpt = best_persons_and_cameras_combination(config_dict, json_files_f, personsIDs_comb, P_all, tracked_keypoint_id, calib_params)
 
-            error_min_tot.append(np.mean(error_proposals))
+            if not np.isinf(error_proposals):
+                error_min_tot.append(np.nanmean(error_proposals))
             cameras_off_count = np.count_nonzero([np.isnan(comb) for comb in proposals]) / len(proposals)
             cameras_off_tot.append(cameras_off_count)            
 
@@ -722,5 +738,5 @@ def track_2d_all(config):
 
 
     # recap message
-    recap_tracking(config, error_min_tot, cameras_off_tot)
+    recap_tracking(config_dict, error_min_tot, cameras_off_tot)
     

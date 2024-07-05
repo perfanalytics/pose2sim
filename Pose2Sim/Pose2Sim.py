@@ -220,7 +220,7 @@ def calibration(config=None):
 
 def poseEstimation(config=None):
     '''
-    Estimate pose using BlazePose, OpenPose, AlphaPose, or DeepLabCut.
+    Estimate pose using RTMLib
     
     config can be a dictionary,
     or a the directory path of a trial, participant, or session,
@@ -251,7 +251,7 @@ def poseEstimation(config=None):
         frames = ["all frames" if not frame_range else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
         logging.info("\n\n---------------------------------------------------------------------")
-        logging.info("Pose estimation")
+        logging.info("Pose estimation for {seq_name}, for {frames}.")
         logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
         logging.info("---------------------------------------------------------------------")
         logging.info(f"\nProject directory: {project_dir}")

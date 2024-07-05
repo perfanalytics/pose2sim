@@ -31,7 +31,7 @@ OUTPUTS:
 
 
 ## INIT
-from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort, zup2yup
+from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort_key, zup2yup
 
 import os
 import logging
@@ -182,7 +182,7 @@ def read_qca(qca_path, binning_factor):
    
     # Cameras names by natural order
     C_vid = [C[v] for v in vid_id]
-    C_vid_id = [C_vid.index(c) for c in natural_sort(C_vid)]
+    C_vid_id = [C_vid.index(c) for c in sorted(C_vid, key=natural_sort_key)]
     C_id = [vid_id[c] for c in C_vid_id]
     C = [C[c] for c in C_id]
     ret = [ret[c] for c in C_id]
@@ -195,7 +195,7 @@ def read_qca(qca_path, binning_factor):
     return ret, C, S, D, K, R, T
 
 
-def calib_optitrack_fun(config, binning_factor=1):
+def calib_optitrack_fun(config_dict, binning_factor=1):
     '''
     Convert an Optitrack calibration file 
 
@@ -305,7 +305,7 @@ def read_vicon(vicon_path):
     # Camera names by natural order
     C_vid_id = [v for v in vid_id if ('VIDEO' or 'Video') in root.findall('Camera')[v].attrib.get('TYPE')]
     C_vid = [root.findall('Camera')[v].attrib.get('DEVICEID') for v in C_vid_id]
-    C = natural_sort(C_vid)
+    C = sorted(C_vid, key=natural_sort_key)
     C_id_sorted = [i for v_sorted in C for i,v in enumerate(root.findall('Camera')) if v.attrib.get('DEVICEID')==v_sorted]
     S = [S[c] for c in C_id_sorted]
     D = [D[c] for c in C_id_sorted]
@@ -1261,7 +1261,7 @@ def recap_calibrate(ret, calib_path, calib_full_type):
     logging.info(f'Calibration file is stored at {calib_path}.')
 
 
-def calibrate_cams_all(config):
+def calibrate_cams_all(config_dict):
     '''
     Either converts a preexisting calibration file, 
     or calculates calibration from scratch (from a board or from points).
@@ -1269,24 +1269,24 @@ def calibrate_cams_all(config):
     Prints recap.
     
     INPUTS:
-    - a config dictionary
+    - a config_dict dictionary
 
     OUTPUT:
     - a .toml camera calibration file
     '''
 
-    # Read config
-    project_dir = config.get('project').get('project_dir')
+    # Read config_dict
+    project_dir = config_dict.get('project').get('project_dir')
     calib_dir = [os.path.join(project_dir, c) for c in os.listdir(project_dir) if ('Calib' in c or 'calib' in c)][0]
-    calib_type = config.get('calibration').get('calibration_type')
+    calib_type = config_dict.get('calibration').get('calibration_type')
 
     if calib_type=='convert':
-        convert_filetype = config.get('calibration').get('convert').get('convert_from')
+        convert_filetype = config_dict.get('calibration').get('convert').get('convert_from')
         try:
             if convert_filetype=='qualisys':
                 convert_ext = '.qca.txt'
                 file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
-                binning_factor = config.get('calibration').get('convert').get('qualisys').get('binning_factor')
+                binning_factor = config_dict.get('calibration').get('convert').get('qualisys').get('binning_factor')
             elif convert_filetype=='optitrack':
                 file_to_convert_path = ['']
                 binning_factor = 1
@@ -1326,9 +1326,9 @@ def calibrate_cams_all(config):
         args_calib_fun = [file_to_convert_path, binning_factor]
         
     elif calib_type=='calculate':
-        intrinsics_config_dict = config.get('calibration').get('calculate').get('intrinsics')
-        extrinsics_config_dict = config.get('calibration').get('calculate').get('extrinsics')
-        extrinsics_method = config.get('calibration').get('calculate').get('extrinsics').get('extrinsics_method')
+        intrinsics_config_dict = config_dict.get('calibration').get('calculate').get('intrinsics')
+        extrinsics_config_dict = config_dict.get('calibration').get('calculate').get('extrinsics')
+        extrinsics_method = config_dict.get('calibration').get('calculate').get('extrinsics').get('extrinsics_method')
 
         calib_output_path = os.path.join(calib_dir, f'Calib_{extrinsics_method}.toml')
         calib_full_type = calib_type

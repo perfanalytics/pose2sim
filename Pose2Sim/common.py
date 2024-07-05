@@ -355,17 +355,12 @@ def sort_stringlist_by_last_number(string_list):
     return sorted(string_list, key=sort_by_last_number)
 
 
-def natural_sort(list): 
+def natural_sort_key(s):
     '''
-    Sorts list of strings with numbers in natural order
-    Example: ['item_1', 'item_2', 'item_10']
-    Taken from: https://stackoverflow.com/a/11150413/12196632
+    Sorts list of strings with numbers in natural order (alphabetical and numerical)
+    Example: ['item_1', 'item_2', 'item_10', 'stuff_1']
     '''
-
-    convert = lambda text: int(text) if text.isdigit() else text.lower() 
-    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)] 
-    
-    return sorted(list, key=alphanum_key)
+    return [int(c) if c.isdigit() else c.lower() for c in re.split('(\d+)', s)]
 
 
 def zup2yup(Q):

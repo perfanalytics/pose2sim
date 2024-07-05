@@ -136,7 +136,7 @@ def kalman_filter(coords, frame_rate, measurement_noise, process_noise, nb_dimen
     return coords_filt
 
 
-def kalman_filter_1d(config, col):
+def kalman_filter_1d(config_dict, col):
     '''
     1D Kalman filter
     Deals with nans
@@ -151,9 +151,9 @@ def kalman_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    trustratio = int(config.get('filtering').get('kalman').get('trust_ratio'))
-    smooth = int(config.get('filtering').get('kalman').get('smooth'))
-    framerate = config.get('project').get('frame_rate')
+    trustratio = int(config_dict.get('filtering').get('kalman').get('trust_ratio'))
+    smooth = int(config_dict.get('filtering').get('kalman').get('smooth'))
+    framerate = config_dict.get('project').get('frame_rate')
     measurement_noise = 20
     process_noise = measurement_noise * trustratio
 
@@ -173,7 +173,7 @@ def kalman_filter_1d(config, col):
     return col_filtered
 
 
-def butterworth_filter_1d(config, col):
+def butterworth_filter_1d(config_dict, col):
     '''
     1D Zero-phase Butterworth filter (dual pass)
     Deals with nans
@@ -188,10 +188,10 @@ def butterworth_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    type = 'low' #config.get('filtering').get('butterworth').get('type')
-    order = int(config.get('filtering').get('butterworth').get('order'))
-    cutoff = int(config.get('filtering').get('butterworth').get('cut_off_frequency'))    
-    framerate = config.get('project').get('frame_rate')
+    type = 'low' #config_dict.get('filtering').get('butterworth').get('type')
+    order = int(config_dict.get('filtering').get('butterworth').get('order'))
+    cutoff = int(config_dict.get('filtering').get('butterworth').get('cut_off_frequency'))    
+    framerate = config_dict.get('project').get('frame_rate')
 
     b, a = signal.butter(order/2, cutoff/(framerate/2), type, analog = False) 
     padlen = 3 * max(len(a), len(b))
@@ -212,7 +212,7 @@ def butterworth_filter_1d(config, col):
     return col_filtered
     
 
-def butterworth_on_speed_filter_1d(config, col):
+def butterworth_on_speed_filter_1d(config_dict, col):
     '''
     1D zero-phase Butterworth filter (dual pass) on derivative
 
@@ -224,10 +224,10 @@ def butterworth_on_speed_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    type = 'low' # config.get('filtering').get('butterworth_on_speed').get('type')
-    order = int(config.get('filtering').get('butterworth_on_speed').get('order'))
-    cutoff = int(config.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
-    framerate = config.get('project').get('frame_rate')
+    type = 'low' # config_dict.get('filtering').get('butterworth_on_speed').get('type')
+    order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
+    cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
+    framerate = config_dict.get('project').get('frame_rate')
 
     b, a = signal.butter(order/2, cutoff/(framerate/2), type, analog = False)
     padlen = 3 * max(len(a), len(b))
@@ -253,7 +253,7 @@ def butterworth_on_speed_filter_1d(config, col):
     return col_filtered
 
 
-def gaussian_filter_1d(config, col):
+def gaussian_filter_1d(config_dict, col):
     '''
     1D Gaussian filter
 
@@ -265,14 +265,14 @@ def gaussian_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    gaussian_filter_sigma_kernel = int(config.get('filtering').get('gaussian').get('sigma_kernel'))
+    gaussian_filter_sigma_kernel = int(config_dict.get('filtering').get('gaussian').get('sigma_kernel'))
 
     col_filtered = gaussian_filter1d(col, gaussian_filter_sigma_kernel)
 
     return col_filtered
     
 
-def loess_filter_1d(config, col):
+def loess_filter_1d(config_dict, col):
     '''
     1D LOWESS filter (Locally Weighted Scatterplot Smoothing)
 
@@ -285,7 +285,7 @@ def loess_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    kernel = config.get('filtering').get('LOESS').get('nb_values_used')
+    kernel = config_dict.get('filtering').get('LOESS').get('nb_values_used')
 
     col_filtered = col.copy()
     mask = np.isnan(col_filtered) 
@@ -302,7 +302,7 @@ def loess_filter_1d(config, col):
     return col_filtered
     
 
-def median_filter_1d(config, col):
+def median_filter_1d(config_dict, col):
     '''
     1D median filter
 
@@ -314,7 +314,7 @@ def median_filter_1d(config, col):
     - col_filtered: Filtered pandas dataframe column
     '''
     
-    median_filter_kernel_size = config.get('filtering').get('median').get('kernel_size')
+    median_filter_kernel_size = config_dict.get('filtering').get('median').get('kernel_size')
     
     col_filtered = signal.medfilt(col, kernel_size=median_filter_kernel_size)
 
@@ -365,7 +365,7 @@ def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names):
     pw.show()
 
 
-def filter1d(col, config, filter_type):
+def filter1d(col, config_dict, filter_type):
     '''
     Choose filter type and filter column
 
@@ -389,12 +389,12 @@ def filter1d(col, config, filter_type):
     filter_fun = filter_mapping[filter_type]
     
     # Filter column
-    col_filtered = filter_fun(config, col)
+    col_filtered = filter_fun(config_dict, col)
 
     return col_filtered
 
 
-def recap_filter3d(config, trc_path):
+def recap_filter3d(config_dict, trc_path):
     '''
     Print a log message giving filtering parameters. Also stored in User/logs.txt.
 
@@ -403,20 +403,20 @@ def recap_filter3d(config, trc_path):
     '''
 
     # Read Config
-    filter_type = config.get('filtering').get('type')
-    kalman_filter_trustratio = int(config.get('filtering').get('kalman').get('trust_ratio'))
-    kalman_filter_smooth = int(config.get('filtering').get('kalman').get('smooth'))
+    filter_type = config_dict.get('filtering').get('type')
+    kalman_filter_trustratio = int(config_dict.get('filtering').get('kalman').get('trust_ratio'))
+    kalman_filter_smooth = int(config_dict.get('filtering').get('kalman').get('smooth'))
     kalman_filter_smooth_str = 'smoother' if kalman_filter_smooth else 'filter'
-    butterworth_filter_type = 'low' # config.get('filtering').get('butterworth').get('type')
-    butterworth_filter_order = int(config.get('filtering').get('butterworth').get('order'))
-    butterworth_filter_cutoff = int(config.get('filtering').get('butterworth').get('cut_off_frequency'))
-    butter_speed_filter_type = 'low' # config.get('filtering').get('butterworth_on_speed').get('type')
-    butter_speed_filter_order = int(config.get('filtering').get('butterworth_on_speed').get('order'))
-    butter_speed_filter_cutoff = int(config.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
-    gaussian_filter_sigma_kernel = int(config.get('filtering').get('gaussian').get('sigma_kernel'))
-    loess_filter_nb_values = config.get('filtering').get('LOESS').get('nb_values_used')
-    median_filter_kernel_size = config.get('filtering').get('median').get('kernel_size')
-    make_c3d = config.get('filtering').get('make_c3d')
+    butterworth_filter_type = 'low' # config_dict.get('filtering').get('butterworth').get('type')
+    butterworth_filter_order = int(config_dict.get('filtering').get('butterworth').get('order'))
+    butterworth_filter_cutoff = int(config_dict.get('filtering').get('butterworth').get('cut_off_frequency'))
+    butter_speed_filter_type = 'low' # config_dict.get('filtering').get('butterworth_on_speed').get('type')
+    butter_speed_filter_order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
+    butter_speed_filter_cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
+    gaussian_filter_sigma_kernel = int(config_dict.get('filtering').get('gaussian').get('sigma_kernel'))
+    loess_filter_nb_values = config_dict.get('filtering').get('LOESS').get('nb_values_used')
+    median_filter_kernel_size = config_dict.get('filtering').get('median').get('kernel_size')
+    make_c3d = config_dict.get('filtering').get('make_c3d')
     
     # Recap
     filter_mapping_recap = {
@@ -433,7 +433,7 @@ def recap_filter3d(config, trc_path):
         logging.info('All filtered trc files have been converted to c3d.')
 
 
-def filter_all(config):
+def filter_all(config_dict):
     '''
     Filter the 3D coordinates of the trc file.
     Displays filtered coordinates for checking.
@@ -446,21 +446,21 @@ def filter_all(config):
     - a filtered trc file
     '''
 
-    # Read config
-    project_dir = config.get('project').get('project_dir')
+    # Read config_dict
+    project_dir = config_dict.get('project').get('project_dir')
     try:
         pose_tracked_dir = os.path.join(project_dir, 'pose-associated')
         os.listdir(pose_tracked_dir)
         pose_dir = pose_tracked_dir
     except:
         pose_dir = os.path.join(project_dir, 'pose')
-    frame_range = config.get('project').get('frame_range')
+    frame_range = config_dict.get('project').get('frame_range')
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    display_figures = config.get('filtering').get('display_figures')
-    filter_type = config.get('filtering').get('type')
+    display_figures = config_dict.get('filtering').get('display_figures')
+    filter_type = config_dict.get('filtering').get('type')
     seq_name = os.path.basename(os.path.realpath(project_dir))
-    make_c3d = config.get('filtering').get('make_c3d')
-    frame_rate = config.get('project').get('frame_rate')
+    make_c3d = config_dict.get('filtering').get('make_c3d')
+    frame_rate = config_dict.get('project').get('frame_rate')
     
     # Frames range
     pose_listdirs_names = next(os.walk(pose_dir))[1]
@@ -484,7 +484,7 @@ def filter_all(config):
         Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
 
         # Filter coordinates
-        Q_filt = Q_coord.apply(filter1d, axis=0, args = [config, filter_type])
+        Q_filt = Q_coord.apply(filter1d, axis=0, args = [config_dict, filter_type])
 
         # Display figures
         if display_figures:
@@ -505,6 +505,6 @@ def filter_all(config):
             convert_to_c3d(t_out)
 
         # Recap
-        recap_filter3d(config, t_out)
+        recap_filter3d(config_dict, t_out)
 
 
