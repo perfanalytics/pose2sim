@@ -18,9 +18,10 @@
 
 
 [project]
-multi_person = true # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
+multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
 frame_rate = 60 # fps
-frame_range = [3,20] # For example [10,300], or [] for all frames
+frame_range = [] # For example [10,300], or [] for all frames. 
+## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
 ## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
@@ -29,7 +30,7 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
 [pose]
-vid_img_extension = 'mkv' # any video or image extension
+vid_img_extension = 'mp4' # any video or image extension
 pose_model = 'HALPE_26'  #With RTMLib: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands), COCO_17 (body)
 						# /!\ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the files if needed
 						 #With MMPose: HALPE_26 (default), COCO_133, COCO_17, CUSTOM. See example at the end of the file
@@ -47,12 +48,12 @@ output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a lis
 
 [synchronization]
 display_sync_plots = true # true or false (lowercase)
-keypoints_to_consider = 'all' # 'all' if all points should be considered (default)
-                           # ['RWrist', 'RElbow'] list of keypoint names if you want to specify the keypoints to consider
+keypoints_to_consider = 'all' # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
+                           # ['RWrist', 'RElbow'] list of keypoint names if you want to specify the keypoints to consider.
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
-                           # [1.0, 0.2, 0.8, 1.1] list of times in seconds, one value per camera if you want to specify an approximate time where to search for synchronization.
-                           # Best times: only one person is in the scene, who performs a sharp vertical movement (with keypoints_to_consider).
-reset_sync = false # Revert to state before synchronization. Won't attempt to synchronize unless set to false.
+                           # [10.0, 2.0, 8.0, 11.0] list of times in seconds, one value per camera if you want to specify the approximate time of a clear vertical event by one person standing alone in the scene
+time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
+
 
 
 # Take heart, calibration is not that complicated once you get the hang of it!

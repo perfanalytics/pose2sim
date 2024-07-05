@@ -343,11 +343,13 @@ def rtm_estimator(config_dict):
     if not len(video_files) == 0: 
         # Process video files
         for video_path in video_files:
+            pose_tracker.reset()
             process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range)
 
     else:
         # Process image folders
         image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
         for image_folder in image_folders:
+            pose_tracker.reset()
             image_folder_path = os.path.join(video_dir, image_folder)
             process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, save_video, save_images, display_detection, frame_range)

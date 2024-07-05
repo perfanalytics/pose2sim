@@ -649,8 +649,8 @@ def track_2d_all(config_dict):
     except:
         raise Exception(f'No .toml calibration file found in the {calib_dir}.')
     pose_dir = os.path.join(project_dir, 'pose')
-    poseSync_dir = os.path.join(project_dir, 'pose_sync')
-    poseTracked_dir = os.path.join(project_dir, 'pose_associated')
+    poseSync_dir = os.path.join(project_dir, 'pose-sync')
+    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
 
     # projection matrix from toml calibration file
     P_all = computeP(calib_file, undistort=undistort_points)

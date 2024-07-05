@@ -20,6 +20,7 @@
 # multi_person = true # If false, only the main person in scene is analyzed. 
 # frame_rate = 60 # fps
 # frame_range = [] # For example [10,300], or [] for all frames
+## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
 ## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
@@ -29,24 +30,29 @@
 
 
 # [pose]
-# pose_framework = 'openpose' # 'openpose', 'mediapipe', 'alphapose', 'deeplabcut' 
-# pose_model = 'BODY_25B' #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
-# 						      #With mediapipe: BLAZEPOSE. 
-# 						      #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133. 
-# 						      #With deeplabcut: CUSTOM. See example at the end of the file.
-# # What follows has not been implemented yet
-# overwrite_pose = false
-# openpose_path = '' # only checked if OpenPose is used
+# vid_img_extension = 'mp4' # any video or image extension
+# pose_model = 'HALPE_26'  #With RTMLib: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands), COCO_17 (body)
+						# /!\ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the files if needed
+						 # With MMPose: HALPE_26 (default), COCO_133, COCO_17, CUSTOM. See example at the end of the file
+						 # With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
+						 # With mediapipe: BLAZEPOSE
+						 # With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133
+						 # With deeplabcut: CUSTOM. See example at the end of the file
+# mode = 'balanced' # 'lightweight', 'balanced', 'performance'
+# det_frequency = 1 # Run inference only every N frames, and inbetween tracks previously detected points. Can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
+# tracking = true # Gives consistent person ID across frames. Slower but might facilitate multi-person triangulation
+# display_detection = true
+# save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
+# output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 
 # [synchronization]
 # display_sync_plots = true # true or false (lowercase)
-# keypoints_to_consider = 'all' # 'all' if all points should be considered (default)
-#                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify the keypoints to consider
+# keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
+                           # # ['RWrist', 'RElbow'] list of keypoint names if you want to specify the keypoints to consider.
 # approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
-#                            # [1.0, 0.2, 0.8, 1.1] list of times in seconds, one value per camera if you want to specify an approximate time where to search for synchronization.
-#                            # Best times: only one person is in the scene, who performs a sharp vertical movement (with keypoints_to_consider).
-# reset_sync = false # Revert to state before synchronization. Won't attempt to synchronize unless set to false.
+                           # # [10.0, 2.0, 8.0, 11.0] list of times in seconds, one value per camera if you want to specify the approximate time of a clear vertical event by one person standing alone in the scene
+# time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
 
 
 ## Take heart, calibration is not that complicated once you get the hang of it!
@@ -115,7 +121,7 @@
 #    [personAssociation.single_person]
 #    reproj_error_threshold_association = 20 # px
 #    tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
-#                # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' with BLAZEPOSE)
+               # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' or 'RShoulder')
    
 #    [personAssociation.multi_person]
 #    reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
@@ -175,80 +181,80 @@ display_figures = false # true or false (lowercase)
 
 
 
-## CUSTOM skeleton, if you trained your own DeepLabCut model for example. 
+## CUSTOM skeleton, if you trained your own model from DeepLabCut or MMPose for example. 
 ## Make sure the node ids correspond to the column numbers of the 2D pose file, starting from zero.
 ## 
 ## If you want to perform inverse kinematics, you will also need to create an OpenSim model
 ## and add to its markerset the location where you expect the triangulated keypoints to be detected.
 ## 
-## In this example, CUSTOM reproduces the BODY_25B skeleton  (default skeletons are stored in skeletons.py).
+## In this example, CUSTOM reproduces the HALPE_26 skeleton (default skeletons are stored in skeletons.py).
 ## You can create as many custom skeletons as you want, just add them further down and rename them.
 ## 
 ## Check your model hierarchy with:  for pre, _, node in RenderTree(model): 
 ##                                      print(f'{pre}{node.name} id={node.id}')
 # [pose.CUSTOM]
 # name = "CHip"
-# id = "None"
-#   [[pose.CUSTOM.children]]
-#   name = "RHip"
-#   id = 12
-#      [[pose.CUSTOM.children.children]]
-#      name = "RKnee"
-#      id = 14
-#         [[pose.CUSTOM.children.children.children]]
-#         name = "RAnkle"
-#         id = 16
-#            [[pose.CUSTOM.children.children.children.children]]
-#            name = "RBigToe"
-#            id = 22
-#               [[pose.CUSTOM.children.children.children.children.children]]
-#               name = "RSmallToe"
-#               id = 23
-#            [[pose.CUSTOM.children.children.children.children]]
-#            name = "RHeel"
-#            id = 24
-#   [[pose.CUSTOM.children]]
-#   name = "LHip"
-#   id = 11
-#      [[pose.CUSTOM.children.children]]
-#      name = "LKnee"
-#      id = 13
-#         [[pose.CUSTOM.children.children.children]]
-#         name = "LAnkle"
-#         id = 15
-#            [[pose.CUSTOM.children.children.children.children]]
-#            name = "LBigToe"
-#            id = 19
-#               [[pose.CUSTOM.children.children.children.children.children]]
-#               name = "LSmallToe"
-#               id = 20
-#            [[pose.CUSTOM.children.children.children.children]]
-#            name = "LHeel"
-#            id = 21
-#   [[pose.CUSTOM.children]]
-#   name = "Neck"
-#   id = 17
-#      [[pose.CUSTOM.children.children]]
-#      name = "Head"
-#      id = 18
-#         [[pose.CUSTOM.children.children.children]]
-#         name = "Nose"
-#         id = 0
-#      [[pose.CUSTOM.children.children]]
-#      name = "RShoulder"
-#      id = 6
-#         [[pose.CUSTOM.children.children.children]]
-#         name = "RElbow"
-#         id = 8
-#            [[pose.CUSTOM.children.children.children.children]]
-#            name = "RWrist"
-#            id = 10
-#      [[pose.CUSTOM.children.children]]
-#      name = "LShoulder"
-#      id = 5
-#         [[pose.CUSTOM.children.children.children]]
-#         name = "LElbow"
-#         id = 7
-#            [[pose.CUSTOM.children.children.children.children]]
-#            name = "LWrist"
-#            id = 9
+# id = "19"
+  # [[pose.CUSTOM.children]]
+  # name = "RHip"
+  # id = 12
+     # [[pose.CUSTOM.children.children]]
+     # name = "RKnee"
+     # id = 14
+        # [[pose.CUSTOM.children.children.children]]
+        # name = "RAnkle"
+        # id = 16
+           # [[pose.CUSTOM.children.children.children.children]]
+           # name = "RBigToe"
+           # id = 21
+              # [[pose.CUSTOM.children.children.children.children.children]]
+              # name = "RSmallToe"
+              # id = 23
+           # [[pose.CUSTOM.children.children.children.children]]
+           # name = "RHeel"
+           # id = 25
+  # [[pose.CUSTOM.children]]
+  # name = "LHip"
+  # id = 11
+     # [[pose.CUSTOM.children.children]]
+     # name = "LKnee"
+     # id = 13
+        # [[pose.CUSTOM.children.children.children]]
+        # name = "LAnkle"
+        # id = 15
+           # [[pose.CUSTOM.children.children.children.children]]
+           # name = "LBigToe"
+           # id = 20
+              # [[pose.CUSTOM.children.children.children.children.children]]
+              # name = "LSmallToe"
+              # id = 22
+           # [[pose.CUSTOM.children.children.children.children]]
+           # name = "LHeel"
+           # id = 24
+  # [[pose.CUSTOM.children]]
+  # name = "Neck"
+  # id = 18
+     # [[pose.CUSTOM.children.children]]
+     # name = "Head"
+     # id = 17
+        # [[pose.CUSTOM.children.children.children]]
+        # name = "Nose"
+        # id = 0
+     # [[pose.CUSTOM.children.children]]
+     # name = "RShoulder"
+     # id = 6
+        # [[pose.CUSTOM.children.children.children]]
+        # name = "RElbow"
+        # id = 8
+           # [[pose.CUSTOM.children.children.children.children]]
+           # name = "RWrist"
+           # id = 10
+     # [[pose.CUSTOM.children.children]]
+     # name = "LShoulder"
+     # id = 5
+        # [[pose.CUSTOM.children.children.children]]
+        # name = "LElbow"
+        # id = 7
+           # [[pose.CUSTOM.children.children.children.children]]
+           # name = "LWrist"
+           # id = 9

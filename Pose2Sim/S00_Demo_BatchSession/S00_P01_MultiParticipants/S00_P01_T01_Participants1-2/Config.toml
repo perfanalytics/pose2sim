@@ -9,24 +9,22 @@
 # If a parameter is not found here, Pose2Sim will look for its value in the 
 # Config.toml file of the level above. This way, you can set global 
 # instructions for the Session and alter them for specific Participants or Trials.
-#
-# If you wish to overwrite a parameter for a specific trial or participant,  
+# 
+# If you wish to overwrite a parameter for a specific trial or participant, 
 # edit its Config.toml file by uncommenting its key (e.g., [project])
 # and editing its value (e.g., frame_range = [10,300]). Or else, uncomment 
 # [filtering.butterworth] and set cut_off_frequency = 10, etc.
 
 
-# [project]
-# multi_person = true # If false, only the main person in scene is analyzed. 
+
+[project]
+multi_person = true # If false, only the main person in scene is analyzed. 
 # frame_rate = 60 # fps
 # frame_range = [] # For example [10,300], or [] for all frames
 ## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
 ## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
-
-# exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
-# e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
 
 # [pose]
@@ -128,55 +126,55 @@
 #    min_affinity = 0.2 # affinity below which a correspondence is ignored
 
 
-# [triangulation]
-# reorder_trc = false # only checked if multi_person analysis
+[triangulation]
+reorder_trc = true # only checked if multi_person analysis
 # reproj_error_threshold_triangulation = 15 # px
 # likelihood_threshold_triangulation= 0.3
 # min_cameras_for_triangulation = 2
 # interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
-#                         # 'none' if you don't want to interpolate missing points
+## 'none' if you don't want to interpolate missing points
 # interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
 # show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 # handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
 # undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
-# make_c3d = false # save triangulated data in c3d format in addition to trc
+# make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
 # [filtering]
 # type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
 # display_figures = false # true or false (lowercase)
-# make_c3d = false # save triangulated data in c3d format in addition to trc
+# make_c3d = true # save triangulated data in c3d format in addition to trc
 
-#    [filtering.butterworth]
-#    order = 4 
-#    cut_off_frequency = 6 # Hz
-#    [filtering.kalman]
-#    # How much more do you trust triangulation results (measurements), than previous data (process assuming constant acceleration)?
-#    trust_ratio = 100 # = measurement_trust/process_trust ~= process_noise/measurement_noise
-#    smooth = true # should be true, unless you need real-time filtering
-#    [filtering.butterworth_on_speed]
-#    order = 4 
-#    cut_off_frequency = 10 # Hz
-#    [filtering.gaussian]
-#    sigma_kernel = 2 #px
-#    [filtering.LOESS]
-#    nb_values_used = 30 # = fraction of data used * nb frames
-#    [filtering.median]
-#    kernel_size = 9
+   # [filtering.butterworth]
+   # order = 4 
+   # cut_off_frequency = 6 # Hz
+   # [filtering.kalman]
+   ## How much more do you trust triangulation results (measurements), than previous data (process assuming constant acceleration)?
+   # trust_ratio = 100 # = measurement_trust/process_trust ~= process_noise/measurement_noise
+   # smooth = true # should be true, unless you need real-time filtering
+   # [filtering.butterworth_on_speed]
+   # order = 4 
+   # cut_off_frequency = 10 # Hz
+   # [filtering.gaussian]
+   # sigma_kernel = 2 #px
+   # [filtering.LOESS]
+   # nb_values_used = 30 # = fraction of data used * nb frames
+   # [filtering.median]
+   # kernel_size = 9
 
 
-# [markerAugmentation] 
+[markerAugmentation] 
 ## Only works on BODY_25 and BODY_25B models
-# participant_height = 1.72 # m # float if single person, list of float if multi-person (same order as the Static trials)
-# participant_mass = 70.0 # kg
-# make_c3d = false # save triangulated data in c3d format in addition to trc
+participant_height = [1.40, 1.72] # m # float if single person, list of float if multi-person (same order as the Static trials)
+participant_mass = [63.0, 70.0] # kg
+# make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
 # [opensim]
 # static_trial = [# static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
-#            # If this Config.toml file is at the Trial level, set to true or false (lowercase);
-#            # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
-#            # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']
+#              # If this Config.toml file is at the Trial level, set to true or false (lowercase);
+#              # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
+#              # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']
 # opensim_bin_path = 'C:\OpenSim 4.4\bin'
 
 

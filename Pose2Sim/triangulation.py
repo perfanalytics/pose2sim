@@ -726,8 +726,8 @@ def triangulate_all(config_dict):
     except:
         raise Exception(f'No .toml calibration file found in the {calib_dir}.')
     pose_dir = os.path.join(project_dir, 'pose')
-    poseSync_dir = os.path.join(project_dir, 'pose_sync')
-    poseTracked_dir = os.path.join(project_dir, 'pose_associated')
+    poseSync_dir = os.path.join(project_dir, 'pose-sync')
+    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
     
     # Projection matrix from toml calibration file
     P = computeP(calib_file, undistort=undistort_points)
@@ -892,10 +892,10 @@ def triangulate_all(config_dict):
     id_excluded_cams_tot = [list(tpl) for tpl in zip(*it.zip_longest(*id_excluded_cams_tot, fillvalue=[np.nan]*keypoints_nb*3))]
 
     # dataframes for each person
-    Q_tot = [pd.DataFrame([Q_tot[f][n] for f in range(*f_range)]) for n in range(nb_persons_to_detect)]
-    error_tot = [pd.DataFrame([error_tot[f][n] for f in range(*f_range)]) for n in range(nb_persons_to_detect)]
-    nb_cams_excluded_tot = [pd.DataFrame([nb_cams_excluded_tot[f][n] for f in range(*f_range)]) for n in range(nb_persons_to_detect)]
-    id_excluded_cams_tot = [pd.DataFrame([id_excluded_cams_tot[f][n] for f in range(*f_range)]) for n in range(nb_persons_to_detect)]
+    Q_tot = [pd.DataFrame([Q_tot_f[n] for Q_tot_f in Q_tot]) for n in range(nb_persons_to_detect)]
+    error_tot = [pd.DataFrame([error_tot_f[n] for error_tot_f in error_tot]) for n in range(nb_persons_to_detect)]
+    nb_cams_excluded_tot = [pd.DataFrame([nb_cams_excluded_tot_f[n] for nb_cams_excluded_tot_f in nb_cams_excluded_tot]) for n in range(nb_persons_to_detect)]
+    id_excluded_cams_tot = [pd.DataFrame([id_excluded_cams_tot_f[n] for id_excluded_cams_tot_f in id_excluded_cams_tot]) for n in range(nb_persons_to_detect)]
     
     for n in range(nb_persons_to_detect):
         error_tot[n]['mean'] = error_tot[n].mean(axis = 1)

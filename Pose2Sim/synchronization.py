@@ -254,7 +254,10 @@ def synchronize_cams_all(config_dict):
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
 
     # List json files
-    pose_listdirs_names = next(os.walk(pose_dir))[1]
+    try:
+        pose_listdirs_names = next(os.walk(pose_dir))[1]
+    except:
+        raise ValueError(f'No json files found in {pose_dir}. Make sure you run Pose2Sim.poseEstimation() first.')
     pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     json_dirs = [os.path.join(pose_dir, j_d) for j_d in json_dirs_names] # list of json directories in pose_dir
@@ -272,7 +275,7 @@ def synchronize_cams_all(config_dict):
     if isinstance(approx_time_maxspeed, list): # search around max speed
         approx_frame_maxspeed = [int(fps * t) for t in approx_time_maxspeed]
         nb_frames_per_cam = [len(fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json')) for json_dir in json_dirs]
-        search_around_frames = [[a-lag_range if a-lag_range>f_range[0] else f_range[0], a+lag_range if a+lag_range<nb_frames_per_cam[i] else nb_frames_per_cam[i]+f_range[0]] for i,a in enumerate(approx_frame_maxspeed)]
+        search_around_frames = [[int(a-lag_range) if a-lag_range>0 else 0, int(a+lag_range) if a+lag_range<nb_frames_per_cam[i] else nb_frames_per_cam[i]+f_range[0]] for i,a in enumerate(approx_frame_maxspeed)]
     elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
         search_around_frames = [[f_range[0], f_range[0]+nb_frames_per_cam[i]] for i in range(cam_nb)]
     else:
@@ -344,10 +347,9 @@ def synchronize_cams_all(config_dict):
             logging.info(f'--> Camera {ref_cam_id} and {cam_id}: {offset_cam} frames offset, correlation {round(max_corr_cam, 2)}.')
         offset.append(offset_cam)
     offset.insert(ref_cam_id, 0)
-    print(offset)
 
-    # rename json files according to the offset and copy them to pose_sync
-    sync_dir = os.path.abspath(os.path.join(pose_dir, '..', 'pose_sync'))
+    # rename json files according to the offset and copy them to pose-sync
+    sync_dir = os.path.abspath(os.path.join(pose_dir, '..', 'pose-sync'))
     os.makedirs(sync_dir, exist_ok=True)
     for d, j_dir in enumerate(json_dirs):
         os.makedirs(os.path.join(sync_dir, os.path.basename(j_dir)), exist_ok=True)
@@ -357,38 +359,5 @@ def synchronize_cams_all(config_dict):
             if int(j_split[-2]) > 0:
                 json_offset_name = ''.join(j_split)
                 shutil.copy(os.path.join(pose_dir, os.path.basename(j_dir), j_file), os.path.join(sync_dir, os.path.basename(j_dir), json_offset_name))
-
-
-    # # select frames to keep for each camera
-    # selected_frames = np.array([np.array(f_range) + o for o in offset])
-    # remove_left =  np.min([frames_to_remove for frames_to_remove in selected_frames])
-    # remove_left = remove_left if remove_left<0 else 0
-    # remove_right = np.max([selected_frames[i,1] - nb_frames_per_cam[i] for i in range(len(nb_frames_per_cam))])
-    # remove_right = remove_right if remove_right>0 else 0
-    # selected_frames = np.array([selected_frames[:,0]-remove_left, selected_frames[:,1]-remove_right]).T
-    # selected_json_files_names = [[j for j in json_files_cam if int(re.split('(\d+)',j)[-2]) in range(*s)] for s,json_files_cam in zip(selected_frames,json_files_names)]
-    # print(selected_json_files_names[0][0])
-
-    # # rename json files according to selected frames and copy them to pose_sync
-    # sync_dir = os.path.abspath(os.path.join(pose_dir, '..', 'pose_sync'))
-    # os.makedirs(sync_dir, exist_ok=True)
-    # selected_frames_ref = list(range(*selected_frames[ref_cam_id]))
-    # for d, j_dir in enumerate(json_dirs):
-    #     os.makedirs(os.path.join(sync_dir, os.path.basename(j_dir)), exist_ok=True)
-    #     selected_frames_dir = list(range(*selected_frames[d]))
-    #     # print('\n', j_dir, selected_frames_dir, selected_frames_ref)
-    #     i = 0
-    #     for (f,f_ref) in zip(selected_frames_dir, selected_frames_ref):
-    #         json_number = int(re.split('(\d+)',selected_json_files_names[d][i])[-2])
-    #         if json_number == f:
-    #             if i<=len(selected_json_files_names[d]):
-    #                 j_split = re.split('(\d+)',selected_json_files_names[d][i])
-    #                 j_split[-2] = f'{f_ref:06d}'
-    #                 json_offset_name = ''.join(j_split)
-    #                 # print(f, f_ref, selected_json_files_names[d][i], json_offset_name)
-    #                 shutil.copy(os.path.join(pose_dir, os.path.basename(j_dir), selected_json_files_names[d][i]), os.path.join(sync_dir, os.path.basename(j_dir), json_offset_name))
-    #                 i+=1
-    #             else:
-    #                 break
 
     logging.info(f'Synchronized json files saved in {sync_dir}.')
