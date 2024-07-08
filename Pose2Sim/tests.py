@@ -45,7 +45,7 @@
 import os
 import toml
 from unittest.mock import patch
-import unittset
+import unittest
 
 from Pose2Sim import Pose2Sim
 
