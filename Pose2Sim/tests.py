@@ -44,7 +44,7 @@
 ## INIT
 import os
 import toml
-import unittest
+from unittest.mock import patch
 from Pose2Sim import Pose2Sim
 
 
@@ -61,7 +61,7 @@ __status__ = "Development"
 
 ## FUNCTIONS
 class TestWorkflow(unittest.TestCase):
-    @unittest.mock.patch('builtins.input', return_value='no')  # Mock input() to return 'yes'
+    @patch('builtins.input', return_value='no')  # Mock input() to return 'yes'
     def test_workflow(self, mock_input):
         '''
         SINGLE-PERSON and MULTI-PERSON:
