@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint on several OS with a several versions of Python
 # See: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Build on Win-MacOS-Ubuntu with Python 3.8-3.11
+name: Build on Win-MacOS-Ubuntu with Python 3.9-3.11
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: [3.8, 3.9, "3.10", "3.11"]
+        python-version: [3.9, "3.10", "3.11"]
         include:
           - os: ubuntu-latest
             path: ~/.cache/pip
@@ -37,23 +37,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: Install Miniconda
+        uses: conda-incubator/setup-miniconda@v3
         with:
+          auto-update-conda: true
           python-version: ${{ matrix.python-version }}
+          activate-environment: pose2sim
 
-      - name: Install dependencies
+      - name: Install OpenSim with conda
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install flake8 pytest
-          python -m pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
+          conda create -n pose2sim python=${{ matrix.python-version }} -y
+          conda install -n pose2sim -c conda-forge -c defaults pip
+          conda install -n pose2sim opensim-org::opensim -y
+          
+      - name: Install pip dependencies
+        run: |
+          conda run -n pose2sim python -m pip install --upgrade pip
+          conda run -n pose2sim python -m pip install flake8 pytest
+          conda run -n pose2sim python -m pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
+      
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          conda run -n pose2sim flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          conda run -n pose2sim flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      
       - name: Test with pytest
         run: |
           cd Pose2Sim
-          pytest -v tests.py
+          conda run -n pose2sim pytest -v tests.py
