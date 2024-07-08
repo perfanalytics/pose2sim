@@ -83,10 +83,10 @@ def augmentTRC(config_dict):
     project_dir = config_dict.get('project').get('project_dir')
     pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     pathOutputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    subject_height = config_dict.get('markerAugmentation').get('participant_height')
+    subject_height = config_dict.get('project').get('participant_height')
     if subject_height is None or subject_height == 0 or subject_height==0:
-        raise ValueError("Subject height is not set or invalid in the config file.")
-    subject_mass = config_dict.get('markerAugmentation').get('participant_mass')
+        raise ValueError("Subject height is not set or is invalid.")
+    subject_mass = config_dict.get('project').get('participant_mass')
     if not type(subject_height) == list:
         subject_height = [subject_height]
         subject_mass = [subject_mass]

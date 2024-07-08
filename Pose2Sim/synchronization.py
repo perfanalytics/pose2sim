@@ -7,35 +7,40 @@
 ## SYNCHRONIZE CAMERAS                 ##
 #########################################
 
-Post-synchronize your cameras in case they are not natively synchronized.
+    Post-synchronize your cameras in case they are not natively synchronized.
 
-For each camera, computes mean vertical speed for the chosen keypoints, 
-and find the time offset for which their correlation is highest. 
+    For each camera, computes mean vertical speed for the chosen keypoints, 
+    and find the time offset for which their correlation is highest. 
 
-Depending on the analysed motion, all keypoints can be taken into account, 
-or a list of them, or the right or left side.
-All frames can be considered, or only those around a specific time (typically, 
-the time when there is a single participant in the scene performing a clear vertical motion).
-Has also been successfully tested for synchronizing random walkswith random walks.
+    Depending on the analysed motion, all keypoints can be taken into account, 
+    or a list of them, or the right or left side.
+    All frames can be considered, or only those around a specific time (typically, 
+    the time when there is a single participant in the scene performing a clear vertical motion).
+    Has also been successfully tested for synchronizing random walkswith random walks.
 
-INPUTS: 
-- json files from each camera folders
-- a Config.toml file
-- a skeleton model
+    Keypoints whose likelihood is too low are filtered out; and the remaining ones are 
+    filtered with a butterworth filter.
 
-OUTPUTS: 
-- synchronized json files for each camera
+    INPUTS: 
+    - json files from each camera folders
+    - a Config.toml file
+    - a skeleton model
+
+    OUTPUTS: 
+    - synchronized json files for each camera
 '''
 
 
 ## INIT
 import numpy as np
 import pandas as pd
+import cv2
 import matplotlib.pyplot as plt
 from scipy import signal
 from scipy import interpolate
 import json
 import os
+import glob
 import fnmatch
 import re
 import shutil
@@ -59,13 +64,13 @@ __status__ = "Development"
 
 
 # FUNCTIONS
-def convert_json2pandas(json_files, min_conf=0.6):
+def convert_json2pandas(json_files, likelihood_threshold=0.6):
     '''
     Convert a list of JSON files to a pandas DataFrame.
 
     INPUTS:
     - json_files: list of str. Paths of the the JSON files.
-    - min_conf: float. Drop values if confidence is below min_conf.
+    - likelihood_threshold: float. Drop values if confidence is below likelihood_threshold.
     - frame_range: select files within frame_range.
 
     OUTPUTS:
@@ -79,7 +84,7 @@ def convert_json2pandas(json_files, min_conf=0.6):
             try:
                 json_data = json.load(j_f)['people'][0]['pose_keypoints_2d']
                 # remove points with low confidence
-                json_data = np.array([[json_data[3*i],json_data[3*i+1],json_data[3*i+2]] if json_data[3*i+2]>min_conf else [0.,0.,0.] for i in range(nb_coord)]).ravel().tolist()
+                json_data = np.array([[json_data[3*i],json_data[3*i+1],json_data[3*i+2]] if json_data[3*i+2]>likelihood_threshold else [0.,0.,0.] for i in range(nb_coord)]).ravel().tolist()
             except:
                 # print(f'No person found in {os.path.basename(json_dir)}, frame {i}')
                 json_data = [np.nan] * 25*3
@@ -215,6 +220,9 @@ def synchronize_cams_all(config_dict):
     the time when there is a single participant in the scene performing a clear vertical motion).
     Has also been successfully tested for synchronizing random walkswith random walks.
 
+    Keypoints whose likelihood is too low are filtered out; and the remaining ones are 
+    filtered with a butterworth filter.
+
     INPUTS: 
     - json files from each camera folders
     - a Config.toml file
@@ -228,6 +236,7 @@ def synchronize_cams_all(config_dict):
     project_dir = config_dict.get('project').get('project_dir')
     pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
     pose_model = config_dict.get('pose').get('pose_model')
+    multi_person = config_dict.get('project').get('multi_person')
     fps =  config_dict.get('project').get('frame_rate')
     frame_range = config_dict.get('project').get('frame_range')
     display_sync_plots = config_dict.get('synchronization').get('display_sync_plots')
@@ -235,10 +244,35 @@ def synchronize_cams_all(config_dict):
     approx_time_maxspeed = config_dict.get('synchronization').get('approx_time_maxspeed') 
     time_range_around_maxspeed = config_dict.get('synchronization').get('time_range_around_maxspeed')
 
+    likelihood_threshold = config_dict.get('synchronization').get('likelihood_threshold')
+    filter_cutoff = int(config_dict.get('synchronization').get('filter_cutoff'))
+    filter_order = int(config_dict.get('synchronization').get('filter_order'))
+
+    # Determine frame rate
+    video_dir = os.path.join(project_dir, 'videos')
+    vid_img_extension = config_dict['pose']['vid_img_extension']
+    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+    if fps == 'auto': 
+        try:
+            cap = cv2.VideoCapture(video_files[0])
+            cap.read()
+            if cap.read()[0] == False:
+                raise
+            fps = int(cap.get(cv2.CAP_PROP_FPS))
+        except:
+            fps = 60  
     lag_range = time_range_around_maxspeed*fps # frames
-    min_conf = 0.4
-    filter_order = 4
-    filter_cutoff = 6
+
+
+    # Warning if multi_person
+    if multi_person:
+        logging.warning('\nYou set your project as a multi-person one: make sure you set `approx_time_maxspeed` and `time_range_around_maxspeed` at times where one single persons are in the scene, you you may get inaccurate results.')
+        do_synchro = input('Do you want to continue? (y/n)')
+        if do_synchro.lower() not in ["y","yes"]:
+            logging.warning('Synchronization cancelled.')
+            return
+        else:
+            logging.warning('Synchronization will be attempted.\n')
 
     # Retrieve keypoints from model
     try: # from skeletons.py
@@ -276,12 +310,26 @@ def synchronize_cams_all(config_dict):
         approx_frame_maxspeed = [int(fps * t) for t in approx_time_maxspeed]
         nb_frames_per_cam = [len(fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json')) for json_dir in json_dirs]
         search_around_frames = [[int(a-lag_range) if a-lag_range>0 else 0, int(a+lag_range) if a+lag_range<nb_frames_per_cam[i] else nb_frames_per_cam[i]+f_range[0]] for i,a in enumerate(approx_frame_maxspeed)]
+        logging.info(f'Synchronization is calculated around the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
     elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
         search_around_frames = [[f_range[0], f_range[0]+nb_frames_per_cam[i]] for i in range(cam_nb)]
+        logging.info('Synchronization is calculated on the whole sequence. This may take a while.')
     else:
         raise ValueError('approx_time_maxspeed should be a list of floats or "auto"')
     
+    if keypoints_to_consider == 'right':
+        logging.info(f'Keypoints used to compute the best synchronization offset: right side.')
+    elif keypoints_to_consider == 'left':
+        logging.info(f'Keypoints used to compute the best synchronization offset: left side.')
+    elif isinstance(keypoints_to_consider, list):
+        logging.info(f'Keypoints used to compute the best synchronization offset: {keypoints_to_consider}.')
+    elif keypoints_to_consider == 'all':
+        logging.info(f'All keypoints are used to compute the best synchronization offset.')
+    logging.info(f'These keypoints are filtered with a Butterworth filter (cut-off frequency: {filter_cutoff} Hz, order: {filter_order}).')
+    logging.info(f'They are removed when their likelihood is below {likelihood_threshold}.\n')
+
     # Extract, interpolate, and filter keypoint coordinates
+    logging.info('Synchronizing...')
     df_coords = []
     b, a = signal.butter(filter_order/2, filter_cutoff/(fps/2), 'low', analog = False) 
     json_files_names_range = [[j for j in json_files_cam if int(re.split('(\d+)',j)[-2]) in range(*frames_cam)] for (json_files_cam, frames_cam) in zip(json_files_names,search_around_frames)]
@@ -291,7 +339,7 @@ def synchronize_cams_all(config_dict):
         raise ValueError(f'No json files found within the specified frame range ({frame_range}) at the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
     
     for i in range(cam_nb):
-        df_coords.append(convert_json2pandas(json_files_range[i], min_conf=min_conf))
+        df_coords.append(convert_json2pandas(json_files_range[i], likelihood_threshold=likelihood_threshold))
         df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
         if keypoints_to_consider == 'right':
             kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k.startswith('R') or k.startswith('right')]
@@ -310,7 +358,7 @@ def synchronize_cams_all(config_dict):
         else:
             raise ValueError('keypoints_to_consider should be "all", "right", "left", or a list of keypoint names.\n\
                             If you specified keypoints, make sure that they exist in your pose_model.')
-
+        
         df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args = ['linear'])
         df_coords[i] = df_coords[i].bfill().ffill()
         df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0))

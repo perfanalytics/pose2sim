@@ -633,7 +633,6 @@ def track_2d_all(config_dict):
     multi_person = config_dict.get('project').get('multi_person')
     pose_model = config_dict.get('pose').get('pose_model')
     tracked_keypoint = config_dict.get('personAssociation').get('single_person').get('tracked_keypoint')
-    likelihood_threshold = config_dict.get('personAssociation').get('likelihood_threshold_association')
     min_cameras_for_triangulation = config_dict.get('triangulation').get('min_cameras_for_triangulation')
     reconstruction_error_threshold = config_dict.get('personAssociation').get('multi_person').get('reconstruction_error_threshold')
     min_affinity = config_dict.get('personAssociation').get('multi_person').get('min_affinity')
@@ -699,6 +698,7 @@ def track_2d_all(config_dict):
         json_files_names_f = [j for j_list in json_files_names_f for j in (j_list or ['none'])]
         try:
             json_files_f = [os.path.join(poseSync_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
+            with open(os.path.exist(json_files_f[0])) as json_exist_test: pass
         except:
             json_files_f = [os.path.join(pose_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
         json_tracked_files_f = [os.path.join(poseTracked_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]

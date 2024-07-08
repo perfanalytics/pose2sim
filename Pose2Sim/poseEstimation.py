@@ -46,7 +46,7 @@ from Pose2Sim.common import natural_sort_key
 
 
 ## AUTHORSHIP INFORMATION
-__author__ = "HunMin Kim"
+__author__ = "HunMin Kim, David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["HunMin Kim", "David Pagnon"]
 __license__ = "BSD 3-Clause License"
@@ -185,11 +185,14 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
     cap.release()
     if save_video:
         out.release()
+        logging.info(f"--> Output video saved to {output_video_path}.")
+    if save_images:
+        logging.info(f"--> Output images saved to {img_output_dir}.")
     if display_detection:
         cv2.destroyAllWindows()
 
 
-def process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, save_video, save_images, display_detection, frame_range):
+def process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, fps, save_video, save_images, display_detection, frame_range):
     '''
     Estimate pose estimation from a folder of images
     
@@ -219,7 +222,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
     sorted(image_files, key=natural_sort_key)
 
     if save_video: # Set up video writer
-        fps = 30 # Edit if you want a different output frame rate
+        logging.warning('Using default framerate of 60 fps.')
         fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
         W, H = cv2.imread(image_files[0]).shape[:2][::-1] # Get the width and height from the first image (assuming all images have the same size)
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
@@ -228,7 +231,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
         cv2.namedWindow("Pose Estimation", cv2.WINDOW_NORMAL)
     
     f_range = [[len(image_files)] if frame_range==[] else frame_range][0]
-    for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'Processing {os.path.basename(img_output_dir)}')):
+    for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
         if frame_idx in range(*f_range):
 
             try:
@@ -261,6 +264,10 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
                 if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
                 cv2.imwrite(os.path.join(img_output_dir, f'{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.png'), img_show)
 
+    if save_video:
+        logging.info(f"--> Output video saved to {output_video_path}.")
+    if save_images:
+        logging.info(f"--> Output images saved to {img_output_dir}.")
     if display_detection:
         cv2.destroyAllWindows()
 
@@ -311,23 +318,52 @@ def rtm_estimator(config_dict):
     det_frequency = config_dict['pose']['det_frequency']
     tracking = config_dict['pose']['tracking']
 
+    # Determine frame rate
+    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+    frame_rate = config_dict.get('project').get('frame_rate')
+    if frame_rate == 'auto': 
+        try:
+            cap = cv2.VideoCapture(video_files[0])
+            cap.read()
+            if cap.read()[0] == False:
+                raise
+        except:
+            frame_rate = 60    
+
     # If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
     if 'CUDAExecutionProvider' in ort.get_available_providers() and torch.cuda.is_available():
         device = 'cuda'
         backend = 'onnxruntime'
+        logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
     else:
         device = 'cpu'
         backend = 'openvino'
+        logging.info(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
+
+    if det_frequency>1:
+        logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points.')
+    if det_frequency==1:
+        logging.info(f'Inference run on every single frame.')
+    else:
+        raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
     
+    if tracking:
+        logging.info(f'Pose estimation will attempt to give consistent person IDs across frames.\n')
+
     # Select the appropriate model based on the model_type
     if pose_model.upper() == 'HALPE_26':
         ModelClass = BodyWithFeet
+        logging.info(f"Using HALPE_26 model (body and feet) for pose estimation.")
     elif pose_model.upper() == 'COCO_133':
         ModelClass = Wholebody
+        logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation.")
     elif pose_model.upper() == 'COCO_17':
         ModelClass = Body # 26 keypoints(halpe26)
+        logging.info(f"Using COCO_17 model (body) for pose estimation.")
     else:
         raise ValueError(f"Invalid model_type: {pose_model}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
+    logging.info(f'Mode {mode}.\n')
+
 
     # Initialize the pose tracker
     pose_tracker = PoseTracker(
@@ -339,17 +375,20 @@ def rtm_estimator(config_dict):
         tracking=tracking,
         to_openpose=False)
 
+    logging.info('\nEstimating pose...')
     video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
     if not len(video_files) == 0: 
         # Process video files
+        logging.info(f'Found video files with extension {vid_img_extension}.')
         for video_path in video_files:
             pose_tracker.reset()
             process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range)
 
     else:
         # Process image folders
+        logging.info(f'Found image folders with extension {vid_img_extension}.')
         image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
         for image_folder in image_folders:
             pose_tracker.reset()
             image_folder_path = os.path.join(video_dir, image_folder)
-            process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, save_video, save_images, display_detection, frame_range)
+            process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, frame_rate, save_video, save_images, display_detection, frame_range)

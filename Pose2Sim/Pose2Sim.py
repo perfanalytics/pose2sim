@@ -260,7 +260,7 @@ def poseEstimation(config=None):
         
         end = time.time()
         elapsed = end - start 
-        logging.info(f'Pose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nPose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
     
 
 def synchronization(config=None):

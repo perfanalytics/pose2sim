@@ -16,9 +16,9 @@
 
 ##### N.B:. Please set undistort_points and handle_LR_swap to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
 
-> **_News_: Version 0.8:**\
-> **Automatic camera synchronization is now supported!**\
-> **Other recently added features**: Multi-person analysis, Blender visualization, Marker augmentation, Automatic batch processing.
+> **_News_: Version 0.9:**\
+> **Pose estimation with RTMPose is now included in Pose2Sim!**\
+> **Other recently added features**: Automatic camera synchronization, multi-person analysis, Blender visualization, Marker augmentation, Automatic batch processing.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
 > To upgrade, type `pip install pose2sim --upgrade`.
@@ -27,7 +27,7 @@ and lens distortions are better taken into account.\ -->
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to the more usual marker-based motion capture methods. It aims to provide a free tool to obtain research-grade results from consumer-grade equipment. Any combination of phone, webcam, GoPro, etc. can be used.
 
-Pose2Sim stands for "OpenPose to OpenSim", as it originally used OpenPose inputs (2D keypoints coordinates obtained from multiple videos) and lead to an OpenSim result (full-body 3D joint angles). Other 2D pose estimators such as BlazePose (MediaPipe), DeepLabCut, AlphaPose, can now be used as inputs.
+Pose2Sim stands for "OpenPose to OpenSim", as it originally used OpenPose inputs (2D keypoints coordinates obtained from multiple videos) and lead to an [OpenSim](https://opensim.stanford.edu/) result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose), and OpenPose and other options are kept as legacy options. 
 
 If you can only use one single camera and don't mind losing some accuracy, please consider using [Sports2D](https://github.com/davidpagnon/Sports2D).
 
@@ -47,11 +47,11 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 - [x] **v0.5** *(12/2023)*: Automatic batch processing
 - [x] **v0.6** *(02/2024)*: Marker augmentation, Blender visualizer
 - [x] **v0.7** *(03/2024)*: Multi-person analysis
-- [x] **v0.9** *(04/2024)*: New synchronization tool
-- [x] **v0.10: *(06/2024)*: Integration of pose estimation in the pipeline**
-- [ ] v0.11: Integration of OpenSim in the pipeline
-- [ ] v0.12: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
-- [ ] v0.13: Graphical User Interface
+- [x] **v0.8** *(04/2024)*: New synchronization tool
+- [x] **v0.9: *(07/2024)*: Integration of pose estimation in the pipeline**
+- [ ] v0.10: Integration of OpenSim in the pipeline
+- [ ] v0.11: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
+- [ ] v0.12: Graphical User Interface
 - [ ] v1.0: First accomplished release
 
 </br>
@@ -68,7 +68,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
       1. [Retrieve the folder structure](#retrieve-the-folder-structure)
       2. [Single Trial vs. Batch processing](#single-trial-vs-batch-processing)
    2. [2D pose estimation](#2d-pose-estimation)
-      1. [With RTMlib (default)](#with-rtmlib-default)
+      1. [With RTMPose (default)](#with-rtmpose-default)
       2. [With MMPose (coming soon)](#with-mmpose-coming-soon)
       3. [With DeepLabCut](#with-deeplabcut)
       4. [With OpenPose (legacy)](#with-openpose-legacy)
@@ -299,15 +299,29 @@ Try uncommenting `[project]` and set `frame_range = [10,300]` for a Participant 
 
 > N.B.: Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json'.
 
-### With RTMlib *(default)*:
-> bla
+### With RTMPose *(default)*:
+> [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose) is a state-of-the-art pose estimation solution that is faster and more accurate than OpenPose. It is now included in Pose2Sim for straightforward end-to-end analysis.
 
-**N.B.:** *OpenPose BODY_25B is the default 2D pose estimation model used in Pose2Sim. However, other skeleton models from other 2D pose estimation solutions can be used alternatively.* 
+Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Type `ipython`.
+
+``` python
+from Pose2Sim import Pose2Sim
+Pose2Sim.poseEstimation()
+```
+
+*N.B.:* The GPU will be used with ONNX backend if a valid CUDA installation is used, otherwise the OpenVINO backend will be used.\
+*N.B.:* Pose estimation can be run in Lightweight, Balanced, or Performance mode.\
+*N.B.:* Detection can be done every frame, or at any chosen interval. Inbetween, previously detected keypoints are tracked.\
+*N.B.:* The detection can also attempt to give consistent IDs to the same persons across frames.
+
 <img src="Content/Pose2D.png" width="760">
+
+</br>
 
 ### With MMPose *(coming soon)*:
 
-> bla
+> Coming soon
 
 ### With DeepLabCut:
 > If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut). In this case, Pose2Sim is used as an alternative to [AniPose](https://github.com/lambdaloop/anipose).
@@ -589,20 +603,18 @@ Pose2Sim.markerAugmentation()
 > Your OpenSim .osim scaled model and .mot inverse kinematic results will be found in the OpenSim folder of your `Participant` directory.
 
 ### OpenSim Scaling
-1. Use the previous steps to capture a static pose, typically an A-pose or a T-pose.
+1. Choose a time range where the 3D keypoints are particularly well reconstructed, or capture a static pose, typically an A-pose...
 2. Open OpenSim.
 3. Open the provided `Model_Pose2Sim_LSTM.osim` model from `Pose2Sim/OpenSim_Setup`. *(File -> Open Model)*
 4. Load the provided `Scaling_Setup_Pose2Sim_LSTM.xml` scaling file. *(Tools -> Scale model -> Load)*
-5. Replace the example static .trc file with your own data.
+5. Replace the example .trc file with your own data.
 6. Run
 7. Save the new scaled OpenSim model.
 
 ### OpenSim Inverse kinematics
-1. Use Pose2Sim to generate 3D trajectories.
-2. Open OpenSim.
-3. Load the provided `IK_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Inverse kinematics -> Load)*
-4. Replace the example .trc file with your own data, and specify the path to your angle kinematics output file.
-5. Run.
+1. Load the provided `IK_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Inverse kinematics -> Load)*
+2. Replace the example .trc file with your own data, and specify the path to your angle kinematics output file.
+3. Run.
 
 <img src="Content/OpenSim.JPG" width="380">
 

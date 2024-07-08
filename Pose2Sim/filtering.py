@@ -27,6 +27,7 @@ import glob
 import fnmatch
 import numpy as np
 import pandas as pd
+import cv2
 import matplotlib.pyplot as plt
 import logging
 
@@ -136,7 +137,7 @@ def kalman_filter(coords, frame_rate, measurement_noise, process_noise, nb_dimen
     return coords_filt
 
 
-def kalman_filter_1d(config_dict, col):
+def kalman_filter_1d(config_dict, frame_rate, col):
     '''
     1D Kalman filter
     Deals with nans
@@ -144,7 +145,7 @@ def kalman_filter_1d(config_dict, col):
     INPUT:
     - col: Pandas dataframe column
     - trustratio: int, ratio process_noise/measurement_noise
-    - framerate: int
+    - frame_rate: int
     - smooth: boolean, True if double pass (recommended), False if single pass (if real-time)
 
     OUTPUT:
@@ -153,7 +154,6 @@ def kalman_filter_1d(config_dict, col):
 
     trustratio = int(config_dict.get('filtering').get('kalman').get('trust_ratio'))
     smooth = int(config_dict.get('filtering').get('kalman').get('smooth'))
-    framerate = config_dict.get('project').get('frame_rate')
     measurement_noise = 20
     process_noise = measurement_noise * trustratio
 
@@ -168,12 +168,12 @@ def kalman_filter_1d(config_dict, col):
     
         # Filter each of the selected sequences
         for seq_f in idx_sequences_to_filter:
-            col_filtered[seq_f] = kalman_filter(col_filtered[seq_f], framerate, measurement_noise, process_noise, nb_dimensions=1, nb_derivatives=3, smooth=smooth).flatten()
+            col_filtered[seq_f] = kalman_filter(col_filtered[seq_f], frame_rate, measurement_noise, process_noise, nb_dimensions=1, nb_derivatives=3, smooth=smooth).flatten()
 
     return col_filtered
 
 
-def butterworth_filter_1d(config_dict, col):
+def butterworth_filter_1d(config_dict, frame_rate, col):
     '''
     1D Zero-phase Butterworth filter (dual pass)
     Deals with nans
@@ -182,7 +182,7 @@ def butterworth_filter_1d(config_dict, col):
     - col: numpy array
     - order: int
     - cutoff: int
-    - framerate: int
+    - frame_rate: int
 
     OUTPUT:
     - col_filtered: Filtered pandas dataframe column
@@ -191,9 +191,8 @@ def butterworth_filter_1d(config_dict, col):
     type = 'low' #config_dict.get('filtering').get('butterworth').get('type')
     order = int(config_dict.get('filtering').get('butterworth').get('order'))
     cutoff = int(config_dict.get('filtering').get('butterworth').get('cut_off_frequency'))    
-    framerate = config_dict.get('project').get('frame_rate')
 
-    b, a = signal.butter(order/2, cutoff/(framerate/2), type, analog = False) 
+    b, a = signal.butter(order/2, cutoff/(frame_rate/2), type, analog = False) 
     padlen = 3 * max(len(a), len(b))
     
     # split into sequences of not nans
@@ -212,7 +211,7 @@ def butterworth_filter_1d(config_dict, col):
     return col_filtered
     
 
-def butterworth_on_speed_filter_1d(config_dict, col):
+def butterworth_on_speed_filter_1d(config_dict, frame_rate, col):
     '''
     1D zero-phase Butterworth filter (dual pass) on derivative
 
@@ -227,9 +226,8 @@ def butterworth_on_speed_filter_1d(config_dict, col):
     type = 'low' # config_dict.get('filtering').get('butterworth_on_speed').get('type')
     order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
     cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
-    framerate = config_dict.get('project').get('frame_rate')
 
-    b, a = signal.butter(order/2, cutoff/(framerate/2), type, analog = False)
+    b, a = signal.butter(order/2, cutoff/(frame_rate/2), type, analog = False)
     padlen = 3 * max(len(a), len(b))
     
     # derivative
@@ -253,7 +251,7 @@ def butterworth_on_speed_filter_1d(config_dict, col):
     return col_filtered
 
 
-def gaussian_filter_1d(config_dict, col):
+def gaussian_filter_1d(config_dict, frame_rate, col):
     '''
     1D Gaussian filter
 
@@ -272,7 +270,7 @@ def gaussian_filter_1d(config_dict, col):
     return col_filtered
     
 
-def loess_filter_1d(config_dict, col):
+def loess_filter_1d(config_dict, frame_rate, col):
     '''
     1D LOWESS filter (Locally Weighted Scatterplot Smoothing)
 
@@ -302,7 +300,7 @@ def loess_filter_1d(config_dict, col):
     return col_filtered
     
 
-def median_filter_1d(config_dict, col):
+def median_filter_1d(config_dict, frame_rate, col):
     '''
     1D median filter
 
@@ -365,13 +363,14 @@ def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names):
     pw.show()
 
 
-def filter1d(col, config_dict, filter_type):
+def filter1d(col, config_dict, filter_type, frame_rate):
     '''
     Choose filter type and filter column
 
     INPUT:
     - col: Pandas dataframe column
     - filter_type: filter type from Config.toml
+    - frame_rate: int
     
     OUTPUT:
     - col_filtered: Filtered pandas dataframe column
@@ -389,7 +388,7 @@ def filter1d(col, config_dict, filter_type):
     filter_fun = filter_mapping[filter_type]
     
     # Filter column
-    col_filtered = filter_fun(config_dict, col)
+    col_filtered = filter_fun(config_dict, frame_rate, col)
 
     return col_filtered
 
@@ -448,25 +447,25 @@ def filter_all(config_dict):
 
     # Read config_dict
     project_dir = config_dict.get('project').get('project_dir')
-    try:
-        pose_tracked_dir = os.path.join(project_dir, 'pose-associated')
-        os.listdir(pose_tracked_dir)
-        pose_dir = pose_tracked_dir
-    except:
-        pose_dir = os.path.join(project_dir, 'pose')
-    frame_range = config_dict.get('project').get('frame_range')
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     display_figures = config_dict.get('filtering').get('display_figures')
     filter_type = config_dict.get('filtering').get('type')
-    seq_name = os.path.basename(os.path.realpath(project_dir))
     make_c3d = config_dict.get('filtering').get('make_c3d')
+
+    # Get frame_rate
+    video_dir = os.path.join(project_dir, 'videos')
+    vid_img_extension = config_dict['pose']['vid_img_extension']
+    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
     frame_rate = config_dict.get('project').get('frame_rate')
-    
-    # Frames range
-    pose_listdirs_names = next(os.walk(pose_dir))[1]
-    json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
-    json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
-    f_range = [[0,min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
+    if frame_rate == 'auto': 
+        try:
+            cap = cv2.VideoCapture(video_files[0])
+            cap.read()
+            if cap.read()[0] == False:
+                raise
+            frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
+        except:
+            frame_rate = 60
     
     # Trc paths
     trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in file]
@@ -484,7 +483,7 @@ def filter_all(config_dict):
         Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
 
         # Filter coordinates
-        Q_filt = Q_coord.apply(filter1d, axis=0, args = [config_dict, filter_type])
+        Q_filt = Q_coord.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
 
         # Display figures
         if display_figures:

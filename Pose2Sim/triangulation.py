@@ -216,13 +216,27 @@ def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
 
     # Read config_dict
     project_dir = config_dict.get('project').get('project_dir')
-    frame_rate = config_dict.get('project').get('frame_rate')
     multi_person = config_dict.get('project').get('multi_person')
     if multi_person:
         seq_name = f'{os.path.basename(os.path.realpath(project_dir))}_P{id_person+1}'
     else:
         seq_name = f'{os.path.basename(os.path.realpath(project_dir))}'
     pose3d_dir = os.path.join(project_dir, 'pose-3d')
+
+    # Get frame_rate
+    video_dir = os.path.join(project_dir, 'videos')
+    vid_img_extension = config_dict['pose']['vid_img_extension']
+    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+    frame_rate = config_dict.get('project').get('frame_rate')
+    if frame_rate == 'auto': 
+        try:
+            cap = cv2.VideoCapture(video_files[0])
+            cap.read()
+            if cap.read()[0] == False:
+                raise
+            frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
+        except:
+            frame_rate = 60
 
     trc_f = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
 
