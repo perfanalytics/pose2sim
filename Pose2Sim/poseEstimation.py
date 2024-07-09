@@ -243,7 +243,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, tracking,
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
 
     if display_detection:
-        cv2.namedWindow(f"Pose Estimation {os.path.basename(image_file)}", cv2.WINDOW_NORMAL)
+        cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
     
     f_range = [[len(image_files)] if frame_range==[] else frame_range][0]
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
@@ -256,6 +256,17 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, tracking,
             
             # Perform pose estimation on the image
             keypoints, scores = pose_tracker(frame)
+
+            # Reorder keypoints, scores
+            if tracking:
+                max_id = max(pose_tracker.track_ids_last_frame)
+                num_frames, num_points, num_coordinates = keypoints.shape
+                keypoints_filled = np.zeros((max_id+1, num_points, num_coordinates))
+                scores_filled = np.zeros((max_id+1, num_points))
+                keypoints_filled[pose_tracker.track_ids_last_frame] = keypoints
+                scores_filled[pose_tracker.track_ids_last_frame] = scores
+                keypoints = keypoints_filled
+                scores = scores_filled            
             
             # Extract frame number from the filename
             if 'openpose' in output_format:
@@ -268,7 +279,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, tracking,
                 img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
 
             if display_detection:
-                cv2.imshow(f"Pose Estimation {os.path.basename(image_file)}", img_show)
+                cv2.imshow(f"Pose Estimation {os.path.basename(image_folder_path)}", img_show)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
