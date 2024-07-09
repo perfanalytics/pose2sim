@@ -343,6 +343,7 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     show_interp_indices = config_dict.get('triangulation').get('show_interp_indices')
     interpolation_kind = config_dict.get('triangulation').get('interpolation')
     interp_gap_smaller_than = config_dict.get('triangulation').get('interp_if_gap_smaller_than')
+    fill_large_gaps_with = config_dict.get('triangulation').get('fill_large_gaps_with')
     make_c3d = config_dict.get('triangulation').get('make_c3d')
     handle_LR_swap = config_dict.get('triangulation').get('handle_LR_swap')
     undistort_points = config_dict.get('triangulation').get('undistort_points')
@@ -383,7 +384,7 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
         logging.info(f'\n--> Mean reprojection error for all points on all frames is {mean_error_px} px, which roughly corresponds to {mean_error_mm} mm. ')
         logging.info(f'Cameras were excluded if likelihood was below {likelihood_threshold} and if the reprojection error was above {error_threshold_triangulation} px.') 
         if interpolation_kind != 'none':
-            logging.info(f'Gaps were interpolated with {interpolation_kind} method if smaller than {interp_gap_smaller_than} frames.') 
+            logging.info(f'Gaps were interpolated with {interpolation_kind} method if smaller than {interp_gap_smaller_than} frames. Larger gaps were filled with {["the last valid value" if fill_large_gaps_with == "last_value" else "zeros" if fill_large_gaps_with == "zeros" else "NaNs"][0]}.') 
         logging.info(f'In average, {mean_cam_excluded} cameras had to be excluded to reach these thresholds.')
         
         cam_excluded_count[n] = {i: v for i, v in zip(cam_names, cam_excluded_count[n].values())}
@@ -733,6 +734,7 @@ def triangulate_all(config_dict):
     likelihood_threshold = config_dict.get('triangulation').get('likelihood_threshold_triangulation')
     interpolation_kind = config_dict.get('triangulation').get('interpolation')
     interp_gap_smaller_than = config_dict.get('triangulation').get('interp_if_gap_smaller_than')
+    fill_large_gaps_with = config_dict.get('triangulation').get('fill_large_gaps_with')
     show_interp_indices = config_dict.get('triangulation').get('show_interp_indices')
     undistort_points = config_dict.get('triangulation').get('undistort_points')
     make_c3d = config_dict.get('triangulation').get('make_c3d')
@@ -961,9 +963,12 @@ def triangulate_all(config_dict):
             except:
                 logging.info(f'Interpolation was not possible for person {n}. This means that not enough points are available, which is often due to a bad calibration.')
     # Fill non-interpolated values with last valid one
-    for n in range(nb_persons_to_detect): 
-        Q_tot[n] = Q_tot[n].ffill(axis=0).bfill(axis=0)
-        # Q_tot[n].replace(np.nan, 0, inplace=True)
+    if fill_large_gaps_with == 'last_value':
+        for n in range(nb_persons_to_detect): 
+            Q_tot[n] = Q_tot[n].ffill(axis=0).bfill(axis=0)
+    elif fill_large_gaps_with == 'zeros':
+        for n in range(nb_persons_to_detect): 
+            Q_tot[n].replace(np.nan, 0, inplace=True)
     
     # Create TRC file
     trc_paths = [make_trc(config_dict, Q_tot[n], keypoints_names, f_range, id_person=n) for n in range(len(Q_tot))]

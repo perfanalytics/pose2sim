@@ -68,7 +68,7 @@ def setup_logging(session_dir):
     '''
     Create logging file and stream handlers
     '''
-    with open(os.path.join(session_dir, 'logs.txt'), 'a+') as log_f: pass
+
     logging.basicConfig(format='%(message)s', level=logging.INFO, 
         handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(session_dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
 
@@ -220,6 +220,7 @@ def calibration(config=None):
     
     end = time.time()
     logging.info(f'\nCalibration took {end-start:.2f} s.')
+    logging.handlers.close()
 
 
 def poseEstimation(config=None):
