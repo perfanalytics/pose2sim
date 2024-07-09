@@ -361,6 +361,10 @@ def rtm_estimator(config_dict):
         device = 'cuda'
         backend = 'onnxruntime'
         logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
+    elif 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
+        device = 'mps'
+        backend = 'onnxruntime'
+        logging.info(f"\nValid MPS installation found: using ONNXRuntime backend with GPU.")
     else:
         device = 'cpu'
         backend = 'openvino'

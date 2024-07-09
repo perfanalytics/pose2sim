@@ -137,6 +137,8 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
    ```
 
+  <!-- import torch; torch.cuda.is_available() -->
+  
    N.B.: You may get an error related to the version of typing-extensions, but this will not have any influence on your results. Don't worry about a warning related to onnxruntime during pose estimation either.
 
 </br>
