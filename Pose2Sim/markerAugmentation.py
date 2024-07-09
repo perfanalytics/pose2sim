@@ -136,10 +136,10 @@ def augmentTRC(config_dict):
         
         # %% Process data.
         # Import TRC file
-        try:
-            trc_file = utilsDataman.TRCFile(pathInputTRCFile)
-        except:
-            raise ValueError('Cannot read TRC file. You may need to enable interpolation in Config.toml while triangulating.')
+        # try:
+        trc_file = utilsDataman.TRCFile(pathInputTRCFile)
+        # except:
+        #     raise ValueError('Cannot read TRC file. You may need to enable interpolation in Config.toml while triangulating.')
         
         # add neck and midhip data if not in file
         trc_file = check_midhip_data(trc_file)
