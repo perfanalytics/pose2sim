@@ -37,6 +37,7 @@ import glob
 import json
 import logging
 from tqdm import tqdm
+import numpy as np
 import cv2
 import torch
 import onnxruntime as ort
@@ -100,13 +101,14 @@ def save_to_openpose(json_file_path, keypoints, scores):
         json.dump(json_output, json_file)
 
 
-def process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range):
+def process_video(video_path, pose_tracker, tracking, output_format, save_video, save_images, display_detection, frame_range):
     '''
     Estimate pose from a video file
     
     INPUTS:
     - video_path: str. Path to the input video file
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
+    - tracking: bool. Whether to give consistent person ID across frames
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
@@ -141,7 +143,7 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
         
     if display_detection:
-        cv2.namedWindow("Pose Estimation", cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
+        cv2.namedWindow(f"Pose Estimation {os.path.basename(video_path)}", cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
 
     frame_idx = 0
     cap = cv2.VideoCapture(video_path)
@@ -149,6 +151,7 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
     f_range = [[total_frames] if frame_range==[] else frame_range][0]
     with tqdm(total=total_frames, desc=f'Processing {os.path.basename(video_path)}') as pbar:
         while cap.isOpened():
+            # print('\nFrame ', frame_idx)
             success, frame = cap.read()
             if not success:
                 break
@@ -156,6 +159,17 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
             if frame_idx in range(*f_range):
                 # Perform pose estimation on the frame
                 keypoints, scores = pose_tracker(frame)
+
+                # Reorder keypoints, scores
+                if tracking:
+                    max_id = max(pose_tracker.track_ids_last_frame)
+                    num_frames, num_points, num_coordinates = keypoints.shape
+                    keypoints_filled = np.zeros((max_id+1, num_points, num_coordinates))
+                    scores_filled = np.zeros((max_id+1, num_points))
+                    keypoints_filled[pose_tracker.track_ids_last_frame] = keypoints
+                    scores_filled[pose_tracker.track_ids_last_frame] = scores
+                    keypoints = keypoints_filled
+                    scores = scores_filled
 
                 # Save to json
                 if 'openpose' in output_format:
@@ -168,7 +182,7 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
                     img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
                 
                 if display_detection:
-                    cv2.imshow("Pose Estimation", img_show)
+                    cv2.imshow(f"Pose Estimation {os.path.basename(video_path)}", img_show)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         break
 
@@ -192,7 +206,7 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
         cv2.destroyAllWindows()
 
 
-def process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, fps, save_video, save_images, display_detection, frame_range):
+def process_images(image_folder_path, vid_img_extension, pose_tracker, tracking, output_format, fps, save_video, save_images, display_detection, frame_range):
     '''
     Estimate pose estimation from a folder of images
     
@@ -200,6 +214,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
     - image_folder_path: str. Path to the input image folder
     - vid_img_extension: str. Extension of the image files
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
+    - tracking: bool. Whether to give consistent person ID across frames
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
@@ -228,7 +243,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
 
     if display_detection:
-        cv2.namedWindow("Pose Estimation", cv2.WINDOW_NORMAL)
+        cv2.namedWindow(f"Pose Estimation {os.path.basename(image_file)}", cv2.WINDOW_NORMAL)
     
     f_range = [[len(image_files)] if frame_range==[] else frame_range][0]
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
@@ -253,7 +268,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
                 img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
 
             if display_detection:
-                cv2.imshow("Pose Estimation", img_show)
+                cv2.imshow(f"Pose Estimation {os.path.basename(image_file)}", img_show)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
@@ -342,7 +357,7 @@ def rtm_estimator(config_dict):
 
     if det_frequency>1:
         logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points.')
-    if det_frequency==1:
+    elif det_frequency==1:
         logging.info(f'Inference run on every single frame.')
     else:
         raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
@@ -382,7 +397,7 @@ def rtm_estimator(config_dict):
         logging.info(f'Found video files with extension {vid_img_extension}.')
         for video_path in video_files:
             pose_tracker.reset()
-            process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range)
+            process_video(video_path, pose_tracker, tracking, output_format, save_video, save_images, display_detection, frame_range)
 
     else:
         # Process image folders
@@ -391,4 +406,4 @@ def rtm_estimator(config_dict):
         for image_folder in image_folders:
             pose_tracker.reset()
             image_folder_path = os.path.join(video_dir, image_folder)
-            process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, frame_rate, save_video, save_images, display_detection, frame_range)
+            process_images(image_folder_path, vid_img_extension, pose_tracker, tracking, output_format, frame_rate, save_video, save_images, display_detection, frame_range)

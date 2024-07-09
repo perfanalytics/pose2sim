@@ -694,7 +694,7 @@ def track_2d_all(config_dict):
     
     for f in tqdm(range(*f_range)):
         # print(f'\nFrame {f}:')
-        json_files_names_f = [[j for j in json_files_names[c] if int(re.split('(\d+)',j)[-2])==f] for c in range(n_cams)]
+        json_files_names_f = [[j for j in json_files_names[c] if int(re.split(r'(\d+)',j)[-2])==f] for c in range(n_cams)]
         json_files_names_f = [j for j_list in json_files_names_f for j in (j_list or ['none'])]
         try:
             json_files_f = [os.path.join(poseSync_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]

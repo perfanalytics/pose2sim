@@ -42,7 +42,7 @@ def natural_sort_key(s):
     """
     Key for natural sorting of strings containing numbers.
     """
-    return [int(c) if c.isdigit() else c.lower() for c in re.split('(\d+)', s)]
+    return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', s)]
 
 
 def read_qca(qca_path, binning_factor):

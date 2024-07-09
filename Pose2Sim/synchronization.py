@@ -303,7 +303,7 @@ def synchronize_cams_all(config_dict):
     
     # frame range selection
     f_range = [[0, min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
-    # json_files_names = [[j for j in json_files_cam if int(re.split('(\d+)',j)[-2]) in range(*f_range)] for json_files_cam in json_files_names]
+    # json_files_names = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*f_range)] for json_files_cam in json_files_names]
 
     # Determine frames to consider for synchronization
     if isinstance(approx_time_maxspeed, list): # search around max speed
@@ -332,7 +332,7 @@ def synchronize_cams_all(config_dict):
     logging.info('Synchronizing...')
     df_coords = []
     b, a = signal.butter(filter_order/2, filter_cutoff/(fps/2), 'low', analog = False) 
-    json_files_names_range = [[j for j in json_files_cam if int(re.split('(\d+)',j)[-2]) in range(*frames_cam)] for (json_files_cam, frames_cam) in zip(json_files_names,search_around_frames)]
+    json_files_names_range = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*frames_cam)] for (json_files_cam, frames_cam) in zip(json_files_names,search_around_frames)]
     json_files_range = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names_range[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     if np.array([j==[] for j in json_files_names_range]).any():
@@ -402,7 +402,7 @@ def synchronize_cams_all(config_dict):
     for d, j_dir in enumerate(json_dirs):
         os.makedirs(os.path.join(sync_dir, os.path.basename(j_dir)), exist_ok=True)
         for j_file in json_files_names[d]:
-            j_split = re.split('(\d+)',j_file)
+            j_split = re.split(r'(\d+)',j_file)
             j_split[-2] = f'{int(j_split[-2])-offset[d]:06d}'
             if int(j_split[-2]) > 0:
                 json_offset_name = ''.join(j_split)
