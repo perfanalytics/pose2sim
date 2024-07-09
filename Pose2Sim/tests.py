@@ -95,7 +95,7 @@ class TestWorkflow(unittest.TestCase):
         os.chdir(project_dir)
         config_dict.get("project").update({"project_dir":project_dir})
         config_dict.get("project").update({"multi_person":False})
-        config_dict.get("pose").update({"mode":'lightweight'})
+        # config_dict.get("pose").update({"mode":'lightweight'})
         config_dict.get("pose").update({"display_detection":False})
         config_dict.get("synchronization").update({"display_sync_plots":False})
         config_dict['filtering']['display_figures'] = False
@@ -119,7 +119,7 @@ class TestWorkflow(unittest.TestCase):
 
         config_dict.get("project").update({"project_dir":project_dir})
         config_dict.get("project").update({"multi_person":True})
-        config_dict.get("pose").update({"mode":'lightweight'})
+        # config_dict.get("pose").update({"mode":'lightweight'})
         config_dict.get("pose").update({"display_detection":False})
         config_dict.get("synchronization").update({"display_sync_plots":False})
         config_dict.get("markerAugmentation").update({"participant_height":[1.21, 1.72]})
