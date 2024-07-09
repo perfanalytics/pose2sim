@@ -220,7 +220,6 @@ def calibration(config=None):
     
     end = time.time()
     logging.info(f'\nCalibration took {end-start:.2f} s.')
-    logging.handlers.close()
 
 
 def poseEstimation(config=None):
