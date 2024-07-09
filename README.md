@@ -129,7 +129,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
        ```
 
 4. ***Optional:***\
-   *Install pyTorch with CUDA and cuDNN support if you want faster inference by running on the GPU.*
+   *For faster inference, you can run on the GPU. Install pyTorch with CUDA and cuDNN support, and ONNX Runtime with GPU support (not available on MacOS).*
    
    Go to the [pyTorch website]( https://pytorch.org/get-started/locally), select the latest CUDA version that is also [available with ONNX runtime](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), and run the provided command.\
    For example, for Windows 11 (June 6th, 2024), CUDA 12.4 is not available for pyTorch, and CUDA 12.1 is not available for ONNX Runtime, so you should revert to CUDA 11.8:
@@ -137,9 +137,14 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
    ```
 
-  <!-- import torch; torch.cuda.is_available() -->
-  
-   N.B.: You may get an error related to the version of typing-extensions, but this will not have any influence on your results. Don't worry about a warning related to onnxruntime during pose estimation either.
+   Then install ONNX Runtime with GPU support:
+   ```
+   pip install onnxruntime-gpu
+   ```
+
+
+  <!-- import torch; torch.cuda.is_available() 
+      import onnxruntime as ort; ort.get_available_providers()-->
 
 </br>
 
@@ -312,10 +317,10 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.poseEstimation()
 ```
 
-*N.B.:* The GPU will be used with ONNX backend if a valid CUDA installation is used, otherwise the OpenVINO backend will be used.\
-*N.B.:* Pose estimation can be run in Lightweight, Balanced, or Performance mode.\
-*N.B.:* Detection can be done every frame, or at any chosen interval. Inbetween, previously detected keypoints are tracked.\
-*N.B.:* The detection can also attempt to give consistent IDs to the same persons across frames.
+*N.B.:* The `GPU` will be used with ONNX backend if a valid CUDA installation is found (or MPS with MacOS), otherwise the `CPU` will be used with OpenVINO backend.\
+*N.B.:* Pose estimation can be run in `lightweight`, `balanced`, or `performance` mode.\
+*N.B.:* Pose estimation can be dramatically sped up by increasing the value of `det_frequency`. In that case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames).\
+*N.B.:* Activating `tracking` will attempt to give consistent IDs to the same persons across frames, which might facilitate synchronization if other people are in the background.
 
 <img src="Content/Pose2D.png" width="760">
 

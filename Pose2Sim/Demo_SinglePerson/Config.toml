@@ -42,7 +42,7 @@ pose_model = 'HALPE_26'  #With RTMLib: HALPE_26 (default, body and feet), COCO_1
 						 #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133
 						 #With deeplabcut: CUSTOM. See example at the end of the file
 mode = 'balanced' # 'lightweight', 'balanced', 'performance'
-det_frequency = 1 # Run person detection only every N frames, and inbetween track previously detected bounding boxes ( (still run keypoint detection on all frame). 
+det_frequency = 1 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (still run keypoint detection on all frame). 
 				  #Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
 tracking = true # Gives consistent person ID across frames. Slightly slower but might facilitate synchronization if other people are in the background
 display_detection = true
