@@ -110,6 +110,12 @@ def interpolate_zeros_nans(col, *args):
     return col_interp
 
 
+def count_persons_in_json(file_path):
+    with open(file_path, 'r') as file:
+        data = json.load(file)
+        return len(data.get('people', []))
+    
+
 def min_with_single_indices(L, T):
     '''
     Let L be a list (size s) with T associated tuple indices (size s).
@@ -796,12 +802,12 @@ def triangulate_all(config_dict):
     # Triangulation
     if multi_person:
         try:
-            nb_persons_to_detect = max([max([len(json.load(open(os.path.join(poseTracked_dir, json_dirs_names[c], json_fname)))['people']) for json_fname in json_files_names[c]]) for c in range(n_cams)])
+            nb_persons_to_detect = max(max(count_persons_in_json(os.path.join(poseTracked_dir, json_dirs_names[c], json_fname)) for json_fname in json_files_names[c]) for c in range(n_cams))
         except:
             try:
-                nb_persons_to_detect = max([max([len(json.load(open(os.path.join(poseSync_dir, json_dirs_names[c], json_fname)))['people']) for json_fname in json_files_names[c]]) for c in range(n_cams)])
+                nb_persons_to_detect = max(max(count_persons_in_json(os.path.join(poseSync_dir, json_dirs_names[c], json_fname)) for json_fname in json_files_names[c]) for c in range(n_cams))
             except:
-                nb_persons_to_detect = max([max([len(json.load(open(os.path.join(pose_dir, json_dirs_names[c], json_fname)))['people']) for json_fname in json_files_names[c]]) for c in range(n_cams)])
+                nb_persons_to_detect = max(max(count_persons_in_json(os.path.join(pose_dir, json_dirs_names[c], json_fname)) for json_fname in json_files_names[c]) for c in range(n_cams))
     else:
         nb_persons_to_detect = 1
 

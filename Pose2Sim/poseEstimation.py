@@ -388,7 +388,7 @@ def rtm_estimator(config_dict):
         logging.info(f"Using COCO_17 model (body) for pose estimation.")
     else:
         raise ValueError(f"Invalid model_type: {pose_model}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
-    logging.info(f'Mode {mode}.\n')
+    logging.info(f'Mode: {mode}.\n')
 
 
     # Initialize the pose tracker

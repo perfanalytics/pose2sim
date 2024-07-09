@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys
 
-
-__version__ = "0.8.2"
+__version__ = "0.8.5"
 VERSION = __version__
 
 

@@ -37,8 +37,8 @@
     3. Not all possible configuration parameters are extensively tested.
     
     Usage: 
-    from Pose2Sim.S00_Demo_BatchSession import tests; tests.test_workflow()
-    python tests.py 
+    cd Pose2Sim/Utilities
+    python tests.py
 '''
 
 ## INIT
@@ -63,7 +63,7 @@ __status__ = "Development"
 
 ## FUNCTIONS
 class TestWorkflow(unittest.TestCase):
-    @patch('builtins.input', return_value='no')  # Mock input() to return 'yes'
+    @patch('builtins.input', return_value='no')  # Mock input() to return 'no'
     def test_workflow(self, mock_input):
         '''
         SINGLE-PERSON and MULTI-PERSON:
@@ -85,17 +85,42 @@ class TestWorkflow(unittest.TestCase):
         python tests.py 
         '''
 
+
+        ##################
+        # SINGLE-PERSON  #
+        ##################
+
+        project_dir = '../Demo_SinglePerson'
+        config_dict = toml.load(os.path.join(project_dir, 'Config.toml'))
+
+        os.chdir(project_dir)
+        config_dict.get("project").update({"project_dir":project_dir})
+        config_dict.get("pose").update({"mode":'lightweight'})
+        config_dict.get("pose").update({"display_detection":False})
+        config_dict.get("synchronization").update({"display_sync_plots":False})
+        # config_dict['triangulation']['reorder_trc'] = False
+        config_dict['filtering']['display_figures'] = False
+
+        Pose2Sim.calibration(config_dict)
+        Pose2Sim.poseEstimation(config_dict)
+        Pose2Sim.synchronization(config_dict)
+        Pose2Sim.personAssociation(config_dict)
+        Pose2Sim.triangulation(config_dict)
+        Pose2Sim.filtering(config_dict)
+        Pose2Sim.markerAugmentation(config_dict)
+        # Pose2Sim.kinematics(config_dict)
+        
+
         ##################
         # MULTI-PERSON   #
         ##################
         
-        project_dir = 'Demo_MultiPerson'
+        project_dir = '../Demo_MultiPerson'
         config_dict = toml.load(os.path.join(project_dir, 'Config.toml'))
         
         os.chdir(project_dir)
         config_dict.get("project").update({"project_dir":project_dir})
-        config_dict.get("project").update({"multi_person":False})
-        # config_dict.get("pose").update({"mode":'lightweight'})
+        config_dict.get("pose").update({"mode":'lightweight'})
         config_dict.get("pose").update({"display_detection":False})
         config_dict.get("synchronization").update({"display_sync_plots":False})
         config_dict['filtering']['display_figures'] = False
@@ -110,31 +135,5 @@ class TestWorkflow(unittest.TestCase):
         # Pose2Sim.kinematics(config_dict)
 
 
-        ##################
-        # SINGLE-PERSON  #
-        ##################
-
-        project_dir = 'Demo_SinglePerson'
-        config_dict = toml.load(os.path.join(project_dir, 'Config.toml'))
-
-        config_dict.get("project").update({"project_dir":project_dir})
-        config_dict.get("project").update({"multi_person":True})
-        # config_dict.get("pose").update({"mode":'lightweight'})
-        config_dict.get("pose").update({"display_detection":False})
-        config_dict.get("synchronization").update({"display_sync_plots":False})
-        config_dict.get("markerAugmentation").update({"participant_height":[1.21, 1.72]})
-        config_dict.get("markerAugmentation").update({"participant_mass":[25.0, 70.0]})
-        # config_dict['triangulation']['reorder_trc'] = False
-
-        Pose2Sim.calibration(config_dict)
-        Pose2Sim.poseEstimation(config_dict)
-        Pose2Sim.synchronization(config_dict)
-        Pose2Sim.personAssociation(config_dict)
-        Pose2Sim.triangulation(config_dict)
-        Pose2Sim.filtering(config_dict)
-        Pose2Sim.markerAugmentation(config_dict)
-        # Pose2Sim.kinematics(config_dict)
-        
-    
 if __name__ == '__main__':
     unittest.main()
