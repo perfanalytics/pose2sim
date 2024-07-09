@@ -30,7 +30,7 @@ import logging
 
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.MarkerAugmenter.utils import TRC2numpy
-from Pose2Sim.common import convert_to_c3d
+from Pose2Sim.common import convert_to_c3d, natural_sort_key
 
 
 ## AUTHORSHIP INFORMATION
@@ -108,6 +108,7 @@ def augmentTRC(config_dict):
         trc_files = trc_filtering
     else:
         trc_files = trc_no_filtering
+    sorted(trc_files, key=natural_sort_key)
 
     for p in range(len(subject_mass)):
         pathInputTRCFile = trc_files[p]
