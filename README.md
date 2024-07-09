@@ -18,6 +18,7 @@
 
 > **_News_: Version 0.9:**\
 > **Pose estimation with RTMPose is now included in Pose2Sim!**\
+> Note that for now, you need to install Pose2Sim from source to access this feature.\
 > **Other recently added features**: Automatic camera synchronization, multi-person analysis, Blender visualization, Marker augmentation, Automatic batch processing.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
