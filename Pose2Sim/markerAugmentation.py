@@ -137,6 +137,7 @@ def augmentTRC(config_dict):
         # %% Process data.
         # Import TRC file
         # try:
+        logging.warning(pathInputTRCFile)
         trc_file = utilsDataman.TRCFile(pathInputTRCFile)
         # except:
         #     raise ValueError('Cannot read TRC file. You may need to enable interpolation in Config.toml while triangulating.')
