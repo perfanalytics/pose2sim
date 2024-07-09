@@ -360,7 +360,7 @@ def natural_sort_key(s):
     Sorts list of strings with numbers in natural order (alphabetical and numerical)
     Example: ['item_1', 'item_2', 'item_10', 'stuff_1']
     '''
-    return [int(c) if c.isdigit() else c.lower() for c in re.split('(\d+)', s)]
+    return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', s)]
 
 
 def zup2yup(Q):

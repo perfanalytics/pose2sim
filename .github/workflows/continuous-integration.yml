@@ -63,7 +63,9 @@ jobs:
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           conda run -n pose2sim flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       
-      - name: Test with pytest
+      - name: 
+        env: |
+          PYTHONIOENCODING: utf-8
         run: |
           cd Pose2Sim
-          conda run -n pose2sim pytest -v tests.py
+          conda run --no-plugins -n pose2sim pytest -v tests.py
