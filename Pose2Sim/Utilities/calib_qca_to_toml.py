@@ -38,6 +38,13 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def natural_sort_key(s):
+    """
+    Key for natural sorting of strings containing numbers.
+    """
+    return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', s)]
+
+
 def read_qca(qca_path, binning_factor):
     '''
     Read a Qualisys .qca.txt calibration file
@@ -105,7 +112,7 @@ def read_qca(qca_path, binning_factor):
    
     # Cameras names by natural order
     C_vid = [C[v] for v in vid_id]
-    C_vid_id = [C_vid.index(c) for c in natural_sort(C_vid)]
+    C_vid_id = [C_vid.index(c) for c in sorted(C_vid, key=natural_sort_key)]
     C_id = [vid_id[c] for c in C_vid_id]
     C = [C[c] for c in C_id]
     ret = [ret[c] for c in C_id]
@@ -153,19 +160,6 @@ def rotate_cam(r, t, ang_x=np.pi, ang_y=0, ang_z=0):
     t = r_ax_h__rt_h[:3,3]
 
     return r, t
-
-
-def natural_sort(list): 
-    '''
-    Sorts list of strings with numbers in natural order
-    Example: ['item_1', 'item_2', 'item_10']
-    Taken from: https://stackoverflow.com/a/11150413/12196632
-    '''
-
-    convert = lambda text: int(text) if text.isdigit() else text.lower() 
-    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)] 
-    
-    return sorted(list, key=alphanum_key)
     
 
 def toml_write(toml_path, C, S, D, K, R, T):

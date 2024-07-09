@@ -30,7 +30,7 @@ import logging
 
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.MarkerAugmenter.utils import TRC2numpy
-from Pose2Sim.common import convert_to_c3d
+from Pose2Sim.common import convert_to_c3d, natural_sort_key
 
 
 ## AUTHORSHIP INFORMATION
@@ -83,10 +83,10 @@ def augmentTRC(config_dict):
     project_dir = config_dict.get('project').get('project_dir')
     pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     pathOutputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    subject_height = config_dict.get('markerAugmentation').get('participant_height')
+    subject_height = config_dict.get('project').get('participant_height')
     if subject_height is None or subject_height == 0 or subject_height==0:
-        raise ValueError("Subject height is not set or invalid in the config file.")
-    subject_mass = config_dict.get('markerAugmentation').get('participant_mass')
+        raise ValueError("Subject height is not set or is invalid.")
+    subject_mass = config_dict.get('project').get('participant_mass')
     if not type(subject_height) == list:
         subject_height = [subject_height]
         subject_mass = [subject_mass]
@@ -108,6 +108,7 @@ def augmentTRC(config_dict):
         trc_files = trc_filtering
     else:
         trc_files = trc_no_filtering
+    sorted(trc_files, key=natural_sort_key)
 
     for p in range(len(subject_mass)):
         pathInputTRCFile = trc_files[p]
@@ -210,7 +211,10 @@ def augmentTRC(config_dict):
             json_file = open(os.path.join(augmenterModelDir, "model.json"), 'r')
             pretrainedModel_json = json_file.read()
             json_file.close()
-            model = tf.keras.models.model_from_json(pretrainedModel_json)
+            model = tf.keras.models.model_from_json(pretrainedModel_json, custom_objects={
+                                    'Sequential': tf.keras.models.Sequential,
+                                    'Dense': tf.keras.layers.Dense
+                                    })
             model.load_weights(os.path.join(augmenterModelDir, "weights.h5"))  
             outputs = model.predict(inputs)
             tf.keras.backend.clear_session()

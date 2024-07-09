@@ -16,9 +16,9 @@
 
 ##### N.B:. Please set undistort_points and handle_LR_swap to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
 
-> **_News_: Version 0.8:**\
-> **Automatic camera synchronization is now supported!**\
-> **Other recently added features**: Multi-person analysis, Blender visualization, Marker augmentation, Automatic batch processing.
+> **_News_: Version 0.9:**\
+> **Pose estimation with RTMPose is now included in Pose2Sim!**\
+> **Other recently added features**: Automatic camera synchronization, multi-person analysis, Blender visualization, Marker augmentation, Automatic batch processing.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
 > To upgrade, type `pip install pose2sim --upgrade`.
@@ -27,7 +27,7 @@ and lens distortions are better taken into account.\ -->
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to the more usual marker-based motion capture methods. It aims to provide a free tool to obtain research-grade results from consumer-grade equipment. Any combination of phone, webcam, GoPro, etc. can be used.
 
-Pose2Sim stands for "OpenPose to OpenSim", as it uses OpenPose inputs (2D keypoints coordinates obtained from multiple videos) and leads to an OpenSim result (full-body 3D joint angles). Other 2D pose estimators such as BlazePose (MediaPipe), DeepLabCut, AlphaPose, can now be used as inputs.
+Pose2Sim stands for "OpenPose to OpenSim", as it originally used OpenPose inputs (2D keypoints coordinates obtained from multiple videos) and lead to an [OpenSim](https://opensim.stanford.edu/) result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose), and OpenPose and other options are kept as legacy options. 
 
 If you can only use one single camera and don't mind losing some accuracy, please consider using [Sports2D](https://github.com/davidpagnon/Sports2D).
 
@@ -47,10 +47,11 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 - [x] **v0.5** *(12/2023)*: Automatic batch processing
 - [x] **v0.6** *(02/2024)*: Marker augmentation, Blender visualizer
 - [x] **v0.7** *(03/2024)*: Multi-person analysis
-- [x] **v0.8 *(04/2024)*: New synchronization tool**
-- [ ] v0.9: Integration of pose estimation and OpenSim in the pipeline
-- [ ] v0.10: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
-- [ ] v0.11: Graphical User Interface
+- [x] **v0.8** *(04/2024)*: New synchronization tool
+- [x] **v0.9: *(07/2024)*: Integration of pose estimation in the pipeline**
+- [ ] v0.10: Integration of OpenSim in the pipeline
+- [ ] v0.11: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
+- [ ] v0.12: Graphical User Interface
 - [ ] v1.0: First accomplished release
 
 </br>
@@ -58,7 +59,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 # Contents
 1. [Installation and Demonstration](#installation-and-demonstration)
    1. [Installation](#installation)
-   2. [Demonstration Part-1: Triangulate OpenPose outputs](#demonstration-part-1-build-3d-trc-file-on-python)
+   2. [Demonstration Part-1: Build 3D TRC file](#demonstration-part-1-build-3d-trc-file)
    3. [Demonstration Part-2: Obtain 3D joint angles with OpenSim](#demonstration-part-2-obtain-3d-joint-angles-with-opensim)
    4. [Demonstration Part-3 (optional): Visualize your results with Blender](#demonstration-part-3-optional-visualize-your-results-with-blender)
    5. [Demonstration Part-4 (optional): Try multi-person analysis](#demonstration-part-4-optional-try-multi-person-analysis)
@@ -67,10 +68,12 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
       1. [Retrieve the folder structure](#retrieve-the-folder-structure)
       2. [Single Trial vs. Batch processing](#single-trial-vs-batch-processing)
    2. [2D pose estimation](#2d-pose-estimation)
-      1. [With OpenPose](#with-openpose)
-      2. [With BlazePose (Mediapipe)](#with-blazepose-mediapipe)
+      1. [With RTMPose (default)](#with-rtmpose-default)
+      2. [With MMPose (coming soon)](#with-mmpose-coming-soon)
       3. [With DeepLabCut](#with-deeplabcut)
-      4. [With AlphaPose](#with-alphapose)
+      4. [With OpenPose (legacy)](#with-openpose-legacy)
+      5. [With Mediapipe BlazePose (legacy)](#with-mediapipe-blazepose-legacy)
+      6. [With AlphaPose (legacy)](#with-alphapose-legacy)
    4. [Camera calibration](#camera-calibration)
       1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
@@ -94,17 +97,24 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
 # Installation and Demonstration
 
 ## Installation
-1. **Install OpenPose** (instructions [there](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/installation/0_index.md)). \
-*Windows portable demo is enough.*
-2. **Install OpenSim 4.x** ([there](https://simtk.org/frs/index.php?group_id=91)). \
-*Tested up to v4.5 on Windows. Has to be compiled from source on Linux (see [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Linux+Support)).*
-3. ***Optional.*** *Install Anaconda or [Miniconda](https://docs.conda.io/en/latest/miniconda.html). \
-   Open an Anaconda terminal and create a virtual environment with typing:*
-   <pre><i>conda create -n Pose2Sim python=3.8 -y 
-   conda activate Pose2Sim</i></pre>
+
+1. ***Optional:***\
+*Install Anaconda or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) for simplicity and avoiding the risk of incompatibilities between libraries.*
+
+   Once installed, open an Anaconda prompt and create a virtual environment:
+   ```
+   conda create -n Pose2Sim python=3.9 -y 
+   conda activate Pose2Sim
+   ```
+
+2. **Install OpenSim**:\
+Install the OpenSim Python API (if you do not want to install via conda, refer [to this page](https://opensimconfluence.atlassian.net/wiki/spaces/OpenSim/pages/53085346/Scripting+in+Python#ScriptinginPython-SettingupyourPythonscriptingenvironment(ifnotusingconda))):
+   ```
+   conda install -c opensim-org opensim -y
+   ```
    
-3. **Install Pose2Sim**:\
-If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.8 is installed.
+3. **INSTALL POSE2SIM**:\
+If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9 is installed. 
    - OPTION 1: **Quick install:** Open a terminal. 
        ``` cmd
        pip install pose2sim
@@ -118,10 +128,23 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.8
        pip install .
        ```
 
+4. ***Optional:***\
+   *Install pyTorch with CUDA and cuDNN support if you want faster inference by running on the GPU.*
+   
+   Go to the [pyTorch website]( https://pytorch.org/get-started/locally), select the latest CUDA version that is also [available with ONNX runtime](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), and run the provided command.\
+   For example, for Windows 11 (June 6th, 2024), CUDA 12.4 is not available for pyTorch, and CUDA 12.1 is not available for ONNX Runtime, so you should revert to CUDA 11.8:
+   ```
+   pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+   ```
+
+  <!-- import torch; torch.cuda.is_available() -->
+  
+   N.B.: You may get an error related to the version of typing-extensions, but this will not have any influence on your results. Don't worry about a warning related to onnxruntime during pose estimation either.
+
 </br>
 
-## Demonstration Part-1: Build 3D TRC file on Python  
-> _**This demonstration provides an example experiment of a person balancing on a beam, filmed with 4 calibrated cameras processed with OpenPose.**_ 
+## Demonstration Part-1: Build 3D TRC file
+> _**This demonstration provides an example experiment of a person balancing on a beam, filmed with 4 cameras.**_ 
 
 Open a terminal, enter `pip show pose2sim`, report package location. \
 Copy this path and go to the Single participant Demo folder: `cd <path>\Pose2Sim\S01_Demo_SingleTrial`. \
@@ -129,6 +152,7 @@ Type `ipython`, and try the following code:
 ``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.calibration()
+Pose2Sim.poseEstimation()
 Pose2Sim.synchronization()
 Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
@@ -141,12 +165,21 @@ Pose2Sim.markerAugmentation()
 
 </br>
 
-__*Go further:*__ Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S01_Demo_SingleTrial/Config.toml) (more info [there](#calculate-from-scratch)).
+__*GO FURTHER:*__\
+Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S01_Demo_SingleTrial/Config.toml) (more info [there](#calculate-from-scratch)).
 
 <br/>
 
 ## Demonstration Part-2: Obtain 3D joint angles with OpenSim  
 > _**In the same vein as you would do with marker-based kinematics, start with scaling your model, and then perform inverse kinematics.**_ 
+
+> N.B.: For now, you still need to install [OpenSim GUI](https://simtk.org/frs/index.php?group_id=91) (tested up to v4.5 on Windows, has to be compiled [from source on Linux](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Linux+Support)). Will be done natively within Pose2Sim soon.
+   
+<!--
+   To visualize the animated skeletons, you can either install:
+   - **[Pose2Sim_Blender](https://github.com/davidpagnon/Pose2Sim_Blender) (recommended, see [Demonstration Part 3](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Linux+Support))**, or 
+      - [OpenSim GUI](https://simtk.org/frs/index.php?group_id=91) (tested up to v4.5 on Windows, has to be compiled [from source on Linux](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Linux+Support)).
+-->  
 
 ### Scaling
 1. Open OpenSim.
@@ -264,40 +297,36 @@ Try uncommenting `[project]` and set `frame_range = [10,300]` for a Participant 
 </br>
 
 ## 2D pose estimation
-> _**Estimate 2D pose from images with Openpose or another pose estimation solution.**_ \
-N.B.: OpenPose model files are apparently not available on their website anymore. Send me an email at dp2032@bath.ac.uk if you want me to forward them to you!\
-N.B.: First film a short static pose that will be used for scaling the OpenSim model (A-pose for example), and then film your motions of interest.\
-N.B.: Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json'.
+> _**Estimate 2D pose from images with RTMPose or another pose estimation solution.**_ 
 
-### With OpenPose:
-The accuracy and robustness of Pose2Sim have been thoroughly assessed only with OpenPose, and especially with the BODY_25B model. Consequently, we recommend using this 2D pose estimation solution. See [OpenPose repository](https://github.com/CMU-Perceptual-Computing-Lab/openpose) for installation and running.
-* Open a command prompt in your **OpenPose** directory. \
-  Launch OpenPose for each `videos` folder: 
-  ``` cmd
-  bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_TRIAL_DIR>\videos\cam01.mp4 --write_json <PATH_TO_TRIAL_DIR>\pose\pose_cam01_json
-  ```
-* The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results than the standard BODY_25 one and has been extensively tested for Pose2Sim. \
-You can also use the [BODY_135 model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models), which allows for the evaluation of pronation/supination, wrist flexion, and wrist deviation.\
-All other OpenPose models (BODY_25, COCO, MPII) are also supported.\
-Make sure you modify the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S01_Demo_SingleTrial/Config.toml) file accordingly.
-* Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
+> N.B.: Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json'.
 
-**N.B.:** *OpenPose BODY_25B is the default 2D pose estimation model used in Pose2Sim. However, other skeleton models from other 2D pose estimation solutions can be used alternatively.* 
+### With RTMPose *(default)*:
+> [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose) is a state-of-the-art pose estimation solution that is faster and more accurate than OpenPose. It is now included in Pose2Sim for straightforward end-to-end analysis.
+
+Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Type `ipython`.
+
+``` python
+from Pose2Sim import Pose2Sim
+Pose2Sim.poseEstimation()
+```
+
+*N.B.:* The GPU will be used with ONNX backend if a valid CUDA installation is used, otherwise the OpenVINO backend will be used.\
+*N.B.:* Pose estimation can be run in Lightweight, Balanced, or Performance mode.\
+*N.B.:* Detection can be done every frame, or at any chosen interval. Inbetween, previously detected keypoints are tracked.\
+*N.B.:* The detection can also attempt to give consistent IDs to the same persons across frames.
 
 <img src="Content/Pose2D.png" width="760">
 
-### With BlazePose (MediaPipe):
-[Mediapipe BlazePose](https://google.github.io/mediapipe/solutions/pose.html) is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
-However, it is less robust and accurate than OpenPose, and can only detect a single person.
-* Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
-  ``` cmd
-  python -m Blazepose_runsave -i input_file -dJs
-  ```
-  Type in `python -m Blazepose_runsave -h` for explanation on parameters.
-* Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S01_Demo_SingleTrial/Config.toml) file.
+</br>
+
+### With MMPose *(coming soon)*:
+
+> Coming soon
 
 ### With DeepLabCut:
-If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut). In this case, Pose2Sim is used as an alternative to [AniPose](https://github.com/lambdaloop/anipose), but it may yield better results since 3D reconstruction takes confidence into account (see [this article](https://doi.org/10.1080/21681163.2023.2292067)).
+> If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut). In this case, Pose2Sim is used as an alternative to [AniPose](https://github.com/lambdaloop/anipose).
 1. Train your DeepLabCut model and run it on your images or videos (more instruction on their repository)
 2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
    ``` cmd
@@ -316,7 +345,38 @@ If you need to detect specific points on a human being, an animal, or an object,
    ```
 4. Create an OpenSim model if you need inverse kinematics.
 
-### With AlphaPose:
+### With OpenPose *(legacy)*:
+> **N.B.: RTMlib is faster, more accurate, and easier to install than OpenPose. This is a legacy option.**\
+> N.B.: OpenPose model files are apparently not available on their website anymore. Send me an email at dp2032@bath.ac.uk if you want me to forward them to you!
+
+The accuracy and robustness of Pose2Sim have been thoroughly assessed only with OpenPose, BODY_25B model. Consequently, we recommend using this 2D pose estimation solution. See [OpenPose repository](https://github.com/CMU-Perceptual-Computing-Lab/openpose) for installation and running. *Windows portable demo is enough.*
+
+* Open a command prompt in your **OpenPose** directory. \
+  Launch OpenPose for each `videos` folder: 
+  ``` cmd
+  bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_TRIAL_DIR>\videos\cam01.mp4 --write_json <PATH_TO_TRIAL_DIR>\pose\pose_cam01_json
+  ```
+* The [BODY_25B model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models) has more accurate results than the standard BODY_25 one and has been extensively tested for Pose2Sim. \
+You can also use the [BODY_135 model](https://github.com/CMU-Perceptual-Computing-Lab/openpose_train/tree/master/experimental_models), which allows for the evaluation of pronation/supination, wrist flexion, and wrist deviation.\
+All other OpenPose models (BODY_25, COCO, MPII) are also supported.\
+Make sure you modify the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S01_Demo_SingleTrial/Config.toml) file accordingly.
+* Use one of the `json_display_with_img.py` or `json_display_with_img.py` scripts (see [Utilities](#utilities)) if you want to display 2D pose detections.
+
+### With MediaPipe BlazePose *(legacy)*:
+> **N.B.: RTMlib is faster, more accurate, and easier to install than BlazePose. This is also a legacy option.**
+
+[Mediapipe BlazePose](https://google.github.io/mediapipe/solutions/pose.html) is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
+However, it is less robust and accurate than OpenPose, and can only detect a single person.
+* Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
+  ``` cmd
+  python -m Blazepose_runsave -i input_file -dJs
+  ```
+  Type in `python -m Blazepose_runsave -h` for explanation on parameters.
+* Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S01_Demo_SingleTrial/Config.toml) file.
+
+### With AlphaPose *(legacy)*:
+> **N.B.: RTMlib is faster, more accurate, and easier to install than AlphaPose. This is also a legacy option.**
+
 [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) is one of the main competitors of OpenPose, and its accuracy is comparable. As a top-down approach (unlike OpenPose which is bottom-up), it is faster on single-person detection, but slower on multi-person detection.\
 All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COCO, MPII). For COCO and MPII, AlphaPose must be run with the flag "--format cmu".
 * Install and run AlphaPose on your videos (more instruction on their repository)
@@ -443,12 +503,11 @@ Pose2Sim.synchronization()
 ```
 
 For each camera, this computes mean vertical speed for the chosen keypoints, and finds the time offset for which their correlation is highest.\
-All keypoints can be taken into account, or a subset of them. The user can also specify a time for each camera when only one participant is in the scene, preferably performing a clear vertical motion.
+All keypoints can be taken into account, or a subset of them. The user can also specify a time for each camera when only one participant is in the scene, preferably performing a clear vertical motion. 
 
-If results are not satisfying, set `reset_sync` to true in `Config.toml` to revert to original state. Then switch to false again and edit the parameters.
+*N.B.:* Works best when only one participant is in the scene, at a roughly equal distance from all cameras and when the capture is at least 5-10 seconds long.
 
-*N.B.:* Alternatively, use a flashlight or a clap to synchronize them. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors) or with a remote control (slightly less reliable).
-
+*N.B.:* Alternatively, use a flashlight, a clap, or a clear event to synchronize cameras. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors) or with their app (slightly less reliable).
 
 
 </br>
@@ -546,20 +605,18 @@ Pose2Sim.markerAugmentation()
 > Your OpenSim .osim scaled model and .mot inverse kinematic results will be found in the OpenSim folder of your `Participant` directory.
 
 ### OpenSim Scaling
-1. Use the previous steps to capture a static pose, typically an A-pose or a T-pose.
+1. Choose a time range where the 3D keypoints are particularly well reconstructed, or capture a static pose, typically an A-pose...
 2. Open OpenSim.
 3. Open the provided `Model_Pose2Sim_LSTM.osim` model from `Pose2Sim/OpenSim_Setup`. *(File -> Open Model)*
 4. Load the provided `Scaling_Setup_Pose2Sim_LSTM.xml` scaling file. *(Tools -> Scale model -> Load)*
-5. Replace the example static .trc file with your own data.
+5. Replace the example .trc file with your own data.
 6. Run
 7. Save the new scaled OpenSim model.
 
 ### OpenSim Inverse kinematics
-1. Use Pose2Sim to generate 3D trajectories.
-2. Open OpenSim.
-3. Load the provided `IK_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Inverse kinematics -> Load)*
-4. Replace the example .trc file with your own data, and specify the path to your angle kinematics output file.
-5. Run.
+1. Load the provided `IK_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Inverse kinematics -> Load)*
+2. Replace the example .trc file with your own data, and specify the path to your angle kinematics output file.
+3. Run.
 
 <img src="Content/OpenSim.JPG" width="380">
 
@@ -568,8 +625,27 @@ Pose2Sim.markerAugmentation()
 ### Command line
 Alternatively, you can use command-line tools:
 
+  <!-- - Take advantage of the full the OpenSim Python API. Run `ipython`:
+
+  See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python) for installation instructions (conda install may take a while).
+  Make sure to replace `py38np120` with your Python version (3.8 in this case) and with your numpy version (1.20 here).
+  ``` cmd
+  conda install -c opensim-org opensim-moco=4.4=py38np120 -y
+  ```
+  If you run into a DLL error while importing opensim, open the file `<Pose2Sim-env>\Lib\opensim\__init__.py` and replace `conda`by `conda-meta` line 4. `<Pose2Sim-env>` location can be found with `conda env list`.\ -->
+  
+  ``` python
+  import opensim
+  opensim.ScaleTool("<PATH TO YOUR SCALING OR IK SETUP FILE>.xml").run()
+  opensim.InverseKinematicsTool("<PATH TO YOUR SCALING OR IK SETUP FILE>.xml").run()
+  ```
+  
+  N.B.: You'll need to adjust the `time_range`, `output_motion_file`, and enter the absolute path (NOT the relative path) to the input and output `.osim`, `.trc`, and `.mot` files in your setup file.
+  
+  You can also run other API commands. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Common+Scripting+Commands#CommonScriptingCommands-UsingtheTools) for more instructions on how to use it.
+
+<!--
 - Open an Anaconda terminal in your OpenSim/bin directory, typically `C:\OpenSim <Version>\bin`.\
-  You'll need to adjust the `time_range`, `output_motion_file`, and enter the full paths to the input and output `.osim`, `.trc`, and `.mot` files in your setup file.
   ``` cmd
   opensim-cmd run-tool <PATH TO YOUR SCALING OR IK SETUP FILE>.xml
   ```
@@ -579,21 +655,7 @@ Alternatively, you can use command-line tools:
   import subprocess
   subprocess.call(["opensim-cmd", "run-tool", r"<PATH TO YOUR SCALING OR IK SETUP FILE>.xml"])
   ```
-
-- Or take advantage of the full the OpenSim Python API. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python) for installation instructions (conda install may take a while).\
-Make sure to replace `py38np120` with your Python version (3.8 in this case) and with your numpy version (1.20 here).
-  ``` cmd
-  conda install -c opensim-org opensim-moco=4.4=py38np120 -y
-  ```
-  If you run into a DLL error while importing opensim, open the file `<Pose2Sim-env>\Lib\opensim\__init__.py` and replace `conda`by `conda-meta` line 4. `<Pose2Sim-env>` location can be found with `conda env list`.\
-  Then run: 
-  `ipython`
-  ``` python
-  import opensim
-  opensim.ScaleTool("<PATH TO YOUR SCALING OR IK SETUP FILE>.xml").run()
-  opensim.InverseKinematicsTool("<PATH TO YOUR SCALING OR IK SETUP FILE>.xml").run()
-  ```
-  You can also run other API commands. See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Common+Scripting+Commands#CommonScriptingCommands-UsingtheTools) for more instructions on how to use it.
+-->
 
 </br>
 
