@@ -64,7 +64,7 @@ jobs:
           conda run -n pose2sim flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       
       - name: 
-        env: |
+        env: 
           PYTHONIOENCODING: utf-8
         run: |
           cd Pose2Sim
