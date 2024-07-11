@@ -784,9 +784,11 @@ def triangulate_all(config_dict):
     n_cams = len(json_dirs_names)
     try: 
         json_files_names = [fnmatch.filter(os.listdir(os.path.join(poseTracked_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+        pose_dir = poseTracked_dir
     except:
         try: 
             json_files_names = [fnmatch.filter(os.listdir(os.path.join(poseSync_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+            pose_dir = poseSync_dir
         except:
             json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
     json_files_names = [sort_stringlist_by_last_number(js) for js in json_files_names]    
@@ -824,13 +826,7 @@ def triangulate_all(config_dict):
         # Get x,y,likelihood values from files
         json_files_names_f = [[j for j in json_files_names[c] if int(re.split(r'(\d+)',j)[-2])==f] for c in range(n_cams)]
         json_files_names_f = [j for j_list in json_files_names_f for j in (j_list or ['none'])]
-        try:
-            json_files_f = [os.path.join(poseTracked_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
-        except:
-            try:
-                json_files_f = [os.path.join(poseSync_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
-            except:
-                json_files_f = [os.path.join(pose_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
+        json_files_f = [os.path.join(pose_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
 
         x_files, y_files, likelihood_files = extract_files_frame_f(json_files_f, keypoints_ids, nb_persons_to_detect)
         # [[[list of coordinates] * n_cams ] * nb_persons_to_detect]
