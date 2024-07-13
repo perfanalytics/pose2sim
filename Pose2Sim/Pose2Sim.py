@@ -502,7 +502,7 @@ def opensimProcessing(config=None):
     or the function can be called without an argument, in which case it the config directory is the current one.
     '''
     
-    raise NotImplementedError('This has not been integrated yet. \nPlease read README.md for further explanation')
+    raise NotImplementedError('This has not been implemented yet. \nPlease see README.md for further explanation')
     
     # # TODO
     # from Pose2Sim.opensimProcessing import opensim_processing_all

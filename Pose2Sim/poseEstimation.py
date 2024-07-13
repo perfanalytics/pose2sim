@@ -326,7 +326,7 @@ def rtm_estimator(config_dict):
     # Read config
     project_dir = config_dict['project']['project_dir']
     # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
+    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     frame_range = config_dict.get('project').get('frame_range')

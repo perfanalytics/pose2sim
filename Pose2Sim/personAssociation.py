@@ -565,7 +565,7 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
     # Read config_dict
     project_dir = config_dict.get('project').get('project_dir')
     # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
+    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     multi_person = config_dict.get('project').get('multi_person')
@@ -627,7 +627,7 @@ def track_2d_all(config_dict):
     # Read config_dict
     project_dir = config_dict.get('project').get('project_dir')
     # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
+    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     multi_person = config_dict.get('project').get('multi_person')

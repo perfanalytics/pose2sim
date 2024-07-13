@@ -330,7 +330,7 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     # Read config_dict
     project_dir = config_dict.get('project').get('project_dir')
     # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
+    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
@@ -724,7 +724,7 @@ def triangulate_all(config_dict):
     # Read config_dict
     project_dir = config_dict.get('project').get('project_dir')
     # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..', '..'))
+    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     multi_person = config_dict.get('project').get('multi_person')
