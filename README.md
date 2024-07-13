@@ -21,7 +21,7 @@
 > **Other recently added features**: Automatic camera synchronization, multi-person analysis, Blender visualization, Marker augmentation.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
-> To upgrade, type `pip install pose2sim --upgrade`.
+> To upgrade, type `pip install pose2sim --upgrade` (note that you need Python 3.9 or higher).
 
 <br>
 
