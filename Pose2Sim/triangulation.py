@@ -805,13 +805,7 @@ def triangulate_all(config_dict):
     
     # Triangulation
     if multi_person:
-        try:
-            nb_persons_to_detect = max(max(count_persons_in_json(os.path.join(poseTracked_dir, json_dirs_names[c], json_fname)) for json_fname in json_files_names[c]) for c in range(n_cams))
-        except:
-            try:
-                nb_persons_to_detect = max(max(count_persons_in_json(os.path.join(poseSync_dir, json_dirs_names[c], json_fname)) for json_fname in json_files_names[c]) for c in range(n_cams))
-            except:
-                nb_persons_to_detect = max(max(count_persons_in_json(os.path.join(pose_dir, json_dirs_names[c], json_fname)) for json_fname in json_files_names[c]) for c in range(n_cams))
+        nb_persons_to_detect = max(max(count_persons_in_json(os.path.join(pose_dir, json_dirs_names[c], json_fname)) for json_fname in json_files_names[c]) for c in range(n_cams))
     else:
         nb_persons_to_detect = 1
 
