@@ -669,12 +669,19 @@ def track_2d_all(config_dict):
     
     # 2d-pose files selection
     pose_listdirs_names = next(os.walk(pose_dir))[1]
-    pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
+    try:
+        pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
+        os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
+    except:
+        raise ValueError(f'No json files found in {pose_dir} subdirectories. Make sure you run Pose2Sim.poseEstimation() first.')
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     try: 
         json_files_names = [fnmatch.filter(os.listdir(os.path.join(poseSync_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
     except:
-        json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+        try:
+            json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+        except:
+            raise ValueError(f'No json files found in {pose_dir} nor {poseSync_dir} subdirectories. Make sure you run Pose2Sim.poseEstimation() first.')
     json_files_names = [sort_stringlist_by_last_number(j) for j in json_files_names]
     
     # 2d-pose-associated files creation

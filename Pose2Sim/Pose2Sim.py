@@ -99,8 +99,7 @@ def determine_level(config_dir):
     '''
     Determine the level at which the function is called.
     Level = 1: Trial folder
-    Level = 2: Participant folder
-    Level = 3: Session folder
+    Level = 2: Root folder
     '''
 
     len_paths = [len(root.split(os.sep)) for root,dirs,files in os.walk(config_dir) if 'Config.toml' in files]
@@ -112,12 +111,12 @@ def determine_level(config_dir):
 
 def read_config_files(config):
     '''
-    Read Session, Participant, and Trial configuration files, 
+    Read Root and Trial configuration files, 
     and output a dictionary with all the parameters.
     '''
 
     if type(config)==dict:
-        level = 3 # log_dir = os.getcwd()
+        level = 2 # log_dir = os.getcwd()
         config_dicts = [config]
         if config_dicts[0].get('project').get('project_dir') == None:
             raise ValueError('Please specify the project directory in config_dict:\n \
@@ -128,12 +127,10 @@ def read_config_files(config):
         level = determine_level(config_dir)
         
         # Trial level
-        if level == 1: 
+        if level == 1: # Trial
             try:
                 # if batch
-                session_config_dict = toml.load(os.path.join(config_dir, '..','..','Config.toml'))
-                participant_config_dict = toml.load(os.path.join(config_dir, '..','Config.toml'))
-                session_config_dict = recursive_update(session_config_dict,participant_config_dict)
+                session_config_dict = toml.load(os.path.join(config_dir, '..','Config.toml'))
                 trial_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
                 session_config_dict = recursive_update(session_config_dict,trial_config_dict)
             except:
@@ -142,10 +139,9 @@ def read_config_files(config):
             session_config_dict.get("project").update({"project_dir":config_dir})
             config_dicts = [session_config_dict]
         
-        # Participant level
+        # Root level
         if level == 2:
-            session_config_dict = toml.load(os.path.join(config_dir, '..','Config.toml'))
-            participant_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
+            session_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
             config_dicts = []
             # Create config dictionaries for all trials of the participant
             for (root,dirs,files) in os.walk(config_dir):
@@ -153,32 +149,10 @@ def read_config_files(config):
                     trial_config_dict = toml.load(os.path.join(root, files[0]))
                     # deep copy, otherwise session_config_dict is modified at each iteration within the config_dicts list
                     temp_dict = deepcopy(session_config_dict)
-                    temp_dict = recursive_update(temp_dict,participant_config_dict)
                     temp_dict = recursive_update(temp_dict,trial_config_dict)
                     temp_dict.get("project").update({"project_dir":os.path.join(config_dir, os.path.relpath(root))})
                     if not os.path.basename(root) in temp_dict.get("project").get('exclude_from_batch'):
                         config_dicts.append(temp_dict)
-
-        # Session level
-        if level == 3:
-            session_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
-            config_dicts = []
-            # Create config dictionaries for all trials of all participants of the session
-            for (root,dirs,files) in os.walk(config_dir):
-                if 'Config.toml' in files and root != config_dir:
-                    # participant
-                    if determine_level(root) == 2:
-                        participant_config_dict = toml.load(os.path.join(root, files[0]))
-                    # trial 
-                    elif determine_level(root) == 1: 
-                        trial_config_dict = toml.load(os.path.join(root, files[0]))
-                        # deep copy, otherwise session_config_dict is modified at each iteration within the config_dicts list
-                        temp_dict = deepcopy(session_config_dict)
-                        temp_dict = recursive_update(temp_dict,participant_config_dict)
-                        temp_dict = recursive_update(temp_dict,trial_config_dict)
-                        temp_dict.get("project").update({"project_dir":os.path.join(config_dir, os.path.relpath(root))})
-                        if not os.path.relpath(root) in [os.path.relpath(p) for p in temp_dict.get("project").get('exclude_from_batch')]:
-                            config_dicts.append(temp_dict)
 
     return level, config_dicts
 
@@ -197,7 +171,7 @@ def calibration(config=None):
     level, config_dicts = read_config_files(config)
     config_dict = config_dicts[0]
     try:
-        session_dir = os.path.realpath([os.getcwd() if level==3 else os.path.join(os.getcwd(), '..') if level==2 else os.path.join(os.getcwd(), '..', '..')][0])
+        session_dir = os.path.realpath([os.getcwd() if level==2 else os.path.join(os.getcwd(), '..')][0])
         [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower() ][0]
     except:
         session_dir = os.path.realpath(os.getcwd())
@@ -242,7 +216,7 @@ def poseEstimation(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
     setup_logging(session_dir)
 
     # Batch process all trials
@@ -289,7 +263,7 @@ def synchronization(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
     setup_logging(session_dir)    
 
     # Batch process all trials
@@ -333,7 +307,7 @@ def personAssociation(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
     setup_logging(session_dir)    
 
     # Batch process all trials
@@ -379,7 +353,7 @@ def triangulation(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
     setup_logging(session_dir)  
 
     # Batch process all trials
@@ -425,12 +399,8 @@ def filtering(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
     setup_logging(session_dir)
-
-    # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
-    setup_logging(session_dir)    
 
     # Batch process all trials
     for config_dict in config_dicts:
@@ -468,7 +438,7 @@ def markerAugmentation(config=None):
             raise ValueError('Please specify the project directory in config_dict:\n \
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
     setup_logging(session_dir)
 
     for config_dict in config_dicts:
@@ -517,7 +487,7 @@ def opensimProcessing(config=None):
     #                          config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # # Set up logging
-    # session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..', '..'))
+    # session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
     # setup_logging(session_dir)    
 
     # # Batch process all trials
@@ -547,3 +517,89 @@ def opensimProcessing(config=None):
     #     # else:
     #     #     logging.info(f'Inverse kinematics took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
 
+
+def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_opensimProcessing=True):
+    '''
+    Run all functions at once. Beware that Synchronization, personAssociation, and markerAugmentation are not always necessary, 
+    and may even lead to worse results. Think carefully before running all.
+    '''
+
+    # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    level, config_dicts = read_config_files(config)
+
+    if type(config)==dict:
+        config_dict = config_dicts[0]
+        if config_dict.get('project').get('project_dir') == None:
+            raise ValueError('Please specify the project directory in config_dict:\n \
+                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+
+    # Set up logging
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
+    setup_logging(session_dir)  
+
+    # Batch process all trials
+    for config_dict in config_dicts:
+        start = time.time()
+        currentDateAndTime = datetime.now()
+        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        seq_name = os.path.basename(project_dir)
+        frame_range = config_dict.get('project').get('frame_range')
+        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
+    
+        logging.info("\n\n=====================================================================")
+        logging.info(f"RUNNING ALL FOR {seq_name}, FOR {frames}.")
+        logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
+        logging.info("=====================================================================")
+        logging.info(f"\nProject directory: {project_dir}\n")
+
+        if do_calibration:
+            logging.info('\nRUNNING CALIBRATION...')
+            calibration(config)
+        else: 
+            logging.info('\nSKIPPING CALIBRATION.')
+
+        if do_poseEstimation:
+            logging.info('\nRUNNING POSE ESTIMATION...')
+            poseEstimation(config)
+        else:
+            logging.info('\nSKIPPING POSE ESTIMATION.')
+
+        if do_synchronization:
+            logging.info('\nRUNNING SYNCHRONIZATION...')
+            synchronization(config)
+        else:
+            logging.info('\nSKIPPING SYNCHRONIZATION.')
+
+        if do_personAssociation:
+            logging.info('\nRUNNING PERSON ASSOCIATION...')
+            personAssociation(config)
+        else:
+            logging.info('\nSKIPPING PERSON ASSOCIATION.')
+
+        if do_triangulation:
+            logging.info('\nRUNNING TRIANGULATION...')
+            triangulation(config)
+        else:
+            logging.info('\nSKIPPING TRIANGULATION.')
+            
+        if do_filtering:
+            logging.info('\nRUNNING FILTERING...')
+            filtering(config)
+        else:
+            logging.info('\nSKIPPING FILTERING.')
+
+        if do_markerAugmentation:
+            logging.info('\nRUNNING MARKER AUGMENTATION.')
+            markerAugmentation(config)
+        else:
+            logging.info('\nSKIPPING MARKER AUGMENTATION.')
+        
+        # if do_opensimProcessing:
+        #     logging.info('\nRUNNING OPENSIM PROCESSING.')
+        #     opensimProcessing(config)
+        # else:
+        #     logging.info('\nSKIPPING OPENSIM PROCESSING.')
+
+        end = time.time()
+        elapsed = end-start 
+        logging.info(f'\nRUNNING ALL FUNCTIONS TOOK  {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')

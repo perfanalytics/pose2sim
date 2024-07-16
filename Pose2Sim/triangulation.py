@@ -778,7 +778,11 @@ def triangulate_all(config_dict):
     keypoints_idx_swapped = [keypoints_names.index(keypoint_name_swapped) for keypoint_name_swapped in keypoints_names_swapped] # find index of new keypoint_name
     
     # 2d-pose files selection
-    pose_listdirs_names = next(os.walk(pose_dir))[1]
+    try:
+        pose_listdirs_names = next(os.walk(pose_dir))[1]
+        os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
+    except:
+        raise ValueError(f'No json files found in {pose_dir} subdirectories. Make sure you run Pose2Sim.poseEstimation() first.')
     pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     n_cams = len(json_dirs_names)
@@ -790,7 +794,10 @@ def triangulate_all(config_dict):
             json_files_names = [fnmatch.filter(os.listdir(os.path.join(poseSync_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
             pose_dir = poseSync_dir
         except:
-            json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+            try:
+                json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+            except:
+                raise Exception(f'No json files found in {pose_dir}, {poseSync_dir}, nor {poseTracked_dir} subdirectories. Make sure you run Pose2Sim.poseEstimation() first.')
     json_files_names = [sort_stringlist_by_last_number(js) for js in json_files_names]    
 
     # frame range selection

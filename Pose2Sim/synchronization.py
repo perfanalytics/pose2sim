@@ -290,8 +290,9 @@ def synchronize_cams_all(config_dict):
     # List json files
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
+        os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
     except:
-        raise ValueError(f'No json files found in {pose_dir}. Make sure you run Pose2Sim.poseEstimation() first.')
+        raise ValueError(f'No json files found in {pose_dir} subdirectories. Make sure you run Pose2Sim.poseEstimation() first.')
     pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     json_dirs = [os.path.join(pose_dir, j_d) for j_d in json_dirs_names] # list of json directories in pose_dir
