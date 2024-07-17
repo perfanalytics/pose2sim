@@ -837,8 +837,8 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Pose:** Support [DeepLabCut](http://www.mackenziemathislab.org/deeplabcut) for training on custom datasets.
 &#10004; **Pose:** Support [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose) as an alternative to OpenPose.
 &#10004; **Pose:** Define custom model in config.toml rather than in skeletons.py.
+&#10004; **Pose:** Integrate pose estimation within Pose2Sim (via RTMlib).
 &#9634; **Pose:** Support [MMPose](https://github.com/open-mmlab/mmpose), [SLEAP](https://sleap.ai/), etc.
-&#9634; **Pose:** Integrate pose estimation within Pose2Sim (via MMPose).
 &#9634; **Pose:** Directly reading from DeepLabCut .csv or .h5 files instead of converting to .json (triangulation, person association, calibration, synchronization...) 
 &#9634; **Pose:** GUI help for DeepLabCut model creation.
 
@@ -850,6 +850,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Calibration:** Convert [bioCV](https://github.com/camera-mc-dev/.github/blob/main/profile/mocapPipe.md) calibration files.
 &#10004; **Calibration:** Easier and clearer calibration procedure: separate intrinsic and extrinsic parameter calculation, edit corner detection if some are wrongly detected (or not visible). 
 &#10004; **Calibration:** Possibility to evaluate extrinsic parameters from cues on scene.
+&#9634; **Calibration:** Support vertical checkerboard.
 &#9634; **Calibration:** Once object points have been detected or clicked once, track them for live calibration of moving cameras. Propose to click again when they are lost.
 &#9634; **Calibration:** Calibrate cameras by pairs and compute average extrinsic calibration with [aniposelib](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/utils.py#L167). 
 &#9634; **Calibration:** Fine-tune calibration with bundle adjustment.
@@ -889,11 +890,11 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **OpenSim:** Add full model with contact spheres ([SmoothSphereHalfSpaceForce](https://simtk.org/api_docs/opensim/api_docs/classOpenSim_1_1SmoothSphereHalfSpaceForce.html#details)) and full-body muscles ([DeGrooteFregly2016Muscle](https://simtk.org/api_docs/opensim/api_docs/classOpenSim_1_1DeGrooteFregly2016Muscle.html#details)), for [Moco](https://opensim-org.github.io/opensim-moco-site/) for example.
 &#10004; **OpenSim:** Add model with [ISB shoulder](https://github.com/stanfordnmbl/opencap-core/blob/main/opensimPipeline/Models/LaiUhlrich2022_shoulder.osim).
 &#9634; **OpenSim:** Integrate OpenSim in Pose2Sim.
-&#9634; **OpenSim:** Do not require a separate scaling trial: scale on the 10 slowest frames of the moving trial instead.
+&#9634; **OpenSim:** Do not require a separate scaling trial: scale on the 10% slowest frames of the moving trial instead, or take median scaling value.
 &#9634; **OpenSim:** Implement optimal fixed-interval Kalman smoothing for inverse kinematics ([this OpenSim fork](https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp)), or [Biorbd](https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp))
 
 &#10004; **GUI:** Blender add-on (cf [MPP2SOS](https://blendermarket.com/products/mocap-mpp2soss)), [Maya-Mocap](https://github.com/davidpagnon/Maya-Mocap) and [BlendOsim](https://github.com/JonathanCamargo/BlendOsim).
-&#9634; **GUI:** App or webapp (e.g., with [Napari](https://napari.org/stable).
+&#9634; **GUI:** App or webapp (e.g., with [Napari](https://napari.org/stable)).
 &#9634; **GUI:** 3D plot of cameras and of triangulated keypoints.
 &#9634; **GUI:** Demo on Google Colab (see [Sports2D](https://bit.ly/Sports2D_Colab) for OpenPose and Python package installation on Google Drive).
 
@@ -902,7 +903,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Demo:** Time shift videos and json to demonstrate synchronization
 &#10004; **Demo:** Add another virtual person to demonstrate personAssociation
 &#9634; **Tutorials:** Make video tutorials.
-&#9634; **Doc:** Use [Sphinx](https://www.sphinx-doc.org/en/master), [MkDocs](https://www.mkdocs.org), or (maybe better), [github.io](https://docs.github.com/fr/pages/quickstart) for clearer documentation.
+&#9634; **Doc:** Use [Sphinx](https://www.sphinx-doc.org/en/master), [MkDocs](https://www.mkdocs.org), or [github.io](https://docs.github.com/fr/pages/quickstart) (maybe better) for clearer documentation.
 
 &#10004; **Pip package**
 &#10004; **Batch processing** (also enable non-batch processing)
