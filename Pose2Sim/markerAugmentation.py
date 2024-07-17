@@ -271,11 +271,8 @@ def augmentTRC(config_dict):
 
         # Save c3d
         if make_c3d:
-            print(pathOutputTRCFile)
             convert_to_c3d(pathOutputTRCFile)
             logging.info(f'Augmented trc files have been converted to c3d.')
-        
-        logging.info('\n')
-    
+            
     return min_y_pos
 

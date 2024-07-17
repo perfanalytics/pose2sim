@@ -7,20 +7,20 @@
 # 
 # IMPORTANT:
 # If a parameter is not found here, Pose2Sim will look for its value in the 
-# Config.toml file of the level above. This way, you can set global 
-# instructions for the Session and alter them for specific Participants or Trials.
+# Config.toml file of the level above. This way, you can set global batch
+# instructions and alter them for specific trials.
 #
-# If you wish to overwrite a parameter for a specific trial or participant,  
-# edit its Config.toml file by uncommenting its key (e.g., [project])
-# and editing its value (e.g., frame_range = [10,300]). Or else, uncomment 
-# [filtering.butterworth] and set cut_off_frequency = 10, etc.
+# If you wish to overwrite a parameter for a specific trial, edit 
+# its Config.toml file by uncommenting its key (e.g., [project])
+# and editing its value (e.g., frame_range = [10,300]). Also try 
+# uncommenting [filtering.butterworth] and set cut_off_frequency = 10, etc.
 
 
 
 [project]
-multi_person = true # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
-participant_height = [1.72, 1.40] # m # float if single person, list of float if multi-person (same order as the Static trials) # Only used for marker augmentation
-participant_mass = [70.0, 63.5] # kg # Only used for marker augmentation and scaling
+multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
+participant_height = 1.72 # m # float if single person, list of float if multi-person (same order as the Static trials) # Only used for marker augmentation
+participant_mass = 70.0 # kg # Only used for marker augmentation and scaling
 
 frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
 frame_range = [] # For example [10,300], or [] for all frames. 
@@ -42,7 +42,7 @@ pose_model = 'HALPE_26'  #With RTMLib: HALPE_26 (body and feet, default), COCO_1
                          #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133
                          #With deeplabcut: CUSTOM. See example at the end of the file
 mode = 'balanced' # 'lightweight', 'balanced', 'performance'
-det_frequency = 1 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
+det_frequency = 100 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
                   # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
 tracking = true # Gives consistent person ID across frames. Slightly slower but might facilitate synchronization if other people are in the background
 display_detection = true
@@ -53,7 +53,7 @@ output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a lis
 
 [synchronization]
 display_sync_plots = true # true or false (lowercase)
-keypoints_to_consider = 'all' # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
+keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify the keypoints to consider.
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
                            # [10.0, 2.0, 8.0, 11.0] list of times in seconds, one value per camera if you want to specify the approximate time of a clear vertical event by one person standing alone in the scene
@@ -144,17 +144,17 @@ min_cameras_for_triangulation = 2
 interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
                         # 'none' if you don't want to interpolate missing points
 interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
-fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
 show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
+fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
 handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
 undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
-make_c3d = false # save triangulated data in c3d format in addition to trc
+make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
 [filtering]
 type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
 display_figures = false # true or false (lowercase) # fails when run multiple times https://github.com/superjax/plotWindow/issues/7
-make_c3d = false # also save triangulated data in c3d format
+make_c3d = true # also save triangulated data in c3d format
 
    [filtering.butterworth]
    order = 4 

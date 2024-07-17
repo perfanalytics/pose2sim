@@ -153,7 +153,7 @@ make_c3d = true # save triangulated data in c3d format in addition to trc
 
 [filtering]
 type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
-display_figures = false # true or false (lowercase)
+display_figures = true # true or false (lowercase) # fails when run multiple times https://github.com/superjax/plotWindow/issues/7
 make_c3d = true # also save triangulated data in c3d format
 
    [filtering.butterworth]
@@ -178,7 +178,7 @@ make_c3d = true # also save triangulated data in c3d format
 ## Requires the following markers: ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
 ##        "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
 ##        "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
-make_c3d = false # save triangulated data in c3d format in addition to trc
+make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
 [opensim]

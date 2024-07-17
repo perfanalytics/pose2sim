@@ -27,7 +27,7 @@ and lens distortions are better taken into account.\ -->
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to marker-based motion capture methods. It aims to provide a free tool to obtain research-grade results from consumer-grade equipment. Any combination of phone, webcam, GoPro, etc. can be used.
 
-Pose2Sim stands for "OpenPose to OpenSim", as it originally used OpenPose inputs (2D keypoints coordinates obtained from multiple videos) and lead to an [OpenSim](https://opensim.stanford.edu/) result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose). OpenPose and other options are kept as legacy options. 
+**Pose2Sim** stands for "OpenPose to OpenSim", as it originally used *OpenPose* inputs (2D keypoints coordinates) from multiple videos and lead to an [OpenSim](https://opensim.stanford.edu/) result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose). OpenPose and other models are kept as legacy options. 
 
 If you can only use one single camera and don't mind losing some accuracy, please consider using [Sports2D](https://github.com/davidpagnon/Sports2D).
 
@@ -63,6 +63,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
    3. [Demonstration Part-2: Obtain 3D joint angles with OpenSim](#demonstration-part-2-obtain-3d-joint-angles-with-opensim)
    4. [Demonstration Part-3 (optional): Visualize your results with Blender](#demonstration-part-3-optional-visualize-your-results-with-blender)
    5. [Demonstration Part-4 (optional): Try multi-person analysis](#demonstration-part-4-optional-try-multi-person-analysis)
+   6. [Demonstration Part-5 (optional): Try batch processing](#demonstration-part-5-optional-try-batch-processing)
 2. [Use on your own data](#use-on-your-own-data)
    1. [Setting your project up](#setting-your-project-up)
       1. [Retrieve the folder structure](#retrieve-the-folder-structure)
