@@ -266,7 +266,7 @@ def synchronize_cams_all(config_dict):
 
     # Warning if multi_person
     if multi_person:
-        logging.warning('\nYou set your project as a multi-person one: make sure you set `approx_time_maxspeed` and `time_range_around_maxspeed` at times where one single persons are in the scene, you you may get inaccurate results.')
+        logging.warning('\nYou set your project as a multi-person one: make sure you set `approx_time_maxspeed` and `time_range_around_maxspeed` at times where one single person is in the scene, or you may get inaccurate results.')
         do_synchro = input('Do you want to continue? (y/n)')
         if do_synchro.lower() not in ["y","yes"]:
             logging.warning('Synchronization cancelled.')

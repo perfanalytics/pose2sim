@@ -66,7 +66,7 @@ class TestWorkflow(unittest.TestCase):
     @patch('builtins.input', return_value='no')  # Mock input() to return 'no'
     def test_workflow(self, mock_input):
         '''
-        SINGLE-PERSON and MULTI-PERSON:
+        SINGLE-PERSON, MULTI-PERSON, BATCH PROCESSING:
             - calibration
             - pose estimation
             - synchronization
@@ -74,6 +74,7 @@ class TestWorkflow(unittest.TestCase):
             - triangulation
             - filtering
             - marker augmentation
+            - run all
 
         N.B.: Calibration from scene dimensions is not tested, as it requires the 
         user to click points on the image. 
@@ -86,9 +87,9 @@ class TestWorkflow(unittest.TestCase):
         '''
 
 
-        ##################
-        # SINGLE-PERSON  #
-        ##################
+        ###################
+        # SINGLE-PERSON   #
+        ###################
 
         project_dir = '../Demo_SinglePerson'
         config_dict = toml.load(os.path.join(project_dir, 'Config.toml'))
@@ -109,11 +110,14 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.filtering(config_dict)
         Pose2Sim.markerAugmentation(config_dict)
         # Pose2Sim.kinematics(config_dict)
+
+        config_dict.get("pose").update({"overwrite_pose":False})
+        Pose2Sim.runAll(config_dict)
         
 
-        ##################
-        # MULTI-PERSON   #
-        ##################
+        ####################
+        # MULTI-PERSON     #
+        ####################
         
         project_dir = '../Demo_MultiPerson'
         config_dict = toml.load(os.path.join(project_dir, 'Config.toml'))
@@ -133,6 +137,19 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.filtering(config_dict)
         Pose2Sim.markerAugmentation(config_dict)
         # Pose2Sim.kinematics(config_dict)
+
+        config_dict.get("pose").update({"overwrite_pose":False})
+        Pose2Sim.runAll(config_dict)
+
+
+        ####################
+        # BATCH PROCESSING #
+        ####################
+
+        project_dir = '../Demo_Batch'
+        os.chdir(project_dir)
+
+        Pose2Sim.runAll()
 
 
 if __name__ == '__main__':

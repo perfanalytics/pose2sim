@@ -18,7 +18,7 @@
 
 > **_News_: Version 0.9:**\
 > **Pose estimation with RTMPose is now included in Pose2Sim!**\
-> **Other recently added features**: Automatic camera synchronization, multi-person analysis, Blender visualization, Marker augmentation.
+> **Other recently added features**: Automatic camera synchronization, multi-person analysis, Blender visualization, Marker augmentation, Batch processing.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
 > To upgrade, type `pip install pose2sim --upgrade` (note that you need Python 3.9 or higher).
@@ -65,9 +65,7 @@ If you can only use one single camera and don't mind losing some accuracy, pleas
    5. [Demonstration Part-4 (optional): Try multi-person analysis](#demonstration-part-4-optional-try-multi-person-analysis)
    6. [Demonstration Part-5 (optional): Try batch processing](#demonstration-part-5-optional-try-batch-processing)
 2. [Use on your own data](#use-on-your-own-data)
-   1. [Setting your project up](#setting-your-project-up)
-      1. [Retrieve the folder structure](#retrieve-the-folder-structure)
-      2. [Single Trial vs. Batch processing](#single-trial-vs-batch-processing)
+   1. [Setting up your project](#setting-up-your-project)
    2. [2D pose estimation](#2d-pose-estimation)
       1. [With RTMPose (default)](#with-rtmpose-default)
       2. [With MMPose (coming soon)](#with-mmpose-coming-soon)
@@ -167,12 +165,19 @@ Pose2Sim.markerAugmentation()
 ```
 3D results are stored as .trc files in each trial folder in the `pose-3d` directory.
 
-*N.B.:* Default parameters have been provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) but can be edited.
-
 </br>
 
-__*GO FURTHER:*__\
-Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
+**Note:** 
+- Default parameters have been provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) but can be edited.
+- You can run all stages at once: 
+  ``` python
+  from Pose2Sim import Pose2Sim
+  Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_opensimProcessing=True)
+  ```
+- Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
+</br>
+
+
 
 <br/>
 
@@ -225,13 +230,12 @@ https://github.com/perfanalytics/pose2sim/assets/54667644/5d7c858f-7e46-40c1-928
 
 Go to the Multi-participant Demo folder: `cd <path>\Pose2Sim\Demo_MultiPerson`. \
 Type `ipython`, and try the following code:
+
 ``` python
 from Pose2Sim import Pose2Sim
-Pose2Sim.personAssociation()
-Pose2Sim.triangulation()
-Pose2Sim.filtering()
-Pose2Sim.markerAugmentation()
+Pose2Sim.runAll(do_synchronization=False) # Synchronization possible, but tricky with multiple persons
 ```
+
 
 One .trc file per participant will be generated and stored in the `pose-3d` directory.\
 You can then run OpenSim scaling and inverse kinematics for each resulting .trc file as in [Demonstration Part-2](#demonstration-part-2-obtain-3d-joint-angles-with-opensim).\
@@ -241,64 +245,45 @@ You can also visualize your results with Blender as in [Demonstration Part-3](#d
 Set *[triangulation]* `reorder_trc = true` if you need to run OpenSim and to match the generated .trc files with the static trials.\
 Make sure that the order of *[markerAugmentation]* `participant_height` and `participant_mass` matches the order of the static trials.
 
-*N.B.:* Note that in the case of our floating ghost participant, marker augmentation may worsen the results. See [Marker augmentation](#marker-augmentation) for instruction on when and when not to use it.
+<br/>
+
+## Demonstration Part-5 (optional): Try batch processing
+> _**Run numerous analysis with different parameters and minimal friction.**_
+
+Go to the Batch Demo folder: `cd <path>\Pose2Sim\Demo_Batch`. \
+Type `ipython`, and try the following code:
+
+``` python
+from Pose2Sim import Pose2Sim
+Pose2Sim.runAll()
+```
+
+The batch processing structure requires a `Config.toml` file in each of the trial directories. Global parameters are given in the `Config.toml` file of the `BatchSession` folder. They can be altered for specific or `Trials` by uncommenting keys and their values in their respective `Config.toml` files.
+
+Run Pose2Sim from the `BatchSession` folder if you want to batch process the whole session, or from a `Trial` folder if you want to process only a specific trial. 
+
+
+| SingleTrial     | BatchSession       |
+|-----------------|--------------------|
+| <pre><b>SingleTrial</b>                    <br>├── <b>calibration</b><br>├── <b>videos</b><br>└── <i><b>Config.toml</i></b></pre> |  <pre><b>BatchSession</b>                     <br>├── <b>calibration</b> <br>├── Trial_1 <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b><br>├── Trial_2 <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b><br>└── <i><b>Config.toml</i></b></pre>  | 
+
+
+For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or uncomment `[pose]` and set `mode = 'lightweight'` in the `Config.toml` file of `Trial_1`.
 
 
 </br></br>
 
 # Use on your own data
 
-> _**Deeper explanations and instructions are given below.**_ \
-> N.B.: If a step is not relevant for your use case (synchronization, person association, marker augmentation...), you can skip it.
+> **N.B.: If a step is not relevant for your use case (synchronization, person association, marker augmentation...), you can skip it.**
 
-</br>
-
-## Setting your project up
+## Setting up your project
   > _**Get ready for automatic batch processing.**_
   
-### Retrieve the folder structure
   1. Open a terminal, enter `pip show pose2sim`, report package location. \
      Copy this path and do `cd <path>\pose2sim`.
-  2. Copy the *Demo_SinglePerson* or *Demo_MultiPerson* folder wherever you like, and rename it as you wish. 
+  2. Copy-paste the *Demo_SinglePerson*, *Demo_MultiPerson*, or *Demo_Batch* folder wherever you like, and rename it as you wish. 
   3. The rest of the tutorial will explain to you how to populate the `Calibration` and `videos` folders, edit the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) files, and run each Pose2Sim step.
-
-</br>
-
-### Single Trial vs. Batch processing
-
-> _**Copy and edit either the [Demo_SinglePerson](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson) folder or the [S00_Demo_BatchSession](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S00_Demo_BatchSession) one.**_ 
-> - Single trial is more straight-forward to set up for isolated experiments
-> - Batch processing allows you to run numerous analysis with different parameters and minimal friction
-
-
-
-#### Single trial
-
-The single trial folder should contain a `Config.toml` file, a `calibration` folder, and a `pose` folder, the latter including one subfolder for each camera.
-
-<pre>
-SingleTrial \
-├── calibration \
-├── pose \
-└── <i><b>Config.toml</i></b>
-</pre>
-
-#### Batch processing
-
-For batch processing, each session directory should follow a `Session -> Participant -> Trial` structure, with a `Config.toml` file in each of the directory levels. 
-
-<pre>
-Session_s1         \ <i><b>Config.toml</i></b>
-├── Calibration\ 
-└── Participant_p1 \ <i><b>Config.toml</i></b>
-    └── Trial_t1   \ <i><b>Config.toml</i></b>
-        └── pose \
-</pre>
-
-Run Pose2Sim from the `Session` folder if you want to batch process the whole session, from the `Participant` folder if you want to batch process all the trials of a participant, or from the `Trial` folder if you want to process a single trial. There should be one `Calibration` folder per session. 
-
-Global parameters are given in the `Config.toml` file of the `Session` folder, and can be altered for specific `Participants` or `Trials` by uncommenting keys and their values in their respective Config.toml files.\
-Try uncommenting `[project]` and set `frame_range = [10,300]` for a Participant for example, or uncomment `[filtering.butterworth]` and set `cut_off_frequency = 10` for a Trial.
 
 </br>
 
@@ -317,6 +302,10 @@ Type `ipython`.
 from Pose2Sim import Pose2Sim
 Pose2Sim.poseEstimation()
 ```
+
+<img src="Content/P2S_poseestimation.png" width="760">
+
+</br>
 
 *N.B.:* The `GPU` will be used with ONNX backend if a valid CUDA installation is found (or MPS with MacOS), otherwise the `CPU` will be used with OpenVINO backend.\
 *N.B.:* Pose estimation can be run in `lightweight`, `balanced`, or `performance` mode.\
@@ -407,8 +396,12 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.calibration()
 ```
 
-Output:\
-<img src="Content/Calib2D.png" width="760">
+
+<img src="Content/P2S_calibration.png" width="760">
+
+</br>
+Output file:
+
 <img src="Content/CalibFile.png" width="760">
 
 
@@ -508,10 +501,19 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.synchronization()
 ```
 
+<img src="Content/P2S_synchronization.png" width="760">
+
+</br>
+
 For each camera, this computes mean vertical speed for the chosen keypoints, and finds the time offset for which their correlation is highest.\
 All keypoints can be taken into account, or a subset of them. The user can also specify a time for each camera when only one participant is in the scene, preferably performing a clear vertical motion. 
 
-*N.B.:* Works best when only one participant is in the scene, at a roughly equal distance from all cameras and when the capture is at least 5-10 seconds long.
+<img src="Content/synchro.jpg" width="760">
+
+*N.B.:* Works best when:
+- only one participant is in the scene (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly)
+- the participant is at a roughly equal distance from all cameras
+- when the capture is at least 5 seconds long
 
 *N.B.:* Alternatively, use a flashlight, a clap, or a clear event to synchronize cameras. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors) or with their app (slightly less reliable).
 
@@ -521,8 +523,9 @@ All keypoints can be taken into account, or a subset of them. The user can also 
 ### Associate persons across cameras
 
 > _**If `multi_person` is set to `false`, the algorithm chooses the person for whom the reprojection error is smallest.\
-  If `multi_person` is set to `true`, it associates across views the people for whom the distances between epipolar lines are the smallest. People are then associated across frames according to their displacement speed.**_ \
-***N.B.:** Skip this step if only one person is in the field of view.*
+  If `multi_person` is set to `true`, it associates across views the people for whom the distances between epipolar lines are the smallest. People are then associated across frames according to their displacement speed.**_ 
+
+> ***N.B.:** Skip this step if only one person is in the field of view.*
 
 Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
 Type `ipython`.
@@ -531,11 +534,12 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.personAssociation()
 ```
 
+<img src="Content/P2S_personassociation.png" width="760">
+   
+</br>
+
 Check printed output. If results are not satisfying, try and release the constraints in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S00_Demo_Session/Config.toml) file.
 
-Output:\
-<img src="Content/Track2D.png" width="760">
-   
 </br>
 
 ### Triangulating keypoints
@@ -551,11 +555,12 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.triangulation()
 ```
 
+<img src="Content/P2S_triangulation.png" width="760">
+
+</br>
+
 Check printed output, and visualize your trc in OpenSim: `File -> Preview experimental data`.\
 If your triangulation is not satisfying, try and release the constraints in the `Config.toml` file.
-
-Output:\
-<img src="Content/Triangulate3D.png" width="760">
 
 </br>
 
@@ -571,12 +576,14 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.filtering()
 ```
 
+<img src="Content/P2S_filtering.png" width="760">
+
+</br>
+
 Check your filtration with the displayed figures, and visualize your .trc file in OpenSim. If your filtering is not satisfying, try and change the parameters in the `Config.toml` file.
 
 Output:\
 <img src="Content/FilterPlot.png" width="760">
-
-<img src="Content/Filter3D.png" width="760">
 
 </br>
 
@@ -603,6 +610,8 @@ Type `ipython`.
 from Pose2Sim import Pose2Sim
 Pose2Sim.markerAugmentation()
 ```
+
+<img src="Content/P2S_markeraugmentation.png" width="760">
 
 </br>
 

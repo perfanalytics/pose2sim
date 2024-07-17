@@ -104,7 +104,7 @@ def determine_level(config_dir):
 
     len_paths = [len(root.split(os.sep)) for root,dirs,files in os.walk(config_dir) if 'Config.toml' in files]
     if len_paths == []:
-        raise FileNotFoundError('Please run Pose2Sim from a Session, Participant, or Trial directory.')
+        raise FileNotFoundError('You need a Config.toml file in each trial or root folder.')
     level = max(len_paths) - min(len_paths) + 1
     return level
 
@@ -172,7 +172,7 @@ def calibration(config=None):
     config_dict = config_dicts[0]
     try:
         session_dir = os.path.realpath([os.getcwd() if level==2 else os.path.join(os.getcwd(), '..')][0])
-        [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower() ][0]
+        [os.path.join(session_dir, c) for c in os.listdir(session_dir) if 'calib' in c.lower() and not c.lower().endswith('.py')][0]
     except:
         session_dir = os.path.realpath(os.getcwd())
     config_dict.get("project").update({"project_dir":session_dir})
@@ -183,17 +183,17 @@ def calibration(config=None):
     
     # Run calibration
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
-    logging.info("\n\n---------------------------------------------------------------------")
+    logging.info("\n---------------------------------------------------------------------")
     logging.info("Camera calibration")
     logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
-    logging.info("---------------------------------------------------------------------")
-    logging.info(f"\nCalibration directory: {calib_dir}")
+    logging.info(f"Calibration directory: {calib_dir}")
+    logging.info("---------------------------------------------------------------------\n")
     start = time.time()
     
     calibrate_cams_all(config_dict)
     
     end = time.time()
-    logging.info(f'\nCalibration took {end-start:.2f} s.')
+    logging.info(f'\nCalibration took {end-start:.2f} s.\n')
 
 
 def poseEstimation(config=None):
@@ -228,17 +228,17 @@ def poseEstimation(config=None):
         frame_range = config_dict.get('project').get('frame_range')
         frames = ["all frames" if not frame_range else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
-        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info("\n---------------------------------------------------------------------")
         logging.info(f"Pose estimation for {seq_name}, for {frames}.")
         logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info("---------------------------------------------------------------------")
-        logging.info(f"\nProject directory: {project_dir}")
+        logging.info(f"Project directory: {project_dir}")
+        logging.info("---------------------------------------------------------------------\n")
     
         rtm_estimator(config_dict)
         
         end = time.time()
         elapsed = end - start 
-        logging.info(f'\nPose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nPose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
     
 
 def synchronization(config=None):
@@ -253,7 +253,7 @@ def synchronization(config=None):
     # Import the function
     from Pose2Sim.synchronization import synchronize_cams_all
 
-    # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    # Determine the level at which the function is called (root:2, trial:1)
     level, config_dicts = read_config_files(config)
 
     if type(config)==dict:
@@ -272,17 +272,17 @@ def synchronization(config=None):
         currentDateAndTime = datetime.now()
         project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
 
-        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info("\n---------------------------------------------------------------------")
         logging.info("Camera synchronization")
         logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info("---------------------------------------------------------------------")
-        logging.info(f"\nProject directory: {project_dir}")
+        logging.info(f"Project directory: {project_dir}")
+        logging.info("---------------------------------------------------------------------\n")
         
         synchronize_cams_all(config_dict)
     
         end = time.time()
         elapsed = end-start 
-        logging.info(f'\nSynchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nSynchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
     
     
 def personAssociation(config=None):
@@ -297,7 +297,7 @@ def personAssociation(config=None):
     
     from Pose2Sim.personAssociation import track_2d_all
 
-    # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    # Determine the level at which the function is called (root:2, trial:1)
     level, config_dicts = read_config_files(config)
 
     if type(config)==dict:
@@ -319,17 +319,17 @@ def personAssociation(config=None):
         frame_range = config_dict.get('project').get('frame_range')
         frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
-        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info("\n---------------------------------------------------------------------")
         logging.info(f"Associating persons for {seq_name}, for {frames}.")
         logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info("---------------------------------------------------------------------")
-        logging.info(f"\nProject directory: {project_dir}")
+        logging.info(f"Project directory: {project_dir}")
+        logging.info("---------------------------------------------------------------------\n")
     
         track_2d_all(config_dict)
     
         end = time.time()
         elapsed = end-start 
-        logging.info(f'\nAssociating persons took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nAssociating persons took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
     
     
 def triangulation(config=None):
@@ -343,7 +343,7 @@ def triangulation(config=None):
 
     from Pose2Sim.triangulation import triangulate_all
 
-    # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    # Determine the level at which the function is called (root:2, trial:1)
     level, config_dicts = read_config_files(config)
 
     if type(config)==dict:
@@ -365,17 +365,17 @@ def triangulation(config=None):
         frame_range = config_dict.get('project').get('frame_range')
         frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
-        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info("\n---------------------------------------------------------------------")
         logging.info(f"Triangulation of 2D points for {seq_name}, for {frames}.")
         logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info("---------------------------------------------------------------------")
-        logging.info(f"\nProject directory: {project_dir}")
+        logging.info(f"Project directory: {project_dir}")
+        logging.info("---------------------------------------------------------------------\n")
         
         triangulate_all(config_dict)
     
         end = time.time()
         elapsed = end-start 
-        logging.info(f'\nTriangulation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nTriangulation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
  
     
 def filtering(config=None):
@@ -389,7 +389,7 @@ def filtering(config=None):
 
     from Pose2Sim.filtering import filter_all
 
-    # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    # Determine the level at which the function is called (root:2, trial:1)
     level, config_dicts = read_config_files(config)
 
     if type(config)==dict:
@@ -410,13 +410,15 @@ def filtering(config=None):
         frame_range = config_dict.get('project').get('frame_range')
         frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
     
-        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info("\n---------------------------------------------------------------------")
         logging.info(f"Filtering 3D coordinates for {seq_name}, for {frames}.")
         logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info("---------------------------------------------------------------------")
-        logging.info(f"\nProject directory: {project_dir}\n")
+        logging.info(f"Project directory: {project_dir}\n")
+        logging.info("---------------------------------------------------------------------\n")
     
         filter_all(config_dict)
+        
+        logging.info('\n')
 
 
 def markerAugmentation(config=None):
@@ -449,17 +451,17 @@ def markerAugmentation(config=None):
         frame_range = config_dict.get('project').get('frame_range')
         frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
-        logging.info("\n\n---------------------------------------------------------------------")
+        logging.info("\n---------------------------------------------------------------------")
         logging.info(f"Augmentation process for {seq_name}, for {frames}.")
         logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info("---------------------------------------------------------------------")
-        logging.info(f"\nProject directory: {project_dir}\n")
+        logging.info(f"Project directory: {project_dir}")
+        logging.info("---------------------------------------------------------------------\n")
 
         augmentTRC(config_dict)
 
         end = time.time()
         elapsed = end-start 
-        logging.info(f'\nMarker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+        logging.info(f'\nMarker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 
 
 def opensimProcessing(config=None):
@@ -477,7 +479,7 @@ def opensimProcessing(config=None):
     # # TODO
     # from Pose2Sim.opensimProcessing import opensim_processing_all
     
-    # # Determine the level at which the function is called (session:3, participant:2, trial:1)
+    # # Determine the level at which the function is called (root:2, trial:1)
     # level, config_dicts = read_config_files(config)
 
     # if type(config)==dict:
@@ -499,23 +501,23 @@ def opensimProcessing(config=None):
     #     frame_range = config_dict.get('project').get('frame_range')
     #     frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
-    #     logging.info("\n\n---------------------------------------------------------------------")
+    #     logging.info("\n---------------------------------------------------------------------")
     #     # if static_file in project_dir: 
     #     #     logging.info(f"Scaling model with <STATIC TRC FILE>.")
     #     # else:
     #     #     logging.info(f"Running inverse kinematics <MOTION TRC FILE>.")
     #     logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
-    #     logging.info("---------------------------------------------------------------------")
-    #     logging.info(f"\nOpenSim output directory: {project_dir}")
+    #     logging.info(f"OpenSim output directory: {project_dir}")
+    #     logging.info("---------------------------------------------------------------------\n")
    
     #     opensim_processing_all(config_dict)
     
     #     end = time.time()
     #     elapsed = end-start 
     #     # if static_file in project_dir: 
-    #     #     logging.info(f'Model scaling took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+    #     #     logging.info(f'Model scaling took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
     #     # else:
-    #     #     logging.info(f'Inverse kinematics took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+    #     #     logging.info(f'Inverse kinematics took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 
 
 def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_opensimProcessing=True):
@@ -524,82 +526,101 @@ def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchron
     and may even lead to worse results. Think carefully before running all.
     '''
 
-    # Determine the level at which the function is called (session:3, participant:2, trial:1)
-    level, config_dicts = read_config_files(config)
-
-    if type(config)==dict:
-        config_dict = config_dicts[0]
-        if config_dict.get('project').get('project_dir') == None:
-            raise ValueError('Please specify the project directory in config_dict:\n \
-                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
+    level, config_dicts = read_config_files(config)
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
     setup_logging(session_dir)  
 
-    # Batch process all trials
-    for config_dict in config_dicts:
-        start = time.time()
-        currentDateAndTime = datetime.now()
-        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
-        seq_name = os.path.basename(project_dir)
-        frame_range = config_dict.get('project').get('frame_range')
-        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
-    
+    currentDateAndTime = datetime.now()
+    start = time.time()
+
+    logging.info("\n\n=====================================================================")
+    logging.info(f"RUNNING ALL.")
+    logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
+    logging.info(f"Project directory: {session_dir}\n")
+    logging.info("=====================================================================")
+
+    if do_calibration:
         logging.info("\n\n=====================================================================")
-        logging.info(f"RUNNING ALL FOR {seq_name}, FOR {frames}.")
-        logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
+        logging.info('Running calibration...')
         logging.info("=====================================================================")
-        logging.info(f"\nProject directory: {project_dir}\n")
+        calibration(config)
+    else: 
+        logging.info("\n\n=====================================================================")
+        logging.info('Skipping calibration.')
+        logging.info("=====================================================================")
 
-        if do_calibration:
-            logging.info('\nRUNNING CALIBRATION...')
-            calibration(config)
-        else: 
-            logging.info('\nSKIPPING CALIBRATION.')
+    if do_poseEstimation:
+        logging.info("\n\n=====================================================================")
+        logging.info('Running pose estimation...')
+        logging.info("=====================================================================")
+        poseEstimation(config)
+    else:
+        logging.info("\n\n=====================================================================")
+        logging.info('Skipping pose estimation.')
+        logging.info("=====================================================================")
 
-        if do_poseEstimation:
-            logging.info('\nRUNNING POSE ESTIMATION...')
-            poseEstimation(config)
-        else:
-            logging.info('\nSKIPPING POSE ESTIMATION.')
+    if do_synchronization:
+        logging.info("\n\n=====================================================================")
+        logging.info('Running synchronization...')
+        logging.info("=====================================================================")
+        synchronization(config)
+    else:
+        logging.info("\n\n=====================================================================")
+        logging.info('Skipping synchronization.')
+        logging.info("=====================================================================")
 
-        if do_synchronization:
-            logging.info('\nRUNNING SYNCHRONIZATION...')
-            synchronization(config)
-        else:
-            logging.info('\nSKIPPING SYNCHRONIZATION.')
+    if do_personAssociation:
+        logging.info("\n\n=====================================================================")
+        logging.info('Running person association...')
+        logging.info("=====================================================================")
+        personAssociation(config)
+    else:
+        logging.info("\n\n=====================================================================")
+        logging.info('Skipping person association.')
+        logging.info("=====================================================================")
 
-        if do_personAssociation:
-            logging.info('\nRUNNING PERSON ASSOCIATION...')
-            personAssociation(config)
-        else:
-            logging.info('\nSKIPPING PERSON ASSOCIATION.')
-
-        if do_triangulation:
-            logging.info('\nRUNNING TRIANGULATION...')
-            triangulation(config)
-        else:
-            logging.info('\nSKIPPING TRIANGULATION.')
-            
-        if do_filtering:
-            logging.info('\nRUNNING FILTERING...')
-            filtering(config)
-        else:
-            logging.info('\nSKIPPING FILTERING.')
-
-        if do_markerAugmentation:
-            logging.info('\nRUNNING MARKER AUGMENTATION.')
-            markerAugmentation(config)
-        else:
-            logging.info('\nSKIPPING MARKER AUGMENTATION.')
+    if do_triangulation:
+        logging.info("\n\n=====================================================================")
+        logging.info('Running triangulation...')
+        logging.info("=====================================================================")
+        triangulation(config)
+    else:
+        logging.info("\n\n=====================================================================")
+        logging.info('Skipping triangulation.')
+        logging.info("=====================================================================")
         
-        # if do_opensimProcessing:
-        #     logging.info('\nRUNNING OPENSIM PROCESSING.')
-        #     opensimProcessing(config)
-        # else:
-        #     logging.info('\nSKIPPING OPENSIM PROCESSING.')
+    if do_filtering:
+        logging.info("\n\n=====================================================================")
+        logging.info('Running filtering...')
+        logging.info("=====================================================================")
+        filtering(config)
+    else:
+        logging.info("\n\n=====================================================================")
+        logging.info('Skipping filtering.')
+        logging.info("=====================================================================")
 
-        end = time.time()
-        elapsed = end-start 
-        logging.info(f'\nRUNNING ALL FUNCTIONS TOOK  {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.')
+    if do_markerAugmentation:
+        logging.info("\n\n=====================================================================")
+        logging.info('Running marker augmentation.')
+        logging.info("=====================================================================")
+        markerAugmentation(config)
+    else:
+        logging.info("\n\n=====================================================================")
+        logging.info('Skipping marker augmentation.')
+        logging.info("\n\n=====================================================================")
+    
+    # if do_opensimProcessing:
+    #     logging.info("\n\n=====================================================================")
+    #     logging.info('Running opensim processing.')
+    #     logging.info("=====================================================================")
+    #     opensimProcessing(config)
+    # else:
+    #     logging.info("\n\n=====================================================================")
+    #     logging.info('Skipping opensim processing.')
+    #     logging.info("=====================================================================")
+
+    end = time.time()
+    elapsed = end-start 
+    logging.info(f'\nRUNNING ALL FUNCTIONS TOOK  {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')

@@ -52,7 +52,7 @@ output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a lis
 
 
 [synchronization]
-display_sync_plots = true # true or false (lowercase)
+display_sync_plots = false # true or false (lowercase)
 keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify the keypoints to consider.
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
