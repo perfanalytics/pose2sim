@@ -258,7 +258,7 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.runAll()
 ```
 
-The batch processing structure requires a `Config.toml` file in each of the trial directories. Global parameters are given in the `Config.toml` file of the `BatchSession` folder. They can be altered for specific or `Trials` by uncommenting keys and their values in their respective `Config.toml` files.
+The batch processing structure requires a `Config.toml` file in each of the trial directories. Global parameters are given in the `Config.toml` file of the `BatchSession` folder. They can be altered for specific Trials by uncommenting keys and their values in their respective `Config.toml` files.
 
 Run Pose2Sim from the `BatchSession` folder if you want to batch process the whole session, or from a `Trial` folder if you want to process only a specific trial. 
 
@@ -319,6 +319,8 @@ Pose2Sim.poseEstimation()
 ### With MMPose *(coming soon)*:
 
 > Coming soon
+
+</br>
 
 ### With DeepLabCut:
 > If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut). In this case, Pose2Sim is used as an alternative to [AniPose](https://github.com/lambdaloop/anipose).

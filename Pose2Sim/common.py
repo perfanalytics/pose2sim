@@ -345,12 +345,16 @@ def sort_stringlist_by_last_number(string_list):
     Sort a list of strings based on the last number in the string.
     Works if other numbers in the string, if strings after number. Ignores alphabetical order.
 
-    Example: ['json1', 'js4on2.b', 'eypoints_0000003.json', 'ajson0', 'json10']
-    gives: ['ajson0', 'json1', 'js4on2.b', 'eypoints_0000003.json', 'json10']
+    Example: ['json1', 'zero', 'js4on2.b', 'aaaa', 'eypoints_0000003.json', 'ajson0', 'json10']
+    gives: ['ajson0', 'json1', 'js4on2.b', 'eypoints_0000003.json', 'json10', 'aaaa', 'zero']
     '''
-    
+
     def sort_by_last_number(s):
-        return int(re.findall(r'\d+', s)[-1])
+        numbers = re.findall(r'\d+', s)
+        if numbers:
+            return (False, int(numbers[-1]))
+        else:
+            return (True, s)
     
     return sorted(string_list, key=sort_by_last_number)
 
