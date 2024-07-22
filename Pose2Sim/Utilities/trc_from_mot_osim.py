@@ -7,18 +7,14 @@
     ## Build trc from mot and osim files            ##
     ##################################################
     
-    Build a trc file which stores all real and virtual markers 
+    Build a trc file which stores real and virtual markers 
     calculated from a .mot motion file and a .osim model file.
-    
-    Beware, it can be quite slow depending on the ccomplexity 
-    of the model and on the number of frames.
-    
-    Also, make sure that OpenSim is installed (e.g. via conda)
+    If no marker list is specified, all markers are included.
     
     Usage: 
-    from Pose2Sim.Utilities import trc_from_mot_osim; trc_from_mot_osim.trc_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_trc_file>')
+    from Pose2Sim.Utilities import trc_from_mot_osim; trc_from_mot_osim.trc_from_mot_osim_func(input_mot_file=r'<input_mot_file>', input_osim_file=r'<output_osim_file>', trc_output_file=r'<trc_output_file>', marker_list=['_rknee', 'r_hip'])
     python -m trc_from_mot_osim -m input_mot_file -o input_osim_file
-    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file -t output_trc_file
+    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file -t trc_output_file -l r_knee r_hip 
 '''
 
 
@@ -42,13 +38,15 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def get_marker_positions(motion_data, model, in_degrees=True):
+def get_marker_positions(motion_data, model, in_degrees=True, marker_list=[]):
     '''
     Get dataframe of marker positions
     
     INPUTS: 
     - motion_data: .mot file opened with osim.TimeSeriesTable
     - model: .osim file opened with osim.Model 
+    - in_degrees: True if the motion data is in degrees, False if in radians
+    - marker_list: list of marker names to include in the trc file. All if not specified
     
     OUTPUT:
     - marker_positions_pd: DataFrame of marker positions 
@@ -57,6 +55,11 @@ def get_marker_positions(motion_data, model, in_degrees=True):
     # Markerset
     marker_set = model.getMarkerSet()
     marker_set_names = [mk.getName() for mk in list(marker_set)]
+    if len(marker_list)>0:
+        marker_set_names = [marker for marker in marker_list if marker in marker_set_names]
+        absent_markers = [marker for marker in marker_list if marker not in marker_set_names]
+        if len(absent_markers)>0:
+            print(f'The following markers were not found in the model: {absent_markers}')
     marker_set_names_xyz = np.array([[m+'_x', m+'_y', m+'_z'] for m in marker_set_names]).flatten()
 
     # Data
@@ -85,34 +88,29 @@ def get_marker_positions(motion_data, model, in_degrees=True):
     marker_positions_pd.insert(0, 'time', times)
     marker_positions_pd.insert(0, 'frame', np.arange(len(times)))
     
-    return marker_positions_pd
+    return marker_positions_pd, marker_set_names
     
     
-def trc_from_mot_osim_func(*args):
+def trc_from_mot_osim_func(**args):
     '''
-    Build a trc file which stores all real and virtual markers 
+    Build a trc file which stores real and virtual markers 
     calculated from a .mot motion file and a .osim model file.
+    If no marker list is specified, all markers are included.
     
     Usage: 
-    from Pose2Sim.Utilities import trc_from_mot_osim; trc_from_mot_osim.trc_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<trc_output_file>')
+    from Pose2Sim.Utilities import trc_from_mot_osim; trc_from_mot_osim.trc_from_mot_osim_func(input_mot_file=r'<input_mot_file>', input_osim_file=r'<output_osim_file>', trc_output_file=r'<trc_output_file>', marker_list=['_rknee', 'r_hip'])
     python -m trc_from_mot_osim -m input_mot_file -o input_osim_file
-    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file -t trc_output_file
+    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file -t trc_output_file -l r_knee r_hip 
     '''
 
-    try:
-        motion_path = args[0]['input_mot_file'] # invoked with argparse
-        osim_path = args[0]['input_osim_file']
-        if args[0]['trc_output_file'] == None:
-            trc_path = motion_path.replace('.mot', '.trc')
-        else:
-            trc_path = args[0]['trc_output_file']
-    except:
-        motion_path = args[0] # invoked as a function
-        osim_path = args[1]
-        try:
-            trc_path = args[2]
-        except:
-            trc_path = motion_path.replace('.mot', '.trc')
+    motion_path = args.get('input_mot_file') # invoked with argparse
+    osim_path = args.get('input_osim_file')
+    trc_path = args.get('trc_output_file')
+    if trc_path == None:
+        trc_path = motion_path.replace('.mot', '.trc')
+    marker_list = args.get('marker_list')
+    if marker_list == None:
+        marker_list = []
 
     # Create dataframe with marker positions
     model = osim.Model(osim_path)
@@ -129,13 +127,10 @@ def trc_from_mot_osim_func(*args):
     else:
         in_degrees = False
     
-    marker_positions_pd = get_marker_positions(motion_data, model, in_degrees=in_degrees)
+    marker_positions_pd, marker_set_names = get_marker_positions(motion_data, model, in_degrees=in_degrees, marker_list=marker_list)
     
     # Trc header
     times = motion_data.getIndependentColumn()
-    marker_set = model.getMarkerSet()
-    marker_set_names = [mk.getName() for mk in list(marker_set)]
-    
     fps = str( int(1/ ((times[-1]-times[0]) / (len(times)-1))))
     nb_frames = str(len(times))
     nb_markers = str(len(marker_set_names))
@@ -170,6 +165,7 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--input_mot_file', required = True, help='input mot file')
     parser.add_argument('-o', '--input_osim_file', required = True, help='input osim file')
     parser.add_argument('-t', '--trc_output_file', required=False, help='trc output file')
+    parser.add_argument('-l', '--marker_list', required=False, nargs='+', default=[], help='list of markers to include in the trc file. All if not specified')
     args = vars(parser.parse_args())
     
-    trc_from_mot_osim_func(args)
+    trc_from_mot_osim_func(**args)
