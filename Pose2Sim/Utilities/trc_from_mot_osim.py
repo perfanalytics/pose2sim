@@ -86,7 +86,7 @@ def get_marker_positions(motion_data, model, in_degrees=True, marker_list=[]):
         marker_positions += [np.array([marker_set.get(mk_name).findLocationInFrame(state, model.getGround()).to_numpy() for mk_name in marker_set_names]).flatten()]
     marker_positions_pd = pd.DataFrame(marker_positions, columns=marker_set_names_xyz)
     marker_positions_pd.insert(0, 'time', times)
-    marker_positions_pd.insert(0, 'frame', np.arange(len(times)))
+    marker_positions_pd.insert(0, 'frame', np.arange(len(times))+1)
     
     return marker_positions_pd, marker_set_names
     
