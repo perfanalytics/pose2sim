@@ -141,11 +141,9 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
    pip install onnxruntime-gpu
    ```
 
->  Note:
-> Full Pose2Sim installation: 9 GB
-> Pose2Sim without GPU support: 5 GB
-> Pose estimation (torch and models): 4.0 GB
->  Without, it still takes about 5 GB (1GB for conda, Python and most libraries, and 4GB for pose estimation).
+>  Note on storage use:\
+<img src="Content/Storage.png" width="760">
+
 
   <!-- import torch; torch.cuda.is_available() 
       import onnxruntime as ort; ort.get_available_providers()-->
