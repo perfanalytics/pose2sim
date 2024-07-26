@@ -128,7 +128,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
        ```
 
 4. ***Optional:***\
-   *For faster inference, you can run on the GPU. Install pyTorch with CUDA and cuDNN support, and ONNX Runtime with GPU support (not available on MacOS). However, be aware that it takes an additional 4 Go on disk.*
+   *For faster inference, you can run on the GPU. Install pyTorch with CUDA and cuDNN support, and ONNX Runtime with GPU support (not available on MacOS). Be aware that it takes an additional 4 GB on disk.*
    
    Go to the [pyTorch website]( https://pytorch.org/get-started/locally), select the latest CUDA version that is also [available with ONNX runtime](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), and run the provided command.\
    For example, for Windows 11 (June 6th, 2024), CUDA 12.4 is not available for pyTorch, and CUDA 12.1 is not available for ONNX Runtime, so you should revert to CUDA 11.8:
@@ -141,6 +141,11 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
    pip install onnxruntime-gpu
    ```
 
+>  Note:
+> Full Pose2Sim installation: 9 GB
+> Pose2Sim without GPU support: 5 GB
+> Pose estimation (torch and models): 4.0 GB
+>  Without, it still takes about 5 GB (1GB for conda, Python and most libraries, and 4GB for pose estimation).
 
   <!-- import torch; torch.cuda.is_available() 
       import onnxruntime as ort; ort.get_available_providers()-->
