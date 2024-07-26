@@ -128,7 +128,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
        ```
 
 4. ***Optional:***\
-   *For faster inference, you can run on the GPU. Install pyTorch with CUDA and cuDNN support, and ONNX Runtime with GPU support (not available on MacOS).*
+   *For faster inference, you can run on the GPU. Install pyTorch with CUDA and cuDNN support, and ONNX Runtime with GPU support (not available on MacOS). However, be aware that it takes an additional 4 Go on disk.*
    
    Go to the [pyTorch website]( https://pytorch.org/get-started/locally), select the latest CUDA version that is also [available with ONNX runtime](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), and run the provided command.\
    For example, for Windows 11 (June 6th, 2024), CUDA 12.4 is not available for pyTorch, and CUDA 12.1 is not available for ONNX Runtime, so you should revert to CUDA 11.8:
