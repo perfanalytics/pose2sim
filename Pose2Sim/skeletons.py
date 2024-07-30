@@ -17,7 +17,7 @@ The definition and hierarchy of the following skeletons are available:
 N.B.: Not all face and hand keypoints are reported in the skeleton architecture, 
 since some are redundant for the orientation of some bodies.
 
-N.B.: The corresponding OpenSim model files are provided in the "Pose2Sim\Empty project" folder.
+N.B.: The corresponding OpenSim model files are provided in the "Pose2Sim/Empty project" folder.
 If you wish to use any other, you will need to adjust the markerset in the .osim model file, 
 as well as in the scaling and IK setup files.
 '''
@@ -372,8 +372,8 @@ COCO_133 = Node("CHip", id=None, children=[
     ]),
     Node("Neck", id=None, children=[
         Node("Nose", id=0, children=[
-            Node("right_eye", id=2),
-            Node("left_eye", id=1),
+            Node("REye", id=2),
+            Node("LEye", id=1),
         ]),
         Node("RShoulder", id=6, children=[
             Node("RElbow", id=8, children=[

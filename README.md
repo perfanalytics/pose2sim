@@ -130,23 +130,28 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
 4. ***Optional:***\
    *For faster inference, you can run on the GPU. Install pyTorch with CUDA and cuDNN support, and ONNX Runtime with GPU support (not available on MacOS). Be aware that it takes an additional 4 GB on disk.*
    
-   Go to the [pyTorch website]( https://pytorch.org/get-started/locally), select the latest CUDA version that is also [available with ONNX runtime](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), and run the provided command.\
-   For example, for Windows 11 (June 6th, 2024), CUDA 12.4 is not available for pyTorch, and CUDA 12.1 is not available for ONNX Runtime, so you should revert to CUDA 11.8:
+   Go to the [ONNXruntime requirement page](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), check the latest CUDA and cuDNN requirements. Then go to the [pyTorch website]( https://pytorch.org/get-started/locally) and install the latest version that satisfies these requirements (beware that torch 2.4 ships with cuDNN 9, while torch 2.3 installs cuDNN 8). For example:
+   ``` cmd
+    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
    ```
-   pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-   ```
+   
+   ***Note:*** issues reported with the default command. However, this has been tested and works:
+   `pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu118`
+
+
 
    Then install ONNX Runtime with GPU support:
    ```
    pip install onnxruntime-gpu
    ```
 
->  Note on storage use:\
-<img src="Content/Storage.png" width="760">
+  > Note on storage use:\
+     <img src="Content/Storage.png" width="760">
 
 
-  <!-- import torch; torch.cuda.is_available() 
-      import onnxruntime as ort; ort.get_available_providers()-->
+  <!-- import torch; print(torch.cuda.is_available()) 
+      import onnxruntime as ort; ort.get_available_providers()
+      print(f'torch version: {torch.__version__}, cuda version: {torch.version.cuda}, cudnn version: {torch.backends.cudnn.version()}, onnxruntime version: {ort.__version__}') -->
 
 </br>
 

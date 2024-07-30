@@ -160,9 +160,9 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_id=0, cam_i
     Compute the time-lagged cross-correlation between two pandas series.
 
     INPUTS:
-    - camx: pandas series. The first time series (coordinates of reference camera).
-    - camy: pandas series. The second time series (camera to compare).
-    - lag_range: int or list. The range of frames for which to compute cross-correlation.
+    - camx: pandas series. Coordinates of reference camera.
+    - camy: pandas series. Coordinates of camera to compare.
+    - lag_range: int or list. Range of frames for which to compute cross-correlation.
     - show: bool. If True, display the cross-correlation plot.
     - ref_cam_id: int. The reference camera id.
     - cam_id: int. The camera id to compare.

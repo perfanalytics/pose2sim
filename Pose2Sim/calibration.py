@@ -19,7 +19,7 @@ parameters may be wrong. Set show_corner_detection to 1 to verify.
 
 INPUTS: 
 - a calibration file in the 'calibration' folder (.qca.txt extension)
-- OR folders 'calibration\intrinsics' (populated with video or about 30 images) and 'calibration\extrinsics' (populated with video or one image)
+- OR folders 'calibration/intrinsics' (populated with video or about 30 images) and 'calibration/extrinsics' (populated with video or one image)
 - a Config.toml file in the 'User' folder
 
 OUTPUTS: 
