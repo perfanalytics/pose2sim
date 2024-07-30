@@ -64,6 +64,7 @@ jobs:
       - name: Test with pytest
         env: 
           PYTHONIOENCODING: utf-8
+          PYTHONUNBUFFERED: "1"
         run: |
           cd Pose2Sim/Utilities
           conda run -n pose2sim pytest -v tests.py --capture=sys
