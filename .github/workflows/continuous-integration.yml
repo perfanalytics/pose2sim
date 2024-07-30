@@ -65,6 +65,7 @@ jobs:
         env: 
           PYTHONIOENCODING: utf-8
           PYTHONUNBUFFERED: "1"
+          KMP_DUPLICATE_LIB_OK: TRUE
         run: |
           cd Pose2Sim/Utilities
           conda run -n pose2sim pytest -v tests.py --capture=sys
