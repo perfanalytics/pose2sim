@@ -7,7 +7,6 @@ on:
   push:
     branches: [ "main" ]
     paths-ignore:
-      - 'setup.cfg'
       - 'README.md'
       - 'Content/**'
   pull_request:
