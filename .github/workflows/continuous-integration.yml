@@ -66,4 +66,4 @@ jobs:
           PYTHONIOENCODING: utf-8
         run: |
           cd Pose2Sim/Utilities
-          conda run -n pose2sim pytest -v tests.py
+          conda run -n pose2sim pytest -v tests.py --capture=sys
