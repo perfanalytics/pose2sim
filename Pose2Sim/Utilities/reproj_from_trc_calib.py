@@ -312,7 +312,7 @@ def reproj_from_trc_calib_func(**args):
         pass
 
     # header preparation
-    num_frames = min(P_all.shape[1], len(data_trc))
+    num_frames = [len(data_trc) if P_all.shape[1]==1 else min(P_all.shape[1], len(data_trc))][0]
     columns_iterables = [['DavidPagnon'], ['person0'], bodyparts, ['x','y']]
     columns_h5 = pd.MultiIndex.from_product(columns_iterables, names=['scorer', 'individuals', 'bodyparts', 'coords'])
     rows_iterables = [[os.path.join(os.path.splitext(input_trc_file)[0],f'img_{i:03d}.png') for i in range(num_frames)]]
@@ -324,7 +324,7 @@ def reproj_from_trc_calib_func(**args):
     Q = data_trc_zup.iloc[:,2:]
     for frame in range(num_frames):
         coords = [[] for cam in range(len(P_all))]
-        P_all_frame = [P_all[cam][frame] for cam in range(len(P_all))]
+        P_all_frame = [P_all[cam][0] if P_all.shape[1]==1 else P_all[cam][frame] for cam in range(len(P_all))]
         for keypoint in range(num_bodyparts):
             q = np.append(Q.iloc[frame,3*keypoint:3*keypoint+3], 1)
             if undistort_points:
