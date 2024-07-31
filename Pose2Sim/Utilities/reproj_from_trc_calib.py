@@ -294,8 +294,9 @@ def reproj_from_trc_calib_func(**args):
     
     # Extract data from calibration file
     P_all = computeP(input_calib_file, undistort=undistort_points)
+    calib_params = retrieve_calib_params(input_calib_file)
+    calib_params_size = [calib_params['S'][i] for i in range(len(P_all))]
     if undistort_points:
-        calib_params = retrieve_calib_params(input_calib_file)
         calib_params_R_filt = [calib_params['R'][i] for i in range(len(P_all))]
         calib_params_T_filt = [calib_params['T'][i] for i in range(len(P_all))]
         calib_params_K_filt = [calib_params['K'][i] for i in range(len(P_all))]
@@ -335,7 +336,15 @@ def reproj_from_trc_calib_func(**args):
             [coords[cam].extend([x_all[cam], y_all[cam]]) for cam in range(len(P_all_frame))]
         for cam in range(len(P_all_frame)):
             data_proj[cam].iloc[frame,:] = coords[cam]
-        
+    
+    # Replace by nan when reprojection out of image
+    for cam in range(len(P_all_frame)):
+        x_above_size = data_proj[cam].iloc[:,::2] < calib_params_size[cam][0]
+        data_proj[cam].iloc[:, ::2] = data_proj[cam].iloc[:, ::2].where(x_above_size, np.nan)
+        y_above_size = data_proj[cam].iloc[:,1::2] < calib_params_size[cam][1]
+        data_proj[cam].iloc[:, 1::2] = data_proj[cam].iloc[:, 1::2].where(y_above_size, np.nan)
+
+
     # Save as h5 and csv if DeepLabCut format
     if deeplabcut_output:
         # to h5
