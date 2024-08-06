@@ -39,7 +39,6 @@ import logging
 from tqdm import tqdm
 import numpy as np
 import cv2
-import torch
 import onnxruntime as ort
 
 from rtmlib import PoseTracker, Body, Wholebody, BodyWithFeet, draw_skeleton
@@ -359,10 +358,15 @@ def rtm_estimator(config_dict):
             frame_rate = 60    
 
     # If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
-    if 'CUDAExecutionProvider' in ort.get_available_providers() and torch.cuda.is_available():
-        device = 'cuda'
-        backend = 'onnxruntime'
-        logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
+    if 'CUDAExecutionProvider' in ort.get_available_providers():
+        try:
+            import torch
+            if torch.cuda.is_available() == False:
+                device = 'cuda'
+                backend = 'onnxruntime'
+                logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
+        except:
+            pass
     elif 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
         device = 'mps'
         backend = 'onnxruntime'

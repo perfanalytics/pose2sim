@@ -408,4 +408,4 @@ if __name__ == '__main__':
     parser.add_argument('-O', '--output_file_root', required=False, help='output file root path, without extension')
     args = vars(parser.parse_args())
 
-    reproj_from_trc_calib_func(**args)
+    reproj_from_trc_calib_func(**args) 

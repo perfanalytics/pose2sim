@@ -1,4 +1,5 @@
 **/__pycache__/
+**/build/
 *.pyc
 logs.txt*
 **/*.log
