@@ -526,9 +526,9 @@ All keypoints can be taken into account, or a subset of them. The user can also 
 *N.B.:* Works best when:
 - only one participant is in the scene (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly)
 - the participant is at a roughly equal distance from all cameras
-- when the capture is at least 5 seconds long
+- the capture lasts at least 5 seconds long
 
-*N.B.:* Alternatively, use a flashlight, a clap, or a clear event to synchronize cameras. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors) or with their app (slightly less reliable).
+*N.B.:* Alternatively, synchronize cameras using a flashlight, a clap, or a clear event. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors), or with their app (slightly less reliable).
 
 
 </br>
