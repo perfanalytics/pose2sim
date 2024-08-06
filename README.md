@@ -128,7 +128,8 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
        ```
 
 4. ***Optional:***\
-   *For faster inference, you can run on the GPU. Install pyTorch with CUDA and cuDNN support, and ONNX Runtime with GPU support (not available on MacOS). Be aware that it takes an additional 4 GB on disk.*
+   *For faster inference, you can run on the GPU. Install pyTorch with CUDA and cuDNN support, and ONNX Runtime with GPU support (not available on MacOS).*\
+   Be aware that GPU support takes an additional 6 GB on disk. The full installation is then 10.75 GB instead of 4.75 GB.
    
    Go to the [ONNXruntime requirement page](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), check the latest CUDA and cuDNN requirements. Then go to the [pyTorch website]( https://pytorch.org/get-started/locally) and install the latest version that satisfies these requirements (beware that torch 2.4 ships with cuDNN 9, while torch 2.3 installs cuDNN 8). For example:
    ``` cmd
@@ -145,8 +146,10 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
    pip install onnxruntime-gpu
    ```
 
-  > Note on storage use:\
-     <img src="Content/Storage.png" width="760">
+> **Note on storage use:**\
+     [Marker augmentation](#marker-augmentation) does not necessarily yield better results, and it requires Tensorflow. You can save 1.3 GB on disk by uninstalling it: `pip uninstall tensorflow`.\
+     A minimal installation with carefully chosen pose models and without GPU support, Tensorflow, PyQt5 **would take less than 3 GB**.
+    <img src="Content/Storage.png" width="760">
 
 
   <!-- import torch; print(torch.cuda.is_available()) 
