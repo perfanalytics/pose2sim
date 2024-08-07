@@ -147,7 +147,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
    ```
 
 > **Note on storage use:**\
-     [Marker augmentation](#marker-augmentation) does not necessarily yield better results, and it requires Tensorflow. You can save 1.3 GB on disk by uninstalling it: `pip uninstall tensorflow`.\
+     A full installation takes up to 11 GB of storage spate. However, GPU support is not mandatory and takes about 6 GB. Moreover, [marker augmentation](#marker-augmentation) requires Tensorflow and does not necessarily yield better results. You can save an additional 1.3 GB by uninstalling it: `pip uninstall tensorflow`.\
      A minimal installation with carefully chosen pose models and without GPU support, Tensorflow, PyQt5 **would take less than 3 GB**.
     <img src="Content/Storage.png" width="760">
 
