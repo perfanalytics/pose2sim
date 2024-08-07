@@ -54,9 +54,9 @@ output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a lis
 [synchronization]
 display_sync_plots = true # true or false (lowercase)
 keypoints_to_consider = 'all' # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
-                           # ['RWrist', 'RElbow'] list of keypoint names if you want to specify the keypoints to consider.
+                           # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
-                           # [10.0, 2.0, 8.0, 11.0] list of times in seconds, one value per camera if you want to specify the approximate time of a clear vertical event by one person standing alone in the scene
+                           # [10.0, 2.0, 8.0, 11.0] list of times (seconds) if you want to specify the approximate time of a clear vertical event for each camera
 time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
 likelihood_threshold = 0.4 # Keypoints whose likelihood is below likelihood_threshold are filtered out
 filter_cutoff = 6 # time series are smoothed to get coherent time-lagged correlation
