@@ -360,7 +360,7 @@ def rtm_estimator(config_dict):
     try:
         import torch
         import onnxruntime as ort
-        if torch.cuda.is_available() == False and 'CUDAExecutionProvider' in ort.get_available_providers():
+        if torch.cuda.is_available() and 'CUDAExecutionProvider' in ort.get_available_providers():
             device = 'cuda'
             backend = 'onnxruntime'
             logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
