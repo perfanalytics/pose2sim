@@ -194,6 +194,7 @@ def calibration(config=None):
     
     end = time.time()
     logging.info(f'\nCalibration took {end-start:.2f} s.\n')
+    logging.shutdown()
 
 
 def poseEstimation(config=None):
@@ -240,6 +241,8 @@ def poseEstimation(config=None):
         elapsed = end - start 
         logging.info(f'\nPose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
     
+    logging.shutdown()
+    
 
 def synchronization(config=None):
     '''
@@ -283,8 +286,10 @@ def synchronization(config=None):
         end = time.time()
         elapsed = end-start 
         logging.info(f'\nSynchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
-    
-    
+
+    logging.shutdown()    
+
+
 def personAssociation(config=None):
     '''
     Tracking one or several persons of interest.
@@ -330,6 +335,8 @@ def personAssociation(config=None):
         end = time.time()
         elapsed = end-start 
         logging.info(f'\nAssociating persons took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
+
+    logging.shutdown()
     
     
 def triangulation(config=None):
@@ -376,7 +383,9 @@ def triangulation(config=None):
         end = time.time()
         elapsed = end-start 
         logging.info(f'\nTriangulation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
- 
+
+    logging.shutdown()
+    
     
 def filtering(config=None):
     '''
@@ -420,6 +429,8 @@ def filtering(config=None):
         
         logging.info('\n')
 
+    logging.shutdown()
+    
 
 def markerAugmentation(config=None):
     '''
@@ -463,6 +474,8 @@ def markerAugmentation(config=None):
         elapsed = end-start 
         logging.info(f'\nMarker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 
+    logging.shutdown()
+    
 
 def opensimProcessing(config=None):
     '''
@@ -518,6 +531,8 @@ def opensimProcessing(config=None):
     #     #     logging.info(f'Model scaling took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
     #     # else:
     #     #     logging.info(f'Inverse kinematics took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
+    
+    # logging.shutdown()
 
 
 def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_opensimProcessing=True):
@@ -624,3 +639,4 @@ def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchron
     end = time.time()
     elapsed = end-start 
     logging.info(f'\nRUNNING ALL FUNCTIONS TOOK  {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
+    logging.shutdown()
