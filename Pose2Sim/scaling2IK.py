@@ -203,13 +203,9 @@ def get_IK_Setup(config_dict):
 def perform_scaling(config_dict):
     # Get the directory of the current script
     current_dir = Path(__file__).parent
-    # Construct the relative path to the 'Geometry' directory
-    geometry_path = current_dir / 'OpenSim_Setup' / 'Geometry'
-
-    # Ensure that the path is passed as a string
+    # Construct the path to the 'Geometry' directory 
+    geometry_path = current_dir / 'OpenSim_Setup' / 
     geometry_path_str = str(geometry_path)
-
-    # Use the path in your code
     print(f"Geometry path: {geometry_path_str}")
     opensim.ModelVisualizer.addDirToGeometrySearchPaths(geometry_path_str)
 
