@@ -180,6 +180,8 @@ def sort_people(Q_kpt_old, Q_kpt):
     # Generate possible person correspondences across frames
     if len(Q_kpt_old) < len(Q_kpt):
         Q_kpt_old = np.concatenate((Q_kpt_old, [[0., 0., 0., 1.]]*(len(Q_kpt)-len(Q_kpt_old))))
+    if len(Q_kpt) < len(Q_kpt_old):
+        Q_kpt = np.concatenate((Q_kpt, [[0., 0., 0., 1.]]*(len(Q_kpt_old)-len(Q_kpt))))
     personsIDs_comb = sorted(list(it.product(range(len(Q_kpt_old)),range(len(Q_kpt)))))
     
     # Compute distance between persons from one frame to another
