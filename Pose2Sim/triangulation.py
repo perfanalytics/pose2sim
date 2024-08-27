@@ -92,6 +92,9 @@ def interpolate_zeros_nans(col, *args):
     # Interpolate nans
     mask = ~(np.isnan(col) | col.eq(0)) # true where nans or zeros
     idx_good = np.where(mask)[0]
+    if len(idx_good) <= 4:
+        return col
+        
     if 'kind' not in locals(): # 'linear', 'slinear', 'quadratic', 'cubic'
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind="linear", bounds_error=False)
     else:
