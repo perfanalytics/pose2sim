@@ -109,7 +109,7 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.triangulation(config_dict)
         Pose2Sim.filtering(config_dict)
         Pose2Sim.markerAugmentation(config_dict)
-        # Pose2Sim.kinematics(config_dict)
+        Pose2Sim.opensimProcessing(config_dict)
 
         config_dict.get("pose").update({"overwrite_pose":False})
         Pose2Sim.runAll(config_dict)
@@ -136,7 +136,7 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.triangulation(config_dict)
         Pose2Sim.filtering(config_dict)
         Pose2Sim.markerAugmentation(config_dict)
-        # Pose2Sim.kinematics(config_dict)
+        Pose2Sim.opensimProcessing(config_dict)
 
         config_dict.get("pose").update({"overwrite_pose":False})
         Pose2Sim.runAll(config_dict)
