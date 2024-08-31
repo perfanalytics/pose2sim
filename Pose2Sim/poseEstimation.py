@@ -348,13 +348,13 @@ def rtm_estimator(config_dict):
     video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
     frame_rate = config_dict.get('project').get('frame_rate')
     if frame_rate == 'auto': 
-        try:
-            cap = cv2.VideoCapture(video_files[0])
-            cap.read()
-            if cap.read()[0] == False:
-                raise
-        except:
-            frame_rate = 60    
+        cap = cv2.VideoCapture(video_files[0])
+        if not cap.isOpened():
+            raise FileNotFoundError(f'Error: Could not open {video_files[0]}. Check that the file exists.')
+        frame_rate = cap.get(cv2.CAP_PROP_FPS)
+        if frame_rate == 0:
+            frame_rate = 30
+            logging.warning(f'Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps.')
 
     # If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
     try:
