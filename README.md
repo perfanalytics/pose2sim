@@ -29,7 +29,7 @@ and lens distortions are better taken into account.\ -->
 
 **Pose2Sim** stands for "OpenPose to OpenSim", as it originally used *OpenPose* inputs (2D keypoints coordinates) from multiple videos and lead to an [OpenSim](https://opensim.stanford.edu/) result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose). OpenPose and other models are kept as legacy options. 
 
-If you can only use one single camera and don't mind losing some accuracy, please consider using [Sports2D](https://github.com/davidpagnon/Sports2D).
+For real-time analysis with a single camera, please consider **[Sports2D](https://github.com/davidpagnon/Sports2D)** (note that the motion must lie in the sagittal or frontal plane). 
 
 
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
