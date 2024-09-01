@@ -39,6 +39,7 @@ Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
 Pose2Sim.filtering()
 Pose2Sim.markerAugmentation()
+Pose2Sim.opensimProcessing()
 # Then run OpenSim (see Readme.md)
 '''
 
