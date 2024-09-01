@@ -74,6 +74,7 @@ class TestWorkflow(unittest.TestCase):
             - triangulation
             - filtering
             - marker augmentation
+            - OpenSim processing
             - run all
 
         N.B.: Calibration from scene dimensions is not tested, as it requires the 
