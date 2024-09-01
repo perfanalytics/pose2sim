@@ -363,7 +363,7 @@ def get_output_dir(config_dir, person_id):
     Returns:
         Path: The path where the output files should be stored.
     """
-    output_dir = config_dir / 'kinematics'  # Assuming 'kinematics' as the default output subdirectory
+    output_dir = config_dir / 'opensim'  # Assuming 'opensim' as the default output subdirectory
 
     # Append the person_id to the output directory if it's a multi-person setup
     if person_id != "SinglePerson":
