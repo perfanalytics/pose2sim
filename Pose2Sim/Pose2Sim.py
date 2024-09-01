@@ -468,15 +468,13 @@ def markerAugmentation(config=None):
 
 def opensimProcessing(config=None):
     '''
-    Process OpenSim tasks based on the provided configuration.
+    Performing OpenSim scaling and inverse kinematics.
+    Selected the 10% slowest frames from trc for scaling
+    Saved as .osim and .mot
 
-    The function handles OpenSim processing for a project. The `config` parameter can be:
-    - A dictionary containing project configuration.
-    - A string representing the directory path of a trial, participant, or session.
-    - None, in which case the current directory is used as the config directory.
-
-    config: dict or str or None, optional
-        The configuration data or path to the configuration directory.
+    config can be a dictionary,
+    or a the directory path of a trial, participant, or session,
+    or the function can be called without an argument, in which case it the config directory is the current one.
     '''
 
     from Pose2Sim.kinematics import opensimProcessing
