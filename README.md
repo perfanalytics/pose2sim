@@ -173,8 +173,12 @@ Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
 Pose2Sim.filtering()
 Pose2Sim.markerAugmentation()
+Pose2Sim.opensimProcessing()
 ```
 3D results are stored as .trc files in each trial folder in the `pose-3d` directory.
+
+OpenSim results are stored as scaled model .osim and .mot in each trial folder in the `opensim` directory.
+
 
 </br>
 
@@ -186,6 +190,7 @@ Pose2Sim.markerAugmentation()
   Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_opensimProcessing=True)
   ```
 - Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
+- If the results are not convincing, refer to Section [OpenSim-kinematics](#OpenSim-kinematics)  in the document.
 </br>
 
 
@@ -649,6 +654,16 @@ Pose2Sim.markerAugmentation()
 <img src="Content/OpenSim.JPG" width="380">
 
 </br>
+
+### If kinematics results are not convicing:
+
+> _***Explanation on choosing the best frames for scaling (L437-448):***_
+_**Explanation on choosing the best frames for scaling (L437-448):**_
+>
+> On difficult trials, some points are not well triangulated, which can lead to bad scaling. For example, if a point of the foot is very far from the rest of the body on some frames, scaling will consider that the foot is very large. Consequently, we need to scale only on the frames that are best triangulated. Now, how to find these best frames? 
+>
+> 
+> My reasoning was that the points of badly triangulated frames would go all over the place, and thus that their speeds would be fast. So I only selected the 10% slowest frames for scaling. I think that in addition, we should take the median scale factor for these frames, because we might have slow frames that are still bad. -> This last step has not been done.
 
 ### Command line
 Alternatively, you can use command-line tools:
