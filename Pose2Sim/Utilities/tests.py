@@ -15,12 +15,14 @@
             - triangulation
             - filtering
             - marker augmentation
+            - opensim processing
         - Multi-person:
             - synchronization
             - person association
             - triangulation
             - filtering
             - marker augmentation
+            - opensim processing
             
     - SINGLE TRIAL:
         - calibration
@@ -29,6 +31,7 @@
         - triangulation
         - filtering
         - marker augmentation
+        - opensim processing
 
     N.B.: 
     1. Calibration from scene dimensions is not tested, as it requires the 
