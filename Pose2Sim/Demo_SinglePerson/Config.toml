@@ -187,11 +187,9 @@ static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
 #            # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
 #            # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']
 opensim_bin_path = 'C:\OpenSim 4.4\bin'
-setup_dir = '\Pose2Sim\OpenSim_Setup'  # Absolute path is recommended
-LSTM = false  #If use augmented measurements then set it true
-load_trc_name = 'filtered'  # 'default' or 'filtered', if lstm = true, this line will be ignored instead using LSTM.trc
+use_augmentation = false  # If using augmented measurements then set it true
+load_trc_name = 'filtered'  # 'default' or 'filtered', if use_augmentation = true, this line will be ignored instead using __LSTM.trc
 IK_timeRange = [] #left empty to IK full range or eg.[0.5,1.0]
-output_dir = 'Demo_SinglePerson\opensim' # Directory where scaled model and IK results will be saved, use abosolute path
 
 
 

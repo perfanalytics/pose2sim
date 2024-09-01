@@ -39,6 +39,7 @@ Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
 Pose2Sim.filtering()
 Pose2Sim.markerAugmentation()
+Pose2Sim.opensimProcessing()
 # Then run OpenSim (see Readme.md)
 '''
 
@@ -465,31 +466,40 @@ def markerAugmentation(config=None):
         logging.info(f'\nMarker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 
 
-
-
 def opensimProcessing(config=None):
+    '''
+    Performing OpenSim scaling and inverse kinematics.
+    Selected the 10% slowest frames from trc for scaling
+    Saved as .osim and .mot
+
+    config can be a dictionary,
+    or a the directory path of a trial, participant, or session,
+    or the function can be called without an argument, in which case it the config directory is the current one.
+    '''
+
+    from Pose2Sim.kinematics import opensimProcessing
 
     # Read the configuration files
     level, config_dicts = read_config_files(config)
 
-    # Ensure that the config is correctly structured
+    # Ensure the configuration is properly structured
     if isinstance(config, dict):
         config_dict = config_dicts[0]
         if config_dict.get('project').get('project_dir') is None:
             raise ValueError('Please specify the project directory in config_dict:\n \
-                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
+                             config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
     setup_logging(session_dir)
 
-    ## Process each config dictionary
+    # Process each configuration dictionary
     for config_dict in config_dicts:
         start = time.time()
         currentDateAndTime = datetime.now()
         project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
         seq_name = os.path.basename(project_dir)
         frame_range = config_dict.get('project').get('frame_range')
-        frames = "all frames" if not frame_range else f"frames {frame_range[0]} to {frame_range[1]}"
+        frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
         logging.info("\n---------------------------------------------------------------------")
         logging.info(f"OpenSim processing for {seq_name}, for {frames}.")
@@ -498,13 +508,7 @@ def opensimProcessing(config=None):
         logging.info("---------------------------------------------------------------------\n")
 
         try:
-            logging.info("Starting scaling process...")
-            scaling2IK.perform_scaling(config_dict)
-            logging.info("Scaling completed successfully.")
-
-            logging.info("Starting inverse kinematics process...")
-            scaling2IK.perform_IK(config_dict)
-            logging.info("Inverse kinematics completed successfully.")
+            opensimProcessing(config_dict)
 
         except Exception as e:
             logging.error(f"Error during OpenSim processing: {e}")
@@ -513,7 +517,6 @@ def opensimProcessing(config=None):
         end = time.time()
         elapsed = end - start
         logging.info(f'\nOpenSim processing took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
-
 
 
 def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_opensimProcessing=True):
@@ -608,10 +611,14 @@ def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchron
         logging.info("\n\n=====================================================================")
 
     if do_opensimProcessing:
-        logging.info("Running OpenSim processing...")
-        scaling2IK(config)
+        logging.info("\n\n=====================================================================")
+        logging.info("Running OpenSim processing.")
+        logging.info("=====================================================================")
+        opensimProcessing(config)
     else:
-        logging.info("Skipping OpenSim processing.")
+        logging.info("\n\n=====================================================================")
+        logging.info('Skipping OpenSim processing.')
+        logging.info("\n\n=====================================================================")
 
     logging.info("Pose2Sim pipeline completed.")
     end = time.time()
