@@ -658,7 +658,6 @@ Pose2Sim.markerAugmentation()
 ### If kinematics results are not convicing:
 
 > _***Explanation on choosing the best frames for scaling (L437-448):***_
-_**Explanation on choosing the best frames for scaling (L437-448):**_
 >
 > On difficult trials, some points are not well triangulated, which can lead to bad scaling. For example, if a point of the foot is very far from the rest of the body on some frames, scaling will consider that the foot is very large. Consequently, we need to scale only on the frames that are best triangulated. Now, how to find these best frames? 
 >
