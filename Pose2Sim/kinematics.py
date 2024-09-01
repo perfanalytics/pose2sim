@@ -1,3 +1,29 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+
+'''
+###########################################################################
+## KINEMATICS PROCESSING                                                 ##
+###########################################################################
+
+Process kinematic data using OpenSim tools.
+
+This script performs scaling, inverse kinematics, and related processing
+on 3D motion capture data (TRC files). The scaling process adjusts the
+generic model to match the subject's physical dimensions, while inverse
+kinematics computes the joint angles based on the motion data.
+
+Set your parameters in Config.toml.
+
+INPUTS:
+- a directory containing TRC files
+- kinematic processing parameters in Config.toml
+
+OUTPUT:
+- scaled OpenSim model files (.osim)
+- joint angle data files (.mot)
+'''
 import os
 import sys
 from collections import defaultdict
@@ -9,6 +35,7 @@ import logging
 import opensim
 
 
+## FUNCTIONS
 def find_config_and_pose3d(project_dir):
     """
     Find configuration files and associated pose-3d directories in the project directory.
@@ -33,30 +60,55 @@ def find_config_and_pose3d(project_dir):
     return config_paths
 
 
-def process_all_groups(config_dict):
+def get_grouped_files(directory, pattern='*.trc'):
     """
-    Process all groups (single or multi-person) based on the configuration.
+    Group TRC files by person ID or treat them as single-person if no ID is found.
 
     Args:
-        config_dict (dict): The configuration dictionary containing project details.
+        directory (str): The directory containing TRC files.
+        pattern (str): The file pattern to search for.
+
+    Returns:
+        dict: A dictionary grouping TRC files by person ID.
     """
-    logging.info(f"Processing setup with config: {config_dict.get('project', {}).get('project_dir')}")
+    files = list(Path(directory).glob(pattern))
+    grouped_files = defaultdict(list)
 
-    # Group files by person_id (or treat as single-person)
-    pose3d_dir = Path(config_dict['project']['project_dir']).parent / 'pose-3d'
-    trc_groups = get_grouped_files(pose3d_dir)
+    for file in files:
+        parts = file.stem.split('_')
+        if len(parts) > 2 and 'P' in parts[2]:  # Multi-person file naming convention
+            person_id = parts[2]
+        else:
+            person_id = "SinglePerson"
+        grouped_files[person_id].append(file)
 
-    for person_id, trc_files in trc_groups.items():
-        # Determine if we are in a single or multi-person setup
-        logging.info(f"Processing {'single' if person_id == 'SinglePerson' else 'multi'}-person setup for {person_id}.")
+    return grouped_files
 
-        # Use load_trc to filter the TRC files based on the configuration
-        filtered_trc_files = load_trc(config_dict, trc_files)
 
-        # Perform scaling and inverse kinematics on the filtered TRC files
-        perform_scaling(config_dict, person_id, filtered_trc_files)
-        perform_inverse_kinematics(config_dict, person_id, filtered_trc_files)
+def process_all_groups(config_dict):
+    """
+       Process all groups (single or multi-person) based on the configuration.
 
+       Args:
+           config_dict (dict): The configuration dictionary containing project details.
+    """
+    logging.info("Processing all groups in the project.")
+    project_dir = config_dict.get('project', {}).get('project_dir')
+    config_and_pose3d_paths = find_config_and_pose3d(project_dir)
+
+    for config_path, pose3d_dir in config_and_pose3d_paths:
+        logging.info(f"Processing setup with config: {config_path}")
+
+        trc_groups = get_grouped_files(pose3d_dir)
+        trial_name = Path(pose3d_dir).parent.name  # Use the parent directory name as the trial name
+
+        for person_id, trc_files in trc_groups.items():
+            filtered_trc_files = load_trc(config_dict, trc_files)
+
+            # Ensure output directory includes the trial name
+            trial_output_dir = get_output_dir(Path(config_dict['project']['project_dir']).parent / trial_name, person_id)
+            perform_scaling(config_dict, person_id, filtered_trc_files, trial_output_dir)
+            perform_inverse_kinematics(config_dict, person_id, filtered_trc_files, trial_output_dir)
 
 def load_trc(config_dict, trc_files):
     """
@@ -128,31 +180,6 @@ def read_trc(trc_path):
     except Exception as e:
         logging.error(f"Error reading TRC file at {trc_path}: {e}")
         raise
-
-
-def get_grouped_files(directory, pattern='*.trc'):
-    """
-    Group TRC files by person ID or treat them as single-person if no ID is found.
-
-    Args:
-        directory (str): The directory containing TRC files.
-        pattern (str): The file pattern to search for.
-
-    Returns:
-        dict: A dictionary grouping TRC files by person ID.
-    """
-    files = list(Path(directory).glob(pattern))
-    grouped_files = defaultdict(list)
-
-    for file in files:
-        parts = file.stem.split('_')
-        if len(parts) > 2 and 'P' in parts[2]:  # Multi-person file naming convention
-            person_id = parts[2]
-        else:
-            person_id = "SinglePerson"
-        grouped_files[person_id].append(file)
-
-    return grouped_files
 
 
 def make_trc_with_Q(Q, header, trc_path):
@@ -351,7 +378,7 @@ def get_output_dir(config_dir, person_id):
     return output_dir
 
 
-def perform_scaling(config_dict, person_id, trc_files):
+def perform_scaling(config_dict, person_id, trc_files, output_dir):
     """
     Perform scaling on the TRC files according to the OpenSim configuration.
 
@@ -359,6 +386,7 @@ def perform_scaling(config_dict, person_id, trc_files):
         config_dict (dict): The configuration dictionary.
         person_id (str): The person identifier (e.g., 'SinglePerson', 'P1').
         trc_files (list): List of TRC files to be processed.
+        output_dir (Path): The directory where the output files should be saved.
     """
     geometry_path = Path(get_OpenSim_Setup()) / 'Geometry'
     geometry_path_str = str(geometry_path)
@@ -383,7 +411,6 @@ def perform_scaling(config_dict, person_id, trc_files):
             else:
                 raise ValueError(f"Unexpected person_id format: '{person_id}'")
 
-        output_dir = get_output_dir(Path(config_dict['project']['project_dir']).parent, person_id)
         logging.debug(f"Performing scaling. Output directory: {output_dir}")
 
         pose_model = get_Model(config_dict)
@@ -427,8 +454,7 @@ def perform_scaling(config_dict, person_id, trc_files):
         logging.error(f"Error during scaling for {person_id}: {e}")
         raise
 
-
-def perform_inverse_kinematics(config_dict, person_id, trc_files):
+def perform_inverse_kinematics(config_dict, person_id, trc_files, output_dir):
     """
     Perform inverse kinematics on the TRC files according to the OpenSim configuration.
 
@@ -436,9 +462,9 @@ def perform_inverse_kinematics(config_dict, person_id, trc_files):
         config_dict (dict): The configuration dictionary.
         person_id (str): The person identifier (e.g., 'SinglePerson', 'P1').
         trc_files (list): List of TRC files to be processed.
+        output_dir (Path): The directory where the output files should be saved.
     """
     try:
-        output_dir = get_output_dir(Path(config_dict['project']['project_dir']).parent, person_id)
         logging.debug(f"Performing inverse kinematics. Output directory: {output_dir}")
 
         for trc_file in trc_files:
@@ -477,22 +503,6 @@ def perform_inverse_kinematics(config_dict, person_id, trc_files):
     except Exception as e:
         logging.error(f"Error during IK for {person_id}: {e}")
         raise
-
-
-def process_all_groups(config_dict):
-    project_dir = config_dict.get('project', {}).get('project_dir')
-    config_and_pose3d_paths = find_config_and_pose3d(project_dir)
-
-    for config_path, pose3d_dir in config_and_pose3d_paths:
-        logging.info(f"Processing setup with config: {config_path}")
-
-        trc_groups = get_grouped_files(pose3d_dir)
-
-        for person_id, trc_files in trc_groups.items():
-            filtered_trc_files = load_trc(config_dict, trc_files)
-
-            perform_scaling(config_dict, person_id, filtered_trc_files)
-            perform_inverse_kinematics(config_dict, person_id, filtered_trc_files)
 
 
 def opensimProcessing(config_dict):
