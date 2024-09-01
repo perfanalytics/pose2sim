@@ -478,6 +478,8 @@ def opensimProcessing(config=None):
         The configuration data or path to the configuration directory.
     '''
 
+    from Pose2Sim.kinematics import opensimProcessing
+
     # Read the configuration files
     level, config_dicts = read_config_files(config)
 
