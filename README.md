@@ -135,12 +135,6 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
    ``` cmd
     pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
    ```
-   
-   ***Note:*** issues reported with the default command. However, this has been tested and works:
-   `pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu118`
-
-
-
    Then install ONNX Runtime with GPU support:
    ```
    pip install onnxruntime-gpu
