@@ -44,12 +44,12 @@
         import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>')
         OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_coordinates', gait_direction='-X', plot=True, save_output=True, output_file='gaitevents.txt')
         OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='height_coordinates', up_direction='Y', height_threshold=6, right_toe_marker='RBigToe', left_toe_marker='LBigToe')
-        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_velocity', gait_direction='-Z', forward_velocity_threshold=1.5, right_toe_marker='RBigToe', left_toe_marker='LBigToe')
+        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_velocity', gait_direction='-Z', forward_velocity_threshold=1, right_toe_marker='RBigToe', left_toe_marker='LBigToe')
         
         python -m trc_gaitevents -i input_trc_file
         OR python -m trc_gaitevents -i input_trc_file --method forward_coordinates --gait_direction=-X --plot True --save_output True --output_file gaitevents.txt
         OR python -m trc_gaitevents -i input_trc_file --method height_coordinates --up_direction=Y --height_threshold 6 --right_toe_marker RBigToe --left_toe_marker LBigToe
-        OR python -m trc_gaitevents -i input_trc_file --method forward_velocity --gait_direction=-Z --forward_velocity_threshold 1.5 --right_toe_marker RBigToe --left_toe_marker LBigToe
+        OR python -m trc_gaitevents -i input_trc_file --method forward_velocity --gait_direction=-Z --forward_velocity_threshold 1 --right_toe_marker RBigToe --left_toe_marker LBigToe
 '''
 
 
@@ -121,82 +121,59 @@ def read_trc(trc_path):
     return Q_coords, frames_col, time_col, markers, header
 
 
+def first_step_side(Ron, Lon):
+    '''
+    Get first step side
+
+    INPUTS:
+    - Ron: list of right on times or frames
+    - Lon: list of left on times or frames
+
+    OUTPUTS:
+    - first_side: 'R' if right first, 'L' if left first
+    '''
+
+    if Ron[0]<Lon[0]: 
+        first_side = 'R'
+    else:
+        first_side = 'L'
+
+    return first_side
+
+
 def clean_gait_events(gait_events):
     '''
-    Clean gait events
-    Remove consecutive on-off pairs if they are not alternating
+    Clean gait events to only keep right-left alternating and full contact pairs
 
+    INPUTS:
+    - gait_events: tuple of lists (Ron, Lon, Roff, Loff)
+
+    OUTPUTS:
+    - Ron, Lon, Roff, Loff = cleaned gait events
     '''
 
     Ron, Lon, Roff, Loff = gait_events
 
-    # Remove on-off pairs if they are not alternating
-
-
-    # If first event is off, remove it
+    # Remove incomplete pairs at the start and end
     if Ron[0]>Roff[0]: Roff.pop(0)
     if Lon[0]>Loff[0]: Loff.pop(0)
 
-    # If last event is on, remove it
     if Ron[-1]>Roff[-1]: Ron.pop(-1)
     if Lon[-1]>Loff[-1]: Lon.pop(-1)
 
-    # If there are several left onsets in a row between right onsets, remove all but the first one. Idem for the other side
-    merged_on = sorted(Ron + Lon)
-    merged_clean_on = [merged_on[0]]
-    # Keep alternating elements
-    for i in range(1, len(merged_on)):
-        if (merged_on[i] in Ron and merged_clean_on[-1] not in Ron) or \
-                (merged_on[i] in Lon and merged_clean_on[-1] not in Lon):
-            merged_clean_on.append(merged_on[i])
-    # Remove consecutive elements at the start if they are from the same list
-    while len(merged_clean_on) > 1 \
-            and (merged_clean_on[0] in Ron \
-            and merged_clean_on[1] in Ron or merged_clean_on[0] in Lon \
-            and merged_clean_on[1] in Lon):
-        merged_clean_on.pop(0)
-    # Remove consecutive elements at the end if they are from the same list
-    while len(merged_clean_on) > 1 \
-            and (merged_clean_on[-1] in Ron \
-            and merged_clean_on[-2] in Ron or merged_clean_on[-1] in Lon \
-            and merged_clean_on[-2] in Lon):
-        merged_clean_on.pop(-1)
-    # Make sure the output lists are in the right order
-    if merged_clean_on[0] in Ron:
-        Ron = merged_clean_on[::2]
-        Lon = merged_clean_on[1::2]
-    else:
-        Ron = merged_clean_on[1::2]
-        Lon = merged_clean_on[::2]
-
-    # If there are several left off in a row between right off, remove all but the last one. Idem for the other side
-    merged_off = sorted(Roff + Loff, reverse=True)
-    merged_clean_off = [merged_off[0]]
-    # Keep alternating elements
-    for i in range(1, len(merged_off)):
-        if (merged_off[i] in Roff and merged_clean_off[-1] not in Roff) or \
-                (merged_off[i] in Loff and merged_clean_off[-1] not in Loff):
-            merged_clean_off.append(merged_off[i])
-    # Remove consecutive elements at the start if they are from the same list
-    while len(merged_clean_off) > 1 \
-            and (merged_clean_off[0] in Roff \
-            and merged_clean_off[1] in Roff or merged_clean_off[0] in Loff \
-            and merged_clean_off[1] in Loff):
-        merged_clean_off.pop(0)
-    # Remove consecutive elements at the end if they are from the same list
-    while len(merged_clean_off) > 1 \
-            and (merged_clean_off[-1] in Roff \
-            and merged_clean_off[-2] in Roff or merged_clean_off[-1] in Loff \
-            and merged_clean_off[-2] in Loff):
-        merged_clean_off.pop(-1)
-    # Make sure the output lists are in the right order
-    if merged_clean_off[0] in Roff:
-        Roff = merged_clean_off[::2][::-1]
-        Loff = merged_clean_off[1::2][::-1]
-    else:
-        Roff = merged_clean_off[1::2][::-1]
-        Loff = merged_clean_off[::2][::-1]
-
+    # Remove lonely pairs that are not alternating with the other side at the beginning or the end
+    if Ron[0]<Lon[0]: # Right first
+        while Ron[1]<Lon[0]: Ron.pop(0)
+        while Lon[-2]>Ron[-1]: Lon.pop(-1)
+        while Roff[1]<Loff[0]: Roff.pop(0)
+        while Loff[-2]>Roff[-1]: Loff.pop(-1)
+        
+    else: # Left first
+        while Lon[1]<Ron[0]: Lon.pop(0)
+        while Ron[-2]>Lon[-1]: Ron.pop(-1)
+        while Loff[1]<Roff[0]: Loff.pop(0)
+        while Roff[-2]>Loff[-1]: Roff.pop(-1)
+        
 
     return Ron, Lon, Roff, Loff
 
@@ -240,38 +217,38 @@ def gait_events_fwd_coords(trc_path, gait_direction, markers=['RHeel', 'RBigToe'
 
     # Find gait events
     max_r_heel_hip_proj = sign*(RHeel_df-Hip_df)
-    frame_Ron = signal.find_peaks(max_r_heel_hip_proj, prominence=peak_prominence)[0]
+    frame_Ron = signal.find_peaks(max_r_heel_hip_proj, prominence=peak_prominence)[0].tolist()
     t_Ron = time_col[frame_Ron].tolist()
 
     max_l_heel_hip_proj = sign*(LHeel_df-Hip_df)
-    frame_Lon = signal.find_peaks(max_l_heel_hip_proj, prominence=peak_prominence)[0]
+    frame_Lon = signal.find_peaks(max_l_heel_hip_proj, prominence=peak_prominence)[0].tolist()
     t_Lon = time_col[frame_Lon].tolist()
 
     max_r_hip_toe_proj = sign*(Hip_df-RBigToe_df)
-    frame_Roff = signal.find_peaks(max_r_hip_toe_proj, prominence=peak_prominence)[0]
+    frame_Roff = signal.find_peaks(max_r_hip_toe_proj, prominence=peak_prominence)[0].tolist()
     t_Roff = time_col[frame_Roff].tolist()
 
     max_l_hip_toe_proj = sign*(Hip_df-LBigToe_df)
-    frame_Loff = signal.find_peaks(max_l_hip_toe_proj, prominence=peak_prominence)[0]
+    frame_Loff = signal.find_peaks(max_l_hip_toe_proj, prominence=peak_prominence)[0].tolist()
     t_Loff = time_col[frame_Loff].tolist()
 
-    # # Clean gait events
-    # frame_Ron, frame_Lon, frame_Roff, frame_Loff = clean_gait_events((frame_Ron, frame_Lon, frame_Roff, frame_Loff))
-    # t_Ron, t_Lon, t_Roff, t_Loff = clean_gait_events((t_Ron, t_Lon, t_Roff, t_Loff))
+    # Clean gait events
+    frame_Ron, frame_Lon, frame_Roff, frame_Loff = clean_gait_events((frame_Ron, frame_Lon, frame_Roff, frame_Loff))
+    t_Ron, t_Lon, t_Roff, t_Loff = clean_gait_events((t_Ron, t_Lon, t_Roff, t_Loff))
 
     # Plot
     if plot:
-        plt.plot(time_col, max_r_heel_hip_proj, label='Right on')
-        plt.plot(time_col[frame_Ron], max_r_heel_hip_proj[frame_Ron], '+')
+        plt.plot(time_col, max_r_heel_hip_proj, 'C0', label='Right on')
+        plt.plot(time_col[frame_Ron], max_r_heel_hip_proj[frame_Ron], 'g+')
 
-        plt.plot(time_col, max_l_heel_hip_proj, label='Left on')
-        plt.plot(time_col[frame_Lon], max_l_heel_hip_proj[frame_Lon], '+')
+        plt.plot(time_col, max_l_heel_hip_proj, 'C1', label='Left on')
+        plt.plot(time_col[frame_Lon], max_l_heel_hip_proj[frame_Lon], 'g+')
 
-        plt.plot(time_col, max_r_hip_toe_proj, label='Right off')
-        plt.plot(time_col[frame_Roff], max_r_hip_toe_proj[frame_Roff], '+')
+        plt.plot(time_col, max_r_hip_toe_proj, 'C0', label='Right off')
+        plt.plot(time_col[frame_Roff], max_r_hip_toe_proj[frame_Roff], 'r+')
 
-        plt.plot(time_col, max_l_hip_toe_proj, label='Left off')
-        plt.plot(time_col[frame_Loff], max_l_hip_toe_proj[frame_Loff], '+')
+        plt.plot(time_col, max_l_hip_toe_proj, 'C1', label='Left off')
+        plt.plot(time_col[frame_Loff], max_l_hip_toe_proj[frame_Loff], 'r+')
 
         plt.title('Gait events')
         plt.xlabel('Time (s)')
@@ -352,19 +329,19 @@ def gait_events_height_coords(trc_path, up_direction, height_threshold=6, filter
     if 0 in frame_Lon: frame_Lon.remove(0)
     t_Lon, t_Loff = time_col[frame_Lon].tolist(), time_col[frame_Loff].tolist()
 
-    # # Clean gait events
-    # frame_Ron, frame_Lon, frame_Roff, frame_Loff = clean_gait_events((frame_Ron, frame_Lon, frame_Roff, frame_Loff))
-    # t_Ron, t_Lon, t_Roff, t_Loff = clean_gait_events((t_Ron, t_Lon, t_Roff, t_Loff))
+    # Clean gait events
+    frame_Ron, frame_Lon, frame_Roff, frame_Loff = clean_gait_events((frame_Ron, frame_Lon, frame_Roff, frame_Loff))
+    t_Ron, t_Lon, t_Roff, t_Loff = clean_gait_events((t_Ron, t_Lon, t_Roff, t_Loff))
 
     # Plot
     if plot:
-        plt.plot(time_col[1:], Rfoot_height_filtered, label='Right foot height filtered')
-        plt.plot(time_col[1:][frame_Ron], Rfoot_height_filtered[frame_Ron], '+')
-        plt.plot(time_col[1:][frame_Roff], Rfoot_height_filtered[frame_Roff], '+')
+        plt.plot(time_col[1:], Rfoot_height_filtered, 'C0', label='Right foot height filtered')
+        plt.plot(time_col[1:][frame_Ron], Rfoot_height_filtered[frame_Ron], 'g+')
+        plt.plot(time_col[1:][frame_Roff], Rfoot_height_filtered[frame_Roff], 'r+')
 
-        plt.plot(time_col[1:], Lfoot_height_filtered, label='Left foot height filtered')
-        plt.plot(time_col[1:][frame_Lon], Lfoot_height_filtered[frame_Lon], '+')
-        plt.plot(time_col[1:][frame_Loff], Lfoot_height_filtered[frame_Loff], '+')
+        plt.plot(time_col[1:], Lfoot_height_filtered, 'C1', label='Left foot height filtered')
+        plt.plot(time_col[1:][frame_Lon], Lfoot_height_filtered[frame_Lon], 'g+')
+        plt.plot(time_col[1:][frame_Loff], Lfoot_height_filtered[frame_Loff], 'r+')
 
         plt.title('Gait events')
         plt.xlabel('Time (s)')
@@ -386,7 +363,7 @@ def gait_events_height_coords(trc_path, up_direction, height_threshold=6, filter
     return (t_Ron, t_Lon, t_Roff, t_Loff), (frame_Ron, frame_Lon, frame_Roff, frame_Loff)
 
 
-def gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=1.5, filter_fs=10, markers=['RBigToe', 'LBigToe'], plot=True):
+def gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=1, filter_fs=10, markers=['RBigToe', 'LBigToe'], plot=True):
     '''
     Determine gait on and off with "forward_velocity" method
     
@@ -451,19 +428,19 @@ def gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=1.5
     if 0 in frame_Lon: frame_Lon.remove(0)
     t_Lon, t_Loff = time_col[frame_Lon].tolist(), time_col[frame_Loff].tolist()
 
-    # # Clean gait events
-    # frame_Ron, frame_Lon, frame_Roff, frame_Loff = clean_gait_events((frame_Ron, frame_Lon, frame_Roff, frame_Loff))
-    # t_Ron, t_Lon, t_Roff, t_Loff = clean_gait_events((t_Ron, t_Lon, t_Roff, t_Loff))
+    # Clean gait events
+    frame_Ron, frame_Lon, frame_Roff, frame_Loff = clean_gait_events((frame_Ron, frame_Lon, frame_Roff, frame_Loff))
+    t_Ron, t_Lon, t_Roff, t_Loff = clean_gait_events((t_Ron, t_Lon, t_Roff, t_Loff))
 
     # Plot
     if plot:
-        plt.plot(time_col[1:], Rfoot_speed_filtered, label='Right foot speed filtered')
-        plt.plot(time_col[1:][frame_Ron], Rfoot_speed_filtered[frame_Ron], '+')
-        plt.plot(time_col[1:][frame_Roff], Rfoot_speed_filtered[frame_Roff], '+')
+        plt.plot(time_col[1:], Rfoot_speed_filtered, 'C0', label='Right foot speed filtered')
+        plt.plot(time_col[1:][frame_Ron], Rfoot_speed_filtered[frame_Ron], 'g+')
+        plt.plot(time_col[1:][frame_Roff], Rfoot_speed_filtered[frame_Roff], 'r+')
 
-        plt.plot(time_col[1:], Lfoot_speed_filtered, label='Left foot speed filtered')
-        plt.plot(time_col[1:][frame_Lon], Lfoot_speed_filtered[frame_Lon], '+')
-        plt.plot(time_col[1:][frame_Loff], Lfoot_speed_filtered[frame_Loff], '+')
+        plt.plot(time_col[1:], Lfoot_speed_filtered, 'C1', label='Left foot speed filtered')
+        plt.plot(time_col[1:][frame_Lon], Lfoot_speed_filtered[frame_Lon], 'g+')
+        plt.plot(time_col[1:][frame_Loff], Lfoot_speed_filtered[frame_Loff], 'r+')
 
         plt.title('Gait events')
         plt.xlabel('Time (s)')
@@ -524,12 +501,12 @@ def trc_gaitevents_func(**args):
         import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>')
         OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_coordinates', gait_direction='-X', plot=True, save_output=True, output_file='gaitevents.txt')
         OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='height_coordinates', up_direction='Y', height_threshold=6, right_toe_marker='RBigToe', left_toe_marker='LBigToe')
-        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_velocity', gait_direction='-Z', forward_velocity_threshold=1.5, right_toe_marker='RBigToe', left_toe_marker='LBigToe')
+        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_velocity', gait_direction='-Z', forward_velocity_threshold=1, right_toe_marker='RBigToe', left_toe_marker='LBigToe')
         
         python -m trc_gaitevents -i input_trc_file
         OR python -m trc_gaitevents -i input_trc_file --method forward_coordinates --gait_direction=-X --plot True --save_output True --output_file gaitevents.txt
         OR python -m trc_gaitevents -i input_trc_file --method height_coordinates --up_direction=Y --height_threshold 6 --right_toe_marker RBigToe --left_toe_marker LBigToe
-        OR python -m trc_gaitevents -i input_trc_file --method forward_velocity --gait_direction=-Z --forward_velocity_threshold 1.5 --right_toe_marker RBigToe --left_toe_marker LBigToe
+        OR python -m trc_gaitevents -i input_trc_file --method forward_velocity --gait_direction=-Z --forward_velocity_threshold 1 --right_toe_marker RBigToe --left_toe_marker LBigToe
     '''
 
     # Retrieve arguments
@@ -554,7 +531,7 @@ def trc_gaitevents_func(**args):
     if gait_direction == None: gait_direction = '+X'
     if up_direction == None: up_direction = '+Y'
     if method == None: method = 'height_coordinates'
-    if forward_velocity_threshold == None: forward_velocity_threshold = 1.5
+    if forward_velocity_threshold == None: forward_velocity_threshold = 1
     if height_threshold == None: height_threshold = 6
     if sacrum_marker == None: sacrum_marker = 'Hip'
     if right_heel_marker == None: right_heel_marker = 'RHeel'
@@ -574,6 +551,9 @@ def trc_gaitevents_func(**args):
         up_direction = +1, up_direction
     elif len(up_direction)==2:
         up_direction = int(up_direction[0]+'1'), up_direction
+
+    if method not in ['forward_coordinates', 'height_coordinates', 'forward_velocity']:
+        raise ValueError('Method must be "forward_coordinates", "height_coordinates", or "forward_velocity"')
 
     # Retrieve gait events
     if method == 'forward_coordinates':
