@@ -44,8 +44,7 @@
 # mode = 'balanced' # 'lightweight', 'balanced', 'performance'
 # det_frequency = 100 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
                   # # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
-# tracking = true # Gives consistent person ID across frames. Slightly slower but might facilitate synchronization if other people are in the background
-# overwrite_pose = true # set to false if you don't want to recalculate pose estimation when it has already been done
+# # overwrite_pose = true # set to false if you don't want to recalculate pose estimation when it has already been done
 # display_detection = true
 # save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 # output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
@@ -141,7 +140,7 @@
 # reproj_error_threshold_triangulation = 15 # px
 # likelihood_threshold_triangulation= 0.3
 # min_cameras_for_triangulation = 2
-# interpolation = 'cubic' #linear, slinear, quadratic, cubic, or none
+# interpolation = 'linear' #linear, slinear, quadratic, cubic, or none
                         # # 'none' if you don't want to interpolate missing points
 # interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
 # show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
