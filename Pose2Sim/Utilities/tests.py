@@ -129,17 +129,19 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("synchronization").update({"display_sync_plots":False})
         config_dict['filtering']['display_figures'] = False
 
+        # Step by step
         Pose2Sim.calibration(config_dict)
         Pose2Sim.poseEstimation(config_dict)
-        Pose2Sim.synchronization(config_dict)
+        # Pose2Sim.synchronization(config_dict) # No synchronization for multi-person for now
         Pose2Sim.personAssociation(config_dict)
         Pose2Sim.triangulation(config_dict)
         Pose2Sim.filtering(config_dict)
         Pose2Sim.markerAugmentation(config_dict)
         # Pose2Sim.kinematics(config_dict)
 
+        # Run all
         config_dict.get("pose").update({"overwrite_pose":False})
-        Pose2Sim.runAll(config_dict)
+        Pose2Sim.runAll(config_dict, do_synchronization=False)
 
 
         ####################
@@ -149,7 +151,7 @@ class TestWorkflow(unittest.TestCase):
         project_dir = '../Demo_Batch'
         os.chdir(project_dir)
 
-        Pose2Sim.runAll()
+        Pose2Sim.runAll(do_synchronization=False)
 
 
 if __name__ == '__main__':

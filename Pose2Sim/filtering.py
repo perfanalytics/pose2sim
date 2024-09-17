@@ -319,7 +319,7 @@ def median_filter_1d(config_dict, frame_rate, col):
     return col_filtered
 
 
-def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names):
+def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0):
     '''
     Displays filtered and unfiltered data for comparison
 
@@ -334,6 +334,7 @@ def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names):
     '''
 
     pw = plotWindow()
+    pw.MainWindow.setWindowTitle('Person '+ str(person_id) + ' coordinates')
     for id, keypoint in enumerate(keypoints_names):
         f = plt.figure()
         
@@ -472,7 +473,7 @@ def filter_all(config_dict):
     trc_f_out = [f'{os.path.basename(t).split(".")[0]}_filt_{filter_type}.trc' for t in trc_path_in]
     trc_path_out = [os.path.join(pose3d_dir, t) for t in trc_f_out]
     
-    for t_in, t_out in zip(trc_path_in, trc_path_out):
+    for person_id, t_in, t_out in enumerate(zip(trc_path_in, trc_path_out)):
         # Read trc header
         with open(t_in, 'r') as trc_file:
             header = [next(trc_file) for line in range(5)]
@@ -489,7 +490,7 @@ def filter_all(config_dict):
         if display_figures:
             # Retrieve keypoints
             keypoints_names = pd.read_csv(t_in, sep="\t", skiprows=3, nrows=0).columns[2::3].to_numpy()
-            display_figures_fun(Q_coord, Q_filt, time_col, keypoints_names)
+            display_figures_fun(Q_coord, Q_filt, time_col, keypoints_names, person_id)
 
         # Reconstruct trc file with filtered coordinates
         with open(t_out, 'w') as trc_o:

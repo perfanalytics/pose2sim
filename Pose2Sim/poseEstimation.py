@@ -127,14 +127,13 @@ def sort_people_rtmlib(pose_tracker, keypoints, scores):
     return sorted_keypoints, sorted_scores
 
 
-def process_video(video_path, pose_tracker, tracking, output_format, save_video, save_images, display_detection, frame_range):
+def process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range):
     '''
     Estimate pose from a video file
     
     INPUTS:
     - video_path: str. Path to the input video file
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
-    - tracking: bool. Whether to give consistent person ID across frames
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
@@ -186,10 +185,6 @@ def process_video(video_path, pose_tracker, tracking, output_format, save_video,
                 # Perform pose estimation on the frame
                 keypoints, scores = pose_tracker(frame)
 
-                # Reorder keypoints, scores
-                if tracking:
-                    keypoints, scores = sort_people_rtmlib(pose_tracker, keypoints, scores)
-
                 # Save to json
                 if 'openpose' in output_format:
                     json_file_path = os.path.join(json_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.json')
@@ -225,7 +220,7 @@ def process_video(video_path, pose_tracker, tracking, output_format, save_video,
         cv2.destroyAllWindows()
 
 
-def process_images(image_folder_path, vid_img_extension, pose_tracker, tracking, output_format, fps, save_video, save_images, display_detection, frame_range):
+def process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, fps, save_video, save_images, display_detection, frame_range):
     '''
     Estimate pose estimation from a folder of images
     
@@ -233,7 +228,6 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, tracking,
     - image_folder_path: str. Path to the input image folder
     - vid_img_extension: str. Extension of the image files
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
-    - tracking: bool. Whether to give consistent person ID across frames
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
@@ -275,17 +269,6 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, tracking,
             
             # Perform pose estimation on the image
             keypoints, scores = pose_tracker(frame)
-
-            # Reorder keypoints, scores
-            if tracking:
-                max_id = max(pose_tracker.track_ids_last_frame)
-                num_frames, num_points, num_coordinates = keypoints.shape
-                keypoints_filled = np.zeros((max_id+1, num_points, num_coordinates))
-                scores_filled = np.zeros((max_id+1, num_points))
-                keypoints_filled[pose_tracker.track_ids_last_frame] = keypoints
-                scores_filled[pose_tracker.track_ids_last_frame] = scores
-                keypoints = keypoints_filled
-                scores = scores_filled            
             
             # Extract frame number from the filename
             if 'openpose' in output_format:
@@ -361,9 +344,7 @@ def rtm_estimator(config_dict):
     save_images = True if 'to_images' in config_dict['pose']['save_video'] else False
     display_detection = config_dict['pose']['display_detection']
     overwrite_pose = config_dict['pose']['overwrite_pose']
-
     det_frequency = config_dict['pose']['det_frequency']
-    tracking = config_dict['pose']['tracking']
 
     # Determine frame rate
     video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
@@ -407,9 +388,6 @@ def rtm_estimator(config_dict):
         logging.info(f'Inference run on every single frame.')
     else:
         raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
-    
-    if tracking:
-        logging.info(f'Pose estimation will attempt to give consistent person IDs across frames.\n')
 
     # Select the appropriate model based on the model_type
     if pose_model.upper() == 'HALPE_26':
@@ -433,7 +411,7 @@ def rtm_estimator(config_dict):
         mode=mode,
         backend=backend,
         device=device,
-        tracking=tracking,
+        tracking=False,
         to_openpose=False)
 
 
@@ -454,7 +432,7 @@ def rtm_estimator(config_dict):
             logging.info(f'Found video files with extension {vid_img_extension}.')
             for video_path in video_files:
                 pose_tracker.reset()
-                process_video(video_path, pose_tracker, tracking, output_format, save_video, save_images, display_detection, frame_range)
+                process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range)
 
         else:
             # Process image folders
@@ -463,4 +441,4 @@ def rtm_estimator(config_dict):
             for image_folder in image_folders:
                 pose_tracker.reset()
                 image_folder_path = os.path.join(video_dir, image_folder)
-                process_images(image_folder_path, vid_img_extension, pose_tracker, tracking, output_format, frame_rate, save_video, save_images, display_detection, frame_range)
+                process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, frame_rate, save_video, save_images, display_detection, frame_range)

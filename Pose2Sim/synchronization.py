@@ -177,11 +177,6 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_id=0, cam_i
     if isinstance(lag_range, int):
         lag_range = [-lag_range, lag_range]
 
-    import hashlib
-    print(repr(list(camx)), repr(list(camy)))
-    hashlib.md5(pd.util.hash_pandas_object(camx).values).hexdigest()
-    hashlib.md5(pd.util.hash_pandas_object(camy).values).hexdigest()
-
     pearson_r = [camx.corr(camy.shift(lag)) for lag in range(lag_range[0], lag_range[1])]
     offset = int(np.floor(len(pearson_r)/2)-np.argmax(pearson_r))
     if not np.isnan(pearson_r).all():

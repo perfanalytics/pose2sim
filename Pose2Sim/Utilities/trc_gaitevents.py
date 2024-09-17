@@ -8,6 +8,10 @@
     ##################################################
     
     Determine gait on and off from a TRC file of point coordinates.
+    
+    N.B.: Could implement the methods listed there in the future. 
+          Please feel free to make a pull-request or keep me informed if you do so!
+
     Three available methods, each of them with their own pros and cons: 
 
     - "forward_coordinates": 

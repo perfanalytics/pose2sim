@@ -152,7 +152,7 @@ make_c3d = false # save triangulated data in c3d format in addition to trc
 
 [filtering]
 type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
-display_figures = false # true or false (lowercase) # fails when run multiple times https://github.com/superjax/plotWindow/issues/7
+display_figures = true # true or false (lowercase) 
 make_c3d = false # also save triangulated data in c3d format
 
    [filtering.butterworth]
