@@ -82,7 +82,9 @@ def convert_json2pandas(json_files, likelihood_threshold=0.6):
     for j_p in json_files:
         with open(j_p) as j_f:
             try:
-                json_data = json.load(j_f)['people'][0]['pose_keypoints_2d']
+                json_data = json.load(j_f)['people']
+                max_confidence_person = max(json_data, key=lambda p: np.mean(p['pose_keypoints_2d'][2::3]))
+                json_data = max_confidence_person['pose_keypoints_2d']
                 # remove points with low confidence
                 json_data = np.array([[json_data[3*i],json_data[3*i+1],json_data[3*i+2]] if json_data[3*i+2]>likelihood_threshold else [0.,0.,0.] for i in range(nb_coord)]).ravel().tolist()
             except:
