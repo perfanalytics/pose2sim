@@ -22,9 +22,9 @@ import sys
 import matplotlib as mpl
 mpl.use('qt5agg')
 mpl.rc('figure', max_open_warning=0)
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="c3d")
 
@@ -481,10 +481,10 @@ class plotWindow():
     '''
 
     def __init__(self, parent=None):
-        self.app = QApplication(sys.argv)
+        self.app = QApplication.instance()
         if not self.app:
             self.app = QApplication(sys.argv)
-        self.MainWindow.__init__()
+        self.MainWindow = QMainWindow()
         self.MainWindow.setWindowTitle("Multitabs figure")
         self.canvases = []
         self.figure_handles = []
