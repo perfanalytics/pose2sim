@@ -473,7 +473,7 @@ def filter_all(config_dict):
     trc_f_out = [f'{os.path.basename(t).split(".")[0]}_filt_{filter_type}.trc' for t in trc_path_in]
     trc_path_out = [os.path.join(pose3d_dir, t) for t in trc_f_out]
     
-    for person_id, t_in, t_out in enumerate(zip(trc_path_in, trc_path_out)):
+    for person_id, (t_in, t_out) in enumerate(zip(trc_path_in, trc_path_out)):
         # Read trc header
         with open(t_in, 'r') as trc_file:
             header = [next(trc_file) for line in range(5)]
