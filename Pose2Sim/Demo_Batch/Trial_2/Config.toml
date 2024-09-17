@@ -19,8 +19,8 @@
 
 [project]
 multi_person = true # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
-participant_height = [1.72, 1.40] # m # float if single person, list of float if multi-person (same order as the Static trials) # Only used for marker augmentation
-participant_mass = [70.0, 63.5] # kg # Only used for marker augmentation and scaling
+participant_height = [1.72, 1.40, 1.86] # m # float if single person, list of float if multi-person (same order as the Static trials) # Only used for marker augmentation
+participant_mass = [70.0, 63.5, 88.0] # kg # Only used for marker augmentation and scaling
 
 # frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
 # frame_range = [] # For example [10,300], or [] for all frames. 
@@ -181,11 +181,14 @@ keypoints_to_consider = 'all' # 'all' if all points should be considered, for ex
 
 
 # [opensim]
-# static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
-# #            # If this Config.toml file is at the Trial level, set to true or false (lowercase);
-# #            # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
-# #            # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']
-# opensim_bin_path = 'C:\OpenSim 4.4\bin'
+#static_trial = ['S00_P00_Participant/S00_P00_T00_StaticTrial']
+#            # If this Config.toml file is at the Trial level, set to true or false (lowercase);
+#            # At the Participant level, specify the name of the static trial folder name, e.g. ['S00_P00_T00_StaticTrial'];
+#            # At the Session level, add participant subdirectory, e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P01_Participant/S00_P00_T00_StaticTrial']
+#opensim_bin_path = 'C:\OpenSim 4.4\bin'
+#use_augmentation = false  # If using augmented measurements then set it true
+#load_trc_name = 'filtered'  # 'default' or 'filtered', if use_augmentation = true, this line will be ignored instead using __LSTM.trc
+#IK_timeRange = [] #left empty to IK full range or eg.[0.5,1.0]
 
 
 

@@ -15,12 +15,14 @@
             - triangulation
             - filtering
             - marker augmentation
+            - opensim processing
         - Multi-person:
             - synchronization
             - person association
             - triangulation
             - filtering
             - marker augmentation
+            - opensim processing
             
     - SINGLE TRIAL:
         - calibration
@@ -29,6 +31,7 @@
         - triangulation
         - filtering
         - marker augmentation
+        - opensim processing
 
     N.B.: 
     1. Calibration from scene dimensions is not tested, as it requires the 
@@ -74,6 +77,7 @@ class TestWorkflow(unittest.TestCase):
             - triangulation
             - filtering
             - marker augmentation
+            - OpenSim processing
             - run all
 
         N.B.: Calibration from scene dimensions is not tested, as it requires the 
@@ -109,7 +113,7 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.triangulation(config_dict)
         Pose2Sim.filtering(config_dict)
         Pose2Sim.markerAugmentation(config_dict)
-        # Pose2Sim.kinematics(config_dict)
+        Pose2Sim.opensimProcessing(config_dict)
 
         config_dict.get("pose").update({"overwrite_pose":False})
         Pose2Sim.runAll(config_dict)
@@ -137,7 +141,7 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.triangulation(config_dict)
         Pose2Sim.filtering(config_dict)
         Pose2Sim.markerAugmentation(config_dict)
-        # Pose2Sim.kinematics(config_dict)
+        Pose2Sim.opensimProcessing(config_dict)
 
         # Run all
         config_dict.get("pose").update({"overwrite_pose":False})
