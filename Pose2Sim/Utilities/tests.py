@@ -7,31 +7,49 @@
     ## Pose2Sim tests                     ##
     ########################################
     
-    - BATCH SESSION:
-        - Calibration conversion from .qca.txt
-        - Single person:
-            - synchronization
-            - person association
-            - triangulation
-            - filtering
-            - marker augmentation
-            - opensim processing
-        - Multi-person:
-            - synchronization
-            - person association
-            - triangulation
-            - filtering
-            - marker augmentation
-            - opensim processing
-            
-    - SINGLE TRIAL:
-        - calibration
+    - SINGLE PERSON:
+        - calibration conversion from .qca.txt
+        - pose estimation
         - synchronization
         - person association
         - triangulation
         - filtering
         - marker augmentation
-        - opensim processing
+        - opensim scaling and inverse kinematics
+        
+        - run all
+
+    - MULTI PERSON:
+        - calibration conversion from .qca.txt
+        - pose estimation
+        - NO synchronization
+        - person association
+        - triangulation
+        - filtering
+        - marker augmentation
+        - opensim scaling and inverse kinematics
+
+        - run all
+
+    - BATCH SESSION, RUN ALL:
+        - Calibration conversion from .qca.txt
+        - Single person:
+            - pose estimation
+            - NO synchronization
+            - person association
+            - triangulation
+            - filtering
+            - marker augmentation
+            - opensim scaling and inverse kinematics
+        - Multi-person:
+            - pose estimation
+            - NO synchronization
+            - person association
+            - triangulation
+            - filtering
+            - marker augmentation
+            - opensim scaling and inverse kinematics
+            
 
     N.B.: 
     1. Calibration from scene dimensions is not tested, as it requires the 
@@ -77,13 +95,12 @@ class TestWorkflow(unittest.TestCase):
             - triangulation
             - filtering
             - marker augmentation
-            - OpenSim processing
+            - opensim scaling and inverse kinematics
             - run all
 
         N.B.: Calibration from scene dimensions is not tested, as it requires the 
         user to click points on the image. 
         Not all possible configuration parameters are extensively tested.
-        Scaling and inverse kinematics are not tested yet.
         
         Usage: 
         from Pose2Sim import tests; tests.test_workflow()
@@ -103,7 +120,6 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("pose").update({"mode":'lightweight'})
         config_dict.get("pose").update({"display_detection":False})
         config_dict.get("synchronization").update({"display_sync_plots":False})
-        # config_dict['triangulation']['reorder_trc'] = False
         config_dict['filtering']['display_figures'] = False
 
         Pose2Sim.calibration(config_dict)
@@ -113,7 +129,7 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.triangulation(config_dict)
         Pose2Sim.filtering(config_dict)
         Pose2Sim.markerAugmentation(config_dict)
-        Pose2Sim.opensimProcessing(config_dict)
+        Pose2Sim.kinematics(config_dict)
 
         config_dict.get("pose").update({"overwrite_pose":False})
         Pose2Sim.runAll(config_dict)
@@ -141,7 +157,7 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.triangulation(config_dict)
         Pose2Sim.filtering(config_dict)
         Pose2Sim.markerAugmentation(config_dict)
-        Pose2Sim.opensimProcessing(config_dict)
+        Pose2Sim.kinematics(config_dict)
 
         # Run all
         config_dict.get("pose").update({"overwrite_pose":False})

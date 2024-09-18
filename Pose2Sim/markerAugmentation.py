@@ -36,7 +36,7 @@ from Pose2Sim.common import convert_to_c3d, natural_sort_key
 ## AUTHORSHIP INFORMATION
 __author__ = "Antoine Falisse, adapted by HunMin Kim and David Pagnon"
 __copyright__ = "Copyright 2022, OpenCap"
-__credits__ = ["Antoine Falisse", "HunMin Kim"]
+__credits__ = ["Antoine Falisse", "HunMin Kim", "David Pagnon"]
 __license__ = "Apache-2.0 License"
 __version__ = "0.9.4"
 __maintainer__ = "David Pagnon"

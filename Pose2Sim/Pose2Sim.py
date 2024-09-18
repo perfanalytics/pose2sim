@@ -39,7 +39,7 @@ Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
 Pose2Sim.filtering()
 Pose2Sim.markerAugmentation()
-Pose2Sim.opensimProcessing()
+Pose2Sim.kinematics()
 # Then run OpenSim (see Readme.md)
 '''
 
@@ -158,7 +158,6 @@ def read_config_files(config):
     return level, config_dicts
 
 
-
 def calibration(config=None):
     '''
     Cameras calibration from checkerboards or from qualisys files.
@@ -192,7 +191,11 @@ def calibration(config=None):
     logging.info("---------------------------------------------------------------------\n")
     start = time.time()
 
-    calibrate_cams_all(config_dict)
+    try:
+        calibrate_cams_all(config_dict)
+    except Exception as e:
+        logging.error(f"Error during calibration: {e}")
+        return
 
     end = time.time()
     logging.info(f'\nCalibration took {end-start:.2f} s.\n')
@@ -236,7 +239,11 @@ def poseEstimation(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        rtm_estimator(config_dict)
+        try:
+            rtm_estimator(config_dict)
+        except Exception as e:
+            logging.error(f"Error during pose estimation: {e}")
+            continue
 
         end = time.time()
         elapsed = end - start
@@ -280,7 +287,11 @@ def synchronization(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        synchronize_cams_all(config_dict)
+        try:
+            synchronize_cams_all(config_dict)
+        except Exception as e:
+            logging.error(f"Error during synchronization: {e}")
+            continue
 
         end = time.time()
         elapsed = end-start
@@ -327,7 +338,11 @@ def personAssociation(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        track_2d_all(config_dict)
+        try:
+            track_2d_all(config_dict)
+        except Exception as e:
+            logging.error(f"Error during person association: {e}")
+            continue
 
         end = time.time()
         elapsed = end-start
@@ -373,7 +388,11 @@ def triangulation(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        triangulate_all(config_dict)
+        try:
+            triangulate_all(config_dict)
+        except Exception as e:
+            logging.error(f"Error during triangulation: {e}")
+            continue
 
         end = time.time()
         elapsed = end-start
@@ -418,7 +437,11 @@ def filtering(config=None):
         logging.info(f"Project directory: {project_dir}\n")
         logging.info("---------------------------------------------------------------------\n")
 
-        filter_all(config_dict)
+        try:
+            filter_all(config_dict)
+        except Exception as e:
+            logging.error(f"Error during filtering: {e}")
+            continue
 
         logging.info('\n')
 
@@ -459,31 +482,32 @@ def markerAugmentation(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        augmentTRC(config_dict)
+        try:
+            augmentTRC(config_dict)
+        except Exception as e:
+            logging.error(f"Error during marker augmentation: {e}")
+            continue
 
         end = time.time()
         elapsed = end-start
         logging.info(f'\nMarker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 
 
-def opensimProcessing(config=None):
+def kinematics(config=None):
     '''
     Performing OpenSim scaling and inverse kinematics.
-    Selected the 10% slowest frames from trc for scaling
-    Saved as .osim and .mot
+    Select the 10% slowest frames from trc for scaling
+    Save scaled model as .osim and output motion as .mot
 
     config can be a dictionary,
     or a the directory path of a trial, participant, or session,
     or the function can be called without an argument, in which case it the config directory is the current one.
     '''
 
-    from Pose2Sim.kinematics import opensimProcessing
-
-    # Read the configuration files
+    from Pose2Sim.kinematics import kinematics
     level, config_dicts = read_config_files(config)
 
-    # Ensure the configuration is properly structured
-    if isinstance(config, dict):
+    if type(config) == dict:
         config_dict = config_dicts[0]
         if config_dict.get('project').get('project_dir') is None:
             raise ValueError('Please specify the project directory in config_dict:\n \
@@ -502,24 +526,23 @@ def opensimProcessing(config=None):
         frames = ["all frames" if frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"][0]
 
         logging.info("\n---------------------------------------------------------------------")
-        logging.info(f"OpenSim processing for {seq_name}, for {frames}.")
+        logging.info(f"OpenSim scaling and inverse kinematics for {seq_name}, for {frames}.")
         logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
         try:
-            opensimProcessing(config_dict)
-
+            kinematics(config_dict)
         except Exception as e:
             logging.error(f"Error during OpenSim processing: {e}")
             continue
 
         end = time.time()
         elapsed = end - start
-        logging.info(f'\nOpenSim processing took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
+        logging.info(f'\nOpenSim scaling and inverse kinematics took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 
 
-def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_opensimProcessing=True):
+def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_kinematics=True):
     '''
     Run all functions at once. Beware that Synchronization, personAssociation, and markerAugmentation are not always necessary,
     and may even lead to worse results. Think carefully before running all.
@@ -610,11 +633,11 @@ def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchron
         logging.info('Skipping marker augmentation.')
         logging.info("\n\n=====================================================================")
 
-    if do_opensimProcessing:
+    if do_kinematics:
         logging.info("\n\n=====================================================================")
         logging.info("Running OpenSim processing.")
         logging.info("=====================================================================")
-        opensimProcessing(config)
+        kinematics(config)
     else:
         logging.info("\n\n=====================================================================")
         logging.info('Skipping OpenSim processing.')

@@ -735,7 +735,6 @@ def triangulate_all(config_dict):
     multi_person = config_dict.get('project').get('multi_person')
     pose_model = config_dict.get('pose').get('pose_model')
     frame_range = config_dict.get('project').get('frame_range')
-    reorder_trc = config_dict.get('triangulation').get('reorder_trc')
     likelihood_threshold = config_dict.get('triangulation').get('likelihood_threshold_triangulation')
     interpolation_kind = config_dict.get('triangulation').get('interpolation')
     interp_gap_smaller_than = config_dict.get('triangulation').get('interp_if_gap_smaller_than')
@@ -977,21 +976,21 @@ def triangulate_all(config_dict):
     if make_c3d:
         c3d_paths = [convert_to_c3d(t) for t in trc_paths]
         
-    # Reorder TRC files
-    if multi_person and reorder_trc and len(trc_paths)>1:
-        trc_id = retrieve_right_trc_order(trc_paths)
-        [os.rename(t, t+'.old') for t in trc_paths]
-        [os.rename(t+'.old', trc_paths[i]) for i, t in zip(trc_id,trc_paths)]
-        if make_c3d:
-            [os.rename(c, c+'.old') for c in c3d_paths]
-            [os.rename(c+'.old', c3d_paths[i]) for i, c in zip(trc_id,c3d_paths)]
-        error_tot = [error_tot[i] for i in trc_id]
-        nb_cams_excluded_tot = [nb_cams_excluded_tot[i] for i in trc_id]
-        cam_excluded_count = [cam_excluded_count[i] for i in trc_id]
-        interp_frames = [interp_frames[i] for i in trc_id]
-        non_interp_frames = [non_interp_frames[i] for i in trc_id]
+    # # Reorder TRC files
+    # if multi_person and reorder_trc and len(trc_paths)>1:
+    #     trc_id = retrieve_right_trc_order(trc_paths)
+    #     [os.rename(t, t+'.old') for t in trc_paths]
+    #     [os.rename(t+'.old', trc_paths[i]) for i, t in zip(trc_id,trc_paths)]
+    #     if make_c3d:
+    #         [os.rename(c, c+'.old') for c in c3d_paths]
+    #         [os.rename(c+'.old', c3d_paths[i]) for i, c in zip(trc_id,c3d_paths)]
+    #     error_tot = [error_tot[i] for i in trc_id]
+    #     nb_cams_excluded_tot = [nb_cams_excluded_tot[i] for i in trc_id]
+    #     cam_excluded_count = [cam_excluded_count[i] for i in trc_id]
+    #     interp_frames = [interp_frames[i] for i in trc_id]
+    #     non_interp_frames = [non_interp_frames[i] for i in trc_id]
         
-        logging.info('\nThe trc and c3d files have been renamed to match the order of the static sequences.')
+    #     logging.info('\nThe trc and c3d files have been renamed to match the order of the static sequences.')
 
 
     # Recap message

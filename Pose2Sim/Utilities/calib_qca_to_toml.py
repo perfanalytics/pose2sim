@@ -39,9 +39,9 @@ __status__ = "Development"
 
 ## FUNCTIONS
 def natural_sort_key(s):
-    """
+    '''
     Key for natural sorting of strings containing numbers.
-    """
+    '''
     return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', s)]
 
 
