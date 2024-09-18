@@ -64,32 +64,53 @@ __status__ = "Development"
 
 
 # FUNCTIONS
-def convert_json2pandas(json_files, likelihood_threshold=0.6):
+def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[]):
     '''
     Convert a list of JSON files to a pandas DataFrame.
+    Only takes one person in the JSON file.
 
     INPUTS:
     - json_files: list of str. Paths of the the JSON files.
     - likelihood_threshold: float. Drop values if confidence is below likelihood_threshold.
-    - frame_range: select files within frame_range.
+    - keypoints_ids: list of int. Indices of the keypoints to extract.
 
     OUTPUTS:
     - df_json_coords: dataframe. Extracted coordinates in a pandas dataframe.
     '''
 
-    nb_coord = 25 # int(len(json_data)/3)
+    nb_coords = len(keypoints_ids)
     json_coords = []
     for j_p in json_files:
         with open(j_p) as j_f:
             try:
-                json_data = json.load(j_f)['people']
-                max_confidence_person = max(json_data, key=lambda p: np.mean(p['pose_keypoints_2d'][2::3]))
-                json_data = max_confidence_person['pose_keypoints_2d']
+                json_data_all = json.load(j_f)['people']
+                
+                # # previous approach takes person #0
+                # json_data = json_data_all[0]
+                # json_data = np.array([json_data['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
+                
+                # # approach based on largest mean confidence does not work if person in background is better detected
+                # p_conf = [np.mean(np.array([p['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])[:, 2])
+                #         if 'pose_keypoints_2d' in p else 0
+                #         for p in json_data_all]
+                # max_confidence_person = json_data_all[np.argmax(p_conf)]
+                # json_data = np.array([max_confidence_person['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
+
+                # latest approach: uses person with largest bounding box
+                bbox_area = [
+                            (keypoints[:, 0].max() - keypoints[:, 0].min()) * (keypoints[:, 1].max() - keypoints[:, 1].min())
+                            if 'pose_keypoints_2d' in p else 0
+                            for p in json_data_all
+                            for keypoints in [np.array([p['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])]
+                            ]
+                max_area_person = json_data_all[np.argmax(bbox_area)]
+                json_data = np.array([max_area_person['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
+                
                 # remove points with low confidence
-                json_data = np.array([[json_data[3*i],json_data[3*i+1],json_data[3*i+2]] if json_data[3*i+2]>likelihood_threshold else [0.,0.,0.] for i in range(nb_coord)]).ravel().tolist()
+                json_data = np.array([j if j[2]>likelihood_threshold else [np.nan, np.nan, np.nan] for j in json_data]).ravel().tolist()
             except:
                 # print(f'No person found in {os.path.basename(json_dir)}, frame {i}')
-                json_data = [np.nan] * 25*3
+                json_data = [np.nan] * nb_coords*3
         json_coords.append(json_data)
     df_json_coords = pd.DataFrame(json_coords)
 
@@ -157,7 +178,7 @@ def interpolate_zeros_nans(col, kind):
         return col
 
 
-def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_id=0, cam_id=1):
+def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_name='0', cam_name='1'):
     '''
     Compute the time-lagged cross-correlation between two pandas series.
 
@@ -166,8 +187,8 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_id=0, cam_i
     - camy: pandas series. Coordinates of camera to compare.
     - lag_range: int or list. Range of frames for which to compute cross-correlation.
     - show: bool. If True, display the cross-correlation plot.
-    - ref_cam_id: int. The reference camera id.
-    - cam_id: int. The camera id to compare.
+    - ref_cam_name: str. The name of the reference camera.
+    - cam_name: str. The name of the camera to compare with.
 
     OUTPUTS:
     - offset: int. The time offset for which the correlation is highest.
@@ -185,8 +206,8 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_id=0, cam_i
         if show:
             f, ax = plt.subplots(2,1)
             # speed
-            camx.plot(ax=ax[0], label = f'Reference: camera #{ref_cam_id}')
-            camy.plot(ax=ax[0], label = f'Compared: camera #{cam_id}')
+            camx.plot(ax=ax[0], label = f'Reference: {ref_cam_name}')
+            camy.plot(ax=ax[0], label = f'Compared: {cam_name}')
             ax[0].set(xlabel='Frame', ylabel='Speed (px/frame)')
             ax[0].legend()
             # time lagged cross-correlation
@@ -303,6 +324,7 @@ def synchronize_cams_all(config_dict):
     nb_frames_per_cam = [len(fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json')) for json_dir in json_dirs]
     cam_nb = len(json_dirs)
     cam_list = list(range(cam_nb))
+    cam_names = [os.path.basename(j_dir).split('_')[0] for j_dir in json_dirs]
     
     # frame range selection
     f_range = [[0, min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
@@ -342,26 +364,22 @@ def synchronize_cams_all(config_dict):
         raise ValueError(f'No json files found within the specified frame range ({frame_range}) at the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
     
     for i in range(cam_nb):
-        df_coords.append(convert_json2pandas(json_files_range[i], likelihood_threshold=likelihood_threshold))
+        df_coords.append(convert_json2pandas(json_files_range[i], likelihood_threshold=likelihood_threshold, keypoints_ids=keypoints_ids))
         df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
         if keypoints_to_consider == 'right':
-            kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k.startswith('R') or k.startswith('right')]
-            kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
-            df_coords[i] = df_coords[i][kpt_indices]
+            kpt_indices = [i for i in range(len(keypoints_ids)) if keypoints_names[i].startswith('R') or keypoints_names[i].startswith('right')]
         elif keypoints_to_consider == 'left':
-            kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k.startswith('L') or k.startswith('left')]
-            kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
-            df_coords[i] = df_coords[i][kpt_indices]
+            kpt_indices = [i for i in range(len(keypoints_ids)) if keypoints_names[i].startswith('L') or keypoints_names[i].startswith('left')]
         elif isinstance(keypoints_to_consider, list):
-            kpt_indices = [i for i,k in zip(keypoints_ids,keypoints_names) if k in keypoints_to_consider]
-            kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
-            df_coords[i] = df_coords[i][kpt_indices]
+            kpt_indices = [i for i in range(len(keypoints_ids)) if keypoints_names[i] in keypoints_to_consider]
         elif keypoints_to_consider == 'all':
-            pass
+            kpt_indices = [i for i in range(len(keypoints_ids))]
         else:
             raise ValueError('keypoints_to_consider should be "all", "right", "left", or a list of keypoint names.\n\
                             If you specified keypoints, make sure that they exist in your pose_model.')
         
+        kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
+        df_coords[i] = df_coords[i][kpt_indices]
         df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args = ['linear'])
         df_coords[i] = df_coords[i].bfill().ffill()
         df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0))
@@ -373,8 +391,8 @@ def synchronize_cams_all(config_dict):
     for i in range(cam_nb):
         df_speed.append(vert_speed(df_coords[i]))
         sum_speeds.append(abs(df_speed[i]).sum(axis=1))
-        # nb_coord = df_speed[i].shape[1]
-        # sum_speeds[i][ sum_speeds[i]>vmax*nb_coord ] = 0
+        # nb_coords = df_speed[i].shape[1]
+        # sum_speeds[i][ sum_speeds[i]>vmax*nb_coords ] = 0
         
         # # Replace 0 by random values, otherwise 0 padding may lead to unreliable correlations
         # sum_speeds[i].loc[sum_speeds[i] < 1] = sum_speeds[i].loc[sum_speeds[i] < 1].apply(lambda x: np.random.normal(0,1))
@@ -385,17 +403,19 @@ def synchronize_cams_all(config_dict):
     # Compute offset for best synchronization:
     # Highest correlation of sum of absolute speeds for each cam compared to reference cam
     ref_cam_id = nb_frames_per_cam.index(min(nb_frames_per_cam)) # ref cam: least amount of frames
+    ref_cam_name = cam_names[ref_cam_id]
     ref_frame_nb = len(df_coords[ref_cam_id])
     lag_range = int(ref_frame_nb/2)
     cam_list.pop(ref_cam_id)
+    cam_names.pop(ref_cam_id)
     offset = []
-    for cam_id in cam_list:
-        offset_cam_section, max_corr_cam = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=display_sync_plots, ref_cam_id=ref_cam_id, cam_id=cam_id)
+    for cam_id, cam_name in zip(cam_list, cam_names):
+        offset_cam_section, max_corr_cam = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=display_sync_plots, ref_cam_name=ref_cam_name, cam_name=cam_name)
         offset_cam = offset_cam_section - (search_around_frames[ref_cam_id][0] - search_around_frames[cam_id][0])
         if isinstance(approx_time_maxspeed, list):
-            logging.info(f'--> Camera {ref_cam_id} and {cam_id}: {offset_cam} frames offset ({offset_cam_section} on the selected section), correlation {round(max_corr_cam, 2)}.')
+            logging.info(f'--> Camera {ref_cam_name} and {cam_name}: {offset_cam} frames offset ({offset_cam_section} on the selected section), correlation {round(max_corr_cam, 2)}.')
         else:
-            logging.info(f'--> Camera {ref_cam_id} and {cam_id}: {offset_cam} frames offset, correlation {round(max_corr_cam, 2)}.')
+            logging.info(f'--> Camera {ref_cam_name} and {cam_name}: {offset_cam} frames offset, correlation {round(max_corr_cam, 2)}.')
         offset.append(offset_cam)
     offset.insert(ref_cam_id, 0)
 
