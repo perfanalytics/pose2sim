@@ -489,79 +489,76 @@ def kinematics(config_dict):
     - Joint angle data files (.mot) for each person.
     '''
 
-    try:
-        # Read config_dict
-        project_dir = config_dict.get('project').get('project_dir')
-        # if batch
-        session_dir = Path(project_dir) / '..'
-        # if single trial
-        session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-        use_augmentation = config_dict.get('kinematics').get('use_augmentation')
-        if use_augmentation: model_name = 'LSTM'
-        else: model_name = config_dict.get('pose').get('pose_model').upper()
-        right_left_symmetry = config_dict.get('kinematics').get('right_left_symmetry')
-        remove_scaling_setup = config_dict.get('kinematics').get('remove_individual_scaling_setup')
-        remove_IK_setup = config_dict.get('kinematics').get('remove_individual_IK_setup')
-        subject_height = config_dict.get('project').get('participant_height')
-        subject_mass = config_dict.get('project').get('participant_mass')
+    # Read config_dict
+    project_dir = config_dict.get('project').get('project_dir')
+    # if batch
+    session_dir = Path(project_dir) / '..'
+    # if single trial
+    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
+    use_augmentation = config_dict.get('kinematics').get('use_augmentation')
+    if use_augmentation: model_name = 'LSTM'
+    else: model_name = config_dict.get('pose').get('pose_model').upper()
+    right_left_symmetry = config_dict.get('kinematics').get('right_left_symmetry')
+    remove_scaling_setup = config_dict.get('kinematics').get('remove_individual_scaling_setup')
+    remove_IK_setup = config_dict.get('kinematics').get('remove_individual_IK_setup')
+    subject_height = config_dict.get('project').get('participant_height')
+    subject_mass = config_dict.get('project').get('participant_mass')
 
-        pose3d_dir = Path(project_dir) / 'pose-3d'
-        kinematics_dir = Path(project_dir) / 'kinematics'
-        kinematics_dir.mkdir(parents=True, exist_ok=True)
-        osim_setup_dir = get_opensim_setup_dir()
-        
-        # OpenSim logs saved to a different file
-        opensim_logs_file = kinematics_dir / 'opensim_logs.txt'
-        opensim.Logger.setLevelString('Info')
-        opensim.Logger.removeFileSink()
-        opensim.Logger.addFileSink(str(opensim_logs_file))
+    pose3d_dir = Path(project_dir) / 'pose-3d'
+    kinematics_dir = Path(project_dir) / 'kinematics'
+    kinematics_dir.mkdir(parents=True, exist_ok=True)
+    osim_setup_dir = get_opensim_setup_dir()
+    
+    # OpenSim logs saved to a different file
+    opensim_logs_file = kinematics_dir / 'opensim_logs.txt'
+    opensim.Logger.setLevelString('Info')
+    opensim.Logger.removeFileSink()
+    opensim.Logger.addFileSink(str(opensim_logs_file))
 
-        # Find all trc files
-        trc_files = []
-        if use_augmentation:
-            trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' in f.name]
-            if len(trc_files) == 0:
-                model_name = config_dict.get('pose').get('pose_model').upper()
-                logging.warning("No LSTM trc files found. Using non augmented trc files instead.")
-        if len(trc_files) == 0: # filtered files by default
-            trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' not in f.name and '_filt' in f.name and '_scaling' not in f.name]
-        if len(trc_files) == 0: 
-            trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' not in f.name and '_scaling' not in f.name]
+    # Find all trc files
+    trc_files = []
+    if use_augmentation:
+        trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' in f.name]
         if len(trc_files) == 0:
-            raise ValueError(f'No trc files found in {pose3d_dir}.')
-        sorted(trc_files, key=natural_sort_key)
+            model_name = config_dict.get('pose').get('pose_model').upper()
+            logging.warning("No LSTM trc files found. Using non augmented trc files instead.")
+    if len(trc_files) == 0: # filtered files by default
+        trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' not in f.name and '_filt' in f.name and '_scaling' not in f.name]
+    if len(trc_files) == 0: 
+        trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' not in f.name and '_scaling' not in f.name]
+    if len(trc_files) == 0:
+        raise ValueError(f'No trc files found in {pose3d_dir}.')
+    sorted(trc_files, key=natural_sort_key)
 
-        # Get subject heights and masses
-        if subject_height is None or subject_height == 0:
-            subject_height = [1.75] * len(trc_files)
-            logging.warning("No subject height found in Config.toml. Using default height of 1.75m.")
-        elif not type(subject_height) == list: # int or float
-            subject_height = [subject_height]
-        elif len(subject_height) < len(trc_files):
-            logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to 1.75m.")
-            subject_height += [1.75] * (len(trc_files) - len(subject_height))
+    # Get subject heights and masses
+    if subject_height is None or subject_height == 0:
+        subject_height = [1.75] * len(trc_files)
+        logging.warning("No subject height found in Config.toml. Using default height of 1.75m.")
+    elif not type(subject_height) == list: # int or float
+        subject_height = [subject_height]
+    elif len(subject_height) < len(trc_files):
+        logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to 1.75m.")
+        subject_height += [1.75] * (len(trc_files) - len(subject_height))
 
-        if subject_mass is None or subject_mass == 0:
-            subject_mass = [70] * len(trc_files)
-            logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
-        elif not type(subject_mass) == list:
-            subject_mass = [subject_mass]
-        elif len(subject_mass) < len(trc_files):
-            logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.")
-            subject_mass += [70] * (len(trc_files) - len(subject_mass))
+    if subject_mass is None or subject_mass == 0:
+        subject_mass = [70] * len(trc_files)
+        logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
+    elif not type(subject_mass) == list:
+        subject_mass = [subject_mass]
+    elif len(subject_mass) < len(trc_files):
+        logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.")
+        subject_mass += [70] * (len(trc_files) - len(subject_mass))
 
-        # Perform scaling and IK for each trc file
-        for p, trc_file in enumerate(trc_files):
-            logging.info(f"Processing TRC file: {trc_file.resolve()}")
+    # Perform scaling and IK for each trc file
+    for p, trc_file in enumerate(trc_files):
+        logging.info(f"Processing TRC file: {trc_file.resolve()}")
 
-            logging.info("Scaling...")
-            perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], remove_scaling_setup=remove_scaling_setup)
-            logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
-            logging.info(f"\tScaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
-            
-            logging.info("\nInverse Kinematics...")
-            perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_setup=remove_IK_setup)
-            logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
-            logging.info(f"\tJoint angle data saved to {(kinematics_dir / (trc_file.stem + '.mot')).resolve()}\n")
-    except RuntimeError as e:
-        logging.error(f"Error occurred: {e}")
+        logging.info("Scaling...")
+        perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], remove_scaling_setup=remove_scaling_setup)
+        logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
+        logging.info(f"\tScaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
+        
+        logging.info("\nInverse Kinematics...")
+        perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_setup=remove_IK_setup)
+        logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
+        logging.info(f"\tJoint angle data saved to {(kinematics_dir / (trc_file.stem + '.mot')).resolve()}\n")

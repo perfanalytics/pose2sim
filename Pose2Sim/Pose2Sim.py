@@ -191,11 +191,7 @@ def calibration(config=None):
     logging.info("---------------------------------------------------------------------\n")
     start = time.time()
 
-    try:
-        calibrate_cams_all(config_dict)
-    except Exception as e:
-        logging.error(f"Error during calibration: {e}")
-        return
+    calibrate_cams_all(config_dict)
 
     end = time.time()
     logging.info(f'\nCalibration took {end-start:.2f} s.\n')
@@ -239,12 +235,8 @@ def poseEstimation(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        try:
-            rtm_estimator(config_dict)
-        except Exception as e:
-            logging.error(f"Error during pose estimation: {e}")
-            continue
-
+        rtm_estimator(config_dict)
+        
         end = time.time()
         elapsed = end - start
         logging.info(f'\nPose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
@@ -287,12 +279,8 @@ def synchronization(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        try:
-            synchronize_cams_all(config_dict)
-        except Exception as e:
-            logging.error(f"Error during synchronization: {e}")
-            continue
-
+        synchronize_cams_all(config_dict)
+        
         end = time.time()
         elapsed = end-start
         logging.info(f'\nSynchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
@@ -338,12 +326,8 @@ def personAssociation(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        try:
-            track_2d_all(config_dict)
-        except Exception as e:
-            logging.error(f"Error during person association: {e}")
-            continue
-
+        track_2d_all(config_dict)
+        
         end = time.time()
         elapsed = end-start
         logging.info(f'\nAssociating persons took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
@@ -388,12 +372,8 @@ def triangulation(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        try:
-            triangulate_all(config_dict)
-        except Exception as e:
-            logging.error(f"Error during triangulation: {e}")
-            continue
-
+        triangulate_all(config_dict)
+        
         end = time.time()
         elapsed = end-start
         logging.info(f'\nTriangulation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
@@ -437,12 +417,8 @@ def filtering(config=None):
         logging.info(f"Project directory: {project_dir}\n")
         logging.info("---------------------------------------------------------------------\n")
 
-        try:
-            filter_all(config_dict)
-        except Exception as e:
-            logging.error(f"Error during filtering: {e}")
-            continue
-
+        filter_all(config_dict)
+        
         logging.info('\n')
 
 
@@ -482,12 +458,8 @@ def markerAugmentation(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        try:
-            augmentTRC(config_dict)
-        except Exception as e:
-            logging.error(f"Error during marker augmentation: {e}")
-            continue
-
+        augmentTRC(config_dict)
+        
         end = time.time()
         elapsed = end-start
         logging.info(f'\nMarker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
@@ -531,12 +503,8 @@ def kinematics(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        try:
-            kinematics(config_dict)
-        except Exception as e:
-            logging.error(f"Error during OpenSim processing: {e}")
-            continue
-
+        kinematics(config_dict)
+        
         end = time.time()
         elapsed = end - start
         logging.info(f'OpenSim scaling and inverse kinematics took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
