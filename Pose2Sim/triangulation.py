@@ -191,6 +191,7 @@ def sort_people(Q_kpt_old, Q_kpt):
     frame_by_frame_dist = []
     for comb in personsIDs_comb:
         frame_by_frame_dist += [euclidean_distance(Q_kpt_old[comb[0]],Q_kpt[comb[1]])]
+    frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
         
     # sort correspondences by distance
     minL, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)

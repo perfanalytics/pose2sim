@@ -211,7 +211,7 @@ def reprojection(P_all, Q):
         y_calc.append(P_cam[1] @ Q / (P_cam[2] @ Q))
         
     return x_calc, y_calc
-        
+
 
 def euclidean_distance(q1, q2):
     '''

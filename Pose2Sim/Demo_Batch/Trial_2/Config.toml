@@ -179,7 +179,7 @@ keypoints_to_consider = 'all' # 'all' if all points should be considered, for ex
 # make_c3d = false # save triangulated data in c3d format in addition to trc
 
 
-# [opensim]
+# [kinematics]
 # use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
 # right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)
 # remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering

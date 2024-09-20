@@ -604,7 +604,7 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
     logging.info(f'\nTracked json files are stored in {os.path.realpath(poseTracked_dir)}.')
     
 
-def track_2d_all(config_dict):
+def associate_all(config_dict):
     '''
     For each frame,
     - Find all possible combinations of detected persons

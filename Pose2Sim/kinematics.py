@@ -275,7 +275,7 @@ def dict_segment_marker_pairs(scaling_root, right_left_symmetry=True):
     
     '''
 
-    measurement_dict = {}
+    segment_markers_dict = {}
     for measurement in scaling_root.findall(".//Measurement"):
         # Collect all marker pairs for this measurement
         marker_pairs = [pair.find('markers').text.strip().split() for pair in measurement.findall(".//MarkerPair")]
@@ -283,17 +283,22 @@ def dict_segment_marker_pairs(scaling_root, right_left_symmetry=True):
         # Collect all body scales for this measurement
         for body_scale in measurement.findall(".//BodyScale"):
             body_name = body_scale.get('name')
-            if right_left_symmetry:
-                measurement_dict[body_name] = marker_pairs
-            else:
-                if body_name.endswith('_r'):
-                    marker_pairs_r = [pair for pair in marker_pairs if any([pair[0].startswith('R'), pair[1].startswith('R')])]
-                    measurement_dict[body_name] = marker_pairs_r
-                elif body_name.endswith('_l'):
-                    marker_pairs_l = [pair for pair in marker_pairs if any([pair[0].startswith('L'), pair[1].startswith('L')])]
-                    measurement_dict[body_name] = marker_pairs_l
+            axes = body_scale.find('axes').text.strip().split()
+            for axis in axes:
+                body_name_axis = f"{body_name}_{axis}"
+                if right_left_symmetry:
+                    segment_markers_dict.setdefault(body_name_axis, []).extend(marker_pairs)
+                else:
+                    if body_name.endswith('_r'):
+                        marker_pairs_r = [pair for pair in marker_pairs if any([pair[0].upper().startswith('R'), pair[1].upper().startswith('R')])]
+                        segment_markers_dict.setdefault(body_name_axis, []).extend(marker_pairs_r)
+                    elif body_name.endswith('_l'):
+                        marker_pairs_l = [pair for pair in marker_pairs if any([pair[0].upper().startswith('L'), pair[1].upper().startswith('L')])]
+                        segment_markers_dict.setdefault(body_name_axis, []).extend(marker_pairs_l)
+                    else:
+                        segment_markers_dict.setdefault(body_name_axis, []).extend(marker_pairs)
 
-    return measurement_dict
+    return segment_markers_dict
 
 
 def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, right_left_symmetry=True):
@@ -321,10 +326,15 @@ def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, 
     # Calculate ratio for each segment
     segment_ratios = trc_segment_lengths / model_segment_lengths
     segment_markers_dict = dict_segment_marker_pairs(scaling_root, right_left_symmetry=right_left_symmetry)
-    segment_ratio_dict = segment_markers_dict.copy()
-    segment_ratio_dict.update({key: np.mean([segment_ratios[segment_pairs.index(k)] 
+    segment_ratio_dict_temp = segment_markers_dict.copy()
+    segment_ratio_dict_temp.update({key: np.mean([segment_ratios[segment_pairs.index(k)] 
                                             for k in segment_markers_dict[key]]) 
                                 for key in segment_markers_dict.keys()})
+    # Merge X, Y, Z ratios into single key
+    segment_ratio_dict={}
+    xyz_keys = list(set([key[:-2] for key in segment_ratio_dict_temp.keys()]))
+    for key in xyz_keys:
+        segment_ratio_dict[key] = [segment_ratio_dict_temp[key+'_X'], segment_ratio_dict_temp[key+'_Y'], segment_ratio_dict_temp[key+'_Z']]
     
     return segment_ratio_dict
 
@@ -351,11 +361,11 @@ def update_scale_values(scaling_root, segment_ratio_dict):
         scale_set.remove(scale)
 
     # Add new Scale elements based on scale_dict
-    for segment, scale in segment_ratio_dict.items():
+    for segment, scales in segment_ratio_dict.items():
         new_scale = etree.Element('Scale')
         # scales
         scales_elem = etree.SubElement(new_scale, 'scales')
-        scales_elem.text = ' '.join([str(scale)]*3)
+        scales_elem.text = ' '.join(map(str, scales))
         # segment name
         segment_elem = etree.SubElement(new_scale, 'segment')
         segment_elem.text = segment
@@ -394,8 +404,8 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
         scaling_path = get_scaling_setup(model_name, osim_setup_dir)
         scaling_tree = etree.parse(scaling_path)
         scaling_root = scaling_tree.getroot()
-        scaling_path_temp = str(kinematics_dir / Path(scaling_path).name)
-
+        scaling_path_temp = str(kinematics_dir / (trc_file.stem + '_scaling_setup.xml'))
+        
         # Read trc file
         Q_coords, _, _, markers, _ = read_trc(trc_file)
 
@@ -415,8 +425,7 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
         scaling_root[0].find(".//scaling_order").text = ' manualScale measurements'
         deactivate_measurements(scaling_root)
         update_scale_values(scaling_root, segment_ratio_dict)
-        for mk_f in scaling_root[0].findall(".//marker_file"):
-            mk_f.text = "Unassigned"
+        for mk_f in scaling_root[0].findall(".//marker_file"): mk_f.text = "Unassigned"
         scaling_root[0].find('ModelScaler').find('output_model_file').text = str(scaled_model_path)
 
         etree.indent(scaling_tree, space='\t', level=0)
@@ -448,7 +457,7 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_s
     try:
         # Retrieve data
         ik_path = get_IK_Setup(model_name, osim_setup_dir)
-        ik_path_temp =  str(kinematics_dir / Path(ik_path).name)
+        ik_path_temp =  str(kinematics_dir / (trc_file.stem + '_ik_setup.xml'))
         scaled_model_path = (kinematics_dir / (trc_file.stem + '.osim')).resolve()
         output_motion_file = Path(kinematics_dir, trc_file.stem + '.mot').resolve()
         if not trc_file.exists():
@@ -546,7 +555,7 @@ def kinematics(config_dict):
     elif not type(subject_mass) == list:
         subject_mass = [subject_mass]
     elif len(subject_mass) < len(trc_files):
-        logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.")
+        logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.\n")
         subject_mass += [70] * (len(trc_files) - len(subject_mass))
 
     # Perform scaling and IK for each trc file
@@ -558,7 +567,7 @@ def kinematics(config_dict):
         logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
         logging.info(f"\tScaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
         
-        logging.info("\nInverse Kinematics...")
+        logging.info("Inverse Kinematics...")
         perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_setup=remove_IK_setup)
         logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
         logging.info(f"\tJoint angle data saved to {(kinematics_dir / (trc_file.stem + '.mot')).resolve()}\n")

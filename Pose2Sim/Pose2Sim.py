@@ -217,7 +217,7 @@ def poseEstimation(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
     setup_logging(session_dir)
 
     # Batch process all trials
@@ -264,7 +264,7 @@ def synchronization(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
     setup_logging(session_dir)
 
     # Batch process all trials
@@ -296,7 +296,7 @@ def personAssociation(config=None):
     or the function can be called without an argument, in which case it the config directory is the current one.
     '''
 
-    from Pose2Sim.personAssociation import track_2d_all
+    from Pose2Sim.personAssociation import associate_all
 
     # Determine the level at which the function is called (root:2, trial:1)
     level, config_dicts = read_config_files(config)
@@ -308,7 +308,7 @@ def personAssociation(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
     setup_logging(session_dir)
 
     # Batch process all trials
@@ -326,7 +326,7 @@ def personAssociation(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        track_2d_all(config_dict)
+        associate_all(config_dict)
         
         end = time.time()
         elapsed = end-start
@@ -354,7 +354,7 @@ def triangulation(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
     setup_logging(session_dir)
 
     # Batch process all trials
@@ -400,7 +400,7 @@ def filtering(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     # Set up logging
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
     setup_logging(session_dir)
 
     # Batch process all trials
@@ -441,7 +441,7 @@ def markerAugmentation(config=None):
             raise ValueError('Please specify the project directory in config_dict:\n \
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
     setup_logging(session_dir)
 
     for config_dict in config_dicts:
@@ -485,7 +485,7 @@ def kinematics(config=None):
             raise ValueError('Please specify the project directory in config_dict:\n \
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
     setup_logging(session_dir)
 
     # Process each configuration dictionary
@@ -519,7 +519,7 @@ def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchron
 
     # Set up logging
     level, config_dicts = read_config_files(config)
-    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '..'))
+    session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
     setup_logging(session_dir)
 
     currentDateAndTime = datetime.now()
