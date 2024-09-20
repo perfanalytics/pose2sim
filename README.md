@@ -16,35 +16,33 @@
 
 ##### N.B:. Please set undistort_points and handle_LR_swap to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
 
-> **_News_: Version 0.109:**\
+> **_News_: Version 0.10.0:**\
 > **OpenSim scaling and inverse kinematics are now integrated in Pose2Sim!** No static trial needed.\
 > **Other recently added features**: Pose estimation, Automatic camera synchronization, Multi-person analysis, Blender visualization, Marker augmentation, Batch processing.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
-> To upgrade, type `pip install pose2sim --upgrade` (note that you need Python 3.9 or higher).
+> To upgrade, type `pip install pose2sim --upgrade`
 
 <br>
 
-`Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to marker-based motion capture methods. It aims to provide a free tool to obtain research-grade results from consumer-grade equipment. Any combination of phone, webcam, GoPro, etc. can be used.
+`Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to traditional marker-based MoCap methods. 
+
+**Pose2Sim** is free and open-source, low-cost but with research-grade accuracy and production-grade robustness. It gives a maximum of control on clearly explained parameters. Any combination of phones, webcams, or GoPros can be used with fully clothed and equiped subjects, so it is particularly adapted to the sports field, the doctor's office, or for outdoor 3D animation capture.
+
+***Note:*** For real-time analysis with a single camera, please consider **[Sports2D](https://github.com/davidpagnon/Sports2D)** (note that the motion must lie in the sagittal or frontal plane). 
+
+<br>
+
+*Fun fact:*\
+Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inputs (2D keypoints coordinates) and lead to an OpenSim result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose), and custom models (from [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut) for example) can also be used. 
 
 
-
-
-<!--powerfull, flexible, intuitive -->
-
-
-
-
-**Pose2Sim** stands for "OpenPose to OpenSim", as it originally used *OpenPose* inputs (2D keypoints coordinates) from multiple videos and lead to an [OpenSim](https://opensim.stanford.edu/) result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose). OpenPose and other models are kept as legacy options. 
-
-For real-time analysis with a single camera, please consider **[Sports2D](https://github.com/davidpagnon/Sports2D)** (note that the motion must lie in the sagittal or frontal plane). 
 
 
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
 
 <img src='Content/Activities_verylow.gif' title='Other more or less challenging tasks and conditions.' width="760">
 
-> *N.B.:* As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
 </br>
 
 **Pose2Sim releases:**
@@ -63,16 +61,17 @@ For real-time analysis with a single camera, please consider **[Sports2D](https:
 - [ ] v0.13: Graphical User Interface
 - [ ] v1.0: First full release
 
+***N.B.:*** As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
+
 </br>
 
 # Contents
 1. [Installation and Demonstration](#installation-and-demonstration)
    1. [Installation](#installation)
-   2. [Demonstration Part-1: Build 3D TRC file](#demonstration-part-1-build-3d-trc-file)
-   3. [Demonstration Part-2: Obtain 3D joint angles with OpenSim](#demonstration-part-2-obtain-3d-joint-angles-with-opensim)
-   4. [Demonstration Part-3 (optional): Visualize your results with Blender](#demonstration-part-3-optional-visualize-your-results-with-blender)
-   5. [Demonstration Part-4 (optional): Try multi-person analysis](#demonstration-part-4-optional-try-multi-person-analysis)
-   6. [Demonstration Part-5 (optional): Try batch processing](#demonstration-part-5-optional-try-batch-processing)
+   2. [Demonstration Part-1: End to end video to 3D joint angle computation](#demonstration-part-1-end-to-end-video-to-3d-joint-angle-computation)
+   3. [Demonstration Part-2: Visualize your results with OpenSim or Blender](#demonstration-part-2-visualize-your-results-with-opensim-or-blender)
+   4. [Demonstration Part-3: Try multi-person analysis](#demonstration-part-3-try-multi-person-analysis)
+   5. [Demonstration Part-4: Try batch processing](#demonstration-part-4-try-batch-processing)
 2. [Use on your own data](#use-on-your-own-data)
    1. [Setting up your project](#setting-up-your-project)
    2. [2D pose estimation](#2d-pose-estimation)
@@ -121,7 +120,7 @@ Install the OpenSim Python API (if you do not want to install via conda, refer [
    conda install -c opensim-org opensim -y
    ```
    
-3. **INSTALL POSE2SIM**:\
+3. **Install Pose2Sim**:\
 If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9 is installed. 
    - OPTION 1: **Quick install:** Open a terminal. 
        ``` cmd
@@ -163,13 +162,13 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
 
 > **Note on storage use:**\
      A full installation takes up to 11 GB of storage spate. However, GPU support is not mandatory and takes about 6 GB. Moreover, [marker augmentation](#marker-augmentation) requires Tensorflow and does not necessarily yield better results. You can save an additional 1.3 GB by uninstalling it: `pip uninstall tensorflow`.\
-     A minimal installation with carefully chosen pose models and without GPU support, Tensorflow, PyQt5 **would take less than 3 GB**.
+     A minimal installation with carefully chosen pose models and without GPU support, Tensorflow, PyQt5 **would take less than 3 GB**.\
     <img src="Content/Storage.png" width="760">
 
 
 </br>
 
-## Demonstration Part-1: Build 3D TRC file
+## Demonstration Part-1: End to end video to 3D joint angle computation
 > _**This demonstration provides an example experiment of a person balancing on a beam, filmed with 4 cameras.**_ 
 
 Open a terminal, enter `pip show pose2sim`, report package location. \
@@ -186,15 +185,14 @@ Pose2Sim.filtering()
 Pose2Sim.markerAugmentation()
 Pose2Sim.kinematics()
 ```
-3D results are stored as .trc files in each trial folder in the `pose-3d` directory.
-
-OpenSim results are stored as scaled model .osim and .mot in each trial folder in the `opensim` directory.
-
+**3D marker locations** are stored as .trc files in each trial folder in the `pose-3d` directory.\
+**3D joint angles** are stored as .mot files in the `kinematics` directory. Scaled models are also stored in the same directory.
 
 </br>
 
 **Note:** 
-- Default parameters have been provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) but can be edited.
+- Default parameters have been provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) but can be edited.\
+All of them are clearly documented: feel free to play with them!
 - You can run all stages at once: 
   ``` python
   from Pose2Sim import Pose2Sim
@@ -202,58 +200,42 @@ OpenSim results are stored as scaled model .osim and .mot in each trial folder i
   # or simply: Pose2Sim.runAll()
   ```
 - Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
-- If the results are not convincing, refer to Section [OpenSim-kinematics](#OpenSim-kinematics)  in the document.
-</br>
-
-
-
-<br/>
-
-## Demonstration Part-2: Obtain 3D joint angles with OpenSim  
-> _**In the same vein as you would do with marker-based kinematics, start with scaling your model, and then perform inverse kinematics.**_ 
-
-> N.B.: For now, you still need to install [OpenSim GUI](https://simtk.org/frs/index.php?group_id=91) (tested up to v4.5 on Windows, has to be compiled [from source on Linux](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Linux+Support)). Will be done natively within Pose2Sim soon.
-   
-<!--
-   To visualize the animated skeletons, you can either install:
-   - **[Pose2Sim_Blender](https://github.com/davidpagnon/Pose2Sim_Blender) (recommended, see [Demonstration Part 3](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Linux+Support))**, or 
-      - [OpenSim GUI](https://simtk.org/frs/index.php?group_id=91) (tested up to v4.5 on Windows, has to be compiled [from source on Linux](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Linux+Support)).
--->  
-
-### Scaling
-1. Open OpenSim.
-2. Open the provided `Model_Pose2Sim_LSTM.osim` model from `Pose2Sim/OpenSim_Setup`. *(File -> Open Model)*
-3. Load the provided `Scaling_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Scale model -> Load)*
-4. Run. You should see your skeletal model take the static pose.
-5. Save your scaled model in `Demo_SinglePerson/OpenSim/Model_Pose2Sim_S00_P00_LSTM_scaled.osim`. *(File -> Save Model As)*
-
-### Inverse kinematics
-1. Load the provided `IK_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Inverse kinematics -> Load)*
-2. Run. You should see your skeletal model move in the Visualizer window.
-5. Your IK motion file will be saved in `S00_P00_OpenSim`.
-<br/>
-
-<p style="text-align: center;"><img src="Content/OpenSim.JPG" width="380"></p>
+- Note that **Pose2Sim.markerAugmentation()** does not necessarily improve results--*in fact, results are worse half of the time.* You can choose to not run this command, and save an additional 1.3 GB by uninstalling tensorflow: `pip uninstall tensorflow`.
 
 </br>
 
-## Demonstration Part-3 (optional): Visualize your results with Blender
-> _**Visualize your results and look in detail for potential areas of improvement (and more).**_ 
+## Demonstration Part-2: Visualize your results with OpenSim or Blender
+> _**Visualize your results and look in detail for potential areas of improvement.**_ 
 
-### Install the add-on
-Follow instructions on the [Pose2Sim_Blender](https://github.com/davidpagnon/Pose2Sim_Blender) add-on page.
+### Basic visualization with the OpenSim GUI
 
-### Visualize your results
-Just play with the buttons!\
-Visualize camera positions, videos, triangulated keypoints, OpenSim skeleton, and more.
 
-**N.B.:** You need to proceed to the full install to import the inverse kinematic results from OpenSim. See instructions [there](https://github.com/davidpagnon/Pose2Sim_Blender?tab=readme-ov-file#full-install).
+- Install OpenSim GUI:\
+  Download the executable [there](https://simtk.org/projects/opensim).
+- Visualize results:
+  - Open the OpenSim GUI, go to File > Open Model, and select the scaled model in the `kinematics` folder.
+  - Go to File > Load Motion, and load the joint angle .mot file in the `kinematics` folder.
+  - If you want to see the 3D marker locations, go to File > Preview Experimental Data, and load the .trc file in the `pose-3d` folder.
 
-https://github.com/perfanalytics/pose2sim/assets/54667644/5d7c858f-7e46-40c1-928c-571a5679633a
+  <img src="Content/OpenSim.JPG" width="380">
+
+
+### Further check with the Pose2Sim Blender add-on
+
+- **Install the add-on:**\
+  Follow instructions on the [Pose2Sim_Blender](https://github.com/davidpagnon/Pose2Sim_Blender) add-on page.
+
+- **Visualize results:**\
+  Just play with the buttons!\
+  Visualize camera positions, videos, triangulated keypoints, OpenSim skeleton, video overlay your results on videos, ... or let your creativity flow and create your own animations!
+
+  https://github.com/davidpagnon/Pose2Sim_Blender/assets/54667644/a2cfb75d-a2d4-471a-b6f8-8f1ee999a619
+  
+  **N.B.:** Full install only required to import the skeleton. See instructions [there](https://github.com/davidpagnon/Pose2Sim_Blender?tab=readme-ov-file#full-install).
 
 <br/>
 
-## Demonstration Part-4 (optional): Try multi-person analysis
+## Demonstration Part-3: Try multi-person analysis
 > _**Another person, hidden all along, will appear when multi-person analysis is activated!**_
 
 Go to the Multi-participant Demo folder: `cd <path>\Pose2Sim\Demo_MultiPerson`. \
@@ -261,24 +243,55 @@ Type `ipython`, and try the following code:
 
 ``` python
 from Pose2Sim import Pose2Sim
+Pose2Sim.calibration()
+Pose2Sim.poseEstimation()
+# Pose2Sim.synchronization()
+Pose2Sim.personAssociation()
+Pose2Sim.triangulation()
+Pose2Sim.filtering()
+Pose2Sim.markerAugmentation()
+Pose2Sim.kinematics()
+```
+
+or equivalently:
+
+``` python
+from Pose2Sim import Pose2Sim
 Pose2Sim.runAll(do_synchronization=False) # Synchronization possible, but tricky with multiple persons
 ```
 
-
 One .trc file per participant will be generated and stored in the `pose-3d` directory.\
-You can then run OpenSim scaling and inverse kinematics for each resulting .trc file as in [Demonstration Part-2](#demonstration-part-2-obtain-3d-joint-angles-with-opensim).\
-You can also visualize your results with Blender as in [Demonstration Part-3](#demonstration-part-3-optional-visualize-your-results-with-blender).
+Similarly, one scaled .osim model and one joint angle .mot file per participant will be stored in the `kinematics`folder.
 
-*N.B.:* Set *[project]* `multi_person = true` for each trial that contains multiple persons.\
-Make sure that the order of *[markerAugmentation]* `participant_height` and `participant_mass` matches the person's IDs.
+You can visualize your results with Blender as explained in [Demonstration Part-2](#demonstration-part-2-visualize-your-results-with-opensim-or-blender).
+
+<br>
+
+***N.B.:***
+- In Config.toml, set `project` > `multi_person = true` for each trial that contains multiple persons.
+- Make sure that the order of `markerAugmentation` > `participant_height` and `participant_mass` matches the person's IDs.
 
 <br/>
 
-## Demonstration Part-5 (optional): Try batch processing
+## Demonstration Part-4 (optional): Try batch processing
 > _**Run numerous analysis with different parameters and minimal friction.**_
 
 Go to the Batch Demo folder: `cd <path>\Pose2Sim\Demo_Batch`. \
 Type `ipython`, and try the following code:
+
+``` python
+from Pose2Sim import Pose2Sim
+Pose2Sim.calibration()
+Pose2Sim.poseEstimation()
+Pose2Sim.synchronization()
+Pose2Sim.personAssociation()
+Pose2Sim.triangulation()
+Pose2Sim.filtering()
+Pose2Sim.markerAugmentation()
+Pose2Sim.kinematics()
+```
+
+or equivalently:
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -302,10 +315,10 @@ For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or un
 
 # Use on your own data
 
-> **N.B.: If a step is not relevant for your use case (synchronization, person association, marker augmentation...), you can skip it.**
+> **N.B.: If a step is not relevant for your use case (synchronization, person association, marker augmentation...), you can just skip it.**
 
 ## Setting up your project
-  > _**Get ready for automatic batch processing.**_
+  > _**Get yourself comfy!**_
   
   1. Open a terminal, enter `pip show pose2sim`, report package location. \
      Copy this path and do `cd <path>\pose2sim`.
