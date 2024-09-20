@@ -7,22 +7,28 @@
 ## KINEMATICS PROCESSING                                                 ##
 ###########################################################################
 
-Process kinematic data using OpenSim tools.
+    Runs OpenSim scaling and inverse kinematics
+    
+    Scaling:
+    - No need for a static trial: scaling is done on the triangulated coordinates (trc file)
+    - Remove 10% fastest frames (potential outliers)
+    - Remove frames where coordinate speed is null (person probably out of frame)
+    - Remove 40% most extreme calculated segment values (potential outliers)
+    - For each segment, scale on the mean of the remaining segment values
+    
+    Inverse Kinematics:
+    - Run on the scaled model with the same trc file
+    - Model markers follow the triangulated markers while respecting the model kinematic constraints
+    - Joint angles are computed
 
-This script performs scaling, inverse kinematics, and related processing
-on 3D motion capture data (TRC files). The scaling process adjusts the
-generic model to match the subject's physical dimensions, while inverse
-kinematics computes the joint angles based on the motion data.
+    INPUTS:
+    - config_dict (dict): Generated from a .toml calibration file
 
-Set your parameters in Config.toml.
-
-INPUTS:
-- a directory containing TRC files
-- kinematic processing parameters in Config.toml
-
-OUTPUT:
-- scaled OpenSim model files (.osim)
-- joint angle data files (.mot)
+    OUTPUTS:
+    - A scaled .osim model for each person
+    - Joint angle data files (.mot) for each person
+    - Optionally, OpenSim scaling and IK setup files saved to the kinematics directory
+    - Pose2Sim and OpenSim logs saved to files
 '''
 
 
@@ -63,7 +69,7 @@ def read_trc(trc_path):
     - trc_path (str): The path to the TRC file.
 
     OUTPUTS:
-    - tuple: A tuple containing the Q coordinates, frames column, time column, and header.
+    - tuple: A tuple containing the Q coordinates, frames column, time column, marker names, and header.
     '''
 
     try:
@@ -84,6 +90,9 @@ def read_trc(trc_path):
 def get_opensim_setup_dir():
     '''
     Locate the OpenSim setup directory within the Pose2Sim package.
+
+    INPUTS:
+    - None
 
     OUTPUTS:
     - Path: The path to the OpenSim setup directory.
@@ -130,12 +139,13 @@ def get_model_path(model_name, osim_setup_dir):
         raise ValueError(f"Pose model '{model_name}' not found.")
 
     unscaled_model_path = osim_setup_dir / pose_model_file
+
     return unscaled_model_path
 
 
 def get_scaling_setup(model_name, osim_setup_dir):
     '''
-    Retrieve the OpenSim scaling setup file path.
+    Retrieve the path of the OpenSim scaling setup file.
 
     INPUTS:
     - model_name (str): Name of the model
@@ -169,12 +179,13 @@ def get_scaling_setup(model_name, osim_setup_dir):
         raise ValueError(f"Pose model '{model_name}' not found.")
 
     scaling_setup_path = osim_setup_dir / scaling_setup_file
+
     return scaling_setup_path
 
 
 def get_IK_Setup(model_name, osim_setup_dir):
     '''
-    Retrieve the OpenSim inverse kinematics setup file path.
+    Retrieve the path of the OpenSim inverse kinematics setup file.
 
     INPUTS:
     - model_name (str): Name of the model
@@ -211,37 +222,11 @@ def get_IK_Setup(model_name, osim_setup_dir):
     return ik_setup_path
 
 
-# def get_output_dir(config_dir, person_id):
-    '''
-    Determines the correct output directory based on the configuration and the person identifier.
-
-    INPUTS:
-    - config_dir (Path): The root directory where the configuration file is located.
-    - person_id (str): Identifier for the person (e.g., 'SinglePerson', 'P1').
-
-    OUTPUTS:
-    - Path: The path where the output files should be stored.
-    '''
-
-    output_dir = config_dir / 'kinematics'  # Assuming 'opensim' as the default output subdirectory
-
-    # Append the person_id to the output directory if it's a multi-person setup
-    if person_id != "SinglePerson":
-        output_dir = output_dir / person_id
-
-    logging.info(f"Output directory determined as: {output_dir}")
-
-    # Create the directory if it does not exist
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-    return output_dir
-
-
 def get_kpt_pairs_from_tree(root_node):
     '''
-    Get name pairs for all parent-child relationships in the tree.
+    Get marker pairs for all parent-child relationships in the tree.
     # Excludes the root node.
+    # Not used in the current version.
 
     INPUTS:
     - root_node (Node): The root node of the tree.
@@ -262,17 +247,31 @@ def get_kpt_pairs_from_tree(root_node):
 
 def get_kpt_pairs_from_scaling(scaling_root):
     '''
-    Get name pairs for all marker pairs in the scaling setup file.
+    Get all marker pairs from the scaling setup file.
+
+    INPUTS:
+    - scaling_root (Element): The root element of the scaling setup file.
+
+    OUTPUTS:
+    - pairs: A list of marker pairs.
     '''
 
-    pairs = [pair.find('markers').text.strip().split(' ') for pair in scaling_root[0].findall(".//MarkerPair")]
+    pairs = [pair.find('markers').text.strip().split(' ') 
+             for pair in scaling_root[0].findall(".//MarkerPair")]
 
     return pairs
 
 
 def dict_segment_marker_pairs(scaling_root, right_left_symmetry=True):
     '''
-    
+    Get a dictionary of segment names and their corresponding marker pairs.
+
+    INPUTS:
+    - scaling_root (Element): The root element of the scaling setup file.
+    - right_left_symmetry (bool): Whether to consider right and left side of equal size.
+
+    OUTPUTS:
+    - segment_markers_dict: A dictionary of segment names and their corresponding marker pairs.
     '''
 
     segment_markers_dict = {}
@@ -301,8 +300,21 @@ def dict_segment_marker_pairs(scaling_root, right_left_symmetry=True):
     return segment_markers_dict
 
 
-def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, right_left_symmetry=True):
+def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, trimmed_extrema_percent=0.5, right_left_symmetry=True):
     '''
+    Calculate the ratios between the size of the actual segment and the size of the model segment.
+    X, Y, and Z ratios are calculated separately if the original scaling setup file asks for it.
+
+    INPUTS:
+    - scaling_root (Element): The root element of the scaling setup file.
+    - unscaled_model (Model): The original OpenSim model before scaling.
+    - Q_coords_scaling (DataFrame): The triangulated coordinates of the markers.
+    - markers (list): The list of marker names.
+    - trimmed_extrema_percent (float): The proportion of the most extreme segment values to remove before calculating their mean.
+    - right_left_symmetry (bool): Whether to consider right and left side of equal size.
+
+    OUTPUTS:
+    - segment_ratio_dict: A dictionary of segment names and their corresponding X, Y, and Z ratios.
     '''
 
     # segment_pairs = get_kpt_pairs_from_tree(eval(model_name))
@@ -314,7 +326,7 @@ def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, 
                         for (pt1,pt2) in segment_pairs])
     # trc_segment_lengths = np.median(trc_segment_lengths, axis=1)
     # trc_segment_lengths = np.mean(trc_segment_lengths, axis=1)
-    trc_segment_lengths = np.array([trimmed_mean(arr, trimmed_percent=0.5) for arr in trc_segment_lengths])
+    trc_segment_lengths = np.array([trimmed_mean(arr, trimmed_extrema_percent=trimmed_extrema_percent) for arr in trc_segment_lengths])
 
     # Get model segment lengths
     model_markers = [marker for marker in markers if marker in [m.getName() for m in unscaled_model.getMarkerSet()]]
@@ -341,6 +353,14 @@ def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, 
 
 def deactivate_measurements(scaling_root):
     '''
+    Deactivate all scalings based on marker positions (called 'measurements' in OpenSim) in the scaling setup file.
+    (will use scaling based on segment sizes instead (called 'manual' in OpenSim))
+
+    INPUTS:
+    - scaling_root (Element): The root element of the scaling setup file.
+
+    OUTPUTS:
+    - scaling_root with deactivated measurements.
     '''
     
     measurement_set = scaling_root.find(".//MeasurementSet/objects")
@@ -351,6 +371,15 @@ def deactivate_measurements(scaling_root):
 
 def update_scale_values(scaling_root, segment_ratio_dict):
     '''
+    Remove previous scaling values ('manual') and 
+    add new scaling values based on calculated segment ratios.
+
+    INPUTS:
+    - scaling_root (Element): The root element of the scaling setup file.
+    - segment_ratio_dict (dict): A dictionary of segment names and their corresponding X, Y, and Z ratios.
+
+    OUTPUTS:
+    - scaling_root with updated scaling values.
     '''
     
     # Get the ScaleSet/objects element
@@ -379,16 +408,27 @@ def update_scale_values(scaling_root, segment_ratio_dict):
 def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_left_symmetry=True, subject_height=1.75, subject_mass=70, remove_scaling_setup=True):
     '''
     Perform model scaling based on the (not necessarily static) TRC file:
-    - Retrieve the 80% slowest frames, excluding frames where the person is out of frame.
-    - From these frames, measure median segment lengths.
-    - Calculate ratio between model and measured segment lengths -> OpenSim manual scaling.
+    - Remove 10% fastest frames (potential outliers)
+    - Remove frames where coordinate speed is null (person probably out of frame)
+    - Remove 40% most extreme calculated segment values (potential outliers)
+    - For each segment, scale on the mean of the remaining segment values
     
     INPUTS:
-    - config_dict (dict): The configuration dictionary.
-    - person_id (str): The person identifier (e.g., 'SinglePerson', 'P1').
-    - trc_files (list): List of TRC files to be processed.
-    - output_dir (Path): The directory where the output files should be saved.
+    - trc_file (Path): The path to the TRC file.
+    - kinematics_dir (Path): The directory where the kinematics files are saved.
+    - osim_setup_dir (Path): The directory where the OpenSim setup and model files are stored.
+    - model_name (str): The name of the model.
+    - right_left_symmetry (bool): Whether to consider right and left side of equal size.
+    - subject_height (float): The height of the subject.
+    - subject_mass (float): The mass of the subject.
+    - remove_scaling_setup (bool): Whether to remove the scaling setup file after scaling.
+    
+    OUTPUTS:
+    - A scaled OpenSim model file.
     '''
+
+    fastest_frames_to_remove_percent = 0.1
+    trimmed_extrema_percent = 0.4 # proportion of the most extreme segment values to remove before calculating their mean
 
     try:
         # Load model
@@ -412,11 +452,12 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
         # Using 80% slowest frames for scaling, removing frames when person is out of frame
         Q_diff = Q_coords.diff(axis=0).sum(axis=1)
         Q_diff = Q_diff[Q_diff != 0] # remove when speed is 0 (person out of frame)
-        min_speed_indices = Q_diff.abs().nsmallest(int(len(Q_diff) * 0.8)).index
+        min_speed_indices = Q_diff.abs().nsmallest(int(len(Q_diff) * (1-fastest_frames_to_remove_percent))).index
         Q_coords_scaling = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
 
         # Get manual scale values (scale on trimmed mean of measured segments rather than on raw keypoints)
-        segment_ratio_dict = dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, right_left_symmetry=right_left_symmetry)
+        segment_ratio_dict = dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, 
+                                                trimmed_extrema_percent=trimmed_extrema_percent, right_left_symmetry=right_left_symmetry)
 
         # Update scaling setup file
         scaling_root[0].find('mass').text = str(subject_mass)
@@ -445,13 +486,19 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
 
 def perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_setup=True):
     '''
-    Perform inverse kinematics on the TRC files according to the OpenSim configuration.
+    Perform inverse kinematics based on a TRC file and a scaled OpenSim model:
+    - Model markers follow the triangulated markers while respecting the model kinematic constraints
+    - Joint angles are computed
 
     INPUTS:
-    - config_dict (dict): The configuration dictionary.
-    - person_id (str): The person identifier (e.g., 'SinglePerson', 'P1').
-    - trc_files (list): List of TRC files to be processed.
-    - output_dir (Path): The directory where the output files should be saved.
+    - trc_file (Path): The path to the TRC file.
+    - kinematics_dir (Path): The directory where the kinematics files are saved.
+    - osim_setup_dir (Path): The directory where the OpenSim setup and model files are stored.
+    - model_name (str): The name of the model.
+    - remove_IK_setup (bool): Whether to remove the IK setup file after running IK.
+
+    OUTPUTS:
+    - A joint angle data file (.mot).
     '''
 
     try:
@@ -488,14 +535,28 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_s
 
 def kinematics(config_dict):
     '''
-    Runs OpenSim scaling and inverse kinematics on the trc files of triangulated coordinates.
+    Runs OpenSim scaling and inverse kinematics
+    
+    Scaling:
+    - No need for a static trial: scaling is done on the triangulated coordinates (trc file)
+    - Remove 10% fastest frames (potential outliers)
+    - Remove frames where coordinate speed is null (person probably out of frame)
+    - Remove 40% most extreme calculated segment values (potential outliers)
+    - For each segment, scale on the mean of the remaining segment values
+    
+    Inverse Kinematics:
+    - Run on the scaled model with the same trc file
+    - Model markers follow the triangulated markers while respecting the model kinematic constraints
+    - Joint angles are computed
 
     INPUTS:
     - config_dict (dict): Generated from a .toml calibration file
 
     OUTPUTS:
-    - A scaled .osim model for each person.
-    - Joint angle data files (.mot) for each person.
+    - A scaled .osim model for each person
+    - Joint angle data files (.mot) for each person
+    - Optionally, OpenSim scaling and IK setup files saved to the kinematics directory
+    - Pose2Sim and OpenSim logs saved to files
     '''
 
     # Read config_dict

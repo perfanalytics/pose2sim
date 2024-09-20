@@ -468,7 +468,6 @@ def markerAugmentation(config=None):
 def kinematics(config=None):
     '''
     Performing OpenSim scaling and inverse kinematics.
-    Select the 10% slowest frames from trc for scaling
     Save scaled model as .osim and output motion as .mot
 
     config can be a dictionary,
