@@ -49,7 +49,7 @@ __status__ = "Development"
 def check_midhip_data(trc_file):
     try:
         # Find MidHip data
-        midhip_data = trc_file.marker("CHip")
+        midhip_data = trc_file.marker("Hip")
         if midhip_data is None or len(midhip_data) == 0:
             raise ValueError("MidHip data is empty")
     except (KeyError, ValueError):
@@ -57,7 +57,7 @@ def check_midhip_data(trc_file):
         rhip_data = trc_file.marker("RHip")
         lhip_data = trc_file.marker("LHip")
         midhip_data = (rhip_data + lhip_data) / 2
-        trc_file.add_marker('CHip', *midhip_data.T)
+        trc_file.add_marker('Hip', *midhip_data.T)
 
     return trc_file
 
@@ -83,14 +83,10 @@ def augmentTRC(config_dict):
     project_dir = config_dict.get('project').get('project_dir')
     pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     pathOutputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    subject_height = config_dict.get('project').get('participant_height')
-    if subject_height is None or subject_height == 0 or subject_height==0:
-        raise ValueError("Subject height is not set or is invalid.")
-    subject_mass = config_dict.get('project').get('participant_mass')
-    if not type(subject_height) == list:
-        subject_height = [subject_height]
-        subject_mass = [subject_mass]
     make_c3d = config_dict.get('markerAugmentation').get('make_c3d')
+    subject_height = config_dict.get('project').get('participant_height')
+    subject_mass = config_dict.get('project').get('participant_mass')
+    
     augmenterDir = os.path.dirname(utilsDataman.__file__)
     augmenterModelName = 'LSTM'
     augmenter_model = 'v0.3'
@@ -109,6 +105,25 @@ def augmentTRC(config_dict):
     else:
         trc_files = trc_no_filtering
     sorted(trc_files, key=natural_sort_key)
+
+    # Get subject heights and masses
+    if subject_height is None or subject_height == 0:
+        subject_height = [1.75] * len(trc_files)
+        logging.warning("No subject height found in Config.toml. Using default height of 1.75m.")
+    elif not type(subject_height) == list: # int or float
+        subject_height = [subject_height]
+    elif len(subject_height) < len(trc_files):
+        logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to 1.75m.")
+        subject_height += [1.75] * (len(trc_files) - len(subject_height))
+
+    if subject_mass is None or subject_mass == 0:
+        subject_mass = [70] * len(trc_files)
+        logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
+    elif not type(subject_mass) == list:
+        subject_mass = [subject_mass]
+    elif len(subject_mass) < len(trc_files):
+        logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.")
+        subject_mass += [70] * (len(trc_files) - len(subject_mass))
 
     for p in range(len(subject_mass)):
         pathInputTRCFile = trc_files[p]
@@ -172,7 +187,7 @@ def augmentTRC(config_dict):
             trc_data_data = trc_data[:,1:]
 
             # Step 2: Normalize with reference marker position.
-            referenceMarker_data = trc_file.marker("CHip")  # instead of trc_file.marker(referenceMarker) # change by HunMin
+            referenceMarker_data = trc_file.marker("Hip")  # instead of trc_file.marker(referenceMarker) # change by HunMin
             norm_trc_data_data = np.zeros((trc_data_data.shape[0],
                                         trc_data_data.shape[1]))
             for i in range(0,trc_data_data.shape[1],3):

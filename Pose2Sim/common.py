@@ -219,11 +219,11 @@ def euclidean_distance(q1, q2):
     
     INPUTS:
     - q1: list of N_dimensional coordinates of point
+         or list of N points of N_dimensional coordinates
     - q2: idem
 
     OUTPUTS:
     - euc_dist: float. Euclidian distance between q1 and q2
-    
     '''
     
     q1 = np.array(q1)
@@ -233,9 +233,38 @@ def euclidean_distance(q1, q2):
         dist =  np.empty_like(dist)
         dist[...] = np.inf
     
-    euc_dist = np.sqrt(np.nansum( [d**2 for d in dist]))
+    if len(dist.shape)==1:
+        euc_dist = np.sqrt(np.nansum( [d**2 for d in dist]))
+    else:
+        euc_dist = np.sqrt(np.nansum( [d**2 for d in dist], axis=1))
     
     return euc_dist
+
+
+def trimmed_mean(arr, trimmed_percent=0.5):
+    '''
+    Trimmed mean calculation for an array.
+
+    INPUTS:
+    - arr (np.array): The input array.
+    - trimmed_percent (float): The percentage of values to be trimmed from both ends.
+
+    OUTPUTS:
+    - float: The trimmed mean of the array.
+    '''
+
+    # Sort the array
+    sorted_arr = np.sort(arr)
+    
+    # Determine the indices for the 25th and 75th percentiles (if trimmed_percent = 0.5)
+    lower_idx = int(len(sorted_arr) * (trimmed_percent/2))
+    upper_idx = int(len(sorted_arr) * (1 - trimmed_percent/2))
+    
+    # Slice the array to exclude the 25% lowest and highest values
+    trimmed_arr = sorted_arr[lower_idx:upper_idx]
+    
+    # Return the mean of the remaining values
+    return np.mean(trimmed_arr)
 
 
 def world_to_camera_persp(r, t):
@@ -364,6 +393,7 @@ def natural_sort_key(s):
     Sorts list of strings with numbers in natural order (alphabetical and numerical)
     Example: ['item_1', 'item_2', 'item_10', 'stuff_1']
     '''
+    s=str(s)
     return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', s)]
 
 

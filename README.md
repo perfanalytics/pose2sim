@@ -16,9 +16,9 @@
 
 ##### N.B:. Please set undistort_points and handle_LR_swap to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
 
-> **_News_: Version 0.9:**\
-> **Pose estimation with RTMPose is now included in Pose2Sim!**\
-> **Other recently added features**: Automatic camera synchronization, multi-person analysis, Blender visualization, Marker augmentation, Batch processing.
+> **_News_: Version 0.109:**\
+> **OpenSim scaling and inverse kinematics are now integrated in Pose2Sim!** No static trial needed.\
+> **Other recently added features**: Pose estimation, Automatic camera synchronization, Multi-person analysis, Blender visualization, Marker augmentation, Batch processing.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
 > To upgrade, type `pip install pose2sim --upgrade` (note that you need Python 3.9 or higher).
@@ -26,6 +26,14 @@ and lens distortions are better taken into account.\ -->
 <br>
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to marker-based motion capture methods. It aims to provide a free tool to obtain research-grade results from consumer-grade equipment. Any combination of phone, webcam, GoPro, etc. can be used.
+
+
+
+
+<!--powerfull, flexible, intuitive -->
+
+
+
 
 **Pose2Sim** stands for "OpenPose to OpenSim", as it originally used *OpenPose* inputs (2D keypoints coordinates) from multiple videos and lead to an [OpenSim](https://opensim.stanford.edu/) result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose). OpenPose and other models are kept as legacy options. 
 
@@ -48,11 +56,12 @@ For real-time analysis with a single camera, please consider **[Sports2D](https:
 - [x] **v0.6** *(02/2024)*: Marker augmentation, Blender visualizer
 - [x] **v0.7** *(03/2024)*: Multi-person analysis
 - [x] **v0.8** *(04/2024)*: New synchronization tool
-- [x] **v0.9: *(07/2024)*: Integration of pose estimation in the pipeline**
-- [ ] v0.10: Integration of OpenSim in the pipeline
-- [ ] v0.11: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
-- [ ] v0.12: Graphical User Interface
-- [ ] v1.0: First accomplished release
+- [x] **v0.9** *(07/2024)*: Integration of pose estimation in the pipeline
+- [x] **v0.10 *(09/2024)*: Integration of OpenSim in the pipeline**
+- [ ] v0.11: Migrated documentation to new github.io website
+- [ ] v0.12: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
+- [ ] v0.13: Graphical User Interface
+- [ ] v1.0: First full release
 
 </br>
 
@@ -175,7 +184,7 @@ Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
 Pose2Sim.filtering()
 Pose2Sim.markerAugmentation()
-Pose2Sim.opensimProcessing()
+Pose2Sim.kinematics()
 ```
 3D results are stored as .trc files in each trial folder in the `pose-3d` directory.
 
@@ -189,7 +198,8 @@ OpenSim results are stored as scaled model .osim and .mot in each trial folder i
 - You can run all stages at once: 
   ``` python
   from Pose2Sim import Pose2Sim
-  Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_opensimProcessing=True)
+  Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_kinematics=True)
+  # or simply: Pose2Sim.runAll()
   ```
 - Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
 - If the results are not convincing, refer to Section [OpenSim-kinematics](#OpenSim-kinematics)  in the document.
@@ -260,8 +270,7 @@ You can then run OpenSim scaling and inverse kinematics for each resulting .trc 
 You can also visualize your results with Blender as in [Demonstration Part-3](#demonstration-part-3-optional-visualize-your-results-with-blender).
 
 *N.B.:* Set *[project]* `multi_person = true` for each trial that contains multiple persons.\
-Set *[triangulation]* `reorder_trc = true` if you need to run OpenSim and to match the generated .trc files with the static trials.\
-Make sure that the order of *[markerAugmentation]* `participant_height` and `participant_mass` matches the order of the static trials.
+Make sure that the order of *[markerAugmentation]* `participant_height` and `participant_mass` matches the person's IDs.
 
 <br/>
 
