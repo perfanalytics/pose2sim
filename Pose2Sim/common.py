@@ -241,13 +241,13 @@ def euclidean_distance(q1, q2):
     return euc_dist
 
 
-def trimmed_mean(arr, trimmed_percent=0.5):
+def trimmed_mean(arr, trimmed_extrema_percent=0.5):
     '''
     Trimmed mean calculation for an array.
 
     INPUTS:
     - arr (np.array): The input array.
-    - trimmed_percent (float): The percentage of values to be trimmed from both ends.
+    - trimmed_extrema_percent (float): The percentage of values to be trimmed from both ends.
 
     OUTPUTS:
     - float: The trimmed mean of the array.
@@ -257,8 +257,8 @@ def trimmed_mean(arr, trimmed_percent=0.5):
     sorted_arr = np.sort(arr)
     
     # Determine the indices for the 25th and 75th percentiles (if trimmed_percent = 0.5)
-    lower_idx = int(len(sorted_arr) * (trimmed_percent/2))
-    upper_idx = int(len(sorted_arr) * (1 - trimmed_percent/2))
+    lower_idx = int(len(sorted_arr) * (trimmed_extrema_percent/2))
+    upper_idx = int(len(sorted_arr) * (1 - trimmed_extrema_percent/2))
     
     # Slice the array to exclude the 25% lowest and highest values
     trimmed_arr = sorted_arr[lower_idx:upper_idx]
