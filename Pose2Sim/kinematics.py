@@ -78,8 +78,7 @@ def read_trc(trc_path):
         return Q_coords, frames_col, time_col, markers, header
     
     except Exception as e:
-        logging.error(f"Error reading TRC file at {trc_path}: {e}")
-        raise
+        raise ValueError(f"Error reading TRC file at {trc_path}: {e}")
 
 
 def get_opensim_setup_dir():
@@ -304,12 +303,6 @@ def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, 
     # segment_pairs = get_kpt_pairs_from_tree(eval(model_name))
     segment_pairs = get_kpt_pairs_from_scaling(scaling_root)
 
-    # Get model segment lengths
-    model_markers_locs = [unscaled_model.getMarkerSet().get(marker).getLocationInGround(unscaled_model.getWorkingState()).to_numpy() for marker in markers]
-    model_segment_lengths = np.array([euclidean_distance(model_markers_locs[markers.index(pt1)], 
-                                                model_markers_locs[markers.index(pt2)]) 
-                                                for (pt1,pt2) in segment_pairs])
-    
     # Get median segment lengths from Q_coords_scaling. Trimmed mean works better than mean or median
     trc_segment_lengths = np.array([euclidean_distance(Q_coords_scaling.iloc[:,markers.index(pt1)*3:markers.index(pt1)*3+3], 
                         Q_coords_scaling.iloc[:,markers.index(pt2)*3:markers.index(pt2)*3+3]) 
@@ -318,6 +311,13 @@ def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, 
     # trc_segment_lengths = np.mean(trc_segment_lengths, axis=1)
     trc_segment_lengths = np.array([trimmed_mean(arr, trimmed_percent=0.5) for arr in trc_segment_lengths])
 
+    # Get model segment lengths
+    model_markers = [marker for marker in markers if marker in [m.getName() for m in unscaled_model.getMarkerSet()]]
+    model_markers_locs = [unscaled_model.getMarkerSet().get(marker).getLocationInGround(unscaled_model.getWorkingState()).to_numpy() for marker in model_markers]
+    model_segment_lengths = np.array([euclidean_distance(model_markers_locs[model_markers.index(pt1)], 
+                                                model_markers_locs[model_markers.index(pt2)]) 
+                                                for (pt1,pt2) in segment_pairs])
+    
     # Calculate ratio for each segment
     segment_ratios = trc_segment_lengths / model_segment_lengths
     segment_markers_dict = dict_segment_marker_pairs(scaling_root, right_left_symmetry=right_left_symmetry)
