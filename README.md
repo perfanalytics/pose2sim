@@ -84,15 +84,15 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
    4. [Camera calibration](#camera-calibration)
       1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
-   5. [Synchronizing, Tracking, Triangulating, Filtering](#synchronizing-tracking-triangulating-filtering)
+   5. [Synchronizing, Associatiating, Triangulating, Filtering](#synchronizing-associating-triangulating-filtering)
       1. [Synchronization](#synchronization)
       2. [Associate persons across cameras](#associate-persons-across-cameras)
       3. [Triangulating keypoints](#triangulating-keypoints)
       4. [Filtering 3D coordinates](#filtering-3d-coordinates)
       5. [Marker augmentation](#marker-augmentation)
    6. [OpenSim kinematics](#opensim-kinematics)
-      1. [OpenSim Scaling](#opensim-scaling)
-      2. [OpenSim Inverse kinematics](#opensim-inverse-kinematics)
+      1. [Within Pose2Sim](#within_pose2sim)
+      2. [Within OpenSim GUI](#within-opensim-gui)
       3. [Command Line](#command-line)
 3. [Utilities](#utilities)
 4. [How to cite and how to contribute](#how-to-cite-and-how-to-contribute)
@@ -219,6 +219,7 @@ All of them are clearly documented: feel free to play with them!
 
   <img src="Content/OpenSim.JPG" width="380">
 
+<br>
 
 ### Further check with the Pose2Sim Blender add-on
 
@@ -330,12 +331,10 @@ For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or un
 ## 2D pose estimation
 > _**Estimate 2D pose from images with RTMPose or another pose estimation solution.**_ 
 
-> N.B.: Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json'.
-
 ### With RTMPose *(default)*:
 > [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose) is a state-of-the-art pose estimation solution that is faster and more accurate than OpenPose. It is now included in Pose2Sim for straightforward end-to-end analysis.
 
-Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
 Type `ipython`.
 
 ``` python
@@ -365,7 +364,7 @@ Pose2Sim.poseEstimation()
 ### With DeepLabCut:
 > If you need to detect specific points on a human being, an animal, or an object, you can also train your own model with [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut). In this case, Pose2Sim is used as an alternative to [AniPose](https://github.com/lambdaloop/anipose).
 1. Train your DeepLabCut model and run it on your images or videos (more instruction on their repository)
-2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)): 
+2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)). Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json': 
    ``` cmd
    python -m DLC_to_OpenPose -i input_h5_file
    ```
@@ -429,7 +428,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 > _**Calculate camera intrinsic properties and extrinsic locations and positions.\
 > Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_
 
-Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
 Type `ipython`.
 
 
@@ -528,14 +527,14 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 </br>
 
 
-## Synchronizing, Tracking, Triangulating, Filtering
+## Synchronizing, Associating, Triangulating, Filtering
 
 ### Synchronization
 
 > _**Cameras need to be synchronized, so that 2D points correspond to the same position across cameras.**_\
 ***N.B.:** Skip this step if your cameras are natively synchronized.*
 
-Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
 Type `ipython`.
 
 ``` python
@@ -569,7 +568,7 @@ All keypoints can be taken into account, or a subset of them. The user can also 
 
 > ***N.B.:** Skip this step if only one person is in the field of view.*
 
-Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
 Type `ipython`.
 ``` python
 from Pose2Sim import Pose2Sim
@@ -589,7 +588,7 @@ Check printed output. If results are not satisfying, try and release the constra
 > The triangulation is weighted by the likelihood of each detected 2D keypoint, provided that they this likelihood is above a threshold.\
   If the reprojection error is above another threshold, right and left sides are swapped; if it is still above, cameras are removed until the threshold is met. If more cameras are removed than a predefined number, triangulation is skipped for this point and this frame. In the end, missing values are interpolated.
 
-Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
 Type `ipython`.
 
 ``` python
@@ -610,7 +609,7 @@ If your triangulation is not satisfying, try and release the constraints in the 
 > _**Filter your 3D coordinates.**_\
 > Numerous filter types are provided, and can be tuned accordingly.
 
-Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
 Type `ipython`.
 
 ``` python
@@ -645,7 +644,7 @@ Only works with models estimating at least the following keypoints (e.g., not CO
 Will not work properly if missing values are not interpolated (i.e., if there are Nan value in the .trc file).
 
 
-Open an Anaconda prompt or a terminal in a `Session`, `Participant`, or `Trial` folder.\
+Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
 Type `ipython`.
 
 ``` python
@@ -658,35 +657,60 @@ Pose2Sim.markerAugmentation()
 </br>
 
 ## OpenSim kinematics
-> _**Obtain 3D joint angles.**_\
-> Your OpenSim .osim scaled model and .mot inverse kinematic results will be found in the OpenSim folder of your `Participant` directory.
+> _**Obtain a scaled model and 3D joint angles.**_
 
-### OpenSim Scaling
-1. Choose a time range where the 3D keypoints are particularly well reconstructed, or capture a static pose, typically an A-pose...
-2. Open OpenSim.
-3. Open the provided `Model_Pose2Sim_LSTM.osim` model from `Pose2Sim/OpenSim_Setup`. *(File -> Open Model)*
-4. Load the provided `Scaling_Setup_Pose2Sim_LSTM.xml` scaling file. *(Tools -> Scale model -> Load)*
-5. Replace the example .trc file with your own data.
-6. Run
-7. Save the new scaled OpenSim model.
+This can be either done fully automatically within Pose2Sim, or manually within OpenSim GUI.
 
-### OpenSim Inverse kinematics
-1. Load the provided `IK_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. *(Tools -> Inverse kinematics -> Load)*
-2. Replace the example .trc file with your own data, and specify the path to your angle kinematics output file.
-3. Run.
+### Within Pose2Sim
+> *Scaling and inverse kinematics are performed in a fully automatic way for each trc file.*\
+> *No need for a static trial!*
+
+> Model scaling is done according to the mean of the segment lengths, across a subset of frames. We remove the 10% fastest frames (potential outliers), the frames where the speed is 0 (person probably out of frame), and the 40% most extreme segment values (potential outliers).
+
+In your Config.toml file, set `use_augmentation = false` is you don't want to use the results with augmented marker (this is sometimes better).\
+Set `right_left_symmetry = false` if you have good reasons to think the participant is not symmetrical (e.g. if they wear a prosthetic limb).
+
+Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
+Type `ipython`.
+
+``` python
+from Pose2Sim import Pose2Sim
+Pose2Sim.kinematics()
+```
+
+<img src="Content/P2S_kinematics.png" width="760">
+
+<img src="Content/OpenSim_logs.png" width="760">
 
 <img src="Content/OpenSim.JPG" width="380">
 
+Once you have the scaled model and the joint angles, you are free to go further! Inverse dynamics, muscle analysis, etc. (make sure previously add muscles from [the Pose2Sim model with muscles](Pose2Sim\OpenSim_Setup\Model_Pose2Sim_Body25b_contacts_muscles.osim)).
+
+<br>
+
+### Within OpenSim GUI
+If you are not fully satisfied with the results, you can perform scaling and inverse kinematics in a more traditional way, with (or without) a static trial.
+
+
+
+**Scaling**
+1. Choose a time range where the 3D keypoints are particularly well reconstructed, or capture a static pose, typically an A-pose...
+2. Open OpenSim.
+3. **File -> Open Model:** Open the provided `Model_Pose2Sim_LSTM.osim` model from `Pose2Sim/OpenSim_Setup`.\
+  ***Note:*** Here and below, replace 'LSTM' by any other model if needed, e.g. HALPE_26
+4. **Tools -> Scale model -> Load**: Load the provided `Scaling_Setup_Pose2Sim_LSTM.xml` scaling file.
+5. Replace the example .trc file with your own data.
+6. Run
+7. **File > Save Model:** Save the new scaled OpenSim model.
+
+**Inverse kinematics**
+1. **Tools -> Inverse kinematics -> Load:** Load the provided `IK_Setup_Pose2Sim_LSTM.xml` scaling file from `Pose2Sim/OpenSim_Setup`. 
+2. Replace the example .trc file with your own data, and specify the path to your angle kinematics output file.
+3. Run.
+4. **Right click on the Model->Motions->Coordinates > Save As:** Save angle results
+
+
 </br>
-
-### If kinematics results are not convicing:
-
-> _***Explanation on choosing the best frames for scaling (L437-448):***_
->
-> On difficult trials, some points are not well triangulated, which can lead to bad scaling. For example, if a point of the foot is very far from the rest of the body on some frames, scaling will consider that the foot is very large. Consequently, we need to scale only on the frames that are best triangulated. Now, how to find these best frames? 
->
-> 
-> My reasoning was that the points of badly triangulated frames would go all over the place, and thus that their speeds would be fast. So I only selected the 10% slowest frames for scaling. I think that in addition, we should take the median scale factor for these frames, because we might have slow frames that are still bad. -> This last step has not been done.
 
 ### Command line
 Alternatively, you can use command-line tools:
@@ -912,6 +936,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#9634; **Calibration:** Convert [fSpy calibration](https://fspy.io/) based on vanishing point.
 
 &#10004; **Synchronization:** Synchronize cameras on keypoint speeds.
+&#9634; **Synchronization:** Synchronize in multi-person mode: click on the person to synchronize on.
 
 &#10004; **Person Association:** Automatically choose the main person to triangulate.
 &#10004; **Person Association:** Multiple persons association. 1. Triangulate all the persons whose reprojection error is below a certain threshold (instead of only the one with minimum error), and then track in time with speed cf [Slembrouck 2020](https://link.springer.com/chapter/10.1007/978-3-030-40605-9_15)? or 2. Based on affinity matrices [Dong 2021](https://arxiv.org/pdf/1901.04111.pdf)? or 3. Based on occupancy maps [Yildiz 2012](https://link.springer.com/chapter/10.1007/978-3-642-35749-7_10)? or 4. With a neural network [Huang 2023](https://arxiv.org/pdf/2304.09471.pdf)?
@@ -941,7 +966,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **OpenSim:** Add scaling and inverse kinematics setup files.
 &#10004; **OpenSim:** Add full model with contact spheres ([SmoothSphereHalfSpaceForce](https://simtk.org/api_docs/opensim/api_docs/classOpenSim_1_1SmoothSphereHalfSpaceForce.html#details)) and full-body muscles ([DeGrooteFregly2016Muscle](https://simtk.org/api_docs/opensim/api_docs/classOpenSim_1_1DeGrooteFregly2016Muscle.html#details)), for [Moco](https://opensim-org.github.io/opensim-moco-site/) for example.
 &#10004; **OpenSim:** Add model with [ISB shoulder](https://github.com/stanfordnmbl/opencap-core/blob/main/opensimPipeline/Models/LaiUhlrich2022_shoulder.osim).
-&#9634; **OpenSim:** Integrate OpenSim in Pose2Sim.
+&#10004; **OpenSim:** Integrate OpenSim in Pose2Sim.
 &#9634; **OpenSim:** Do not require a separate scaling trial: scale on the 10% slowest frames of the moving trial instead, or take median scaling value.
 &#9634; **OpenSim:** Implement optimal fixed-interval Kalman smoothing for inverse kinematics ([this OpenSim fork](https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp)), or [Biorbd](https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp))
 
@@ -962,7 +987,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Catch errors**
 &#9634; **Conda package** 
 &#9634; **Docker image**
-&#9634; Run pose estimation and OpenSim from within Pose2Sim
+&#9634;  Integrate [Sports2D](https://github.com/davidpagnon/Sports2D/) for OpenSim analysis from a single camera
 &#9634; Real-time: Run Pose estimation, Person association, Triangulation, Kalman filter, IK frame by frame (instead of running each step for all frames)
 &#9634; Config parameter for non batch peocessing
 
@@ -981,7 +1006,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 - Supervised my PhD: [@lreveret](https://github.com/lreveret) (INRIA, Université Grenoble Alpes), and [@mdomalai](https://github.com/mdomalai) (Université de Poitiers).
 - Provided the Demo data: [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
 - Tested the code and provided feedback: [@simonozan](https://github.com/simonozan), [@daeyongyang](https://github.com/daeyongyang), [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals)
-- Submitted various accepted pull requests: [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals)
+- Submitted various accepted pull requests: [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals), [@peterlololsss](https://github.com/peterlololsss)
 - Provided a code snippet for Optitrack calibration: [@claraaudap](https://github.com/claraaudap) (Université Bretagne Sud).
 - Issued MPP2SOS, a (non-free) Blender extension based on Pose2Sim: [@carlosedubarreto](https://github.com/carlosedubarreto)
 
