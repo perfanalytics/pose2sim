@@ -1308,8 +1308,8 @@ def calibrate_cams_all(config_dict):
                 convert_ext = '.calib'
                 file_to_convert_path = sorted(glob.glob(os.path.join(calib_dir, f'*{convert_ext}')))
                 binning_factor = 1
-            elif convert_filetype=='anipose' or convert_filetype=='freemocap': # no conversion needed, skips this stage
-                logging.info(f'\n--> No conversion needed from AniPose nor from FreeMocap. Calibration skipped.\n')
+            elif convert_filetype=='anipose' or convert_filetype=='freemocap' or convert_filetype=='caliscope': # no conversion needed, skips this stage
+                logging.info(f'\n--> No conversion needed from Caliscope, AniPose, nor from FreeMocap. Calibration skipped.\n')
                 return
             else:
                 convert_ext = '???'
