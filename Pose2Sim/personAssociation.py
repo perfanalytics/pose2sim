@@ -278,7 +278,11 @@ def compute_rays(json_coord, calib_params, cam_id):
         line = norm_Q - cam_center
         norm_line = line/np.linalg.norm(line)
         moment = np.cross(cam_center, norm_line)
-        plucker.append(np.concatenate([norm_line, moment, [likelihood[i]]]))
+        plucker_i = np.concatenate([norm_line, moment, [likelihood[i]]])
+        if not np.isnan(plucker_i).any():
+            plucker.append(plucker_i)
+        else:
+            plucker.append(np.array([0.0]*7))
 
     return np.array(plucker)
 
