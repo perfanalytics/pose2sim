@@ -112,17 +112,19 @@ def retrieve_calib_params(calib_file):
     
     calib = toml.load(calib_file)
 
+    cal_keys = [c for c in calib.keys() 
+                if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
+                and isinstance(calib[c],dict)]
     S, K, dist, optim_K, inv_K, R, R_mat, T = [], [], [], [], [], [], [], []
-    for c, cam in enumerate(calib.keys()):
-        if cam != 'metadata':
-            S.append(np.array(calib[cam]['size']))
-            K.append(np.array(calib[cam]['matrix']))
-            dist.append(np.array(calib[cam]['distortions']))
-            optim_K.append(cv2.getOptimalNewCameraMatrix(K[c], dist[c], [int(s) for s in S[c]], 1, [int(s) for s in S[c]])[0])
-            inv_K.append(np.linalg.inv(K[c]))
-            R.append(np.array(calib[cam]['rotation']))
-            R_mat.append(cv2.Rodrigues(R[c])[0])
-            T.append(np.array(calib[cam]['translation']))
+    for c, cam in enumerate(cal_keys):
+        S.append(np.array(calib[cam]['size']))
+        K.append(np.array(calib[cam]['matrix']))
+        dist.append(np.array(calib[cam]['distortions']))
+        optim_K.append(cv2.getOptimalNewCameraMatrix(K[c], dist[c], [int(s) for s in S[c]], 1, [int(s) for s in S[c]])[0])
+        inv_K.append(np.linalg.inv(K[c]))
+        R.append(np.array(calib[cam]['rotation']))
+        R_mat.append(cv2.Rodrigues(R[c])[0])
+        T.append(np.array(calib[cam]['translation']))
     calib_params = {'S': S, 'K': K, 'dist': dist, 'inv_K': inv_K, 'optim_K': optim_K, 'R': R, 'R_mat': R_mat, 'T': T}
             
     return calib_params
@@ -142,22 +144,24 @@ def computeP(calib_file, undistort=False):
     
     calib = toml.load(calib_file)
     
+    cal_keys = [c for c in calib.keys() 
+                if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
+                and isinstance(calib[c],dict)]
     P = []
-    for cam in list(calib.keys()):
-        if cam != 'metadata':
-            K = np.array(calib[cam]['matrix'])
-            if undistort:
-                S = np.array(calib[cam]['size'])
-                dist = np.array(calib[cam]['distortions'])
-                optim_K = cv2.getOptimalNewCameraMatrix(K, dist, [int(s) for s in S], 1, [int(s) for s in S])[0]
-                Kh = np.block([optim_K, np.zeros(3).reshape(3,1)])
-            else:
-                Kh = np.block([K, np.zeros(3).reshape(3,1)])
-            R, _ = cv2.Rodrigues(np.array(calib[cam]['rotation']))
-            T = np.array(calib[cam]['translation'])
-            H = np.block([[R,T.reshape(3,1)], [np.zeros(3), 1 ]])
-            
-            P.append(Kh @ H)
+    for cam in list(cal_keys):
+        K = np.array(calib[cam]['matrix'])
+        if undistort:
+            S = np.array(calib[cam]['size'])
+            dist = np.array(calib[cam]['distortions'])
+            optim_K = cv2.getOptimalNewCameraMatrix(K, dist, [int(s) for s in S], 1, [int(s) for s in S])[0]
+            Kh = np.block([optim_K, np.zeros(3).reshape(3,1)])
+        else:
+            Kh = np.block([K, np.zeros(3).reshape(3,1)])
+        R, _ = cv2.Rodrigues(np.array(calib[cam]['rotation']))
+        T = np.array(calib[cam]['translation'])
+        H = np.block([[R,T.reshape(3,1)], [np.zeros(3), 1 ]])
+        
+        P.append(Kh @ H)
    
     return P
 

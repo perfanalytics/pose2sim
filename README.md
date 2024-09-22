@@ -449,6 +449,9 @@ Output file:
 ### Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
 
 If you already have a calibration file, set `calibration_type` type to `convert` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
+- **From [Caliscope](https://mprib.github.io/caliscope/):**
+  - Copy your Caliscope `.toml` calibration file to the Pose2Sim `Calibration` folder.
+  - Calibration can be skipped since Pose2Sim can natively read the Caliscope format.
 - **From [Qualisys](https://www.qualisys.com):**
   - Export calibration to `.qca.txt` within QTM.
   - Copy it in the `Calibration` Pose2Sim folder.

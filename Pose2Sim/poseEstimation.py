@@ -133,6 +133,7 @@ def sort_people_sports2d(keyptpre, keypt, scores):
     frame_by_frame_dist = []
     for comb in personsIDs_comb:
         frame_by_frame_dist += [euclidean_distance(keyptpre[comb[0]],keypt[comb[1]])]
+    frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
     
     # Sort correspondences by distance
     _, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)

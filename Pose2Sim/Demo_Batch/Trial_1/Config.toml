@@ -67,7 +67,8 @@
 # calibration_type = 'convert' # 'convert' or 'calculate'
 
    # [calibration.convert]
-   # convert_from = 'qualisys' # 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
+   # convert_from = 'caliscope' # 'caliscope', 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
+      # [calibration.convert.caliscope]  # No parameter needed
       # [calibration.convert.qualisys]
       # binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
       # [calibration.convert.optitrack]  # See readme for instructions
