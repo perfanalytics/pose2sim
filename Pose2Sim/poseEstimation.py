@@ -36,12 +36,13 @@ import os
 import glob
 import json
 import logging
+import itertools as it
 from tqdm import tqdm
 import numpy as np
 import cv2
 
 from rtmlib import PoseTracker, Body, Wholebody, BodyWithFeet, draw_skeleton
-from Pose2Sim.common import natural_sort_key
+from Pose2Sim.common import natural_sort_key, min_with_single_indices, euclidean_distance
 
 
 ## AUTHORSHIP INFORMATION
@@ -98,36 +99,63 @@ def save_to_openpose(json_file_path, keypoints, scores):
     with open(json_file_path, 'w') as json_file:
         json.dump(json_output, json_file)
 
-
-def sort_people_rtmlib(pose_tracker, keypoints, scores):
+   
+def sort_people_sports2d(keyptpre, keypt, scores):
     '''
-    Associate persons across frames (RTMLib method)
+    Associate persons across frames (Pose2Sim method)
+    Persons' indices are sometimes swapped when changing frame
+    A person is associated to another in the next frame when they are at a small distance
+    
+    N.B.: Requires min_with_single_indices and euclidian_distance function (see common.py)
 
     INPUTS:
-    - pose_tracker: PoseTracker. The initialized RTMLib pose tracker object
-    - keypoints: array of shape K, L, M with K the number of detected persons,
+    - keyptpre: array of shape K, L, M with K the number of detected persons,
     L the number of detected keypoints, M their 2D coordinates
-    - scores: array of shape K, L with K the number of detected persons,
+    - keypt: idem keyptpre, for current frame
+    - score: array of shape K, L with K the number of detected persons,
     L the confidence of detected keypoints
-
-    OUTPUT:
+    
+    OUTPUTS:
+    - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
     - sorted_keypoints: array with reordered persons
     - sorted_scores: array with reordered scores
     '''
     
-    try:
-        desired_size = max(pose_tracker.track_ids_last_frame)+1
-        sorted_keypoints = np.full((desired_size, keypoints.shape[1], 2), np.nan)
-        sorted_keypoints[pose_tracker.track_ids_last_frame] = keypoints[:len(pose_tracker.track_ids_last_frame), :, :]
-        sorted_scores = np.full((desired_size, scores.shape[1]), np.nan)
-        sorted_scores[pose_tracker.track_ids_last_frame] = scores[:len(pose_tracker.track_ids_last_frame), :]
-    except:
-        sorted_keypoints, sorted_scores = keypoints, scores
+    # Generate possible person correspondences across frames
+    if len(keyptpre) < len(keypt):
+        keyptpre = np.concatenate((keyptpre, np.full((len(keypt)-len(keyptpre), keypt.shape[1], 2), np.nan)))
+    if len(keypt) < len(keyptpre):
+        keypt = np.concatenate((keypt, np.full((len(keyptpre)-len(keypt), keypt.shape[1], 2), np.nan)))
+        scores = np.concatenate((scores, np.full((len(keyptpre)-len(scores), scores.shape[1]), np.nan)))
+    personsIDs_comb = sorted(list(it.product(range(len(keyptpre)), range(len(keypt)))))
+    
+    # Compute distance between persons from one frame to another
+    frame_by_frame_dist = []
+    for comb in personsIDs_comb:
+        frame_by_frame_dist += [euclidean_distance(keyptpre[comb[0]],keypt[comb[1]])]
+    
+    # Sort correspondences by distance
+    _, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
+    
+    # Associate points to same index across frames, nan if no correspondence
+    sorted_keypoints, sorted_scores = [], []
+    for i in range(len(keyptpre)):
+        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+        if len(id_in_old) > 0:
+            sorted_keypoints += [keypt[id_in_old[0]]]
+            sorted_scores += [scores[id_in_old[0]]]
+        else:
+            sorted_keypoints += [keypt[i]]
+            sorted_scores += [scores[i]]
+    sorted_keypoints, sorted_scores = np.array(sorted_keypoints), np.array(sorted_scores)
 
-    return sorted_keypoints, sorted_scores
+    # Keep track of previous values even when missing for more than one frame
+    sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints) & ~np.isnan(keyptpre), keyptpre, sorted_keypoints)
+    
+    return sorted_prev_keypoints, sorted_keypoints, sorted_scores
 
 
-def process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range):
+def process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person):
     '''
     Estimate pose from a video file
     
@@ -185,6 +213,11 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
                 # Perform pose estimation on the frame
                 keypoints, scores = pose_tracker(frame)
 
+                # Tracking people IDs across frames
+                if multi_person:
+                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores)
+           
                 # Save to json
                 if 'openpose' in output_format:
                     json_file_path = os.path.join(json_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.json')
@@ -220,7 +253,7 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
         cv2.destroyAllWindows()
 
 
-def process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, fps, save_video, save_images, display_detection, frame_range):
+def process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, fps, save_video, save_images, display_detection, frame_range, multi_person):
     '''
     Estimate pose estimation from a folder of images
     
@@ -269,6 +302,11 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
             
             # Perform pose estimation on the image
             keypoints, scores = pose_tracker(frame)
+
+            # Tracking people IDs across frames
+            if multi_person:
+                if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores)
             
             # Extract frame number from the filename
             if 'openpose' in output_format:
@@ -332,6 +370,7 @@ def rtm_estimator(config_dict):
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     frame_range = config_dict.get('project').get('frame_range')
+    multi_person = config_dict.get('project').get('multi_person')
     video_dir = os.path.join(project_dir, 'videos')
     pose_dir = os.path.join(project_dir, 'pose')
 
@@ -432,7 +471,7 @@ def rtm_estimator(config_dict):
             logging.info(f'Found video files with extension {vid_img_extension}.')
             for video_path in video_files:
                 pose_tracker.reset()
-                process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range)
+                process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person)
 
         else:
             # Process image folders
@@ -441,4 +480,4 @@ def rtm_estimator(config_dict):
             for image_folder in image_folders:
                 pose_tracker.reset()
                 image_folder_path = os.path.join(video_dir, image_folder)
-                process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, frame_rate, save_video, save_images, display_detection, frame_range)
+                process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person)
