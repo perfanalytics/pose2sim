@@ -555,7 +555,8 @@ All keypoints can be taken into account, or a subset of them. The user can also 
 *N.B.:* Works best when:
 - only one participant is in the scene (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly)
 - the participant is at a roughly equal distance from all cameras
-- the capture lasts at least 5 seconds long
+- the capture lasts at least 5 seconds long, so that there is enough data to synchronize on
+- the capture lasts a few minutes maximum, so that camera are less likely to [drift with time](https://github.com/mprib/caliscope/discussions/496)
 
 *N.B.:* Alternatively, synchronize cameras using a flashlight, a clap, or a clear event. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors), or with their app (slightly less reliable).
 
