@@ -27,7 +27,7 @@ and lens distortions are better taken into account.\ -->
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to traditional marker-based MoCap methods. 
 
-**Pose2Sim** is free and open-source, low-cost but with research-grade accuracy and production-grade robustness. It gives a maximum of control on clearly explained parameters. Any combination of phones, webcams, or GoPros can be used with fully clothed and equiped subjects, so it is particularly adapted to the sports field, the doctor's office, or for outdoor 3D animation capture.
+**Pose2Sim** is free and open-source, low-cost but with research-grade accuracy and production-grade robustness. It gives a maximum of control on clearly explained parameters. Any combination of phones, webcams, or GoPros can be used with fully clothed subjects, so it is particularly adapted to the sports field, the doctor's office, or for outdoor 3D animation capture.
 
 ***Note:*** For real-time analysis with a single camera, please consider **[Sports2D](https://github.com/davidpagnon/Sports2D)** (note that the motion must lie in the sagittal or frontal plane). 
 
@@ -91,7 +91,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
       4. [Filtering 3D coordinates](#filtering-3d-coordinates)
       5. [Marker augmentation](#marker-augmentation)
    6. [OpenSim kinematics](#opensim-kinematics)
-      1. [Within Pose2Sim](#within_pose2sim)
+      1. [Within Pose2Sim](#within-pose2sim)
       2. [Within OpenSim GUI](#within-opensim-gui)
       3. [Command Line](#command-line)
 3. [Utilities](#utilities)
@@ -274,7 +274,7 @@ You can visualize your results with Blender as explained in [Demonstration Part-
 
 <br/>
 
-## Demonstration Part-4 (optional): Try batch processing
+## Demonstration Part-4: Try batch processing
 > _**Run numerous analysis with different parameters and minimal friction.**_
 
 Go to the Batch Demo folder: `cd <path>\Pose2Sim\Demo_Batch`. \
