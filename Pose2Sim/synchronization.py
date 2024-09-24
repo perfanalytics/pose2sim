@@ -197,6 +197,10 @@ def update(cap, image, slider, frame_to_json, pose_dir, json_dir_name, keypoints
         annotations.clear()
         for idx, bbox in enumerate(bounding_boxes_list):
             x_min, y_min, x_max, y_max = bbox
+
+            if not np.all(np.isfinite([x_min, y_min, x_max, y_max])):
+                continue
+            
             rect = plt.Rectangle(
                 (x_min, y_min),
                 x_max - x_min,
@@ -247,8 +251,7 @@ def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], 
         with open(j_p) as j_f:
             try:
                 json_data_all = json.load(j_f)['people']
-                print(f"shape of json_data_all: {len(json_data_all)}")
-                
+
                 # # previous approach takes person #0
                 # json_data = json_data_all[0]
                 # json_data = np.array([json_data['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
@@ -654,7 +657,7 @@ def synchronize_cams_all(config_dict):
             slider = Slider(
                 ax_slider,
                 'Frame',
-                search_around_frames[i][0],
+                search_around_frames[i][0], # target frame range = search_around_frames
                 search_around_frames[i][1]-1, # -1 because starting from 0
                 valinit=frame_number,
                 valfmt='%0.0f', # integer
