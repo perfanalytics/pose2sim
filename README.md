@@ -37,8 +37,6 @@ and lens distortions are better taken into account.\ -->
 Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inputs (2D keypoints coordinates) and lead to an OpenSim result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose), and custom models (from [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut) for example) can also be used. 
 
 
-
-
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
 
 <img src='Content/Activities_verylow.gif' title='Other more or less challenging tasks and conditions.' width="760">
