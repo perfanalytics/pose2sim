@@ -30,7 +30,6 @@
     - synchronized json files for each camera
 '''
 
-
 ## INIT
 import numpy as np
 import pandas as pd
@@ -66,6 +65,101 @@ __status__ = "Development"
 
 
 # FUNCTIONS
+def draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations):
+    '''
+    Draws the bounding boxes and annotations on the given axes.
+    Clears any existing rectangles and annotations.
+
+    INPUTS:
+    - ax: The axes object to draw on.
+    - bounding_boxes_list: list of tuples. Each tuple contains (x_min, y_min, x_max, y_max) of a bounding box.
+    - rects: List to store rectangle patches representing bounding boxes.
+    - annotations: List to store text annotations for each bounding box.
+
+    OUTPUTS:
+    - None. Modifies rects and annotations in place.
+    '''
+    # Clear previous rectangles and annotations
+    for rect in rects:
+        rect.remove()
+    rects.clear()
+    for annotation in annotations:
+        annotation.remove()
+    annotations.clear()
+
+    # Draw bounding boxes and annotations
+    for idx, bbox in enumerate(bounding_boxes_list):
+        if not np.all(np.isfinite(bbox)) or np.any(np.isnan(bbox)):
+            # Skip drawing for NaN bounding boxes but keep the index space
+            continue
+
+        x_min, y_min, x_max, y_max = bbox
+        rect = plt.Rectangle(
+            (x_min, y_min),
+            x_max - x_min,
+            y_max - y_min,
+            linewidth=1,
+            edgecolor='white',
+            facecolor=(1, 1, 1, 0.1),
+            linestyle='-',
+            path_effects=[
+                plt.matplotlib.patheffects.withSimplePatchShadow()
+            ],
+            zorder=2,
+        )
+        ax.add_patch(rect)
+        rects.append(rect)
+        # Add person_id annotation
+        annotation = ax.text(
+            x_min,
+            y_min - 10,
+            f'Person {idx}',
+            color='white',
+            fontsize=7,
+            fontweight='normal',
+            bbox=dict(facecolor='black', alpha=0.5, boxstyle='round,pad=0.3'),
+            zorder=3,
+        )
+        annotations.append(annotation)
+
+
+def reset_styles(rects, annotations):
+    '''
+    Resets the styles of the rectangles and annotations to default.
+
+    INPUTS:
+    - rects: List of rectangle patches representing bounding boxes.
+    - annotations: List of text annotations for each bounding box.
+
+    OUTPUTS:
+    - None. Modifies rects and annotations in place.
+    '''
+    for rect, annotation in zip(rects, annotations):
+        rect.set_linewidth(1)
+        rect.set_edgecolor('white')
+        rect.set_facecolor((1, 1, 1, 0.1))
+        annotation.set_fontsize(7)
+        annotation.set_fontweight('normal')
+
+
+def highlight_bounding_box(rect, annotation):
+    '''
+    Highlights a rectangle and its annotation.
+
+    INPUTS:
+    - rect: Rectangle patch to highlight.
+    - annotation: Text annotation to highlight.
+
+    OUTPUTS:
+    - None. Modifies rect and annotation in place.
+    '''
+    rect.set_linewidth(2)
+    rect.set_edgecolor('yellow')
+    rect.set_facecolor((1, 1, 0, 0.2))
+    annotation.set_fontsize(8)
+    annotation.set_fontweight('bold')
+
+
 def on_hover(event, fig, rects, annotations, bounding_boxes_list):
     '''
     Event handler for mouse hover over the person's bounding box.
@@ -82,39 +176,23 @@ def on_hover(event, fig, rects, annotations, bounding_boxes_list):
     OUTPUTS:
     - None. This function updates the plot in place.
     '''
-
     x_hover = event.xdata
     y_hover = event.ydata
     if x_hover is None or y_hover is None:
         return
-    
+
     # Reset all rectangle styles
-    for rect, annotation in zip(rects, annotations):
-        rect.set_linewidth(1)
-        rect.set_edgecolor('white')
-        rect.set_facecolor((1, 1, 1, 0.1))
-        annotation.set_fontsize(7)
-        annotation.set_fontweight('normal')
+    reset_styles(rects, annotations)
 
     # Check if the mouse is inside any bounding box
-    bounding_boxes_list = [bbox for bbox in bounding_boxes_list if np.all(np.isfinite(bbox)) and not np.any(np.isnan(bbox))]
-    print(f"bbox list: {bounding_boxes_list}")
+    bounding_boxes_list = [bbox for bbox in bounding_boxes_list if np.all(np.isfinite(bbox)) and not np.any(np.isnan(bbox))] # remove NaN bounding boxes for make sure matching with rects
     for idx, bbox in enumerate(bounding_boxes_list):
         x_min, y_min, x_max, y_max = bbox
         if x_min <= x_hover <= x_max and y_min <= y_hover <= y_max:
-            logging.info(f"length of rects and bounding_boxes_list: {len(rects)} {len(bounding_boxes_list)}")
-            logging.info(f"idx: {idx}")
-            logging.info(f"info of bbox: {bbox}")
-            logging.info(f"info of rects: {rects}")
-            logging.info(f"info of bounding boxes: {bounding_boxes_list}")
-            rects[idx].set_linewidth(2)
-            rects[idx].set_edgecolor('yellow')
-            rects[idx].set_facecolor((1, 1, 0, 0.2))
-            annotations[idx].set_fontsize(8)
-            annotations[idx].set_fontweight('bold')
+            highlight_bounding_box(rects[idx], annotations[idx])
             break
-
     fig.canvas.draw_idle()
+
 
 def on_click(event, ax, bounding_boxes_list, selected_idx_container):
     '''
@@ -144,8 +222,8 @@ def on_click(event, ax, bounding_boxes_list, selected_idx_container):
             plt.close()
             break
 
-def update(cap, image, slider, frame_to_json, pose_dir, json_dir_name, keypoints_ids,
-           rects, annotations, bounding_boxes_list, ax, fig, keypoints_all):
+
+def update(cap, image, slider, frame_to_json, pose_dir, json_dir_name, rects, annotations, bounding_boxes_list, ax, fig):
     '''
     Updates the plot when the slider value changes.
 
@@ -158,18 +236,15 @@ def update(cap, image, slider, frame_to_json, pose_dir, json_dir_name, keypoints
     - frame_to_json: dict. Mapping from frame numbers to JSON file names.
     - pose_dir: str. Path to the directory containing pose data.
     - json_dir_name: str. Name of the JSON directory for the current camera.
-    - keypoints_ids: list of int. Indices of keypoints to extract.
     - rects: List of rectangle patches representing bounding boxes.
     - annotations: List of text annotations for each bounding box.
     - bounding_boxes_list: list of tuples. List to store bounding boxes for the current frame.
     - ax: The axes object of the plot.
     - fig: The figure object containing the plot.
-    - keypoints_all: List to store keypoints of all detected people in the current frame.
 
     OUTPUTS:
     - None. This function updates the plot with the new frame, bounding boxes, and annotations.
     '''
-
     frame_number = int(slider.val) # current frame number
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number) 
     ret, frame = cap.read()
@@ -184,57 +259,35 @@ def update(cap, image, slider, frame_to_json, pose_dir, json_dir_name, keypoints
             # Compute bounding boxes
             bounding_boxes_list.clear()
             bounding_boxes_list.extend(bounding_boxes(json_file_path))
-            # print(f"length of rects and bounding_boxes_list: {len(rects)} {len(bounding_boxes_list)}")
-            # Remove bounding box have infinite values
-            bounding_boxes_list = [bbox for bbox in bounding_boxes_list if np.all(np.isfinite(bbox)) and not np.any(np.isnan(bbox))]
-
-            print(f"length of rects and bounding_boxes_list AAAAA: {len(rects)} {len(bounding_boxes_list)}")
+            # Remove bounding boxes with infinite or NaN values
         else:
             bounding_boxes_list.clear()
-
-        # Redraw bounding boxes and annotations
-        for rect in rects:
-            rect.remove()
-        rects.clear()
-        for annotation in annotations:
-            annotation.remove()
-        annotations.clear()
-        for idx, bbox in enumerate(bounding_boxes_list):
-            x_min, y_min, x_max, y_max = bbox
-
-            # if not np.all(np.isfinite([x_min, y_min, x_max, y_max])):
-
-            rect = plt.Rectangle(
-                (x_min, y_min),
-                x_max - x_min,
-                y_max - y_min,
-                linewidth=1,
-                edgecolor='white',
-                facecolor=(1, 1, 1, 0.1),
-                linestyle='-',
-                path_effects=[
-                    plt.matplotlib.patheffects.withSimplePatchShadow() # Add shadow for better visibility
-                ],
-                zorder=2,
-            )
-            ax.add_patch(rect)
-            rects.append(rect)
-
-            annotation = ax.text(
-                x_min,
-                y_min - 10,
-                f'Person {idx}',
-                color='white',
-                fontsize=7,
-                fontweight='normal',
-                bbox=dict(facecolor='black', alpha=0.5, boxstyle='round,pad=0.3'),
-                zorder=3,
-            )
-            annotations.append(annotation)
-
+            
+        # Draw bounding boxes and annotations
+        draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations)
         fig.canvas.draw_idle()
 
+
 def get_selected_id_list(multi_person, video_files, cam_names, cam_nb, json_files_names_range, search_around_frames, pose_dir, json_dirs_names, keypoints_ids):
+    '''
+    Allows the user to select a person from each camera by clicking on their bounding box in the displayed video frames.
+    This function handles multiple cameras and returns a list of selected person indices for each camera.
+
+    INPUTS:
+    - multi_person: bool. Indicates whether multiple people are present in the videos.
+    - video_files: list of str. Paths to the video files for each camera.
+    - cam_names: list of str. Names of the cameras.
+    - cam_nb: int. Number of cameras.
+    - json_files_names_range: list of lists. Each sublist contains JSON file names for a camera in a specific frame range.
+    - search_around_frames: list of tuples. Each tuple contains (start_frame, end_frame) for searching around frames in each camera.
+    - pose_dir: str. Path to the directory containing pose data.
+    - json_dirs_names: list of str. Names of the JSON directories for each camera.
+    - keypoints_ids: list of int. Indices of keypoints to consider.
+
+    OUTPUTS:
+    - selected_id_list: list of int or None. List containing the index of the selected person for each camera.
+                        If no person is selected for a camera, None is appended for that camera.
+    '''
     if multi_person:
         selected_id_list = []
 
@@ -294,7 +347,6 @@ def get_selected_id_list(multi_person, video_files, cam_names, cam_nb, json_file
                     keypoints = np.array([p['pose_keypoints_2d'][3*k:3*k+3] for k in keypoints_ids if p['pose_keypoints_2d'][3*k+2] >= 0.3])
                     keypoints_all.append(keypoints)
                 bounding_boxes_list = bounding_boxes(json_file_path)
-                bounding_boxes_list = [bbox for bbox in bounding_boxes_list if np.all(np.isfinite(bbox)) and not np.any(np.isnan(bbox))]
             else:
                 logging.warning(f'No JSON data found for frame {frame_number}')
                 keypoints_all = []
@@ -306,37 +358,7 @@ def get_selected_id_list(multi_person, video_files, cam_names, cam_nb, json_file
             image = ax.imshow(frame_rgb)
             rects = []
             annotations = []
-
-            # Draw bounding boxes and annotations
-            for idx, bbox in enumerate(bounding_boxes_list):
-                x_min, y_min, x_max, y_max = bbox
-                rect = plt.Rectangle(
-                    (x_min, y_min),
-                    x_max - x_min,
-                    y_max - y_min,
-                    linewidth=1,
-                    edgecolor='white',
-                    facecolor=(1, 1, 1, 0.1),
-                    linestyle='-',
-                    path_effects=[
-                        plt.matplotlib.patheffects.withSimplePatchShadow() # Add shadow for better visibility
-                    ],
-                    zorder=2,
-                )
-                ax.add_patch(rect)
-                rects.append(rect)
-
-                # Add person_id annotation
-                annotation = ax.text(
-                    x_min,
-                    y_min - 10,
-                    f'Person {idx}',
-                    color='white',
-                    fontsize=7,
-                    bbox=dict(facecolor='black', alpha=0.5, boxstyle='round,pad=0.3'),
-                    zorder=3,
-                )
-                annotations.append(annotation)
+            draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations)
 
             # Set the title
             ax.set_title(f'{cam_name} - Click on the person to select', fontsize=14, fontweight='bold', color='black', pad=15)
@@ -370,7 +392,7 @@ def get_selected_id_list(multi_person, video_files, cam_names, cam_nb, json_file
 
             # Connect the update function to the slider
             slider.on_changed(lambda val: update(cap, image, slider, frame_to_json, pose_dir, json_dirs_names[i],
-                                                 keypoints_ids, rects, annotations, bounding_boxes_list, ax, fig, keypoints_all))
+                                                 rects, annotations, bounding_boxes_list, ax, fig))
 
             # Show the plot
             plt.show()
@@ -388,6 +410,7 @@ def get_selected_id_list(multi_person, video_files, cam_names, cam_nb, json_file
         selected_id_list = [None] * cam_nb
     
     return selected_id_list
+
 
 def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], multi_person=False, selected_id=None):
     '''
@@ -618,17 +641,6 @@ def synchronize_cams_all(config_dict):
         except:
             fps = 60  
     lag_range = time_range_around_maxspeed*fps # frames
-
-    ## May I remove this safely?
-    # Warning if multi_person 
-    # if multi_person:
-    #     logging.warning('\nYou set your project as a multi-person one: make sure you set `approx_time_maxspeed` and `time_range_around_maxspeed` at times where one single person is in the scene, or you may get inaccurate results.')
-    #     do_synchro = input('Do you want to continue? (y/n)')
-    #     if do_synchro.lower() not in ["y","yes"]:
-    #         logging.warning('Synchronization cancelled.')
-    #         return
-    #     else:
-    #         logging.warning('Synchronization will be attempted.\n')
 
     # Retrieve keypoints from model
     try: # from skeletons.py
