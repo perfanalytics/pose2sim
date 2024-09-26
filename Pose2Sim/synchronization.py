@@ -68,7 +68,6 @@ __status__ = "Development"
 def draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations):
     '''
     Draws the bounding boxes and annotations on the given axes.
-    Clears any existing rectangles and annotations.
 
     INPUTS:
     - ax: The axes object to draw on.
@@ -79,48 +78,31 @@ def draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotati
     OUTPUTS:
     - None. Modifies rects and annotations in place.
     '''
-    # Clear previous rectangles and annotations
-    for rect in rects:
-        rect.remove()
-    rects.clear()
-    for annotation in annotations:
-        annotation.remove()
-    annotations.clear()
+    # Clear existing rectangles and annotations
+    for items in [rects, annotations]:
+            for item in items:
+                item.remove()
+            items.clear()
 
     # Draw bounding boxes and annotations
-    for idx, bbox in enumerate(bounding_boxes_list):
-        if not np.all(np.isfinite(bbox)) or np.any(np.isnan(bbox)):
-            # Skip drawing for NaN bounding boxes but keep the index space
-            continue
+    for idx, (x_min, y_min, x_max, y_max) in enumerate(bounding_boxes_list):
+        if not np.isfinite([x_min, y_min, x_max, y_max]).all():
+            continue  # Skip invalid bounding boxes for solve issue(posx and posy should be finite values)
 
-        x_min, y_min, x_max, y_max = bbox
         rect = plt.Rectangle(
-            (x_min, y_min),
-            x_max - x_min,
-            y_max - y_min,
-            linewidth=1,
-            edgecolor='white',
-            facecolor=(1, 1, 1, 0.1),
-            linestyle='-',
-            path_effects=[
-                plt.matplotlib.patheffects.withSimplePatchShadow()
-            ],
-            zorder=2,
+            (x_min, y_min), x_max - x_min, y_max - y_min,
+            linewidth=1, edgecolor='white', facecolor=(1, 1, 1, 0.1),
+            linestyle='-', path_effects=[plt.matplotlib.patheffects.withSimplePatchShadow()], zorder=2
         )
         ax.add_patch(rect)
         rects.append(rect)
-        # Add person_id annotation
+
         annotation = ax.text(
-            x_min,
-            y_min - 10,
-            f'Person {idx}',
-            color='white',
-            fontsize=7,
-            fontweight='normal',
-            bbox=dict(facecolor='black', alpha=0.5, boxstyle='round,pad=0.3'),
-            zorder=3,
+            x_min, y_min - 10, f'Person {idx}', color='white', fontsize=7, fontweight='normal',
+            bbox=dict(facecolor='black', alpha=0.5, boxstyle='round,pad=0.3'), zorder=3
         )
         annotations.append(annotation)
+
 
 
 def reset_styles(rects, annotations):
@@ -162,72 +144,61 @@ def highlight_bounding_box(rect, annotation):
 
 def on_hover(event, fig, rects, annotations, bounding_boxes_list):
     '''
-    Event handler for mouse hover over the person's bounding box.
-
     Highlights the bounding box and annotation when the mouse hovers over a person in the plot.
-
+    
     INPUTS:
     - event: The hover event.
     - fig:  The figure object.
     - rects: The rectangles representing bounding boxes.
     - annotations: The annotations corresponding to each bounding box.
-    - bounding_boxes_list: list of tuples. Each tuple contains (x_min, y_min, x_max, y_max) of a bounding box.
+    - bounding_boxes_list: List of tuples containing bounding box coordinates.
 
     OUTPUTS:
     - None. This function updates the plot in place.
     '''
-    x_hover = event.xdata
-    y_hover = event.ydata
-    if x_hover is None or y_hover is None:
+    if event.xdata is None or event.ydata is None:
         return
 
-    # Reset all rectangle styles
+    # Reset styles of all rectangles and annotations
     reset_styles(rects, annotations)
 
-    # Check if the mouse is inside any bounding box
-    bounding_boxes_list = [bbox for bbox in bounding_boxes_list if np.all(np.isfinite(bbox)) and not np.any(np.isnan(bbox))] # remove NaN bounding boxes for make sure matching with rects
-    for idx, bbox in enumerate(bounding_boxes_list):
-        x_min, y_min, x_max, y_max = bbox
-        if x_min <= x_hover <= x_max and y_min <= y_hover <= y_max:
+    # Find and highlight the bounding box under the mouse cursor
+    # remove NaN bounding boxes for make sure matching with rects
+    bounding_boxes_list = [bbox for bbox in bounding_boxes_list if np.all(np.isfinite(bbox)) and not np.any(np.isnan(bbox))]
+    for idx, (x_min, y_min, x_max, y_max) in enumerate(bounding_boxes_list):
+        if x_min <= event.xdata <= x_max and y_min <= event.ydata <= y_max:
             highlight_bounding_box(rects[idx], annotations[idx])
             break
+
     fig.canvas.draw_idle()
+
 
 
 def on_click(event, ax, bounding_boxes_list, selected_idx_container):
     '''
-    Event handler for mouse click on the person's bouding box.
-
     Detects if a bounding box is clicked and records the index of the selected person.
 
     INPUTS:
     - event: The click event.
     - ax: The axes object of the plot.
-    - bounding_boxes_list: list of tuples. Each tuple contains (x_min, y_min, x_max, y_max) of a bounding box.
-    - selected_idx_container: list with one element. Used to store the index of the selected person.
+    - bounding_boxes_list: List of tuples containing bounding box coordinates.
+    - selected_idx_container: List with one element to store the selected person's index.
 
     OUTPUTS:
     - None. Updates selected_idx_container[0] with the index of the selected person.
     '''
-
-    if event.inaxes != ax: # ignore if the click is outside the plot
+    if event.inaxes != ax or event.xdata is None or event.ydata is None:
         return
-    
-    x_click = event.xdata
-    y_click = event.ydata
-    for idx, bbox in enumerate(bounding_boxes_list):
-        x_min, y_min, x_max, y_max = bbox
-        if x_min <= x_click <= x_max and y_min <= y_click <= y_max:
+
+    for idx, (x_min, y_min, x_max, y_max) in enumerate(bounding_boxes_list):
+        if x_min <= event.xdata <= x_max and y_min <= event.ydata <= y_max:
             selected_idx_container[0] = idx
             plt.close()
             break
 
-
 def update(cap, image, slider, frame_to_json, pose_dir, json_dir_name, rects, annotations, bounding_boxes_list, ax, fig):
     '''
     Updates the plot when the slider value changes.
-
-    Loads the new frame from the video and updates the bounding boxes and annotations.
 
     INPUTS:
     - cap: cv2.VideoCapture. The video capture object.
@@ -238,178 +209,131 @@ def update(cap, image, slider, frame_to_json, pose_dir, json_dir_name, rects, an
     - json_dir_name: str. Name of the JSON directory for the current camera.
     - rects: List of rectangle patches representing bounding boxes.
     - annotations: List of text annotations for each bounding box.
-    - bounding_boxes_list: list of tuples. List to store bounding boxes for the current frame.
+    - bounding_boxes_list: List of tuples to store bounding boxes for the current frame.
     - ax: The axes object of the plot.
     - fig: The figure object containing the plot.
 
     OUTPUTS:
-    - None. This function updates the plot with the new frame, bounding boxes, and annotations.
+    - None. Updates the plot with the new frame, bounding boxes, and annotations.
     '''
-    frame_number = int(slider.val) # current frame number
-    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number) 
+    frame_number = int(slider.val)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
     ret, frame = cap.read()
-    if ret:
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        image.set_data(frame_rgb)
 
-        # Read the JSON data for the current frame
-        json_file_name = frame_to_json.get(frame_number)
-        if json_file_name:
-            json_file_path = os.path.join(pose_dir, json_dir_name, json_file_name)
-            # Compute bounding boxes
-            bounding_boxes_list.clear()
-            bounding_boxes_list.extend(bounding_boxes(json_file_path))
-            # Remove bounding boxes with infinite or NaN values
-        else:
-            bounding_boxes_list.clear()
-            
-        # Draw bounding boxes and annotations
-        draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations)
-        fig.canvas.draw_idle()
+    if not ret:
+        return
+
+    # Update frame image
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    image.set_data(frame_rgb)
+
+    # Load bounding boxes from JSON
+    json_file_name = frame_to_json.get(frame_number)
+    bounding_boxes_list.clear()
+
+    if json_file_name:
+        json_file_path = os.path.join(pose_dir, json_dir_name, json_file_name)
+        bounding_boxes_list.extend(bounding_boxes(json_file_path))
+
+    # Draw bounding boxes and annotations
+    draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations)
+    fig.canvas.draw_idle()
 
 
-def get_selected_id_list(multi_person, video_files, cam_names, cam_nb, json_files_names_range, search_around_frames, pose_dir, json_dirs_names, keypoints_ids):
+def get_selected_id_list(multi_person, video_files, cam_names, cam_nb, json_files_names_range, search_around_frames, pose_dir, json_dirs_names):
     '''
-    Allows the user to select a person from each camera by clicking on their bounding box in the displayed video frames.
-    This function handles multiple cameras and returns a list of selected person indices for each camera.
+    Allows the user to select a person from each camera by clicking on their bounding box in the video frames.
 
     INPUTS:
     - multi_person: bool. Indicates whether multiple people are present in the videos.
     - video_files: list of str. Paths to the video files for each camera.
     - cam_names: list of str. Names of the cameras.
     - cam_nb: int. Number of cameras.
-    - json_files_names_range: list of lists. Each sublist contains JSON file names for a camera in a specific frame range.
-    - search_around_frames: list of tuples. Each tuple contains (start_frame, end_frame) for searching around frames in each camera.
+    - json_files_names_range: list of lists. Each sublist contains JSON file names for a camera.
+    - search_around_frames: list of tuples. Each tuple contains (start_frame, end_frame) for searching frames.
     - pose_dir: str. Path to the directory containing pose data.
     - json_dirs_names: list of str. Names of the JSON directories for each camera.
     - keypoints_ids: list of int. Indices of keypoints to consider.
 
     OUTPUTS:
-    - selected_id_list: list of int or None. List containing the index of the selected person for each camera.
-                        If no person is selected for a camera, None is appended for that camera.
+    - selected_id_list: list of int or None. List of the selected person indices for each camera.
     '''
-    if multi_person:
-        selected_id_list = []
+    if not multi_person:
+        return [None] * cam_nb
 
-        # Map video files to cameras
-        video_files_dict = {}
-        for video_file in video_files:
-            video_name = os.path.basename(video_file)
-            for cam_name in cam_names:
-                if cam_name in video_name:
-                    video_files_dict[cam_name] = video_file
-                    break
+    selected_id_list = []
+    video_files_dict = {cam_name: file for cam_name in cam_names for file in video_files if cam_name in os.path.basename(file)}
 
-        for i in range(cam_nb):
-            cam_name = cam_names[i]
-            video_file = video_files_dict.get(cam_name)
-            if not video_file:
-                logging.warning(f'No video file found for camera {cam_name}')
-                selected_id_list.append(None)
-                continue
+    for i, cam_name in enumerate(cam_names):
+        video_file = video_files_dict.get(cam_name)
+        if not video_file:
+            logging.warning(f'No video file found for camera {cam_name}')
+            selected_id_list.append(None)
+            continue
 
-            # Initialize video capture
-            cap = cv2.VideoCapture(video_file)
+        cap = cv2.VideoCapture(video_file)
+        frame_to_json = {int(re.split(r'(\d+)', name)[-2]): name for name in json_files_names_range[i]}
+        frame_number = search_around_frames[i][0]
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+        ret, frame = cap.read()
 
-            # Build mapping from frame numbers to JSON file names
-            json_frame_numbers = []
-            frame_to_json = {}
-            for json_file_name in json_files_names_range[i]:
-                frame_num = int(re.split(r'(\d+)', json_file_name)[-2])
-                json_frame_numbers.append(frame_num)
-                frame_to_json[frame_num] = json_file_name
-
-            # Set initial frame number
-            frame_number = search_around_frames[i][0]
-
-            # Read the initial frame
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
-            ret, frame = cap.read()
-            if not ret:
-                logging.warning(f'Cannot read frame {frame_number} from video {video_file}')
-                selected_id_list.append(None)
-                cap.release()
-                continue
-            
-            # Get the frame dimensions
-            frame_height, frame_width, _ = frame.shape # height, width, channels
-            fig_width = frame_width / 200 # I should test it more, but it was fine with demo
-            fig_height = frame_height / 250 # I should test it more, but it was fine with demo
-            
-            # Read the JSON data for the initial frame
-            json_file_name = frame_to_json.get(frame_number)
-            if json_file_name:
-                json_file_path = os.path.join(pose_dir, json_dirs_names[i], json_file_name)
-                with open(json_file_path) as j_f:
-                    json_data_all = json.load(j_f)['people']
-                keypoints_all = []
-                for p in json_data_all:
-                    keypoints = np.array([p['pose_keypoints_2d'][3*k:3*k+3] for k in keypoints_ids if p['pose_keypoints_2d'][3*k+2] >= 0.3])
-                    keypoints_all.append(keypoints)
-                bounding_boxes_list = bounding_boxes(json_file_path)
-            else:
-                logging.warning(f'No JSON data found for frame {frame_number}')
-                keypoints_all = []
-                bounding_boxes_list = []
-
-            # Set up the plot
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-            image = ax.imshow(frame_rgb)
-            rects = []
-            annotations = []
-            draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations)
-
-            # Set the title
-            ax.set_title(f'{cam_name} - Click on the person to select', fontsize=14, fontweight='bold', color='black', pad=15)
-            ax.axis('off') # Hide the grid
-
-            # Initialize selected_idx
-            selected_idx_container = [None]
-
-            # Connect event handlers
-            fig.canvas.mpl_connect('motion_notify_event', lambda event: on_hover(event, fig, rects, annotations, bounding_boxes_list))
-            fig.canvas.mpl_connect('button_press_event', lambda event: on_click(event, ax, bounding_boxes_list, selected_idx_container))
-
-            # Create the slider
-            ax_slider = plt.axes([ax.get_position().x0, 0.05, ax.get_position().width, 0.05])
-            slider = Slider(
-                ax_slider,
-                'Frame',
-                search_around_frames[i][0], # target frame range = search_around_frames
-                search_around_frames[i][1]-1, # -1 because starting from 0
-                valinit=frame_number,
-                valfmt='%0.0f', # integer
-                )
-
-            # Customize the slider appearance
-            ## font
-            slider.label.set_fontsize(10)
-            ## bar
-            slider.poly.set_edgecolor((0, 0, 0, 0.5)) # semi-transparent black
-            slider.poly.set_facecolor('lightblue')
-            slider.poly.set_linewidth(1)
-
-            # Connect the update function to the slider
-            slider.on_changed(lambda val: update(cap, image, slider, frame_to_json, pose_dir, json_dirs_names[i],
-                                                 rects, annotations, bounding_boxes_list, ax, fig))
-
-            # Show the plot
-            plt.show()
-
+        if not ret:
+            logging.warning(f'Cannot read frame {frame_number} from video {video_file}')
+            selected_id_list.append(None)
             cap.release()
+            continue
 
-            selected_idx = selected_idx_container[0]
-            if selected_idx is not None:
-                selected_id_list.append(selected_idx)
-                logging.info(f'Camera {cam_name}: selected person {selected_idx}')
-            else:
-                logging.warning(f'No person selected in camera {cam_name}')
-                selected_id_list.append(None)
-    else:
-        selected_id_list = [None] * cam_nb
-    
+        # Process frame data
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        bounding_boxes_list = []
+
+        json_file_name = frame_to_json.get(frame_number)
+        if json_file_name:
+            json_file_path = os.path.join(pose_dir, json_dirs_names[i], json_file_name)
+            bounding_boxes_list.extend(bounding_boxes(json_file_path))
+        else:
+            logging.warning(f'No JSON data found for frame {frame_number}')
+
+        # Initialize plot
+        frame_height, frame_width = frame_rgb.shape[:2]
+        fig_width, fig_height = frame_width / 200, frame_height / 250
+
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+        ax.imshow(frame_rgb)
+        ax.set_title(f'{cam_name} - Click on the person to select', fontsize=14, fontweight='bold', color='black', pad=15)
+        ax.axis('off')
+
+        rects, annotations = [], []
+        draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations)
+
+        selected_idx_container = [None]
+
+        # Event handling
+        fig.canvas.mpl_connect('motion_notify_event', lambda event: on_hover(event, fig, rects, annotations, bounding_boxes_list))
+        fig.canvas.mpl_connect('button_press_event', lambda event: on_click(event, ax, bounding_boxes_list, selected_idx_container))
+
+        # Add slider
+        ax_slider = plt.axes([ax.get_position().x0, 0.05, ax.get_position().width, 0.05])
+        slider = Slider(ax_slider, 'Frame', search_around_frames[i][0], search_around_frames[i][1] - 1, valinit=frame_number, valfmt='%0.0f')
+
+        # Customize slider
+        slider.label.set_fontsize(10)
+        slider.poly.set_edgecolor((0, 0, 0, 0.5))
+        slider.poly.set_facecolor('lightblue')
+        slider.poly.set_linewidth(1)
+
+        # Connect the update function to the slider
+        slider.on_changed(lambda val: update(cap, ax.images[0], slider, frame_to_json, pose_dir, json_dirs_names[i], rects, annotations, bounding_boxes_list, ax, fig))
+
+        # Show the plot and handle events
+        plt.show()
+        cap.release()
+
+        selected_id_list.append(selected_idx_container[0])
+        logging.info(f'{cam_name}: selected person {selected_idx_container[0]}')
+
     return selected_id_list
+
 
 
 def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], multi_person=False, selected_id=None):
@@ -709,7 +633,7 @@ def synchronize_cams_all(config_dict):
         raise ValueError(f'No json files found within the specified frame range ({frame_range}) at the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
     
     # Handle manual selection if multi person is True
-    selected_id_list = get_selected_id_list(multi_person, video_files, cam_names, cam_nb, json_files_names_range, search_around_frames, pose_dir, json_dirs_names, keypoints_ids)
+    selected_id_list = get_selected_id_list(multi_person, video_files, cam_names, cam_nb, json_files_names_range, search_around_frames, pose_dir, json_dirs_names)
 
     for i in range(cam_nb):
         df_coords.append(convert_json2pandas(json_files_range[i], likelihood_threshold=likelihood_threshold, keypoints_ids=keypoints_ids, multi_person=multi_person, selected_id=selected_id_list[i]))
