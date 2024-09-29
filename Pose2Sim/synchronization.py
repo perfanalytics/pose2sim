@@ -65,6 +65,35 @@ __status__ = "Development"
 
 
 # FUNCTIONS
+def load_frame_and_bounding_boxes(cap, frame_number, frame_to_json, pose_dir, json_dir_name):
+    '''
+    Given a video capture object and a frame number, load the frame and corresponding bounding boxes.
+
+    INPUTS:
+    - cap: cv2.VideoCapture object.
+    - frame_number: int. The frame number to load.
+    - frame_to_json: dict. Mapping from frame numbers to JSON file names.
+    - pose_dir: str. Path to the directory containing pose data.
+    - json_dir_name: str. Name of the JSON directory for the current camera.
+
+    OUTPUTS:
+    - frame_rgb: The RGB image of the frame.
+    - bounding_boxes_list: List of bounding boxes for the frame.
+    '''
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+    ret, frame = cap.read()
+    if not ret:
+        return None, []
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    json_file_name = frame_to_json.get(frame_number)
+    bounding_boxes_list = []
+    if json_file_name:
+        json_file_path = os.path.join(pose_dir, json_dir_name, json_file_name)
+        bounding_boxes_list.extend(bounding_boxes(json_file_path))
+    return frame_rgb, bounding_boxes_list
+
+
 def draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations):
     '''
     Draws the bounding boxes and annotations on the given axes.
@@ -93,7 +122,7 @@ def draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotati
             (x_min, y_min), x_max - x_min, y_max - y_min,
             linewidth=1, edgecolor='white', facecolor=(1, 1, 1, 0.1),
             linestyle='-', path_effects=[plt.matplotlib.patheffects.withSimplePatchShadow()], zorder=2
-        )
+        ) # add shadow
         ax.add_patch(rect)
         rects.append(rect)
 
@@ -196,6 +225,7 @@ def on_click(event, ax, bounding_boxes_list, selected_idx_container):
             plt.close()
             break
 
+
 def update(cap, image, slider, frame_to_json, pose_dir, json_dir_name, rects, annotations, bounding_boxes_list, ax, fig):
     '''
     Updates the plot when the slider value changes.
@@ -217,23 +247,17 @@ def update(cap, image, slider, frame_to_json, pose_dir, json_dir_name, rects, an
     - None. Updates the plot with the new frame, bounding boxes, and annotations.
     '''
     frame_number = int(slider.val)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
-    ret, frame = cap.read()
 
-    if not ret:
+    frame_rgb, bounding_boxes_list_new = load_frame_and_bounding_boxes(cap, frame_number, frame_to_json, pose_dir, json_dir_name)
+    if frame_rgb is None:
         return
 
     # Update frame image
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     image.set_data(frame_rgb)
 
-    # Load bounding boxes from JSON
-    json_file_name = frame_to_json.get(frame_number)
+    # Update bounding boxes
     bounding_boxes_list.clear()
-
-    if json_file_name:
-        json_file_path = os.path.join(pose_dir, json_dir_name, json_file_name)
-        bounding_boxes_list.extend(bounding_boxes(json_file_path))
+    bounding_boxes_list.extend(bounding_boxes_list_new)
 
     # Draw bounding boxes and annotations
     draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations)
@@ -253,7 +277,6 @@ def get_selected_id_list(multi_person, video_files, cam_names, cam_nb, json_file
     - search_around_frames: list of tuples. Each tuple contains (start_frame, end_frame) for searching frames.
     - pose_dir: str. Path to the directory containing pose data.
     - json_dirs_names: list of str. Names of the JSON directories for each camera.
-    - keypoints_ids: list of int. Indices of keypoints to consider.
 
     OUTPUTS:
     - selected_id_list: list of int or None. List of the selected person indices for each camera.
@@ -274,25 +297,13 @@ def get_selected_id_list(multi_person, video_files, cam_names, cam_nb, json_file
         cap = cv2.VideoCapture(video_file)
         frame_to_json = {int(re.split(r'(\d+)', name)[-2]): name for name in json_files_names_range[i]}
         frame_number = search_around_frames[i][0]
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
-        ret, frame = cap.read()
 
-        if not ret:
+        frame_rgb, bounding_boxes_list = load_frame_and_bounding_boxes(cap, frame_number, frame_to_json, pose_dir, json_dirs_names[i])
+        if frame_rgb is None:
             logging.warning(f'Cannot read frame {frame_number} from video {video_file}')
             selected_id_list.append(None)
             cap.release()
             continue
-
-        # Process frame data
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        bounding_boxes_list = []
-
-        json_file_name = frame_to_json.get(frame_number)
-        if json_file_name:
-            json_file_path = os.path.join(pose_dir, json_dirs_names[i], json_file_name)
-            bounding_boxes_list.extend(bounding_boxes(json_file_path))
-        else:
-            logging.warning(f'No JSON data found for frame {frame_number}')
 
         # Initialize plot
         frame_height, frame_width = frame_rgb.shape[:2]
@@ -333,7 +344,6 @@ def get_selected_id_list(multi_person, video_files, cam_names, cam_nb, json_file
         logging.info(f'{cam_name}: selected person {selected_idx_container[0]}')
 
     return selected_id_list
-
 
 
 def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], multi_person=False, selected_id=None):
