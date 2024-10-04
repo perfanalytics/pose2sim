@@ -481,7 +481,7 @@ def filter_all(config_dict):
         # Read trc coordinates values
         trc_df = pd.read_csv(t_in, sep="\t", skiprows=4)
         frames_col, time_col = trc_df.iloc[:,0], trc_df.iloc[:,1]
-        Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
+        Q_coord = trc_df.drop(trc_df.columns[[0, 1, -1]], axis=1)
 
         # Filter coordinates
         Q_filt = Q_coord.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
@@ -489,7 +489,7 @@ def filter_all(config_dict):
         # Display figures
         if display_figures:
             # Retrieve keypoints
-            keypoints_names = pd.read_csv(t_in, sep="\t", skiprows=3, nrows=0).columns[2::3].to_numpy()
+            keypoints_names = pd.read_csv(t_in, sep="\t", skiprows=3, nrows=0).columns[2::3][:-1].to_numpy()
             display_figures_fun(Q_coord, Q_filt, time_col, keypoints_names, person_id)
 
         # Reconstruct trc file with filtered coordinates

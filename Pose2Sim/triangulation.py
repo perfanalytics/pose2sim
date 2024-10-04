@@ -214,8 +214,8 @@ def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
     header_trc = ['PathFileType\t4\t(X/Y/Z)\t' + trc_f, 
             'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames', 
             '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, f_range[0], f_range[1]])),
-            'Frame#\tTime\t' + '\t\t\t'.join(keypoints_names) + '\t\t',
-            '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(keypoints_names))])]
+            'Frame#\tTime\t' + '\t\t\t'.join(keypoints_names) + '\t\t\t',
+            '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(keypoints_names))]) + '\t']
     
     # Zup to Yup coordinate system
     Q = zup2yup(Q)
