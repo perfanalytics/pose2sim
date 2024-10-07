@@ -80,7 +80,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
       5. [With Mediapipe BlazePose (legacy)](#with-mediapipe-blazepose-legacy)
       6. [With AlphaPose (legacy)](#with-alphapose-legacy)
    4. [Camera calibration](#camera-calibration)
-      1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
+      1. [Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-caliscope-anipose-freemocap-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
    5. [Synchronizing, Associatiating, Triangulating, Filtering](#synchronizing-associating-triangulating-filtering)
       1. [Synchronization](#synchronization)
@@ -444,7 +444,7 @@ Output file:
 <img src="Content/CalibFile.png" width="760">
 
 
-### Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
+### Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
 
 If you already have a calibration file, set `calibration_type` type to `convert` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 - **From [Caliscope](https://mprib.github.io/caliscope/), [AniPose](https://github.com/lambdaloop/anipose) or [FreeMocap](https://github.com/freemocap/freemocap):**  
