@@ -955,7 +955,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#9634; **Triangulation:** Pre-compile weighted_triangulation and reprojection with @jit(nopython=True, parallel=True) for faster execution.
 &#9634; **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).
 &#9634; **Triangulation:** Implement normalized DLT and RANSAC triangulation, Outlier rejection (sliding z-score?), as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).
-&#9634; **Triangulation:** Track hands and face (won't be taken into account in OpenSim at this stage).
+&#9634; **Triangulation:** Track hands and face, and add articulated OpenSim hand.
 
 &#10004; **Filtering:** Available filtering methods: Butterworth, Butterworth on speed, Gaussian, Median, LOESS (polynomial smoothing).
 &#10004; **Filtering:** Implement Kalman filter and Kalman smoother.
