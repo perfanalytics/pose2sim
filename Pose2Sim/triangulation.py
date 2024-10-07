@@ -310,7 +310,10 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     undistort_points = config_dict.get('triangulation').get('undistort_points')
     
     # Recap
-    calib_cam1 = calib[list(calib.keys())[0]]
+    cal_keys = [c for c in calib.keys() 
+                if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
+                and isinstance(calib[c],dict)]
+    calib_cam1 = calib[cal_keys[0]]
     fm = calib_cam1['matrix'][0][0]
     Dm = euclidean_distance(calib_cam1['translation'], [0,0,0])
 
