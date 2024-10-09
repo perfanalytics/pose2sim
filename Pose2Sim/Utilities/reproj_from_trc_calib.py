@@ -14,7 +14,7 @@
     the OpenPose format. If OpenPose is chosen, the HALPE_26 model is used, 
     with ear and eye at coordinates (0,0) since they are not used by Pose2Sim. 
     You can change the MODEL tree to a different one if you need to reproject 
-    in OpenPose format with a different model than HALPLE_26.
+    in OpenPose format with a different model than HALPE_26.
 
     New: Moving cameras and zooming cameras are now supported.
     
@@ -339,10 +339,12 @@ def reproj_from_trc_calib_func(**args):
     
     # Replace by nan when reprojection out of image
     for cam in range(len(P_all_frame)):
-        x_above_size = data_proj[cam].iloc[:,::2] < calib_params_size[cam][0]
-        data_proj[cam].iloc[:, ::2] = data_proj[cam].iloc[:, ::2].where(x_above_size, np.nan)
-        y_above_size = data_proj[cam].iloc[:,1::2] < calib_params_size[cam][1]
-        data_proj[cam].iloc[:, 1::2] = data_proj[cam].iloc[:, 1::2].where(y_above_size, np.nan)
+        x_valid = data_proj[cam].iloc[:,::2] < calib_params_size[cam][0]
+        y_valid = data_proj[cam].iloc[:,1::2] < calib_params_size[cam][1]
+        data_proj[cam].iloc[:, ::2] = data_proj[cam].iloc[:, ::2].where(x_valid, np.nan)
+        data_proj[cam].iloc[:, 1::2] = data_proj[cam].iloc[:, ::2].where(x_valid, np.nan)
+        data_proj[cam].iloc[:, ::2] = data_proj[cam].iloc[:, 1::2].where(y_valid, np.nan)
+        data_proj[cam].iloc[:, 1::2] = data_proj[cam].iloc[:, 1::2].where(y_valid, np.nan)
 
 
     # Save as h5 and csv if DeepLabCut format
@@ -382,8 +384,9 @@ def reproj_from_trc_calib_func(**args):
                 data_proj_frame = data_proj[cam].iloc[frame]['DavidPagnon']['person0']
                 # store 2D keypoints and respect model keypoint order
                 for (i,b) in zip(bodyparts_ids, bodyparts):
-                    # print(repr(data_proj_frame[b].values))
-                    json_dict_copy['people'][0]['pose_keypoints_2d'][[i*3,i*3+1,i*3+2]] = np.append(data_proj_frame[b].values, 1)
+                    # visibility: 2 visible, 1 occluded, 0 out of frame
+                    coords = data_proj_frame[b].values
+                    json_dict_copy['people'][0]['pose_keypoints_2d'][[i*3,i*3+1,i*3+2]] = np.array([0.0, 0.0, 0]) if np.isnan(coords).any() else np.append(coords, 2)
                 json_dict_copy['people'][0]['pose_keypoints_2d'] = json_dict_copy['people'][0]['pose_keypoints_2d'].tolist()
                 # write json file
                 json_file = os.path.join(cam_dir, f'{filename}_cam_{cam+1:02d}.{frame:05d}.json')
@@ -408,4 +411,4 @@ if __name__ == '__main__':
     parser.add_argument('-O', '--output_file_root', required=False, help='output file root path, without extension')
     args = vars(parser.parse_args())
 
-    reproj_from_trc_calib_func(**args) 
+    reproj_from_trc_calib_func(**args)
