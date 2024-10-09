@@ -346,7 +346,6 @@ def reproj_from_trc_calib_func(**args):
         data_proj[cam].iloc[:, ::2] = data_proj[cam].iloc[:, 1::2].where(y_valid, np.nan)
         data_proj[cam].iloc[:, 1::2] = data_proj[cam].iloc[:, 1::2].where(y_valid, np.nan)
 
-
     # Save as h5 and csv if DeepLabCut format
     if deeplabcut_output:
         # to h5
@@ -384,9 +383,7 @@ def reproj_from_trc_calib_func(**args):
                 data_proj_frame = data_proj[cam].iloc[frame]['DavidPagnon']['person0']
                 # store 2D keypoints and respect model keypoint order
                 for (i,b) in zip(bodyparts_ids, bodyparts):
-                    # visibility: 2 visible, 1 occluded, 0 out of frame
-                    coords = data_proj_frame[b].values
-                    json_dict_copy['people'][0]['pose_keypoints_2d'][[i*3,i*3+1,i*3+2]] = np.array([0.0, 0.0, 0]) if np.isnan(coords).any() else np.append(coords, 2)
+                    json_dict_copy['people'][0]['pose_keypoints_2d'][[i*3,i*3+1,i*3+2]] = np.append(data_proj_frame[b].values, 1)
                 json_dict_copy['people'][0]['pose_keypoints_2d'] = json_dict_copy['people'][0]['pose_keypoints_2d'].tolist()
                 # write json file
                 json_file = os.path.join(cam_dir, f'{filename}_cam_{cam+1:02d}.{frame:05d}.json')
