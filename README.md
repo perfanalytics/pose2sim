@@ -663,7 +663,8 @@ This can be either done fully automatically within Pose2Sim, or manually within 
 
 ### Within Pose2Sim
 > *Scaling and inverse kinematics are performed in a fully automatic way for each trc file.*\
-> *No need for a static trial!*
+> *No need for a static trial!*\
+> _**Note that automatic scaling is not recommended when the participant is mostly crouching or sitting. In this case, scale manually on a standing trial**_ (see [next section](#within-opensim-gui)).
 
 > Model scaling is done according to the mean of the segment lengths, across a subset of frames. We remove the 10% fastest frames (potential outliers), the frames where the speed is 0 (person probably out of frame), and the 40% most extreme segment values (potential outliers).
 
@@ -689,9 +690,7 @@ Once you have the scaled model and the joint angles, you are free to go further!
 <br>
 
 ### Within OpenSim GUI
-If you are not fully satisfied with the results, you can perform scaling and inverse kinematics in a more traditional way, with (or without) a static trial.
-
-
+If you are not fully satisfied with the results or on sitting or crouching trials, you can perform scaling and inverse kinematics in a more traditional way, with (or without) a static trial.
 
 **Scaling**
 1. Choose a time range where the 3D keypoints are particularly well reconstructed, or capture a static pose, typically an A-pose...
