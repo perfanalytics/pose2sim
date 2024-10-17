@@ -23,6 +23,12 @@
 and lens distortions are better taken into account.\ -->
 > To upgrade, type `pip install pose2sim --upgrade`
 
+<!-- GitHub Star Button -->
+<!-- 
+<a class="github-button" href="https://github.com/perfanalytics/pose2sim" data-color-scheme="no-preference: light; light: light; dark: dark;" data-icon="octicon-star" data-show-count="true" aria-label="Star perfanalytics/pose2sim on GitHub">Star</a>
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+-->
+
 <br>
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to traditional marker-based MoCap methods. 
