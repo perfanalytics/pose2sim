@@ -200,8 +200,8 @@ All of them are clearly documented: feel free to play with them!
 - You can run all stages at once: 
   ``` python
   from Pose2Sim import Pose2Sim
-  Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_kinematics=True)
-  # or simply: Pose2Sim.runAll()
+  Pose2Sim.runAll()
+  # or: Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_kinematics=True)
   ```
 - Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
 - Note that **Pose2Sim.markerAugmentation()** does not necessarily improve results--*in fact, results are worse half of the time.* You can choose to not run this command, and save an additional 1.3 GB by uninstalling tensorflow: `pip uninstall tensorflow`.
