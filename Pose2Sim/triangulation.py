@@ -764,7 +764,7 @@ def triangulate_all(config_dict):
     json_files_names = [sort_stringlist_by_last_number(js) for js in json_files_names]    
 
     # frame range selection
-    f_range = [[0,max([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
+    f_range = [[0,min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
     frame_nb = f_range[1] - f_range[0]
     
     # Check that camera number is consistent between calibration file and pose folders
