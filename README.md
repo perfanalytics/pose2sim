@@ -536,7 +536,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 ### Synchronization
 
-> _**Cameras need to be synchronized, so that 2D points correspond to the same position across cameras.**_\
+> _**2D points can be triangulated only if they represent the same body position across view: therefore, cameras need to be synchronized.**_\
 ***N.B.:** Skip this step if your cameras are natively synchronized.*
 
 Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
@@ -552,13 +552,14 @@ Pose2Sim.synchronization()
 </br>
 
 For each camera, this computes mean vertical speed for the chosen keypoints, and finds the time offset for which their correlation is highest.\
-All keypoints can be taken into account, or a subset of them. The user can also specify a time for each camera when only one participant is in the scene, preferably performing a clear vertical motion. 
+All keypoints can be taken into account, or a subset of them. The user can also specify a time for each camera when the participant is roughly horizontally static but with a clear vertical motion (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly). 
 
 <img src="Content/synchro.jpg" width="760">
 
 *N.B.:* Works best when:
-- only one participant is in the scene (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly)
-- the participant is at a roughly equal distance from all cameras
+- only one participant is in the scene
+- the participant does not move towards or away from the cameras
+- they perform a clear vertical movement
 - the capture lasts at least 5 seconds long, so that there is enough data to synchronize on
 - the capture lasts a few minutes maximum, so that camera are less likely to [drift with time](https://github.com/mprib/caliscope/discussions/496)
 
