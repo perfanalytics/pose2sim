@@ -1,0 +1,86 @@
+solid Visualization Toolkit generated SLA File
+ facet normal -1 0 0
+  outer loop
+   vertex -0.05 -0.05 -0.05
+   vertex -0.05 -0.05 0.05
+   vertex -0.05 0.05 -0.05
+  endloop
+ endfacet
+ facet normal 1 0 0
+  outer loop
+   vertex -0.05 0.05 0.05
+   vertex -0.05 0.05 -0.05
+   vertex -0.05 -0.05 0.05
+  endloop
+ endfacet
+ facet normal -1 0 0
+  outer loop
+   vertex 0.05 -0.05 -0.05
+   vertex 0.05 0.05 -0.05
+   vertex 0.05 -0.05 0.05
+  endloop
+ endfacet
+ facet normal 1 0 0
+  outer loop
+   vertex 0.05 0.05 0.05
+   vertex 0.05 -0.05 0.05
+   vertex 0.05 0.05 -0.05
+  endloop
+ endfacet
+ facet normal -1 0 0
+  outer loop
+   vertex -0.05 -0.05 -0.05
+   vertex 0.05 -0.05 -0.05
+   vertex -0.05 -0.05 0.05
+  endloop
+ endfacet
+ facet normal 1 0 0
+  outer loop
+   vertex 0.05 -0.05 0.05
+   vertex -0.05 -0.05 0.05
+   vertex 0.05 -0.05 -0.05
+  endloop
+ endfacet
+ facet normal -1 0 0
+  outer loop
+   vertex -0.05 0.05 -0.05
+   vertex -0.05 0.05 0.05
+   vertex 0.05 0.05 -0.05
+  endloop
+ endfacet
+ facet normal 1 0 0
+  outer loop
+   vertex 0.05 0.05 0.05
+   vertex 0.05 0.05 -0.05
+   vertex -0.05 0.05 0.05
+  endloop
+ endfacet
+ facet normal -1 0 0
+  outer loop
+   vertex -0.05 -0.05 -0.05
+   vertex -0.05 0.05 -0.05
+   vertex 0.05 -0.05 -0.05
+  endloop
+ endfacet
+ facet normal 1 0 0
+  outer loop
+   vertex 0.05 0.05 -0.05
+   vertex 0.05 -0.05 -0.05
+   vertex -0.05 0.05 -0.05
+  endloop
+ endfacet
+ facet normal -1 0 0
+  outer loop
+   vertex -0.05 -0.05 0.05
+   vertex 0.05 -0.05 0.05
+   vertex -0.05 0.05 0.05
+  endloop
+ endfacet
+ facet normal 1 0 0
+  outer loop
+   vertex 0.05 0.05 0.05
+   vertex -0.05 0.05 0.05
+   vertex 0.05 -0.05 0.05
+  endloop
+ endfacet
+endsolid

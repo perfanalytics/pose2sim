@@ -8,20 +8,19 @@
     ##################################################
     
     Reproject 3D points from a trc file to the camera planes determined by a 
-    toml calibration file.
+    toml calibration file, to the DeepLabCut (default), MMpose, or 
+    OpenPose format.
 
-    The output 2D points can be chosen to follow the DeepLabCut (default) or 
-    the OpenPose format. If OpenPose is chosen, the HALPE_26 model is used, 
-    with ear and eye at coordinates (0,0) since they are not used by Pose2Sim. 
-    You can change the MODEL tree to a different one if you need to reproject 
-    in OpenPose format with a different model than HALPLE_26.
+    The order or the markers depends on the markerset chosen markerset--it is the same as in the trc file if unspecified.
+    You can change the marker order in CONSTANTS if you need to.
 
     New: Moving cameras and zooming cameras are now supported.
     
     Usage: 
     from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', '<output_format>', r'<output_file_root>')
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -o
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -o -u
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -odm
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -odm --markerset halpe26
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file --openpose --deeplabcut --mmpose --undistort
     python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -d -o output_file_root
 '''
 
@@ -33,6 +32,7 @@ import numpy as np
 import toml
 import cv2
 import json
+import re
 from anytree import Node, RenderTree
 from copy import deepcopy
 import argparse
@@ -49,50 +49,20 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
-## SKELETON
-'''HALPE_26 (full-body without hands, from AlphaPose, MMPose, etc.)
-https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md
-https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose'''
-MODEL = Node("Hip", id=19, children=[
-    Node("RHip", id=12, children=[
-        Node("RKnee", id=14, children=[
-            Node("RAnkle", id=16, children=[
-                Node("RBigToe", id=21, children=[
-                    Node("RSmallToe", id=23),
-                ]),
-                Node("RHeel", id=25),
-            ]),
-        ]),
-    ]),
-    Node("LHip", id=11, children=[
-        Node("LKnee", id=13, children=[
-            Node("LAnkle", id=15, children=[
-                Node("LBigToe", id=20, children=[
-                    Node("LSmallToe", id=22),
-                ]),
-                Node("LHeel", id=24),
-            ]),
-        ]),
-    ]),
-    Node("Neck", id=18, children=[
-        Node("Head", id=17, children=[
-            Node("Nose", id=0),
-        ]),
-        Node("RShoulder", id=6, children=[
-            Node("RElbow", id=8, children=[
-                Node("RWrist", id=10),
-            ]),
-        ]),
-        Node("LShoulder", id=5, children=[
-            Node("LElbow", id=7, children=[
-                Node("LWrist", id=9),
-            ]),
-        ]),
-    ]),
-])
+# CONSTANTS
+halpe26_markers = ['NOSB', 'LEYE', 'REYE', 'LEAR', 'REAR', 'shoulder_l', 'shoulder_r', 'elb_l', 'elb_r', 'wrist_l', 'wrist_r', 'hip_l', 'hip_r', 'knee_l', 'knee_r', 'ankle_l', 'ankle_r', 'THD', 'C7', 'SACR', 'MTP1_L', 'MTP1_R', 'MTP5_L', 'MTP5_R', 'HEEL_L', 'HEEL_R']
+halpeplus_markers = ['NOSB', 'shoulder_l', 'shoulder_r', 'elb_l', 'elb_r', 'wrist_l', 'wrist_r', 'hip_l', 'hip_r', 'knee_l', 'knee_r', 'ankle_l', 'ankle_r', 'THD', 'C7', 'SACR', 'MTP1_L', 'MTP1_R', 'MTP5_L', 'MTP5_R', 'HEEL_L', 'HEEL_R', 'LHPE', 'RHPE', 'LHPI', 'RHPI', 'TOE_L', 'TOE_R', 'T10', 'UA_L', 'UA_R', 'LA_L', 'LA_R', 'UL_L', 'UL_R', 'LL_L', 'LL_R']
+biocvplus_markers = ['ACROM_R', 'ACROM_L', 'C7', 'T10', 'CLAV', 'XIP_PROC', 'UA_R', 'ELB_LAT_R', 'ELB_MED_R', 'LA_R', 'WRI_LAT_R', 'WRI_MED_R', 'HAND_R', 'UA_L', 'ELB_LAT_L', 'ELB_MED_L', 'LA_L', 'WRI_LAT_L', 'WRI_MED_L', 'HAND_L', 'ASIS_R', 'ASIS_L', 'PSIS_R', 'PSIS_L', 'ILCREST_R', 'ILCREST_L', 'UL_R', 'KNEE_LAT_R', 'KNEE_MED_R', 'LL_R', 'MAL_LAT_R', 'MAL_MED_R', 'HEEL_R', 'MTP1_R', 'MTP5_R', 'TOE_R', 'UL_L', 'KNEE_LAT_L', 'KNEE_MED_L', 'LL_L', 'MAL_LAT_L', 'MAL_MED_L', 'HEEL_L', 'MTP1_L', 'MTP5_L', 'TOE_L', 'THD', 'NOSB']
 
 
 ## FUNCTIONS
+def str_to_id(string):
+    '''
+    Convert a string to an integer id
+    '''
+    return ''.join([str(abs(ord(char) - 96)) for char in string])
+
+
 def computeP(calib_file, undistort=False):
     '''
     Compute projection matrices from toml calibration file.
@@ -252,38 +222,171 @@ def yup2zup(Q):
     return Q
 
 
+def dataset_to_openpose(coords_df, openpose_path_root, marker_list=['NOSB', 'shoulder_l', 'shoulder_r', 'elb_l', 'elb_r', 'wrist_l', 'wrist_r', 'hip_l', 'hip_r', 'knee_l', 'knee_r', 'ankle_l', 'ankle_r', 'THD', 'C7', 'SACR', 'MTP1_L', 'MTP1_R', 'MTP5_L', 'MTP5_R', 'HEEL_L', 'HEEL_R', 'LHPE', 'RHPE', 'LHPI', 'RHPI', 'TOE_L', 'TOE_R', 'T10', 'UA_L', 'UA_R', 'LA_L', 'LA_R', 'UL_L', 'UL_R', 'LL_L', 'LL_R']):
+    '''
+    Write 2D labels to OpenPose format.
+
+    INPUTS:
+    - coords_df: pandas dataframe with 2D labels. E.g.: all_dfs = pd.read_csv(dlc_labels_path, header = [0,1,2,3], index_col=0)
+    - openpose_path_root: path to save the json files (frame number will be appended)
+    - marker_list: list of markers in the order provided by the dataset. E.g. for Halpeplus: ['NOSB', 'shoulder_l', 'shoulder_r', 'elb_l', 'elb_r', 'wrist_l', 'wrist_r', 'hip_l', 'hip_r', 'knee_l', 'knee_r', 'ankle_l', 'ankle_r', 'THD', 'C7', 'SACR', 'MTP1_L', 'MTP1_R', 'MTP5_L', 'MTP5_R', 'HEEL_L', 'HEEL_R', 'LHPE', 'RHPE', 'LHPI', 'RHPI', 'TOE_L', 'TOE_R', 'T10', 'UA_L', 'UA_R', 'LA_L', 'LA_R', 'UL_L', 'UL_R', 'LL_L', 'LL_R']
+
+    OUTPUTS:
+    - coordinates written in the openpose json format (one per frame)
+    '''
+    
+    #prepare json files
+    json_dict = {'version':1.3, 'people':[]}
+    json_dict['people'] = [{'person_id':[-1], 
+                    'pose_keypoints_2d': np.zeros(len(marker_list)*3), 
+                    'face_keypoints_2d': [], 
+                    'hand_left_keypoints_2d':[], 
+                    'hand_right_keypoints_2d':[], 
+                    'pose_keypoints_3d':[], 
+                    'face_keypoints_3d':[], 
+                    'hand_left_keypoints_3d':[], 
+                    'hand_right_keypoints_3d':[]}]
+    
+    # write one json file per camera and per frame
+    persons = list(set(['_'.join(item.split('_')[:5]) for item in coords_df.columns.levels[1]]))
+    for frame in range(len(coords_df)):
+        for person in persons:
+            json_dict_copy = deepcopy(json_dict)
+            coords = coords_df.iloc[frame, coords_df.columns.get_level_values(1)==person]
+            # store 2D keypoints and respect model keypoint order
+            coords_list = []
+            for marker in marker_list:
+                coords_mk = coords.loc[coords.index.get_level_values(2)==marker]
+                coords_list += [0.0, 0.0, 0] if np.isnan(coords_mk).any() else coords_mk.tolist()+[1]
+            json_dict_copy['people'][0]['pose_keypoints_2d'] = coords_list
+
+        # write json file
+        json_file = os.path.join(os.path.dirname(openpose_path_root), f'{os.path.splitext(os.path.basename(openpose_path_root))[0]}_{frame:04d}.json')
+        with open(json_file, 'w') as js_f:
+            js_f.write(json.dumps(json_dict_copy))
+
+
+def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom', marker_list=['NOSB', 'shoulder_l', 'shoulder_r', 'elb_l', 'elb_r', 'wrist_l', 'wrist_r', 'hip_l', 'hip_r', 'knee_l', 'knee_r', 'ank_l', 'ankle_r', 'THD', 'CY', 'SACR', 'MTP1_L', 'MTP1_R', 'MTP5_L', 'MTP5_R', 'HEEL_L', 'HEEL_R', 'LHPE', 'RHPE', 'LHPI', 'RHPI', 'TOE_L', 'TOE_R', 'T10', 'UA_L', 'UA_R', 'LA_L', 'LA_R', 'UL_L', 'UL_R', 'LL_L', 'LL_R']):
+    '''
+    Export 2D labels to MMPose format.
+
+    INPUTS:
+    - coords_df: pandas dataframe with 2D labels. E.g.: all_dfs = pd.read_csv(dlc_labels_path, header = [0,1,2,3]), index_col=0)
+    - mmpose_json_file: path to save the json file
+    - img_size: image size [width, height]
+    - markerset: name of the markerset. E.g.: 'halpe26', 'halpeplus', 'biocvplus'
+    - marker_list: list of markers from inverse kinematics and/or SMPL mesh. E.g.: ['ankle_l', 'NOSB',]
+
+    OUTPUTS:
+    - labels2d_json: saved json file
+    '''
+
+    # transform first name in integer, and append other numbers from persons
+    persons = list(set(['_'.join(item.split('_')[:5]) for item in coords_df.columns.levels[1]]))
+    person_ids = [str_to_id(p.split('_')[1]) + ''.join(p.split('_')[3:]) if len(p.split('_'))>=3 
+                  else str_to_id(p.split('_')[0]) 
+                  for p in persons]
+    
+    labels2d_json_data = {}
+    labels2d_json_data['info'] = {'description': f'Bedlam Pose {markerset}', 
+                                    'url': 'https://github.com/davidpagnon/bedlam_pose', 
+                                    'version': '0.1', 
+                                    'year': 2024, 
+                                    'contributor': 'David Pagnon', 
+                                    'date_created': '2024/08/14'}
+    labels2d_json_data['licenses'] = [{'url': 'https://bedlam.is.tue.mpg.de/license.html', 'id': 1, 'name': 'Non-commercial scientific research purposes'},
+                                        {'url': 'https://creativecommons.org/licenses/by/4.0/deed.en', 'id': 2, 'name': 'Attribution License'}]
+    labels2d_json_data['images'] = []
+    labels2d_json_data['annotations'] = []
+    labels2d_json_data['categories'] = [{'id': 1, 'name': 'person'}]
+
+    # for each image
+    for i in range(len(coords_df)):
+        file_name = coords_df.index[i]
+        w, h = img_size
+        # id from concatenation of numbers from path
+        file_id = ''.join(re.findall(r'\d+', str(file_name)))
+
+        labels2d_json_data['images'] += [{'file_name': file_name, 
+                                            'height': str(h), 
+                                            'width': str(w), 
+                                            'id': file_id, 
+                                            'license': 1}]
+        
+        # for each person
+        for p, person in enumerate(persons):
+            # store 2D keypoints and respect model keypoint order
+            coords = coords_df.iloc[i, coords_df.columns.get_level_values(1)==person]
+            coords_list = []
+            for marker in marker_list:
+                # visibility: 2 visible, 1 occluded, 0 out of frame
+                coords_mk = coords.loc[coords.index.get_level_values(2)==marker]
+                coords_list += [0.0, 0.0, 0] if np.isnan(coords_mk).any() else coords_mk.tolist()+[2]
+            
+            # bbox
+            min_x = np.nanmin(coords.loc[coords.index.get_level_values(3)=='x'])
+            min_y = np.nanmin(coords.loc[coords.index.get_level_values(3)=='y'])
+            max_x = np.nanmax(coords.loc[coords.index.get_level_values(3)=='x'])
+            max_y = np.nanmax(coords.loc[coords.index.get_level_values(3)=='y'])
+            bbox = [min_x, min_y, max_x, max_y]
+            # bbox_width = max_x - min_x
+            # bbox_height = max_y - min_y
+            # bbox = [min_x, min_y, bbox_width, bbox_height]
+
+            # num_keypoints, id, category_id
+            num_keypoints = len(marker_list)
+            id = person_ids[p]
+            category_id = 1
+            # segmentation and area not filled, and each annotation represents one single person
+            segmentation = []
+            area = 0
+            iscrowd = 0 # 1 if len(persons)>1 else 0
+            labels2d_json_data['annotations'] += [{ 'keypoints': coords_list, 
+                                                    'num_keypoints': num_keypoints, 
+                                                    'bbox': bbox, 
+                                                    'id': id, 
+                                                    'image_id': file_id, 
+                                                    'category_id': category_id, 
+                                                    'segmentation': segmentation, 
+                                                    'area': area, 
+                                                    'iscrowd': iscrowd}]
+    
+    with open(mmpose_json_file, 'w') as f:
+        json.dump(labels2d_json_data, f)
+
+
 def reproj_from_trc_calib_func(**args):
     '''
     Reproject 3D points from a trc file to the camera planes determined by a 
-    toml calibration file.
-    
-    The output 2D points can be chosen to follow the DeepLabCut (default) or 
-    the OpenPose format. If OpenPose is chosen, the HALPE_26 model is used, 
-    with ear and eye at coordinates (0,0) since they are not used by Pose2Sim. 
-    You can change the MODEL tree to a different one if you need to reproject 
-    in OpenPose format with a different model than HALPLE_26.
+    toml calibration file, to the DeepLabCut (default), MMpose, or 
+    OpenPose format.
+
+    The order or the markers depends on the markerset chosen markerset--it is the same as in the trc file if unspecified.
+    You can change the marker order in CONSTANTS if you need to.
 
     New: Moving cameras and zooming cameras are now supported.
     
     Usage: 
-    from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(input_trc_file = r'<input_trc_file>', input_calib_file = r'<input_calib_file>', openpose_output=True, deeplabcut_output=True, undistort_points=True, output_file_root = r'<output_file_root>')
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -o
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file --openpose_output --deeplabcut_output --undistort_points --output_file_root output_file_root
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -o -O output_file_root
+    from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', '<output_format>', r'<output_file_root>')
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -odm
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file --openpose --deeplabcut --mmpose --undistort
+    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -d -o output_file_root
     '''
 
     input_trc_file = os.path.realpath(args.get('input_trc_file')) # invoked with argparse
     input_calib_file = os.path.realpath(args.get('input_calib_file'))
-    openpose_output = args.get('openpose_output')
-    deeplabcut_output = args.get('deeplabcut_output')
+    openpose_output = args.get('openpose')
+    deeplabcut_output = args.get('deeplabcut')
+    mmpose_output = args.get('mmpose')
+    markerset = args.get('markerset')
     undistort_points = args.get('undistort_points')
     output_file_root = args.get('output_file_root')
     if output_file_root == None:
         output_file_root = input_trc_file.replace('.trc', '_reproj')
     if os.path.exists(output_file_root):
         os.makedirs(output_file_root, exist_ok=True)
-    if not openpose_output and not deeplabcut_output:
-        raise ValueError('Output_format must be specified either "openpose_output" (-o) or "deeplabcut_output (-d)"') 
+    if not openpose_output and not deeplabcut_output and not mmpose_output:
+        raise ValueError('Output_format must be specified either "openpose" (-o), "deeplabcut" (-d), or "mmpose" (-m)')
 
     # Extract data from trc file
     header_trc, data_trc = df_from_trc(input_trc_file)
@@ -339,60 +442,47 @@ def reproj_from_trc_calib_func(**args):
     
     # Replace by nan when reprojection out of image
     for cam in range(len(P_all_frame)):
-        x_above_size = data_proj[cam].iloc[:,::2] < calib_params_size[cam][0]
-        data_proj[cam].iloc[:, ::2] = data_proj[cam].iloc[:, ::2].where(x_above_size, np.nan)
-        y_above_size = data_proj[cam].iloc[:,1::2] < calib_params_size[cam][1]
-        data_proj[cam].iloc[:, 1::2] = data_proj[cam].iloc[:, 1::2].where(y_above_size, np.nan)
+        x_valid = data_proj[cam].iloc[:,::2] < calib_params_size[cam][0]
+        y_valid = data_proj[cam].iloc[:,1::2] < calib_params_size[cam][1]
+        data_proj[cam].iloc[:, ::2] = data_proj[cam].iloc[:, ::2].where(x_valid, np.nan)
+        data_proj[cam].iloc[:, ::2] = np.where(y_valid==False, np.nan, data_proj[cam].iloc[:, ::2])
+        data_proj[cam].iloc[:, 1::2] = data_proj[cam].iloc[:, 1::2].where(y_valid, np.nan)
+        data_proj[cam].iloc[:, 1::2] = np.where(x_valid==False, np.nan, data_proj[cam].iloc[:, 1::2])
 
+    # Marker list in the right order
+    if markerset == 'halpe26':
+        marker_list = halpe26_markers
+    elif markerset == 'halpeplus':
+        marker_list = halpeplus_markers
+    elif markerset == 'biocvplus':
+        marker_list = biocvplus_markers
+    else:
+        marker_list = list(dict.fromkeys(data_proj[cam].columns.get_level_values(2)[1:]))
 
     # Save as h5 and csv if DeepLabCut format
     if deeplabcut_output:
         # to h5
-        h5_files = [os.path.join(cam_dir,f'{filename}_cam_{i+1:02d}.h5') for i,cam_dir in enumerate(cam_dirs)]
+        h5_files = [os.path.join(cam_dir,f'{filename}_cam_{i+1:02d}_dlc.h5') for i,cam_dir in enumerate(cam_dirs)]
         [data_proj[i].to_hdf(h5_files[i], index=True, key='reprojected_points') for i in range(len(P_all))]
 
         # to csv
-        csv_files = [os.path.join(cam_dir,f'{filename}_cam_{i+1:02d}.csv') for i,cam_dir in enumerate(cam_dirs)]
+        csv_files = [os.path.join(cam_dir,f'{filename}_cam_{i+1:02d}_dlc.csv') for i,cam_dir in enumerate(cam_dirs)]
         [data_proj[i].to_csv(csv_files[i], sep=',', index=True, lineterminator='\n') for i in range(len(P_all))]
 
-    # Save as json if OpenPose format
-    elif openpose_output:
-        # read model tree
-        model = MODEL
-        print('Keypoint hierarchy:')
-        for pre, _, node in RenderTree(model): 
-            print(f'{pre}{node.name} id={node.id}')
-        bodyparts_ids = [[node.id for _, _, node in RenderTree(model) if node.name==b][0] for b in bodyparts]
-        nb_joints = len(bodyparts_ids)
-        #prepare json files
-        json_dict = {'version':1.3, 'people':[]}
-        json_dict['people'] = [{'person_id':[-1], 
-                        'pose_keypoints_2d': np.zeros(nb_joints*3), 
-                        'face_keypoints_2d': [], 
-                        'hand_left_keypoints_2d':[], 
-                        'hand_right_keypoints_2d':[], 
-                        'pose_keypoints_3d':[], 
-                        'face_keypoints_3d':[], 
-                        'hand_left_keypoints_3d':[], 
-                        'hand_right_keypoints_3d':[]}]
-        # write one json file per camera and per frame
+    # Save as json if Coco/MMpose format
+    if mmpose_output:
         for cam, cam_dir in enumerate(cam_dirs):
-            for frame in range(len(Q)):
-                json_dict_copy = deepcopy(json_dict)
-                data_proj_frame = data_proj[cam].iloc[frame]['DavidPagnon']['person0']
-                # store 2D keypoints and respect model keypoint order
-                for (i,b) in zip(bodyparts_ids, bodyparts):
-                    # print(repr(data_proj_frame[b].values))
-                    json_dict_copy['people'][0]['pose_keypoints_2d'][[i*3,i*3+1,i*3+2]] = np.append(data_proj_frame[b].values, 1)
-                json_dict_copy['people'][0]['pose_keypoints_2d'] = json_dict_copy['people'][0]['pose_keypoints_2d'].tolist()
-                # write json file
-                json_file = os.path.join(cam_dir, f'{filename}_cam_{cam+1:02d}.{frame:05d}.json')
-                with open(json_file, 'w') as js_f:
-                    js_f.write(json.dumps(json_dict_copy))
-            print('Camera #', cam, 'done.')
+            mmpose_json_file = os.path.join(cam_dir, f'{filename}_cam_{cam+1:02d}_mmpose.json')
+            dataset_to_mmpose2d(data_proj[cam], mmpose_json_file, calib_params_size[cam], markerset=markerset, marker_list=marker_list)
+        
+    # Save as json if OpenPose format
+    if openpose_output:
+        for cam, cam_dir in enumerate(cam_dirs):
+            openpose_path_root = os.path.join(cam_dir, f'{filename}_cam{cam+1:02d}_openpose.json')
+            dataset_to_openpose(data_proj[cam], openpose_path_root, marker_list=marker_list)
             
     # Wrong format
-    else:
+    if not openpose_output and not deeplabcut_output and not mmpose_output:
         raise ValueError('output_format must be either "openpose" or "deeplabcut"')
     
     print(f'Reprojected points saved at {output_file_root}.')
@@ -402,10 +492,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--input_trc_file', required = True, help='trc 3D coordinates input file path')
     parser.add_argument('-c', '--input_calib_file', required = True, help='toml calibration input file path')
-    parser.add_argument('-o', '--openpose_output', required=False, action='store_true', help='output format in the openpose json format')
-    parser.add_argument('-d', '--deeplabcut_output', required=False, action='store_true', help='output format in the deeplabcut csv and json formats')
+    parser.add_argument('-o', '--openpose', required=False, action='store_true', help='output format in the openpose json format')
+    parser.add_argument('-d', '--deeplabcut', required=False, action='store_true', help='output format in the deeplabcut csv and h5 formats')
+    parser.add_argument('-m', '--mmpose', required=False, action='store_true', help='output format in the Coco/MMpose json format')
+    parser.add_argument('-s', '--markerset', required=False, help='markerset name, e.g. halpe26, halpeplus, biocvplus')
     parser.add_argument('-u', '--undistort_points', required=False, action='store_true', help='takes distortion into account if True')
     parser.add_argument('-O', '--output_file_root', required=False, help='output file root path, without extension')
     args = vars(parser.parse_args())
 
-    reproj_from_trc_calib_func(**args) 
+    reproj_from_trc_calib_func(**args)

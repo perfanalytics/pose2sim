@@ -273,34 +273,6 @@
 							<groups />
 						</BodyScaleSet>
 					</Measurement>
-					<Measurement name="head">
-						<!--Flag to turn on and off scaling for this measurement.-->
-						<apply>true</apply>
-						<!--Set of marker pairs used to determine the scale factors.-->
-						<MarkerPairSet>
-							<objects>
-								<MarkerPair>
-									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> Head Nose</markers>
-								</MarkerPair>
-								<MarkerPair>
-									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> Head Neck</markers>
-								</MarkerPair>
-							</objects>
-							<groups />
-						</MarkerPairSet>
-						<!--Set of bodies to be scaled by this measurement.-->
-						<BodyScaleSet>
-							<objects>
-								<BodyScale name="head">
-									<!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
-									<axes> X Y Z</axes>
-								</BodyScale>
-							</objects>
-							<groups />
-						</BodyScaleSet>
-					</Measurement>
 					<Measurement name="pelvis">
 						<!--Flag to turn on and off scaling for this measurement.-->
 						<apply>true</apply>

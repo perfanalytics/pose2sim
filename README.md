@@ -23,6 +23,12 @@
 and lens distortions are better taken into account.\ -->
 > To upgrade, type `pip install pose2sim --upgrade`
 
+<!-- GitHub Star Button -->
+<!-- 
+<a class="github-button" href="https://github.com/perfanalytics/pose2sim" data-color-scheme="no-preference: light; light: light; dark: dark;" data-icon="octicon-star" data-show-count="true" aria-label="Star perfanalytics/pose2sim on GitHub">Star</a>
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+-->
+
 <br>
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to traditional marker-based MoCap methods. 
@@ -80,7 +86,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
       5. [With Mediapipe BlazePose (legacy)](#with-mediapipe-blazepose-legacy)
       6. [With AlphaPose (legacy)](#with-alphapose-legacy)
    4. [Camera calibration](#camera-calibration)
-      1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
+      1. [Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-caliscope-anipose-freemocap-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
    5. [Synchronizing, Associatiating, Triangulating, Filtering](#synchronizing-associating-triangulating-filtering)
       1. [Synchronization](#synchronization)
@@ -194,8 +200,8 @@ All of them are clearly documented: feel free to play with them!
 - You can run all stages at once: 
   ``` python
   from Pose2Sim import Pose2Sim
-  Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_kinematics=True)
-  # or simply: Pose2Sim.runAll()
+  Pose2Sim.runAll()
+  # or: Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_kinematics=True)
   ```
 - Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
 - Note that **Pose2Sim.markerAugmentation()** does not necessarily improve results--*in fact, results are worse half of the time.* You can choose to not run this command, and save an additional 1.3 GB by uninstalling tensorflow: `pip uninstall tensorflow`.
@@ -344,10 +350,10 @@ Pose2Sim.poseEstimation()
 
 </br>
 
-*N.B.:* The `GPU` will be used with ONNX backend if a valid CUDA installation is found (or MPS with MacOS), otherwise the `CPU` will be used with OpenVINO backend.\
 *N.B.:* Pose estimation can be run in `lightweight`, `balanced`, or `performance` mode.\
-*N.B.:* Pose estimation can be dramatically sped up by increasing the value of `det_frequency`. In that case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames).\
-*N.B.:* Activating `tracking` will attempt to give consistent IDs to the same persons across frames, which might facilitate synchronization if other people are in the background.
+*N.B.:* The `pose_model` with body, feet, hands, and face is required for wrist motion but is much slower and slightly less accurate on body keypoints.\
+*N.B.:* The `GPU` will be used with ONNX backend if a valid CUDA installation is found (or MPS with MacOS), otherwise the `CPU` will be used with OpenVINO backend.\
+*N.B.:* Pose estimation can be dramatically sped up by increasing the value of `det_frequency`. In that case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames).
 
 <img src="Content/Pose2D.png" width="760">
 
@@ -444,7 +450,7 @@ Output file:
 <img src="Content/CalibFile.png" width="760">
 
 
-### Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
+### Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
 
 If you already have a calibration file, set `calibration_type` type to `convert` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.
 - **From [Caliscope](https://mprib.github.io/caliscope/), [AniPose](https://github.com/lambdaloop/anipose) or [FreeMocap](https://github.com/freemocap/freemocap):**  
@@ -530,8 +536,10 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 ### Synchronization
 
-> _**Cameras need to be synchronized, so that 2D points correspond to the same position across cameras.**_\
-***N.B.:** Skip this step if your cameras are natively synchronized.*
+> _**2D points can be triangulated only if they represent the same body position across all cameras: therefore, views need to be synchronized.**_\
+For each camera, this computes mean vertical speed for the chosen keypoints, and finds the time offset for which their correlation is highest.
+
+>***N.B.:** Skip this step if your cameras are natively synchronized.*
 
 Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
 Type `ipython`.
@@ -545,19 +553,21 @@ Pose2Sim.synchronization()
 
 </br>
 
-For each camera, this computes mean vertical speed for the chosen keypoints, and finds the time offset for which their correlation is highest.\
-All keypoints can be taken into account, or a subset of them. The user can also specify a time for each camera when only one participant is in the scene, preferably performing a clear vertical motion. 
+In `multi_person` mode, a video will pop up to let the user choose on which person to synchronize.\
+All keypoints can be taken into account, or a subset of them.\
+The whole capture can be used for synchronization, or you can choose a time range when the participant is roughly horizontally static but with a clear vertical motion (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly). 
+
+<img src="Content/synchro_multi.jpg" width="380">
 
 <img src="Content/synchro.jpg" width="760">
 
 *N.B.:* Works best when:
-- only one participant is in the scene (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly)
-- the participant is at a roughly equal distance from all cameras
+- the participant does not move towards or away from the cameras
+- they perform a clear vertical movement
 - the capture lasts at least 5 seconds long, so that there is enough data to synchronize on
-- the capture lasts a few minutes maximum, so that camera are less likely to [drift with time](https://github.com/mprib/caliscope/discussions/496)
+- the capture lasts a few minutes maximum, so that cameras are less likely to [drift with time](https://github.com/mprib/caliscope/discussions/496)
 
 *N.B.:* Alternatively, synchronize cameras using a flashlight, a clap, or a clear event. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors), or with their app (slightly less reliable).
-
 
 </br>
 
@@ -607,7 +617,7 @@ If your triangulation is not satisfying, try and release the constraints in the 
 
 ### Filtering 3D coordinates
 > _**Filter your 3D coordinates.**_\
-> Numerous filter types are provided, and can be tuned accordingly.
+> Butterworth, Kalman, Butterworth on speed, Gaussian, LOESS, Median filters are available and can be tuned accordingly.
 
 Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
 Type `ipython`.
@@ -663,7 +673,8 @@ This can be either done fully automatically within Pose2Sim, or manually within 
 
 ### Within Pose2Sim
 > *Scaling and inverse kinematics are performed in a fully automatic way for each trc file.*\
-> *No need for a static trial!*
+> *No need for a static trial!*\
+> _**Note that automatic scaling is not recommended when the participant is mostly crouching or sitting. In this case, scale manually on a standing trial**_ (see [next section](#within-opensim-gui)).
 
 > Model scaling is done according to the mean of the segment lengths, across a subset of frames. We remove the 10% fastest frames (potential outliers), the frames where the speed is 0 (person probably out of frame), and the 40% most extreme segment values (potential outliers).
 
@@ -689,9 +700,7 @@ Once you have the scaled model and the joint angles, you are free to go further!
 <br>
 
 ### Within OpenSim GUI
-If you are not fully satisfied with the results, you can perform scaling and inverse kinematics in a more traditional way, with (or without) a static trial.
-
-
+If you are not fully satisfied with the results or on sitting or crouching trials, you can perform scaling and inverse kinematics in a more traditional way, with (or without) a static trial.
 
 **Scaling**
 1. Choose a time range where the 3D keypoints are particularly well reconstructed, or capture a static pose, typically an A-pose...
@@ -955,7 +964,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#9634; **Triangulation:** Pre-compile weighted_triangulation and reprojection with @jit(nopython=True, parallel=True) for faster execution.
 &#9634; **Triangulation:** Offer the possibility of triangulating with Sparse Bundle Adjustment (SBA), Extended Kalman Filter (EKF), Full Trajectory Estimation (FTE) (see [AcinoSet](https://github.com/African-Robotics-Unit/AcinoSet)).
 &#9634; **Triangulation:** Implement normalized DLT and RANSAC triangulation, Outlier rejection (sliding z-score?), as well as a [triangulation refinement step](https://doi.org/10.1109/TMM.2022.3171102).
-&#9634; **Triangulation:** Track hands and face (won't be taken into account in OpenSim at this stage).
+&#9634; **Triangulation:** Track hands and face, and add articulated OpenSim hand.
 
 &#10004; **Filtering:** Available filtering methods: Butterworth, Butterworth on speed, Gaussian, Median, LOESS (polynomial smoothing).
 &#10004; **Filtering:** Implement Kalman filter and Kalman smoother.
@@ -967,7 +976,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **OpenSim:** Add full model with contact spheres ([SmoothSphereHalfSpaceForce](https://simtk.org/api_docs/opensim/api_docs/classOpenSim_1_1SmoothSphereHalfSpaceForce.html#details)) and full-body muscles ([DeGrooteFregly2016Muscle](https://simtk.org/api_docs/opensim/api_docs/classOpenSim_1_1DeGrooteFregly2016Muscle.html#details)), for [Moco](https://opensim-org.github.io/opensim-moco-site/) for example.
 &#10004; **OpenSim:** Add model with [ISB shoulder](https://github.com/stanfordnmbl/opencap-core/blob/main/opensimPipeline/Models/LaiUhlrich2022_shoulder.osim).
 &#10004; **OpenSim:** Integrate OpenSim in Pose2Sim.
-&#9634; **OpenSim:** Do not require a separate scaling trial: scale on the 10% slowest frames of the moving trial instead, or take median scaling value.
+&#10004; **OpenSim:** Do not require a separate scaling trial: scale on the 10% slowest frames of the moving trial instead, or take median scaling value.
 &#9634; **OpenSim:** Implement optimal fixed-interval Kalman smoothing for inverse kinematics ([this OpenSim fork](https://github.com/antoinefalisse/opensim-core/blob/kalman_smoother/OpenSim/Tools/InverseKinematicsKSTool.cpp)), or [Biorbd](https://github.com/pyomeca/biorbd/blob/f776fe02e1472aebe94a5c89f0309360b52e2cbc/src/RigidBody/KalmanReconsMarkers.cpp))
 
 &#10004; **GUI:** Blender add-on (cf [MPP2SOS](https://blendermarket.com/products/mocap-mpp2soss)), [Maya-Mocap](https://github.com/davidpagnon/Maya-Mocap) and [BlendOsim](https://github.com/JonathanCamargo/BlendOsim).

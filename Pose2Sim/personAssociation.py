@@ -588,7 +588,10 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
         mean_error_px = np.around(np.nanmean(error), decimals=1)
         
         calib = toml.load(calib_file)
-        calib_cam1 = calib[list(calib.keys())[0]]
+        cal_keys = [c for c in calib.keys() 
+                    if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
+                    and isinstance(calib[c],dict)]
+        calib_cam1 = calib[cal_keys[0]]
         fm = calib_cam1['matrix'][0][0]
         Dm = euclidean_distance(calib_cam1['translation'], [0,0,0])
         mean_error_mm = np.around(mean_error_px * Dm / fm * 1000, decimals=1)

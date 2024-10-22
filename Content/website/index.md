@@ -37,9 +37,9 @@ and lens distortions are better taken into account.\ -->
 Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inputs (2D keypoints coordinates) and lead to an OpenSim result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose), and custom models (from [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut) for example) can also be used. 
 
 
-<img src="/Content/Pose2Sim_workflow.jpg" width="760">
+<img src="../Pose2Sim_workflow.jpg" width="760">
 
-<img src='/Content/Activities_verylow.gif' title='Other more or less challenging tasks and conditions.' width="760">
+<img src='../Activities_verylow.gif' title='Other more or less challenging tasks and conditions.' width="760">
 
 </br>
 
@@ -161,7 +161,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
 > **Note on storage use:**\
      A full installation takes up to 11 GB of storage spate. However, GPU support is not mandatory and takes about 6 GB. Moreover, [marker augmentation](#marker-augmentation) requires Tensorflow and does not necessarily yield better results. You can save an additional 1.3 GB by uninstalling it: `pip uninstall tensorflow`.\
      A minimal installation with carefully chosen pose models and without GPU support, Tensorflow, PyQt5 **would take less than 3 GB**.\
-    <img src="/Content/Storage.png" width="760">
+    <img src="../Storage.png" width="760">
 
 
 </br>
@@ -215,7 +215,7 @@ All of them are clearly documented: feel free to play with them!
   - Go to File > Load Motion, and load the joint angle .mot file in the `kinematics` folder.
   - If you want to see the 3D marker locations, go to File > Preview Experimental Data, and load the .trc file in the `pose-3d` folder.
 
-  <img src="/Content/OpenSim.JPG" width="380">
+  <img src="../OpenSim.JPG" width="380">
 
 <br>
 
@@ -340,7 +340,7 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.poseEstimation()
 ```
 
-<img src="/Content/P2S_poseestimation.png" width="760">
+<img src="../P2S_poseestimation.png" width="760">
 
 </br>
 
@@ -349,7 +349,7 @@ Pose2Sim.poseEstimation()
 *N.B.:* Pose estimation can be dramatically sped up by increasing the value of `det_frequency`. In that case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames).\
 *N.B.:* Activating `tracking` will attempt to give consistent IDs to the same persons across frames, which might facilitate synchronization if other people are in the background.
 
-<img src="/Content/Pose2D.png" width="760">
+<img src="../Pose2D.png" width="760">
 
 </br>
 
@@ -436,12 +436,12 @@ Pose2Sim.calibration()
 ```
 
 
-<img src="/Content/P2S_calibration.png" width="760">
+<img src="../P2S_calibration.png" width="760">
 
 </br>
 Output file:
 
-<img src="/Content/CalibFile.png" width="760">
+<img src="../CalibFile.png" width="760">
 
 
 ### Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
@@ -495,7 +495,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
       - is flat, without reflections, surrounded by a wide white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even). Go to [calib.io](https://calib.io/pages/camera-calibration-pattern-generator) to generate a suitable checkerboard.
     - A common error is to specify the external, instead of the internal number of corners (one less than the count from calib.io). This may be one less than you would intuitively think. 
     
-    <img src="/Content/Calib_int.png" width="600">
+    <img src="../Calib_int.png" width="600">
 
     ***Intrinsic calibration error should be below 0.5 px.***
         
@@ -519,7 +519,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
       For a more automatic calibration, OpenPose keypoints could also be used for calibration.\
       **COMING SOON!**
 
-  <img src="/Content/Calib_ext.png" width="920">
+  <img src="../Calib_ext.png" width="920">
   
   ***Extrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.***
 
@@ -541,14 +541,14 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.synchronization()
 ```
 
-<img src="/Content/P2S_synchronization.png" width="760">
+<img src="../P2S_synchronization.png" width="760">
 
 </br>
 
 For each camera, this computes mean vertical speed for the chosen keypoints, and finds the time offset for which their correlation is highest.\
 All keypoints can be taken into account, or a subset of them. The user can also specify a time for each camera when only one participant is in the scene, preferably performing a clear vertical motion. 
 
-<img src="/Content/synchro.jpg" width="760">
+<img src="../synchro.jpg" width="760">
 
 *N.B.:* Works best when:
 - only one participant is in the scene (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly)
@@ -575,7 +575,7 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.personAssociation()
 ```
 
-<img src="/Content/P2S_personassociation.png" width="760">
+<img src="../P2S_personassociation.png" width="760">
    
 </br>
 
@@ -596,7 +596,7 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.triangulation()
 ```
 
-<img src="/Content/P2S_triangulation.png" width="760">
+<img src="../P2S_triangulation.png" width="760">
 
 </br>
 
@@ -617,14 +617,14 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.filtering()
 ```
 
-<img src="/Content/P2S_filtering.png" width="760">
+<img src="../P2S_filtering.png" width="760">
 
 </br>
 
 Check your filtration with the displayed figures, and visualize your .trc file in OpenSim. If your filtering is not satisfying, try and change the parameters in the `Config.toml` file.
 
 Output:\
-<img src="/Content/FilterPlot.png" width="760">
+<img src="../FilterPlot.png" width="760">
 
 </br>
 
@@ -652,7 +652,7 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.markerAugmentation()
 ```
 
-<img src="/Content/P2S_markeraugmentation.png" width="760">
+<img src="../P2S_markeraugmentation.png" width="760">
 
 </br>
 
@@ -678,11 +678,11 @@ from Pose2Sim import Pose2Sim
 Pose2Sim.kinematics()
 ```
 
-<img src="/Content/P2S_kinematics.png" width="760">
+<img src="../P2S_kinematics.png" width="760">
 
-<img src="/Content/OpenSim_logs.png" width="760">
+<img src="../OpenSim_logs.png" width="760">
 
-<img src="/Content/OpenSim.JPG" width="380">
+<img src="../OpenSim.JPG" width="380">
 
 Once you have the scaled model and the joint angles, you are free to go further! Inverse dynamics, muscle analysis, etc. (make sure previously add muscles from [the Pose2Sim model with muscles](Pose2Sim\OpenSim_Setup\Model_Pose2Sim_Body25b_contacts_muscles.osim)).
 
@@ -851,7 +851,7 @@ Reprojects 3D coordinates of a trc file to the image planes defined by a calibra
    </pre>
 </details>
 
-<img src="/Content/Pose2Sim_workflow_utilities.jpg" width="760">
+<img src="../Pose2Sim_workflow_utilities.jpg" width="760">
 
 </br>
 

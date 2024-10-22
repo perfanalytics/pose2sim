@@ -214,8 +214,8 @@ def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
     header_trc = ['PathFileType\t4\t(X/Y/Z)\t' + trc_f, 
             'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames', 
             '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, f_range[0], f_range[1]])),
-            'Frame#\tTime\t' + '\t\t\t'.join(keypoints_names) + '\t\t',
-            '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(keypoints_names))])]
+            'Frame#\tTime\t' + '\t\t\t'.join(keypoints_names) + '\t\t\t',
+            '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(keypoints_names))]) + '\t']
     
     # Zup to Yup coordinate system
     Q = zup2yup(Q)
@@ -297,7 +297,10 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     calib = toml.load(calib_file)
-    cam_names = np.array([calib[c].get('name') for c in list(calib.keys())])
+    cal_keys = [c for c in calib.keys() 
+            if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
+            and isinstance(calib[c],dict)]
+    cam_names = np.array([calib[c].get('name') if calib[c].get('name') else c for c in cal_keys])
     cam_names = cam_names[list(cam_excluded_count[0].keys())]
     error_threshold_triangulation = config_dict.get('triangulation').get('reproj_error_threshold_triangulation')
     likelihood_threshold = config_dict.get('triangulation').get('likelihood_threshold_triangulation')
@@ -310,7 +313,7 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     undistort_points = config_dict.get('triangulation').get('undistort_points')
     
     # Recap
-    calib_cam1 = calib[list(calib.keys())[0]]
+    calib_cam1 = calib[cal_keys[0]]
     fm = calib_cam1['matrix'][0][0]
     Dm = euclidean_distance(calib_cam1['translation'], [0,0,0])
 
@@ -761,7 +764,7 @@ def triangulate_all(config_dict):
     json_files_names = [sort_stringlist_by_last_number(js) for js in json_files_names]    
 
     # frame range selection
-    f_range = [[0,max([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
+    f_range = [[0,min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
     frame_nb = f_range[1] - f_range[0]
     
     # Check that camera number is consistent between calibration file and pose folders
