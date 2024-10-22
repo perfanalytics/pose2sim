@@ -42,7 +42,6 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
           activate-environment: pose2sim
-          cache-packages: true
 
       - name: Install OpenSim with conda
         run: |
