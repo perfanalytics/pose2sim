@@ -113,7 +113,6 @@ def load_frame_and_bounding_boxes(cap, frame_number, frame_to_json, pose_dir, js
     return frame_rgb, bounding_boxes_list
 
 
-
 def draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations):
     '''
     Draws the bounding boxes and annotations on the given axes.
@@ -305,7 +304,6 @@ def get_selected_id_list(multi_person, vid_or_img_files, cam_names, cam_nb, json
     OUTPUTS:
     - selected_id_list: list of int or None. List of the selected person indices for each camera.
     '''
-
     if not multi_person:
         return [None] * cam_nb
 
