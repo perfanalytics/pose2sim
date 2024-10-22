@@ -11,7 +11,7 @@
     write the results to JSON files, videos, and/or images.
     Results can optionally be displayed in real time.
 
-    Supported models: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands, face), COCO_17 (body)
+    Supported models: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands), COCO_17 (body)
     Supported modes: lightweight, balanced, performance (edit paths at rtmlib/tools/solutions if you 
     need nother detection or pose models)
 
@@ -239,7 +239,7 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
 
                 if save_images:
                     if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
-                    cv2.imwrite(os.path.join(img_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.png'), img_show)
+                    cv2.imwrite(os.path.join(img_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.jpg'), img_show)
 
             frame_idx += 1
             pbar.update(1)
@@ -295,7 +295,6 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
     f_range = [[len(image_files)] if frame_range==[] else frame_range][0]
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
         if frame_idx in range(*f_range):
-
             try:
                 frame = cv2.imread(image_file)
             except:
@@ -345,7 +344,7 @@ def rtm_estimator(config_dict):
     write the results to JSON files, videos, and/or images.
     Results can optionally be displayed in real time.
 
-    Supported models: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands, face), COCO_17 (body)
+    Supported models: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands), COCO_17 (body)
     Supported modes: lightweight, balanced, performance (edit paths at rtmlib/tools/solutions if you 
     need nother detection or pose models)
 
@@ -390,13 +389,16 @@ def rtm_estimator(config_dict):
     video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
     frame_rate = config_dict.get('project').get('frame_rate')
     if frame_rate == 'auto': 
-        cap = cv2.VideoCapture(video_files[0])
-        if not cap.isOpened():
-            raise FileNotFoundError(f'Error: Could not open {video_files[0]}. Check that the file exists.')
-        frame_rate = cap.get(cv2.CAP_PROP_FPS)
-        if frame_rate == 0:
+        try:
+            cap = cv2.VideoCapture(video_files[0])
+            if not cap.isOpened():
+                raise FileNotFoundError(f'Error: Could not open {video_files[0]}. Check that the file exists.')
+            frame_rate = cap.get(cv2.CAP_PROP_FPS)
+            if frame_rate == 0:
+                frame_rate = 30
+                logging.warning(f'Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps.')
+        except:
             frame_rate = 30
-            logging.warning(f'Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps.')
 
     # If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
     try:
@@ -435,7 +437,7 @@ def rtm_estimator(config_dict):
         logging.info(f"Using HALPE_26 model (body and feet) for pose estimation.")
     elif pose_model.upper() == 'COCO_133':
         ModelClass = Wholebody
-        logging.info(f"Using COCO_133 model (body, feet, hands, face, and face) for pose estimation.")
+        logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation.")
     elif pose_model.upper() == 'COCO_17':
         ModelClass = Body # 26 keypoints(halpe26)
         logging.info(f"Using COCO_17 model (body) for pose estimation.")

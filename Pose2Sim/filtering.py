@@ -9,7 +9,7 @@
 
 Filter trc 3D coordinates.
 
-Available filters: Butterworth, Butterworth on speed, Gaussian, LOESS, Median
+Available filters: Butterworth, Butterworth on speed, Gaussian, LOESS, Median, Kalman
 Set your parameters in Config.toml
     
 INPUTS: 

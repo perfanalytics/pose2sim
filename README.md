@@ -537,7 +537,9 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 ### Synchronization
 
 > _**2D points can be triangulated only if they represent the same body position across all cameras: therefore, views need to be synchronized.**_\
-***N.B.:** Skip this step if your cameras are natively synchronized.*
+For each camera, this computes mean vertical speed for the chosen keypoints, and finds the time offset for which their correlation is highest.
+
+>***N.B.:** Skip this step if your cameras are natively synchronized.*
 
 Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
 Type `ipython`.
@@ -551,20 +553,21 @@ Pose2Sim.synchronization()
 
 </br>
 
-For each camera, this computes mean vertical speed for the chosen keypoints, and finds the time offset for which their correlation is highest.\
-All keypoints can be taken into account, or a subset of them. The user can also specify a time for each camera when the participant is roughly horizontally static but with a clear vertical motion (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly). 
+In `multi_person` mode, a video will pop up to let the user choose on which person to synchronize.\
+All keypoints can be taken into account, or a subset of them.\
+The whole capture can be used for synchronization, or you can choose a time range when the participant is roughly horizontally static but with a clear vertical motion (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly). 
+
+<img src="Content/synchro_multi.jpg" width="380">
 
 <img src="Content/synchro.jpg" width="760">
 
 *N.B.:* Works best when:
-- only one participant is in the scene
 - the participant does not move towards or away from the cameras
 - they perform a clear vertical movement
 - the capture lasts at least 5 seconds long, so that there is enough data to synchronize on
-- the capture lasts a few minutes maximum, so that camera are less likely to [drift with time](https://github.com/mprib/caliscope/discussions/496)
+- the capture lasts a few minutes maximum, so that cameras are less likely to [drift with time](https://github.com/mprib/caliscope/discussions/496)
 
 *N.B.:* Alternatively, synchronize cameras using a flashlight, a clap, or a clear event. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors), or with their app (slightly less reliable).
-
 
 </br>
 
@@ -614,7 +617,7 @@ If your triangulation is not satisfying, try and release the constraints in the 
 
 ### Filtering 3D coordinates
 > _**Filter your 3D coordinates.**_\
-> Numerous filter types are provided, and can be tuned accordingly.
+> Butterworth, Kalman, Butterworth on speed, Gaussian, LOESS, Median filters are available and can be tuned accordingly.
 
 Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
 Type `ipython`.
