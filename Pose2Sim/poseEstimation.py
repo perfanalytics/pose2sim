@@ -11,7 +11,7 @@
     write the results to JSON files, videos, and/or images.
     Results can optionally be displayed in real time.
 
-    Supported models: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands), COCO_17 (body)
+    Supported models: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands, face), COCO_17 (body)
     Supported modes: lightweight, balanced, performance (edit paths at rtmlib/tools/solutions if you 
     need nother detection or pose models)
 
@@ -345,7 +345,7 @@ def rtm_estimator(config_dict):
     write the results to JSON files, videos, and/or images.
     Results can optionally be displayed in real time.
 
-    Supported models: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands), COCO_17 (body)
+    Supported models: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands, face), COCO_17 (body)
     Supported modes: lightweight, balanced, performance (edit paths at rtmlib/tools/solutions if you 
     need nother detection or pose models)
 
@@ -435,7 +435,7 @@ def rtm_estimator(config_dict):
         logging.info(f"Using HALPE_26 model (body and feet) for pose estimation.")
     elif pose_model.upper() == 'COCO_133':
         ModelClass = Wholebody
-        logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation.")
+        logging.info(f"Using COCO_133 model (body, feet, hands, face, and face) for pose estimation.")
     elif pose_model.upper() == 'COCO_17':
         ModelClass = Body # 26 keypoints(halpe26)
         logging.info(f"Using COCO_17 model (body) for pose estimation.")
