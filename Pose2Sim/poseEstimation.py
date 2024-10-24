@@ -156,12 +156,12 @@ def sort_people_sports2d(keyptpre, keypt, scores):
     return sorted_prev_keypoints, sorted_keypoints, sorted_scores
 
 
-def process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person):
+def process_video(video_file_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person):
     '''
     Estimate pose from a video file
     
     INPUTS:
-    - video_path: str. Path to the input video file
+    - video_file_path: str. Path to the input video file
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
@@ -176,16 +176,16 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
     '''
 
     try:
-        cap = cv2.VideoCapture(video_path)
+        cap = cv2.VideoCapture(video_file_path)
         cap.read()
         if cap.read()[0] == False:
             raise
     except:
-        raise NameError(f"{video_path} is not a video. Images must be put in one subdirectory per camera.")
+        raise NameError(f"{video_file_path} is not a video. Images must be put in one subdirectory per camera.")
     
-    pose_dir = os.path.abspath(os.path.join(video_path, '..', '..', 'pose'))
+    pose_dir = os.path.abspath(os.path.join(video_file_path, '..', '..', 'pose'))
     if not os.path.isdir(pose_dir): os.makedirs(pose_dir)
-    video_name_wo_ext = os.path.splitext(os.path.basename(video_path))[0]
+    video_name_wo_ext = os.path.splitext(os.path.basename(video_file_path))[0]
     json_output_dir = os.path.join(pose_dir, f'{video_name_wo_ext}_json')
     output_video_path = os.path.join(pose_dir, f'{video_name_wo_ext}_pose.mp4')
     img_output_dir = os.path.join(pose_dir, f'{video_name_wo_ext}_img')
@@ -197,13 +197,13 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
         
     if display_detection:
-        cv2.namedWindow(f"Pose Estimation {os.path.basename(video_path)}", cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
+        cv2.namedWindow(f"Pose Estimation {os.path.basename(video_file_path)}", cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
 
     frame_idx = 0
-    cap = cv2.VideoCapture(video_path)
+    cap = cv2.VideoCapture(video_file_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     f_range = [[total_frames] if frame_range==[] else frame_range][0]
-    with tqdm(total=total_frames, desc=f'Processing {os.path.basename(video_path)}') as pbar:
+    with tqdm(total=total_frames, desc=f'Processing {os.path.basename(video_file_path)}') as pbar:
         while cap.isOpened():
             # print('\nFrame ', frame_idx)
             success, frame = cap.read()
@@ -230,7 +230,7 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
                     img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
                 
                 if display_detection:
-                    cv2.imshow(f"Pose Estimation {os.path.basename(video_path)}", img_show)
+                    cv2.imshow(f"Pose Estimation {os.path.basename(video_file_path)}", img_show)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         break
 
@@ -371,6 +371,8 @@ def rtm_estimator(config_dict):
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     frame_range = config_dict.get('project').get('frame_range')
     multi_person = config_dict.get('project').get('multi_person')
+    save_video = True if 'to_video' in config_dict['project']['save_video'] else False
+    save_images = True if 'to_images' in config_dict['project']['save_video'] else False
     video_dir = os.path.join(project_dir, 'videos')
     pose_dir = os.path.join(project_dir, 'pose')
 
@@ -379,8 +381,6 @@ def rtm_estimator(config_dict):
     vid_img_extension = config_dict['pose']['vid_img_extension']
     
     output_format = config_dict['pose']['output_format']
-    save_video = True if 'to_video' in config_dict['pose']['save_video'] else False
-    save_images = True if 'to_images' in config_dict['pose']['save_video'] else False
     display_detection = config_dict['pose']['display_detection']
     overwrite_pose = config_dict['pose']['overwrite_pose']
     det_frequency = config_dict['pose']['det_frequency']
@@ -476,9 +476,9 @@ def rtm_estimator(config_dict):
         if not len(video_files) == 0: 
             # Process video files
             logging.info(f'Found video files with extension {vid_img_extension}.')
-            for video_path in video_files:
+            for video_file_path in video_files:
                 pose_tracker.reset()
-                process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person)
+                process_video(video_file_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person)
 
         else:
             # Process image folders

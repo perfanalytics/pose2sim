@@ -29,6 +29,8 @@ frame_range = [] # For example [10,300], or [] for all frames.
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
 ## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
 
+save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
+
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
@@ -46,7 +48,6 @@ det_frequency = 1 # Run person detection only every N frames, and inbetween trac
                   # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
 display_detection = true
 overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
-save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 
