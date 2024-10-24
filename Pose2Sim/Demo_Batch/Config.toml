@@ -35,7 +35,9 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
 [pose]
-vid_img_extension = 'mp4' # any video or image extension
+single_camera = false # true or false (lowercase) # If true, only one camera is used.
+webcam_ids = 0 # your webcam ids (0 is default)
+vid_img_extension = 'mp4' # any video or image extension # 'webcam' from webcam
 pose_model = 'HALPE_26'  #With RTMLib: HALPE_26 (body and feet, default), COCO_133 (body, feet, hands), COCO_17 (body)
                          # /!\ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the output files if needed
                          #With MMPose: HALPE_26, COCO_133, COCO_17, CUSTOM. See CUSTOM example at the end of the file

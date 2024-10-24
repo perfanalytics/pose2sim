@@ -40,9 +40,15 @@ import itertools as it
 from tqdm import tqdm
 import numpy as np
 import cv2
+from pathlib import Path
+import subprocess
+import imageio_ffmpeg as ffmpeg
+from datetime import datetime
+import sys
 
 from rtmlib import PoseTracker, Body, Wholebody, BodyWithFeet, draw_skeleton
 from Pose2Sim.common import natural_sort_key, min_with_single_indices, euclidean_distance
+from Sports2D.Utilities.common import setup_pose_tracker, setup_video, setup_webcam
 
 
 ## AUTHORSHIP INFORMATION
@@ -156,54 +162,7 @@ def sort_people_sports2d(keyptpre, keypt, scores):
     return sorted_prev_keypoints, sorted_keypoints, sorted_scores
 
 
-def setup_video(video_file_path, save_video, vid_output_path):
-    '''
-    Set up video capture with OpenCV.
-
-    INPUTS:
-    - video_file_path: Path. The path to the video file
-    - save_video: bool. Whether to save the video output
-    - vid_output_path: Path. The path to save the video output
-
-    OUTPUTS:
-    - cap: cv2.VideoCapture. The video capture object
-    - out_vid: cv2.VideoWriter. The video writer object
-    - cam_width: int. The width of the video
-    - cam_height: int. The height of the video
-    - fps: int. The frame rate of the video
-    '''
-    
-    if video_file_path.name == video_file_path.stem:
-        raise ValueError("Please set video_input to 'webcam' or to a video file (with extension) in Config.toml")
-    try:
-        cap = cv2.VideoCapture(video_file_path)
-        if not cap.isOpened():
-            raise
-    except:
-        raise NameError(f"{video_file_path} is not a video. Check video_dir and video_input in your Config.toml file.")
-    
-    cam_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    cam_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps == 0: fps = 30
-    
-    out_vid = None
-
-    if save_video:
-        # try:
-        #     fourcc = cv2.VideoWriter_fourcc(*'avc1') # =h264. better compression and quality but may fail on some systems
-        #     out_vid = cv2.VideoWriter(vid_output_path, fourcc, fps, (cam_width, cam_height))
-        #     if not out_vid.isOpened():
-        #         raise ValueError("Failed to open video writer with 'avc1' (h264)")
-        # except Exception:
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out_vid = cv2.VideoWriter(vid_output_path, fourcc, fps, (cam_width, cam_height))
-            # logging.info("Failed to open video writer with 'avc1' (h264). Using 'mp4v' instead.")
-        
-    return cap, out_vid, cam_width, cam_height, fps
-
-
-def process_video(video_file_path, pose_tracker, output_format, save_video, save_images, display_detection, input_frame_range, multi_person):
+def process_video(config_dict, video_file_path, pose_tracker, input_frame_range, output_dir):
     '''
     Estimate pose from a video file
     
@@ -222,6 +181,13 @@ def process_video(video_file_path, pose_tracker, output_format, save_video, save
     - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
     '''
 
+    save_video = True if 'to_video' in config_dict['project']['save_video'] else False
+    save_images = True if 'to_images' in config_dict['project']['save_video'] else False
+    multi_person = config_dict.get('project').get('multi_person')
+
+    output_format = config_dict['pose']['output_format']
+    display_detection = config_dict['pose']['display_detection']
+
     try:
         cap = cv2.VideoCapture(video_file_path)
         cap.read()
@@ -230,16 +196,24 @@ def process_video(video_file_path, pose_tracker, output_format, save_video, save
     except:
         raise NameError(f"{video_file_path} is not a video. Images must be put in one subdirectory per camera.")
     
-    output_dir = os.path.abspath(os.path.join(video_file_path, '..', '..', 'pose'))
+    if video_file_path == "webcam":
+        current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_dir_name = f'webcam_{current_date}'
+    else:
+        video_file_stem = video_file_path.stem
+        output_dir_name = f'{video_file_stem}_Sports2D'
+    output_dir = os.path.abspath(os.path.join(output_dir, 'pose'))
     if not os.path.isdir(output_dir): os.makedirs(output_dir)
-    output_dir_name = os.path.splitext(os.path.basename(video_file_path))[0]
     img_output_dir = os.path.join(output_dir, f'{output_dir_name}_img') 
     json_output_dir = os.path.join(output_dir, f'{output_dir_name}_json')
     output_video_path = os.path.join(output_dir, f'{output_dir_name}_pose.mp4')
     
     # Set up video capture
     if video_file_path == "webcam":
-        return
+        # cap, out_vid, cam_width, cam_height, fps = setup_webcam(webcam_id, save_video, output_video_path, input_size)
+        frame_range = [0,sys.maxsize]
+        frame_iterator = range(*frame_range)
+        logging.warning('Webcam input: the framerate may vary. If results are filtered, Sports2D will use the average framerate as input.')
     else:
         cap, out_vid, cam_width, cam_height, fps = setup_video(video_file_path, save_video, output_video_path)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -249,6 +223,7 @@ def process_video(video_file_path, pose_tracker, output_format, save_video, save
     if display_detection:
         cv2.namedWindow(f"Pose Estimation {os.path.basename(video_file_path)}", cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
 
+    frame_processing_times = []
     with frame_iterator as pbar:
         frame_idx = 0
         while cap.isOpened():
@@ -263,6 +238,8 @@ def process_video(video_file_path, pose_tracker, output_format, save_video, save
                 continue
             
             if frame_idx in range(*frame_range):
+                start_time = datetime.now()
+
                 # Perform pose estimation on the frame
                 keypoints, scores = pose_tracker(frame)
 
@@ -270,7 +247,7 @@ def process_video(video_file_path, pose_tracker, output_format, save_video, save
                 if multi_person:
                     if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
                     prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores)
-           
+
                 # Save to json
                 if 'openpose' in output_format:
                     json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
@@ -293,17 +270,37 @@ def process_video(video_file_path, pose_tracker, output_format, save_video, save
                     if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
                     cv2.imwrite(os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'), img_show)
 
+                if video_file_path == 'webcam' and save_video:   # To adjust framerate of output video
+                    elapsed_time = (datetime.now() - start_time).total_seconds()
+                    frame_processing_times.append(elapsed_time)
+
             frame_idx += 1
             pbar.update(1)
 
     cap.release()
     if save_video:
         out_vid.release()
+        if video_file_path == 'webcam':
+            actual_framerate = len(frame_processing_times) / sum(frame_processing_times)
+            logging.info(f"Rewriting webcam video based on the average framerate {actual_framerate}.")
+            resample_video(output_video_path, fps, actual_framerate)
+            fps = actual_framerate
         logging.info(f"--> Output video saved to {output_video_path}.")
     if save_images:
         logging.info(f"--> Output images saved to {img_output_dir}.")
     if display_detection:
         cv2.destroyAllWindows()
+
+def resample_video(vid_output_path, fps, desired_framerate):
+    '''
+    Resample video to the desired fps using ffmpeg.
+    '''
+   
+    ffmpeg_path = ffmpeg.get_ffmpeg_exe()
+    new_vid_path = vid_output_path.parent / Path(vid_output_path.stem+'_2'+vid_output_path.suffix)
+    subprocess.run([ffmpeg_path, '-i', vid_output_path, '-filter:v', f'setpts={fps/desired_framerate}*PTS', '-r', str(desired_framerate), new_vid_path])
+    vid_output_path.unlink()
+    new_vid_path.rename(vid_output_path)
 
 
 def process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, fps, save_video, save_images, display_detection, frame_range, multi_person):
@@ -422,9 +419,7 @@ def rtm_estimator(config_dict):
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     frame_range = config_dict.get('project').get('frame_range')
-    multi_person = config_dict.get('project').get('multi_person')
-    save_video = True if 'to_video' in config_dict['project']['save_video'] else False
-    save_images = True if 'to_images' in config_dict['project']['save_video'] else False
+    output_dir = config_dict.get('project').get('project_dir')
     video_dir = os.path.join(project_dir, 'videos')
     pose_dir = os.path.join(project_dir, 'pose')
 
@@ -432,76 +427,11 @@ def rtm_estimator(config_dict):
     mode = config_dict['pose']['mode'] # lightweight, balanced, performance
     vid_img_extension = config_dict['pose']['vid_img_extension']
     
-    output_format = config_dict['pose']['output_format']
-    display_detection = config_dict['pose']['display_detection']
     overwrite_pose = config_dict['pose']['overwrite_pose']
     det_frequency = config_dict['pose']['det_frequency']
 
-    # Determine frame rate
-    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+    pose_tracker = setup_pose_tracker(det_frequency, mode, pose_model)
 
-    # If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
-    try:
-        import torch
-        import onnxruntime as ort
-        if torch.cuda.is_available() and 'CUDAExecutionProvider' in ort.get_available_providers():
-            device = 'cuda'
-            backend = 'onnxruntime'
-            logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
-        elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
-            device = 'rocm'
-            backend = 'onnxruntime'
-            logging.info(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
-        else:
-            raise 
-    except:
-        try:
-            import onnxruntime as ort
-            if 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
-                device = 'mps'
-                backend = 'onnxruntime'
-                logging.info(f"\nValid MPS installation found: using ONNXRuntime backend with GPU.")
-            else:
-                raise
-        except:
-            device = 'cpu'
-            backend = 'openvino'
-            logging.info(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
-
-    if det_frequency>1:
-        logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points.')
-    elif det_frequency==1:
-        logging.info(f'Inference run on every single frame.')
-    else:
-        raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
-
-    # Select the appropriate model based on the model_type
-    if pose_model.upper() == 'HALPE_26':
-        ModelClass = BodyWithFeet
-        logging.info(f"Using HALPE_26 model (body and feet) for pose estimation.")
-    elif pose_model.upper() == 'COCO_133':
-        ModelClass = Wholebody
-        logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation.")
-    elif pose_model.upper() == 'COCO_17':
-        ModelClass = Body # 26 keypoints(halpe26)
-        logging.info(f"Using COCO_17 model (body) for pose estimation.")
-    else:
-        raise ValueError(f"Invalid model_type: {pose_model}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
-    logging.info(f'Mode: {mode}.\n')
-
-
-    # Initialize the pose tracker
-    pose_tracker = PoseTracker(
-        ModelClass,
-        det_frequency=det_frequency,
-        mode=mode,
-        backend=backend,
-        device=device,
-        tracking=False,
-        to_openpose=False)
-
-
-    logging.info('\nEstimating pose...')
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
         os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
@@ -512,15 +442,19 @@ def rtm_estimator(config_dict):
             raise
             
     except:
-        video_files = glob.glob(os.path.join(video_dir, '*' + vid_img_extension))
+        logging.info('\nEstimating pose...')
+        if vid_img_extension == 'webcam':
+            video_files = ['webcam']
+        else:
+            video_files = glob.glob(os.path.join(video_dir, '*' + vid_img_extension))
         if not len(video_files) == 0:
             # Process video files
             logging.info(f'Found video files with extension {vid_img_extension}.')
             for video_file_path in video_files:
                 pose_tracker.reset()
                 logging.info(f'Video files {video_file_path}.')
-                # process_fun(config_dict, video_file, frame_range, result_dir)
-                process_video(video_file_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person)
+                # process_fun(config_dict, video_file_path, pose_tracker, frame_range, output_dir)
+                process_video(config_dict, video_file_path, pose_tracker, frame_range, output_dir)
 
         else:
             # Process image folders
@@ -529,4 +463,4 @@ def rtm_estimator(config_dict):
             for image_folder in image_folders:
                 pose_tracker.reset()
                 image_folder_path = os.path.join(video_dir, image_folder)
-                process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person)
+                process_images(config_dict, image_folder_path, pose_tracker, frame_range)
