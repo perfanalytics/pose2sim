@@ -156,7 +156,54 @@ def sort_people_sports2d(keyptpre, keypt, scores):
     return sorted_prev_keypoints, sorted_keypoints, sorted_scores
 
 
-def process_video(video_file_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person):
+def setup_video(video_file_path, save_video, vid_output_path):
+    '''
+    Set up video capture with OpenCV.
+
+    INPUTS:
+    - video_file_path: Path. The path to the video file
+    - save_video: bool. Whether to save the video output
+    - vid_output_path: Path. The path to save the video output
+
+    OUTPUTS:
+    - cap: cv2.VideoCapture. The video capture object
+    - out_vid: cv2.VideoWriter. The video writer object
+    - cam_width: int. The width of the video
+    - cam_height: int. The height of the video
+    - fps: int. The frame rate of the video
+    '''
+    
+    if video_file_path.name == video_file_path.stem:
+        raise ValueError("Please set video_input to 'webcam' or to a video file (with extension) in Config.toml")
+    try:
+        cap = cv2.VideoCapture(video_file_path)
+        if not cap.isOpened():
+            raise
+    except:
+        raise NameError(f"{video_file_path} is not a video. Check video_dir and video_input in your Config.toml file.")
+    
+    cam_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    cam_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps == 0: fps = 30
+    
+    out_vid = None
+
+    if save_video:
+        # try:
+        #     fourcc = cv2.VideoWriter_fourcc(*'avc1') # =h264. better compression and quality but may fail on some systems
+        #     out_vid = cv2.VideoWriter(vid_output_path, fourcc, fps, (cam_width, cam_height))
+        #     if not out_vid.isOpened():
+        #         raise ValueError("Failed to open video writer with 'avc1' (h264)")
+        # except Exception:
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out_vid = cv2.VideoWriter(vid_output_path, fourcc, fps, (cam_width, cam_height))
+            # logging.info("Failed to open video writer with 'avc1' (h264). Using 'mp4v' instead.")
+        
+    return cap, out_vid, cam_width, cam_height, fps
+
+
+def process_video(video_file_path, pose_tracker, output_format, save_video, save_images, display_detection, input_frame_range, multi_person):
     '''
     Estimate pose from a video file
     
@@ -183,34 +230,39 @@ def process_video(video_file_path, pose_tracker, output_format, save_video, save
     except:
         raise NameError(f"{video_file_path} is not a video. Images must be put in one subdirectory per camera.")
     
-    pose_dir = os.path.abspath(os.path.join(video_file_path, '..', '..', 'pose'))
-    if not os.path.isdir(pose_dir): os.makedirs(pose_dir)
-    video_name_wo_ext = os.path.splitext(os.path.basename(video_file_path))[0]
-    json_output_dir = os.path.join(pose_dir, f'{video_name_wo_ext}_json')
-    output_video_path = os.path.join(pose_dir, f'{video_name_wo_ext}_pose.mp4')
-    img_output_dir = os.path.join(pose_dir, f'{video_name_wo_ext}_img')
+    output_dir = os.path.abspath(os.path.join(video_file_path, '..', '..', 'pose'))
+    if not os.path.isdir(output_dir): os.makedirs(output_dir)
+    output_dir_name = os.path.splitext(os.path.basename(video_file_path))[0]
+    img_output_dir = os.path.join(output_dir, f'{output_dir_name}_img') 
+    json_output_dir = os.path.join(output_dir, f'{output_dir_name}_json')
+    output_video_path = os.path.join(output_dir, f'{output_dir_name}_pose.mp4')
     
-    if save_video: # Set up video writer
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
-        fps = cap.get(cv2.CAP_PROP_FPS) # Get the frame rate from the raw video
-        W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) # Get the width and height from the raw video
-        out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
-        
+    # Set up video capture
+    if video_file_path == "webcam":
+        return
+    else:
+        cap, out_vid, cam_width, cam_height, fps = setup_video(video_file_path, save_video, output_video_path)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        frame_range = [[total_frames] if input_frame_range==[] else input_frame_range][0]
+        frame_iterator = tqdm(range(*frame_range), desc=f'Processing {video_file_path}') # use a progress bar
+    
     if display_detection:
         cv2.namedWindow(f"Pose Estimation {os.path.basename(video_file_path)}", cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
 
-    frame_idx = 0
-    cap = cv2.VideoCapture(video_file_path)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    f_range = [[total_frames] if frame_range==[] else frame_range][0]
-    with tqdm(total=total_frames, desc=f'Processing {os.path.basename(video_file_path)}') as pbar:
+    with frame_iterator as pbar:
+        frame_idx = 0
         while cap.isOpened():
-            # print('\nFrame ', frame_idx)
             success, frame = cap.read()
-            if not success:
+
+            if frame_idx > frame_range[1] - 1:
                 break
+
+            # If frame not grabbed
+            if not success:
+                logging.warning(f"Failed to grab frame {frame_idx}.")
+                continue
             
-            if frame_idx in range(*f_range):
+            if frame_idx in range(*frame_range):
                 # Perform pose estimation on the frame
                 keypoints, scores = pose_tracker(frame)
 
@@ -221,7 +273,7 @@ def process_video(video_file_path, pose_tracker, output_format, save_video, save
            
                 # Save to json
                 if 'openpose' in output_format:
-                    json_file_path = os.path.join(json_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.json')
+                    json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
                     save_to_openpose(json_file_path, keypoints, scores)
 
                 # Draw skeleton on the frame
@@ -231,22 +283,22 @@ def process_video(video_file_path, pose_tracker, output_format, save_video, save
                 
                 if display_detection:
                     cv2.imshow(f"Pose Estimation {os.path.basename(video_file_path)}", img_show)
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                    if (cv2.waitKey(1) & 0xFF) == ord('q') or (cv2.waitKey(1) & 0xFF) == 27:
                         break
 
                 if save_video:
-                    out.write(img_show)
+                    out_vid.write(img_show)
 
                 if save_images:
                     if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
-                    cv2.imwrite(os.path.join(img_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.jpg'), img_show)
+                    cv2.imwrite(os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'), img_show)
 
             frame_idx += 1
             pbar.update(1)
 
     cap.release()
     if save_video:
-        out.release()
+        out_vid.release()
         logging.info(f"--> Output video saved to {output_video_path}.")
     if save_images:
         logging.info(f"--> Output images saved to {img_output_dir}.")
@@ -287,7 +339,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
         logging.warning('Using default framerate of 60 fps.')
         fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
         W, H = cv2.imread(image_files[0]).shape[:2][::-1] # Get the width and height from the first image (assuming all images have the same size)
-        out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
+        cap = cv2.VideoWriter(output_video_path, fourcc, 60, (W, H)) # Create the output video file
 
     if display_detection:
         cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
@@ -324,7 +376,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
                     break
 
             if save_video:
-                out.write(img_show)
+                cap.write(img_show)
 
             if save_images:
                 if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
@@ -387,18 +439,6 @@ def rtm_estimator(config_dict):
 
     # Determine frame rate
     video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-    frame_rate = config_dict.get('project').get('frame_rate')
-    if frame_rate == 'auto': 
-        try:
-            cap = cv2.VideoCapture(video_files[0])
-            if not cap.isOpened():
-                raise FileNotFoundError(f'Error: Could not open {video_files[0]}. Check that the file exists.')
-            frame_rate = cap.get(cv2.CAP_PROP_FPS)
-            if frame_rate == 0:
-                frame_rate = 30
-                logging.warning(f'Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps.')
-        except:
-            frame_rate = 30
 
     # If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
     try:
@@ -472,12 +512,14 @@ def rtm_estimator(config_dict):
             raise
             
     except:
-        video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-        if not len(video_files) == 0: 
+        video_files = glob.glob(os.path.join(video_dir, '*' + vid_img_extension))
+        if not len(video_files) == 0:
             # Process video files
             logging.info(f'Found video files with extension {vid_img_extension}.')
             for video_file_path in video_files:
                 pose_tracker.reset()
+                logging.info(f'Video files {video_file_path}.')
+                # process_fun(config_dict, video_file, frame_range, result_dir)
                 process_video(video_file_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person)
 
         else:
@@ -487,4 +529,4 @@ def rtm_estimator(config_dict):
             for image_folder in image_folders:
                 pose_tracker.reset()
                 image_folder_path = os.path.join(video_dir, image_folder)
-                process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person)
+                process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person)
