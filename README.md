@@ -352,7 +352,7 @@ Pose2Sim.poseEstimation()
 
 *N.B.:* Pose estimation can be run in `lightweight`, `balanced`, or `performance` mode.\
 *N.B.:* The `pose_model` with body, feet, hands, and face is required for wrist motion but is much slower and slightly less accurate on body keypoints.\
-*N.B.:* The `GPU` will be used with ONNX backend if a valid CUDA installation is found (or MPS with MacOS), otherwise the `CPU` will be used with OpenVINO backend.\
+*N.B.:* The `GPU` will be used with ONNX backend if a valid CUDA installation is found (or ROCM with AMD GPUS, or MPS with MacOS), otherwise the `CPU` will be used with OpenVINO backend.\
 *N.B.:* Pose estimation can be dramatically sped up by increasing the value of `det_frequency`. In that case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames).
 
 <img src="Content/Pose2D.png" width="760">
@@ -537,7 +537,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 ### Synchronization
 
 > _**2D points can be triangulated only if they represent the same body position across all cameras: therefore, views need to be synchronized.**_\
-For each camera, this computes mean vertical speed for the chosen keypoints, and finds the time offset for which their correlation is highest.
+For each camera, the algorithm computes mean vertical speed for the chosen keypoints, and synchronizes by finding the time offset for which the correlation is highest.
 
 >***N.B.:** Skip this step if your cameras are natively synchronized.*
 

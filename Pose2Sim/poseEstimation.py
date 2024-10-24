@@ -408,6 +408,10 @@ def rtm_estimator(config_dict):
             device = 'cuda'
             backend = 'onnxruntime'
             logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
+        elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
+            device = 'rocm'
+            backend = 'onnxruntime'
+            logging.info(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
         else:
             raise 
     except:
