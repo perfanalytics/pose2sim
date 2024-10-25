@@ -187,8 +187,12 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
     multi_person = config_dict.get('project').get('multi_person')
 
     output_format = config_dict['pose']['output_format']
-    show_realtime_results = config_dict['pose'].get('display_detection') or config_dict['pose'].get('show_realtime_results')
+    show_realtime_results = config_dict['pose'].get('show_realtime_results')
 
+    if show_realtime_results is None:
+        show_realtime_results = config_dict['pose'].get('display_detection')
+        if show_realtime_results is not None:
+            print("Warning: 'display_detection' is deprecated. Please use 'show_realtime_results' instead.")
 
     try:
         cap = cv2.VideoCapture(video_file_path)
@@ -323,7 +327,12 @@ def process_images(config_dict, image_folder_path, pose_tracker, input_frame_ran
     frame_range = config_dict.get('project').get('frame_range')
 
     output_format = config_dict['pose']['output_format']
-    show_realtime_results = config_dict['pose']['show_realtime_results']
+    show_realtime_results = config_dict['pose'].get('show_realtime_results')
+
+    if show_realtime_results is None:
+        show_realtime_results = config_dict['pose'].get('display_detection')
+        if show_realtime_results is not None:
+            print("Warning: 'display_detection' is deprecated. Please use 'show_realtime_results' instead.")
     vid_img_extension = config_dict['pose']['vid_img_extension']
 
     image_file_stem = image_folder_path.stem
