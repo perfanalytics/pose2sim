@@ -48,7 +48,6 @@ import sys
 
 from rtmlib import PoseTracker, Body, Wholebody, BodyWithFeet, draw_skeleton
 from Pose2Sim.common import natural_sort_key, min_with_single_indices, euclidean_distance
-from Sports2D.Utilities.common import setup_pose_tracker, setup_video, setup_webcam
 
 
 ## AUTHORSHIP INFORMATION
@@ -181,6 +180,8 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
     - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
     '''
 
+    from Sports2D.Utilities.common import setup_webcam, setup_video, setup_capture_directories
+
     save_video = True if 'to_video' in config_dict['project']['save_video'] else False
     save_images = True if 'to_images' in config_dict['project']['save_video'] else False
     multi_person = config_dict.get('project').get('multi_person')
@@ -196,18 +197,8 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
     except:
         raise NameError(f"{video_file_path} is not a video. Images must be put in one subdirectory per camera.")
     
-    if video_file_path == "webcam":
-        current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir_name = f'webcam_{current_date}'
-    else:
-        video_file_stem = video_file_path.stem
-        output_dir_name = f'{video_file_stem}_Sports2D'
-    output_dir = os.path.abspath(os.path.join(output_dir, 'pose'))
-    if not os.path.isdir(output_dir): os.makedirs(output_dir)
-    img_output_dir = os.path.join(output_dir, f'{output_dir_name}_img') 
-    json_output_dir = os.path.join(output_dir, f'{output_dir_name}_json')
-    output_video_path = os.path.join(output_dir, f'{output_dir_name}_pose.mp4')
-    
+    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(video_file_path, output_dir)
+
     # Set up video capture
     if video_file_path == "webcam":
         # cap, out_vid, cam_width, cam_height, fps = setup_webcam(webcam_id, save_video, output_video_path, input_size)
@@ -303,7 +294,7 @@ def resample_video(vid_output_path, fps, desired_framerate):
     new_vid_path.rename(vid_output_path)
 
 
-def process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, fps, save_video, save_images, display_detection, frame_range, multi_person):
+def process_images(config_dict, image_folder_path, pose_tracker, input_frame_range, output_dir):
     '''
     Estimate pose estimation from a folder of images
     
@@ -321,15 +312,31 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
     - if save_video: Video file with the detected keypoints and confidence scores drawn on the frames
     - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
-    '''    
+    '''
 
-    pose_dir = os.path.abspath(os.path.join(image_folder_path, '..', '..', 'pose'))
-    if not os.path.isdir(pose_dir): os.makedirs(pose_dir)
-    json_output_dir = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_json')
-    output_video_path = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_pose.mp4')
-    img_output_dir = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_img')
+    from Sports2D.Utilities.common import setup_capture_directories
 
-    image_files = glob.glob(os.path.join(image_folder_path, '*'+vid_img_extension))
+    save_video = True if 'to_video' in config_dict['project']['save_video'] else False
+    save_images = True if 'to_images' in config_dict['project']['save_video'] else False
+    multi_person = config_dict.get('project').get('multi_person')
+    frame_range = config_dict.get('project').get('frame_range')
+
+    output_format = config_dict['pose']['output_format']
+    display_detection = config_dict['pose']['display_detection']
+    vid_img_extension = config_dict['pose']['vid_img_extension']
+
+    image_file_stem = image_folder_path.stem
+    output_dir_name = f'{image_file_stem}_Sports2D'
+    output_dir = os.path.abspath(os.path.join(output_dir, 'pose'))
+    if not os.path.isdir(output_dir): os.makedirs(output_dir)
+    img_output_dir = os.path.join(output_dir, f'{output_dir_name}_img')
+    json_output_dir = os.path.join(output_dir, f'{output_dir_name}_json')
+    output_video_path = os.path.join(output_dir, f'{output_dir_name}_pose.mp4')
+
+    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(image_folder_path, output_dir)
+
+
+    image_files = glob.glob(os.path.join(image_folder_path, '*' + vid_img_extension))
     sorted(image_files, key=natural_sort_key)
 
     if save_video: # Set up video writer
@@ -411,6 +418,8 @@ def rtm_estimator(config_dict):
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
     - Optionally, videos and/or image files with the detected keypoints 
     '''
+  
+    from Sports2D.Utilities.common import setup_pose_tracker
 
     # Read config
     project_dir = config_dict['project']['project_dir']
