@@ -171,7 +171,7 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
-    - display_detection: bool. Whether to show real-time visualization
+    - show_realtime_results: bool. Whether to show real-time visualization
     - frame_range: list. Range of frames to process
 
     OUTPUTS:
@@ -187,7 +187,8 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
     multi_person = config_dict.get('project').get('multi_person')
 
     output_format = config_dict['pose']['output_format']
-    display_detection = config_dict['pose']['display_detection']
+    show_realtime_results = config_dict['pose'].get('display_detection') or config_dict['pose'].get('show_realtime_results')
+
 
     try:
         cap = cv2.VideoCapture(video_file_path)
@@ -211,7 +212,7 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
         frame_range = [[total_frames] if input_frame_range==[] else input_frame_range][0]
         frame_iterator = tqdm(range(*frame_range), desc=f'Processing {video_file_path}') # use a progress bar
     
-    if display_detection:
+    if show_realtime_results:
         cv2.namedWindow(f"Pose Estimation {os.path.basename(video_file_path)}", cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
 
     frame_processing_times = []
@@ -245,11 +246,11 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
                     save_to_openpose(json_file_path, keypoints, scores)
 
                 # Draw skeleton on the frame
-                if display_detection or save_video or save_images:
+                if show_realtime_results or save_video or save_images:
                     img_show = frame.copy()
                     img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
                 
-                if display_detection:
+                if show_realtime_results:
                     cv2.imshow(f"Pose Estimation {os.path.basename(video_file_path)}", img_show)
                     if (cv2.waitKey(1) & 0xFF) == ord('q') or (cv2.waitKey(1) & 0xFF) == 27:
                         break
@@ -279,7 +280,7 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
         logging.info(f"--> Output video saved to {output_video_path}.")
     if save_images:
         logging.info(f"--> Output images saved to {img_output_dir}.")
-    if display_detection:
+    if show_realtime_results:
         cv2.destroyAllWindows()
 
 def resample_video(vid_output_path, fps, desired_framerate):
@@ -305,7 +306,7 @@ def process_images(config_dict, image_folder_path, pose_tracker, input_frame_ran
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
-    - display_detection: bool. Whether to show real-time visualization
+    - show_realtime_results: bool. Whether to show real-time visualization
     - frame_range: list. Range of frames to process
 
     OUTPUTS:
@@ -322,7 +323,7 @@ def process_images(config_dict, image_folder_path, pose_tracker, input_frame_ran
     frame_range = config_dict.get('project').get('frame_range')
 
     output_format = config_dict['pose']['output_format']
-    display_detection = config_dict['pose']['display_detection']
+    show_realtime_results = config_dict['pose']['show_realtime_results']
     vid_img_extension = config_dict['pose']['vid_img_extension']
 
     image_file_stem = image_folder_path.stem
@@ -345,7 +346,7 @@ def process_images(config_dict, image_folder_path, pose_tracker, input_frame_ran
         W, H = cv2.imread(image_files[0]).shape[:2][::-1] # Get the width and height from the first image (assuming all images have the same size)
         cap = cv2.VideoWriter(output_video_path, fourcc, 60, (W, H)) # Create the output video file
 
-    if display_detection:
+    if show_realtime_results:
         cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
     
     f_range = [[len(image_files)] if frame_range==[] else frame_range][0]
@@ -370,11 +371,11 @@ def process_images(config_dict, image_folder_path, pose_tracker, input_frame_ran
                 save_to_openpose(json_file_path, keypoints, scores)
 
             # Draw skeleton on the image
-            if display_detection or save_video or save_images:
+            if show_realtime_results or save_video or save_images:
                 img_show = frame.copy()
                 img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
 
-            if display_detection:
+            if show_realtime_results:
                 cv2.imshow(f"Pose Estimation {os.path.basename(image_folder_path)}", img_show)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
@@ -390,7 +391,7 @@ def process_images(config_dict, image_folder_path, pose_tracker, input_frame_ran
         logging.info(f"--> Output video saved to {output_video_path}.")
     if save_images:
         logging.info(f"--> Output images saved to {img_output_dir}.")
-    if display_detection:
+    if show_realtime_results:
         cv2.destroyAllWindows()
 
 
