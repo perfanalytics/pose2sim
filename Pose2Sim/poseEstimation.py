@@ -36,18 +36,12 @@ import os
 import glob
 import json
 import logging
-import itertools as it
 from tqdm import tqdm
-import numpy as np
 import cv2
-from pathlib import Path
-import subprocess
-import imageio_ffmpeg as ffmpeg
 from datetime import datetime
-import sys
 
-from rtmlib import PoseTracker, Body, Wholebody, BodyWithFeet, draw_skeleton
-from Pose2Sim.common import natural_sort_key, min_with_single_indices, euclidean_distance
+from rtmlib import draw_skeleton
+from Pose2Sim.common import natural_sort_key
 
 
 ## AUTHORSHIP INFORMATION
@@ -62,318 +56,6 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def save_to_openpose(json_file_path, keypoints, scores):
-    '''
-    Save the keypoints and scores to a JSON file in the OpenPose format
-
-    INPUTS:
-    - json_file_path: Path to save the JSON file
-    - keypoints: Detected keypoints
-    - scores: Confidence scores for each keypoint
-
-    OUTPUTS:
-    - JSON file with the detected keypoints and confidence scores in the OpenPose format
-    '''
-
-    # Prepare keypoints with confidence scores for JSON output
-    nb_detections = len(keypoints)
-    # print('results: ', keypoints, scores)
-    detections = []
-    for i in range(nb_detections): # nb of detected people
-        keypoints_with_confidence_i = []
-        for kp, score in zip(keypoints[i], scores[i]):
-            keypoints_with_confidence_i.extend([kp[0].item(), kp[1].item(), score.item()])
-        detections.append({
-                    "person_id": [-1],
-                    "pose_keypoints_2d": keypoints_with_confidence_i,
-                    "face_keypoints_2d": [],
-                    "hand_left_keypoints_2d": [],
-                    "hand_right_keypoints_2d": [],
-                    "pose_keypoints_3d": [],
-                    "face_keypoints_3d": [],
-                    "hand_left_keypoints_3d": [],
-                    "hand_right_keypoints_3d": []
-                })
-            
-    # Create JSON output structure
-    json_output = {"version": 1.3, "people": detections}
-    
-    # Save JSON output for each frame
-    json_output_dir = os.path.abspath(os.path.join(json_file_path, '..'))
-    if not os.path.isdir(json_output_dir): os.makedirs(json_output_dir)
-    with open(json_file_path, 'w') as json_file:
-        json.dump(json_output, json_file)
-
-   
-def sort_people_sports2d(keyptpre, keypt, scores):
-    '''
-    Associate persons across frames (Pose2Sim method)
-    Persons' indices are sometimes swapped when changing frame
-    A person is associated to another in the next frame when they are at a small distance
-    
-    N.B.: Requires min_with_single_indices and euclidian_distance function (see common.py)
-
-    INPUTS:
-    - keyptpre: array of shape K, L, M with K the number of detected persons,
-    L the number of detected keypoints, M their 2D coordinates
-    - keypt: idem keyptpre, for current frame
-    - score: array of shape K, L with K the number of detected persons,
-    L the confidence of detected keypoints
-    
-    OUTPUTS:
-    - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
-    - sorted_keypoints: array with reordered persons
-    - sorted_scores: array with reordered scores
-    '''
-    
-    # Generate possible person correspondences across frames
-    if len(keyptpre) < len(keypt):
-        keyptpre = np.concatenate((keyptpre, np.full((len(keypt)-len(keyptpre), keypt.shape[1], 2), np.nan)))
-    if len(keypt) < len(keyptpre):
-        keypt = np.concatenate((keypt, np.full((len(keyptpre)-len(keypt), keypt.shape[1], 2), np.nan)))
-        scores = np.concatenate((scores, np.full((len(keyptpre)-len(scores), scores.shape[1]), np.nan)))
-    personsIDs_comb = sorted(list(it.product(range(len(keyptpre)), range(len(keypt)))))
-    
-    # Compute distance between persons from one frame to another
-    frame_by_frame_dist = []
-    for comb in personsIDs_comb:
-        frame_by_frame_dist += [euclidean_distance(keyptpre[comb[0]],keypt[comb[1]])]
-    frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
-    
-    # Sort correspondences by distance
-    _, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
-    
-    # Associate points to same index across frames, nan if no correspondence
-    sorted_keypoints, sorted_scores = [], []
-    for i in range(len(keyptpre)):
-        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
-        if len(id_in_old) > 0:
-            sorted_keypoints += [keypt[id_in_old[0]]]
-            sorted_scores += [scores[id_in_old[0]]]
-        else:
-            sorted_keypoints += [keypt[i]]
-            sorted_scores += [scores[i]]
-    sorted_keypoints, sorted_scores = np.array(sorted_keypoints), np.array(sorted_scores)
-
-    # Keep track of previous values even when missing for more than one frame
-    sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints) & ~np.isnan(keyptpre), keyptpre, sorted_keypoints)
-    
-    return sorted_prev_keypoints, sorted_keypoints, sorted_scores
-
-
-def process_video(config_dict, video_file_path, pose_tracker, input_frame_range, output_dir):
-    '''
-    Estimate pose from a video file
-    
-    INPUTS:
-    - video_file_path: str. Path to the input video file
-    - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
-    - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
-    - save_video: bool. Whether to save the output video
-    - save_images: bool. Whether to save the output images
-    - show_realtime_results: bool. Whether to show real-time visualization
-    - frame_range: list. Range of frames to process
-
-    OUTPUTS:
-    - JSON files with the detected keypoints and confidence scores in the OpenPose format
-    - if save_video: Video file with the detected keypoints and confidence scores drawn on the frames
-    - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
-    '''
-
-    from Sports2D.Utilities.common import setup_webcam, setup_video, setup_capture_directories, validate_video_file, setup_video_capture, display_realtime_results, finalize_video_processing, read_frame, track_people
-
-    webcam_id =  config_dict.get('project').get('webcam_id')
-    input_size = config_dict.get('project').get('input_size')
-
-    save_video = True if 'to_video' in config_dict['project']['save_video'] else False
-    save_images = True if 'to_images' in config_dict['project']['save_video'] else False
-    multi_person = config_dict.get('project').get('multi_person')
-
-    output_format = config_dict['pose']['output_format']
-    show_realtime_results = config_dict['pose'].get('show_realtime_results')
-
-    if show_realtime_results is None:
-        show_realtime_results = config_dict['pose'].get('display_detection')
-        if show_realtime_results is not None:
-            print("Warning: 'display_detection' is deprecated. Please use 'show_realtime_results' instead.")
-    
-    logging.info(f'Multi-person is {"" if multi_person else "not "}selected.')
-
-    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(video_file_path, output_dir)
-
-    validate_video_file(video_file_path)
-
-    cap, frame_iterator, out_vid, cam_width, cam_height = setup_video_capture(video_file_path, webcam_id, save_video, output_video_path, input_size, input_frame_range)
-
-    if show_realtime_results:
-        display_realtime_results(video_file_path)
-    
-    if video_file_path == 'webcam' and save_video:
-        total_processing_start_time = datetime.now()
-
-    frames_processed = 0
-    for frame_idx in frame_iterator:
-        frame = read_frame(cap, frame_idx)
-
-        # If frame not grabbed
-        if frame is None:
-            logging.warning(f"Failed to grab frame {frame_idx}.")
-            continue
-
-        # Perform pose estimation on the frame
-        keypoints, scores = pose_tracker(frame)
-
-        # Tracking people IDs across frames
-        keypoints, scores, prev_keypoints = track_people(
-            keypoints, scores, multi_person, None, prev_keypoints
-        )
-
-        save_json_output(output_format, json_output_dir, output_dir_name, frame_idx, keypoints, scores)
-
-        # Draw skeleton on the frame
-        if show_realtime_results or save_video or save_images:
-            img_show = frame.copy()
-            img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
-
-        if show_realtime_results:
-            cv2.imshow(f"Pose Estimation {os.path.basename(video_file_path)}", img_show)
-            if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
-                break
-
-        # Sauvegarde de la vidéo et des images
-        if save_video:
-            out_vid.write(img_show)
-        if save_images:
-            os.makedirs(img_output_dir, exist_ok=True)
-            cv2.imwrite(
-                os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'),
-                img_show
-            )
-
-        frames_processed += 1
-
-    cap.release()
-
-    if save_video:
-        out_vid.release()
-        if video_file_path == 'webcam' and frames_processed > 0:
-            fps = finalize_video_processing(frames_processed, total_processing_start_time, output_video_path, fps)
-        logging.info(f"--> Output video saved to {output_video_path}.")
-    if save_images:
-        logging.info(f"--> Output images saved to {img_output_dir}.")
-    if show_realtime_results:
-        cv2.destroyAllWindows()
-
-def save_json_output(output_format, json_output_dir, output_dir_name, frame_idx, keypoints, scores):
-    if 'openpose' in output_format:
-        json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
-        save_to_openpose(json_file_path, keypoints, scores)
-
-def process_images(config_dict, image_folder_path, pose_tracker, input_frame_range, output_dir):
-    '''
-    Estimate pose estimation from a folder of images
-    
-    INPUTS:
-    - image_folder_path: str. Path to the input image folder
-    - vid_img_extension: str. Extension of the image files
-    - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
-    - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
-    - save_video: bool. Whether to save the output video
-    - save_images: bool. Whether to save the output images
-    - show_realtime_results: bool. Whether to show real-time visualization
-    - frame_range: list. Range of frames to process
-
-    OUTPUTS:
-    - JSON files with the detected keypoints and confidence scores in the OpenPose format
-    - if save_video: Video file with the detected keypoints and confidence scores drawn on the frames
-    - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
-    '''
-
-    from Sports2D.Utilities.common import setup_capture_directories
-
-    save_video = True if 'to_video' in config_dict['project']['save_video'] else False
-    save_images = True if 'to_images' in config_dict['project']['save_video'] else False
-    multi_person = config_dict.get('project').get('multi_person')
-    frame_range = config_dict.get('project').get('frame_range')
-
-    output_format = config_dict['pose']['output_format']
-    show_realtime_results = config_dict['pose'].get('show_realtime_results')
-
-    if show_realtime_results is None:
-        show_realtime_results = config_dict['pose'].get('display_detection')
-        if show_realtime_results is not None:
-            print("Warning: 'display_detection' is deprecated. Please use 'show_realtime_results' instead.")
-    vid_img_extension = config_dict['pose']['vid_img_extension']
-
-    image_file_stem = image_folder_path.stem
-    output_dir_name = f'{image_file_stem}_Sports2D'
-    output_dir = os.path.abspath(os.path.join(output_dir, 'pose'))
-    if not os.path.isdir(output_dir): os.makedirs(output_dir)
-    img_output_dir = os.path.join(output_dir, f'{output_dir_name}_img')
-    json_output_dir = os.path.join(output_dir, f'{output_dir_name}_json')
-    output_video_path = os.path.join(output_dir, f'{output_dir_name}_pose.mp4')
-
-    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(image_folder_path, output_dir)
-
-
-    image_files = glob.glob(os.path.join(image_folder_path, '*' + vid_img_extension))
-    sorted(image_files, key=natural_sort_key)
-
-    if save_video: # Set up video writer
-        logging.warning('Using default framerate of 60 fps.')
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
-        W, H = cv2.imread(image_files[0]).shape[:2][::-1] # Get the width and height from the first image (assuming all images have the same size)
-        cap = cv2.VideoWriter(output_video_path, fourcc, 60, (W, H)) # Create the output video file
-
-    if show_realtime_results:
-        cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
-    
-    f_range = [[len(image_files)] if frame_range==[] else frame_range][0]
-    for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
-        if frame_idx in range(*f_range):
-            try:
-                frame = cv2.imread(image_file)
-            except:
-                raise NameError(f"{image_file} is not an image. Videos must be put in the video directory, not in subdirectories.")
-            
-            # Perform pose estimation on the image
-            keypoints, scores = pose_tracker(frame)
-
-            # Tracking people IDs across frames
-            if multi_person:
-                if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores)
-            
-            # Extract frame number from the filename
-            if 'openpose' in output_format:
-                json_file_path = os.path.join(json_output_dir, f"{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.json")
-                save_to_openpose(json_file_path, keypoints, scores)
-
-            # Draw skeleton on the image
-            if show_realtime_results or save_video or save_images:
-                img_show = frame.copy()
-                img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
-
-            if show_realtime_results:
-                cv2.imshow(f"Pose Estimation {os.path.basename(image_folder_path)}", img_show)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-
-            if save_video:
-                cap.write(img_show)
-
-            if save_images:
-                if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
-                cv2.imwrite(os.path.join(img_output_dir, f'{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.png'), img_show)
-
-    if save_video:
-        logging.info(f"--> Output video saved to {output_video_path}.")
-    if save_images:
-        logging.info(f"--> Output images saved to {img_output_dir}.")
-    if show_realtime_results:
-        cv2.destroyAllWindows()
-
-
 def rtm_estimator(config_dict):
     '''
     Estimate pose from a video file or a folder of images and 
@@ -453,3 +135,254 @@ def rtm_estimator(config_dict):
                 pose_tracker.reset()
                 image_folder_path = os.path.join(video_dir, image_folder)
                 process_images(config_dict, image_folder_path, pose_tracker, frame_range)
+
+def process_video(config_dict, video_file_path, pose_tracker, input_frame_range, output_dir):
+    '''
+    Estimate pose from a video file
+    
+    INPUTS:
+    - video_file_path: str. Path to the input video file
+    - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
+    - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
+    - save_video: bool. Whether to save the output video
+    - save_images: bool. Whether to save the output images
+    - show_realtime_results: bool. Whether to show real-time visualization
+    - frame_range: list. Range of frames to process
+
+    OUTPUTS:
+    - JSON files with the detected keypoints and confidence scores in the OpenPose format
+    - if save_video: Video file with the detected keypoints and confidence scores drawn on the frames
+    - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
+    '''
+
+    from Sports2D.Utilities.common import setup_webcam, setup_video, setup_capture_directories, validate_video_file, setup_video_capture, display_realtime_results, finalize_video_processing, read_frame, track_people
+
+    webcam_id =  config_dict.get('project').get('webcam_id')
+    input_size = config_dict.get('project').get('input_size')
+
+    save_video = True if 'to_video' in config_dict['project']['save_video'] else False
+    save_images = True if 'to_images' in config_dict['project']['save_video'] else False
+    multi_person = config_dict.get('project').get('multi_person')
+
+    output_format = config_dict['pose']['output_format']
+    show_realtime_results = config_dict['pose'].get('show_realtime_results')
+
+    if show_realtime_results is None:
+        show_realtime_results = config_dict['pose'].get('display_detection')
+        if show_realtime_results is not None:
+            print("Warning: 'display_detection' is deprecated. Please use 'show_realtime_results' instead.")
+    
+    logging.info(f'Multi-person is {"" if multi_person else "not "}selected.')
+
+    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(video_file_path, output_dir)
+
+    validate_video_file(video_file_path)
+
+    cap, frame_iterator, out_vid, cam_width, cam_height = setup_video_capture(video_file_path, webcam_id, save_video, output_video_path, input_size, input_frame_range)
+
+    if show_realtime_results:
+        display_realtime_results(video_file_path)
+    
+    if video_file_path == 'webcam' and save_video:
+        total_processing_start_time = datetime.now()
+
+    frames_processed = 0
+    for frame_idx in frame_iterator:
+        frame = read_frame(cap, frame_idx)
+
+        # If frame not grabbed
+        if frame is None:
+            logging.warning(f"Failed to grab frame {frame_idx}.")
+            continue
+
+        # Perform pose estimation on the frame
+        keypoints, scores = pose_tracker(frame)
+
+        # Tracking people IDs across frames
+        keypoints, scores, prev_keypoints = track_people(
+            keypoints, scores, multi_person, None, prev_keypoints, pose_tracker
+        )
+
+        if 'openpose' in output_format:
+            json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
+            save_to_openpose(json_file_path, keypoints, scores)
+
+        # Draw skeleton on the frame
+        if show_realtime_results or save_video or save_images:
+            img_show = frame.copy()
+            img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+
+        if show_realtime_results:
+            cv2.imshow(f"Pose Estimation {os.path.basename(video_file_path)}", img_show)
+            if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
+                break
+
+        # Sauvegarde de la vidéo et des images
+        if save_video:
+            out_vid.write(img_show)
+        if save_images:
+            os.makedirs(img_output_dir, exist_ok=True)
+            cv2.imwrite(
+                os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'),
+                img_show
+            )
+
+        frames_processed += 1
+
+    cap.release()
+
+    if save_video:
+        out_vid.release()
+        if video_file_path == 'webcam' and frames_processed > 0:
+            fps = finalize_video_processing(frames_processed, total_processing_start_time, output_video_path, fps)
+        logging.info(f"--> Output video saved to {output_video_path}.")
+    if save_images:
+        logging.info(f"--> Output images saved to {img_output_dir}.")
+    if show_realtime_results:
+        cv2.destroyAllWindows()
+
+def process_images(config_dict, image_folder_path, pose_tracker, input_frame_range, output_dir):
+    '''
+    Estimate pose estimation from a folder of images
+    
+    INPUTS:
+    - image_folder_path: str. Path to the input image folder
+    - vid_img_extension: str. Extension of the image files
+    - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
+    - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
+    - save_video: bool. Whether to save the output video
+    - save_images: bool. Whether to save the output images
+    - show_realtime_results: bool. Whether to show real-time visualization
+    - frame_range: list. Range of frames to process
+
+    OUTPUTS:
+    - JSON files with the detected keypoints and confidence scores in the OpenPose format
+    - if save_video: Video file with the detected keypoints and confidence scores drawn on the frames
+    - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
+    '''
+
+    from Sports2D.Utilities.common import setup_capture_directories, track_people
+
+    save_video = True if 'to_video' in config_dict['project']['save_video'] else False
+    save_images = True if 'to_images' in config_dict['project']['save_video'] else False
+    multi_person = config_dict.get('project').get('multi_person')
+    frame_range = config_dict.get('project').get('frame_range')
+
+    output_format = config_dict['pose']['output_format']
+    show_realtime_results = config_dict['pose'].get('show_realtime_results')
+
+    if show_realtime_results is None:
+        show_realtime_results = config_dict['pose'].get('display_detection')
+        if show_realtime_results is not None:
+            print("Warning: 'display_detection' is deprecated. Please use 'show_realtime_results' instead.")
+    vid_img_extension = config_dict['pose']['vid_img_extension']
+
+    image_file_stem = image_folder_path.stem
+    output_dir_name = f'{image_file_stem}_Sports2D'
+    output_dir = os.path.abspath(os.path.join(output_dir, 'pose'))
+    if not os.path.isdir(output_dir): os.makedirs(output_dir)
+    img_output_dir = os.path.join(output_dir, f'{output_dir_name}_img')
+    json_output_dir = os.path.join(output_dir, f'{output_dir_name}_json')
+    output_video_path = os.path.join(output_dir, f'{output_dir_name}_pose.mp4')
+
+    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(image_folder_path, output_dir)
+
+
+    image_files = glob.glob(os.path.join(image_folder_path, '*' + vid_img_extension))
+    sorted(image_files, key=natural_sort_key)
+
+    if save_video: # Set up video writer
+        logging.warning('Using default framerate of 60 fps.')
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
+        W, H = cv2.imread(image_files[0]).shape[:2][::-1] # Get the width and height from the first image (assuming all images have the same size)
+        cap = cv2.VideoWriter(output_video_path, fourcc, 60, (W, H)) # Create the output video file
+
+    if show_realtime_results:
+        cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
+    
+    f_range = [[len(image_files)] if frame_range==[] else frame_range][0]
+    for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
+        if frame_idx in range(*f_range):
+            try:
+                frame = cv2.imread(image_file)
+            except:
+                raise NameError(f"{image_file} is not an image. Videos must be put in the video directory, not in subdirectories.")
+            
+            # Perform pose estimation on the image
+            keypoints, scores = pose_tracker(frame)
+
+            # Tracking people IDs across frames
+            keypoints, scores, prev_keypoints = track_people(
+                keypoints, scores, multi_person, None, prev_keypoints, pose_tracker
+            )
+            
+            # Extract frame number from the filename
+            if 'openpose' in output_format:
+                json_file_path = os.path.join(json_output_dir, f"{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.json")
+                save_to_openpose(json_file_path, keypoints, scores)
+
+            # Draw skeleton on the image
+            if show_realtime_results or save_video or save_images:
+                img_show = frame.copy()
+                img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+
+            if show_realtime_results:
+                cv2.imshow(f"Pose Estimation {os.path.basename(image_folder_path)}", img_show)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+
+            if save_video:
+                cap.write(img_show)
+
+            if save_images:
+                if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
+                cv2.imwrite(os.path.join(img_output_dir, f'{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.png'), img_show)
+
+    if save_video:
+        logging.info(f"--> Output video saved to {output_video_path}.")
+    if save_images:
+        logging.info(f"--> Output images saved to {img_output_dir}.")
+    if show_realtime_results:
+        cv2.destroyAllWindows()
+
+def save_to_openpose(json_file_path, keypoints, scores):
+    '''
+    Save the keypoints and scores to a JSON file in the OpenPose format
+
+    INPUTS:
+    - json_file_path: Path to save the JSON file
+    - keypoints: Detected keypoints
+    - scores: Confidence scores for each keypoint
+
+    OUTPUTS:
+    - JSON file with the detected keypoints and confidence scores in the OpenPose format
+    '''
+
+    # Prepare keypoints with confidence scores for JSON output
+    nb_detections = len(keypoints)
+    # print('results: ', keypoints, scores)
+    detections = []
+    for i in range(nb_detections): # nb of detected people
+        keypoints_with_confidence_i = []
+        for kp, score in zip(keypoints[i], scores[i]):
+            keypoints_with_confidence_i.extend([kp[0].item(), kp[1].item(), score.item()])
+        detections.append({
+                    "person_id": [-1],
+                    "pose_keypoints_2d": keypoints_with_confidence_i,
+                    "face_keypoints_2d": [],
+                    "hand_left_keypoints_2d": [],
+                    "hand_right_keypoints_2d": [],
+                    "pose_keypoints_3d": [],
+                    "face_keypoints_3d": [],
+                    "hand_left_keypoints_3d": [],
+                    "hand_right_keypoints_3d": []
+                })
+            
+    # Create JSON output structure
+    json_output = {"version": 1.3, "people": detections}
+    
+    # Save JSON output for each frame
+    json_output_dir = os.path.abspath(os.path.join(json_file_path, '..'))
+    if not os.path.isdir(json_output_dir): os.makedirs(json_output_dir)
+    with open(json_file_path, 'w') as json_file:
+        json.dump(json_output, json_file)
