@@ -180,7 +180,10 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
     - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
     '''
 
-    from Sports2D.Utilities.common import setup_webcam, setup_video, setup_capture_directories
+    from Sports2D.Utilities.common import setup_webcam, setup_video, setup_capture_directories, validate_video_file, setup_video_capture, display_realtime_results, finalize_video_processing, read_frame, track_people
+
+    webcam_id =  config_dict.get('project').get('webcam_id')
+    input_size = config_dict.get('project').get('input_size')
 
     save_video = True if 'to_video' in config_dict['project']['save_video'] else False
     save_images = True if 'to_images' in config_dict['project']['save_video'] else False
@@ -193,111 +196,78 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
         show_realtime_results = config_dict['pose'].get('display_detection')
         if show_realtime_results is not None:
             print("Warning: 'display_detection' is deprecated. Please use 'show_realtime_results' instead.")
-
-    try:
-        cap = cv2.VideoCapture(video_file_path)
-        cap.read()
-        if cap.read()[0] == False:
-            raise
-    except:
-        raise NameError(f"{video_file_path} is not a video. Images must be put in one subdirectory per camera.")
     
+    logging.info(f'Multi-person is {"" if multi_person else "not "}selected.')
+
     output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(video_file_path, output_dir)
 
-    # Set up video capture
-    if video_file_path == "webcam":
-        # cap, out_vid, cam_width, cam_height, fps = setup_webcam(webcam_id, save_video, output_video_path, input_size)
-        frame_range = [0,sys.maxsize]
-        frame_iterator = range(*frame_range)
-        logging.warning('Webcam input: the framerate may vary. If results are filtered, Sports2D will use the average framerate as input.')
-    else:
-        cap, out_vid, cam_width, cam_height, fps = setup_video(video_file_path, save_video, output_video_path)
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        frame_range = [[total_frames] if input_frame_range==[] else input_frame_range][0]
-        frame_iterator = tqdm(range(*frame_range), desc=f'Processing {video_file_path}') # use a progress bar
-    
+    validate_video_file(video_file_path)
+
+    cap, frame_iterator, out_vid, cam_width, cam_height = setup_video_capture(video_file_path, webcam_id, save_video, output_video_path, input_size, input_frame_range)
+
     if show_realtime_results:
-        cv2.namedWindow(f"Pose Estimation {os.path.basename(video_file_path)}", cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
+        display_realtime_results(video_file_path)
+    
+    if video_file_path == 'webcam' and save_video:
+        total_processing_start_time = datetime.now()
 
-    frame_processing_times = []
-    with frame_iterator as pbar:
-        frame_idx = 0
-        while cap.isOpened():
-            success, frame = cap.read()
+    frames_processed = 0
+    for frame_idx in frame_iterator:
+        frame = read_frame(cap, frame_idx)
 
-            if frame_idx > frame_range[1] - 1:
+        # If frame not grabbed
+        if frame is None:
+            logging.warning(f"Failed to grab frame {frame_idx}.")
+            continue
+
+        # Perform pose estimation on the frame
+        keypoints, scores = pose_tracker(frame)
+
+        # Tracking people IDs across frames
+        keypoints, scores, prev_keypoints = track_people(
+            keypoints, scores, multi_person, None, prev_keypoints
+        )
+
+        save_json_output(output_format, json_output_dir, output_dir_name, frame_idx, keypoints, scores)
+
+        # Draw skeleton on the frame
+        if show_realtime_results or save_video or save_images:
+            img_show = frame.copy()
+            img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+
+        if show_realtime_results:
+            cv2.imshow(f"Pose Estimation {os.path.basename(video_file_path)}", img_show)
+            if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
                 break
 
-            # If frame not grabbed
-            if not success:
-                logging.warning(f"Failed to grab frame {frame_idx}.")
-                continue
-            
-            if frame_idx in range(*frame_range):
-                start_time = datetime.now()
+        # Sauvegarde de la vidéo et des images
+        if save_video:
+            out_vid.write(img_show)
+        if save_images:
+            os.makedirs(img_output_dir, exist_ok=True)
+            cv2.imwrite(
+                os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'),
+                img_show
+            )
 
-                # Perform pose estimation on the frame
-                keypoints, scores = pose_tracker(frame)
-
-                # Tracking people IDs across frames
-                if multi_person:
-                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores)
-
-                # Save to json
-                if 'openpose' in output_format:
-                    json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
-                    save_to_openpose(json_file_path, keypoints, scores)
-
-                # Draw skeleton on the frame
-                if show_realtime_results or save_video or save_images:
-                    img_show = frame.copy()
-                    img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
-                
-                if show_realtime_results:
-                    cv2.imshow(f"Pose Estimation {os.path.basename(video_file_path)}", img_show)
-                    if (cv2.waitKey(1) & 0xFF) == ord('q') or (cv2.waitKey(1) & 0xFF) == 27:
-                        break
-
-                if save_video:
-                    out_vid.write(img_show)
-
-                if save_images:
-                    if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
-                    cv2.imwrite(os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'), img_show)
-
-                if video_file_path == 'webcam' and save_video:   # To adjust framerate of output video
-                    elapsed_time = (datetime.now() - start_time).total_seconds()
-                    frame_processing_times.append(elapsed_time)
-
-            frame_idx += 1
-            pbar.update(1)
+        frames_processed += 1
 
     cap.release()
+
     if save_video:
         out_vid.release()
-        if video_file_path == 'webcam':
-            actual_framerate = len(frame_processing_times) / sum(frame_processing_times)
-            logging.info(f"Rewriting webcam video based on the average framerate {actual_framerate}.")
-            resample_video(output_video_path, fps, actual_framerate)
-            fps = actual_framerate
+        if video_file_path == 'webcam' and frames_processed > 0:
+            fps = finalize_video_processing(frames_processed, total_processing_start_time, output_video_path, fps)
         logging.info(f"--> Output video saved to {output_video_path}.")
     if save_images:
         logging.info(f"--> Output images saved to {img_output_dir}.")
     if show_realtime_results:
         cv2.destroyAllWindows()
 
-def resample_video(vid_output_path, fps, desired_framerate):
-    '''
-    Resample video to the desired fps using ffmpeg.
-    '''
-   
-    ffmpeg_path = ffmpeg.get_ffmpeg_exe()
-    new_vid_path = vid_output_path.parent / Path(vid_output_path.stem+'_2'+vid_output_path.suffix)
-    subprocess.run([ffmpeg_path, '-i', vid_output_path, '-filter:v', f'setpts={fps/desired_framerate}*PTS', '-r', str(desired_framerate), new_vid_path])
-    vid_output_path.unlink()
-    new_vid_path.rename(vid_output_path)
-
+def save_json_output(output_format, json_output_dir, output_dir_name, frame_idx, keypoints, scores):
+    if 'openpose' in output_format:
+        json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
+        save_to_openpose(json_file_path, keypoints, scores)
 
 def process_images(config_dict, image_folder_path, pose_tracker, input_frame_range, output_dir):
     '''
