@@ -178,7 +178,7 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
 
     validate_video_file(video_file_path)
 
-    cap, frame_iterator, out_vid, cam_width, cam_height = setup_video_capture(video_file_path, webcam_id, save_video, output_video_path, input_size, input_frame_range)
+    cap, frame_iterator, out_vid, cam_width, cam_height, fps = setup_video_capture(video_file_path, webcam_id, save_video, output_video_path, input_size, input_frame_range)
 
     if show_realtime_results:
         display_realtime_results(video_file_path)
@@ -187,6 +187,7 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
         total_processing_start_time = datetime.now()
 
     frames_processed = 0
+    prev_keypoints = None
     for frame_idx in frame_iterator:
         frame = read_frame(cap, frame_idx)
 
