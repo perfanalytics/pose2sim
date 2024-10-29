@@ -162,24 +162,23 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
 
     save_video = True if 'to_video' in config_dict['project']['save_video'] else False
     save_images = True if 'to_images' in config_dict['project']['save_video'] else False
+    
     multi_person = config_dict.get('project').get('multi_person')
-
-    output_format = config_dict['pose']['output_format']
     show_realtime_results = config_dict['pose'].get('show_realtime_results')
-
     if show_realtime_results is None:
         show_realtime_results = config_dict['pose'].get('display_detection')
         if show_realtime_results is not None:
             print("Warning: 'display_detection' is deprecated. Please use 'show_realtime_results' instead.")
     
+    output_format = config_dict['pose']['output_format']
+
     logging.info(f'Multi-person is {"" if multi_person else "not "}selected.')
 
     output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(video_file_path, output_dir)
 
-    validate_video_file(video_file_path)
-
     cap, frame_iterator, out_vid, cam_width, cam_height, fps = setup_video_capture(video_file_path, webcam_id, save_video, output_video_path, input_size, input_frame_range)
 
+    # Call to display real-time results if needed
     if show_realtime_results:
         display_realtime_results(video_file_path)
     
