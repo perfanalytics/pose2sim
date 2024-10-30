@@ -52,7 +52,7 @@ from copy import deepcopy
 import logging, logging.handlers
 from datetime import datetime
 
-from Pose2Sim.common import setup_logging
+from Sports2D.Utilities.config import setup_logging
 
 
 ## AUTHORSHIP INFORMATION

@@ -36,12 +36,17 @@ import os
 import glob
 import json
 import logging
-from tqdm import tqdm
 import cv2
+
 from datetime import datetime
+from pathlib import Path
+from tqdm import tqdm
 
 from rtmlib import draw_skeleton
 from Pose2Sim.common import natural_sort_key
+from Sports2D.Utilities.config import setup_pose_tracker, setup_video_capture, setup_capture_directories, process_video_frames
+from Sports2D.Utilities.video_management import display_realtime_results, finalize_video_processing, track_people
+from Sports2D.Utilities.utilities import read_frame
 
 
 ## AUTHORSHIP INFORMATION
@@ -80,8 +85,6 @@ def rtm_estimator(config_dict):
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
     - Optionally, videos and/or image files with the detected keypoints 
     '''
-  
-    from Sports2D.Utilities.common import setup_pose_tracker
 
     # Read config
     project_dir = config_dict['project']['project_dir']
@@ -115,17 +118,18 @@ def rtm_estimator(config_dict):
     except:
         logging.info('\nEstimating pose...')
         if vid_img_extension == 'webcam':
-            video_files = ['webcam']
+            video_paths = ['webcam']
+            frame_ranges = [None]
         else:
-            video_files = glob.glob(os.path.join(video_dir, '*' + vid_img_extension))
-        if not len(video_files) == 0:
+            video_paths = list(Path(video_dir).glob('*' + vid_img_extension))
+            frame_ranges = process_video_frames(config_dict, video_paths)
+        if not len(video_paths) == 0:
             # Process video files
             logging.info(f'Found video files with extension {vid_img_extension}.')
-            for video_file_path in video_files:
+            for video_path, frame_range in zip(video_paths, frame_ranges):
                 pose_tracker.reset()
-                logging.info(f'Video files {video_file_path}.')
-                # process_fun(config_dict, video_file_path, pose_tracker, frame_range, output_dir)
-                process_video(config_dict, video_file_path, pose_tracker, frame_range, output_dir)
+                logging.info(f'Video files {video_path}.')
+                process_video(config_dict, video_path, pose_tracker, frame_range, output_dir)
 
         else:
             # Process image folders
@@ -154,8 +158,6 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
     - if save_video: Video file with the detected keypoints and confidence scores drawn on the frames
     - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
     '''
-
-    from Sports2D.Utilities.common import setup_webcam, setup_video, setup_capture_directories, validate_video_file, setup_video_capture, display_realtime_results, finalize_video_processing, read_frame, track_people
 
     webcam_id =  config_dict.get('project').get('webcam_id')
     input_size = config_dict.get('project').get('input_size')
@@ -261,20 +263,18 @@ def process_images(config_dict, image_folder_path, pose_tracker, input_frame_ran
     - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
     '''
 
-    from Sports2D.Utilities.common import setup_capture_directories, track_people
-
     save_video = True if 'to_video' in config_dict['project']['save_video'] else False
     save_images = True if 'to_images' in config_dict['project']['save_video'] else False
+    
     multi_person = config_dict.get('project').get('multi_person')
-    frame_range = config_dict.get('project').get('frame_range')
-
-    output_format = config_dict['pose']['output_format']
     show_realtime_results = config_dict['pose'].get('show_realtime_results')
-
     if show_realtime_results is None:
         show_realtime_results = config_dict['pose'].get('display_detection')
         if show_realtime_results is not None:
             print("Warning: 'display_detection' is deprecated. Please use 'show_realtime_results' instead.")
+
+    output_format = config_dict['pose']['output_format']
+     
     vid_img_extension = config_dict['pose']['vid_img_extension']
 
     image_file_stem = image_folder_path.stem
@@ -287,7 +287,6 @@ def process_images(config_dict, image_folder_path, pose_tracker, input_frame_ran
 
     output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(image_folder_path, output_dir)
 
-
     image_files = glob.glob(os.path.join(image_folder_path, '*' + vid_img_extension))
     sorted(image_files, key=natural_sort_key)
 
@@ -298,11 +297,11 @@ def process_images(config_dict, image_folder_path, pose_tracker, input_frame_ran
         cap = cv2.VideoWriter(output_video_path, fourcc, 60, (W, H)) # Create the output video file
 
     if show_realtime_results:
-        cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
+        display_realtime_results(image_folder_path)
     
-    f_range = [[len(image_files)] if frame_range==[] else frame_range][0]
+    frame_range = [[len(image_files)] if input_frame_range==[] else input_frame_range][0]
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
-        if frame_idx in range(*f_range):
+        if frame_idx in range(*frame_range):
             try:
                 frame = cv2.imread(image_file)
             except:
