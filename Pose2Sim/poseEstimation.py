@@ -101,6 +101,8 @@ def rtm_estimator(config_dict):
     mode = config_dict['pose']['mode'] # lightweight, balanced, performance
     vid_img_extension = config_dict['pose']['vid_img_extension']
     
+    webcam_id =  config_dict.get('pose').get('webcam_ids')
+    
     overwrite_pose = config_dict['pose']['overwrite_pose']
     det_frequency = config_dict['pose']['det_frequency']
 
@@ -118,27 +120,35 @@ def rtm_estimator(config_dict):
     except:
         logging.info('\nEstimating pose...')
         if vid_img_extension == 'webcam':
-            video_paths = ['webcam']
-            frame_ranges = [None]
+            if isinstance(webcam_id, list):
+                video_paths = [f'webcam{cam_id}' for cam_id in webcam_id]
+            else:
+                video_paths = [f'webcam{webcam_id}']
+            frame_ranges = [None] * len(video_paths)
         else:
-            video_paths = list(Path(video_dir).glob('*' + vid_img_extension))
+            video_paths = [f for f in Path(video_dir).iterdir() if f.is_file() and f.suffix == vid_img_extension]
             frame_ranges = process_video_frames(config_dict, video_paths)
-        if not len(video_paths) == 0:
-            # Process video files
-            logging.info(f'Found video files with extension {vid_img_extension}.')
+        
+        if video_paths:
+            logging.info(f'Found video files/webcams with extension {vid_img_extension}.')
             for video_path, frame_range in zip(video_paths, frame_ranges):
                 pose_tracker.reset()
-                logging.info(f'Video files {video_path}.')
+                logging.info(f'Processing video file or webcam {video_path}.')
                 process_video(config_dict, video_path, pose_tracker, frame_range, output_dir)
-
         else:
-            # Process image folders
-            logging.info(f'Found image folders with extension {vid_img_extension}.')
-            image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
-            for image_folder in image_folders:
-                pose_tracker.reset()
-                image_folder_path = os.path.join(video_dir, image_folder)
-                process_images(config_dict, image_folder_path, pose_tracker, frame_range)
+            image_folders = [f for f in Path(video_dir).iterdir() if f.is_dir()]
+            if image_folders:
+                logging.info('Found image folders.')
+                for image_folder in image_folders:
+                    pose_tracker.reset()
+                    image_folder_path = str(image_folder)
+                    video_files_in_folder = list(image_folder.glob('*' + vid_img_extension))
+                    if video_files_in_folder:
+                        raise NameError(f"{video_files_in_folder[0]} is not an image. Videos must be put in the video directory, not in subdirectories.")
+                    else:
+                        process_images(config_dict, image_folder_path, pose_tracker, frame_range)
+            else:
+                raise FileNotFoundError(f'No video files or image folders found in {video_dir}.')
 
 def process_video(config_dict, video_file_path, pose_tracker, input_frame_range, output_dir):
     '''
@@ -159,8 +169,7 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
     - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
     '''
 
-    webcam_id =  config_dict.get('project').get('webcam_id')
-    input_size = config_dict.get('project').get('input_size')
+    input_size = config_dict.get('pose').get('input_size')
 
     save_video = True if 'to_video' in config_dict['project']['save_video'] else False
     save_images = True if 'to_images' in config_dict['project']['save_video'] else False
@@ -176,9 +185,9 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
 
     logging.info(f'Multi-person is {"" if multi_person else "not "}selected.')
 
-    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(video_file_path, output_dir)
+    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(video_file_path, output_dir, save_images)
 
-    cap, frame_iterator, out_vid, cam_width, cam_height, fps = setup_video_capture(video_file_path, webcam_id, save_video, output_video_path, input_size, input_frame_range)
+    cap, frame_iterator, out_vid, cam_width, cam_height, fps = setup_video_capture(video_file_path, save_video, output_video_path, input_size, input_frame_range)
 
     # Call to display real-time results if needed
     if show_realtime_results:
@@ -223,7 +232,6 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
         if save_video:
             out_vid.write(img_show)
         if save_images:
-            os.makedirs(img_output_dir, exist_ok=True)
             cv2.imwrite(
                 os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'),
                 img_show
@@ -277,14 +285,6 @@ def process_images(config_dict, image_folder_path, pose_tracker, input_frame_ran
      
     vid_img_extension = config_dict['pose']['vid_img_extension']
 
-    image_file_stem = image_folder_path.stem
-    output_dir_name = f'{image_file_stem}_Sports2D'
-    output_dir = os.path.abspath(os.path.join(output_dir, 'pose'))
-    if not os.path.isdir(output_dir): os.makedirs(output_dir)
-    img_output_dir = os.path.join(output_dir, f'{output_dir_name}_img')
-    json_output_dir = os.path.join(output_dir, f'{output_dir_name}_json')
-    output_video_path = os.path.join(output_dir, f'{output_dir_name}_pose.mp4')
-
     output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(image_folder_path, output_dir)
 
     image_files = glob.glob(os.path.join(image_folder_path, '*' + vid_img_extension))
@@ -302,11 +302,8 @@ def process_images(config_dict, image_folder_path, pose_tracker, input_frame_ran
     frame_range = [[len(image_files)] if input_frame_range==[] else input_frame_range][0]
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
         if frame_idx in range(*frame_range):
-            try:
-                frame = cv2.imread(image_file)
-            except:
-                raise NameError(f"{image_file} is not an image. Videos must be put in the video directory, not in subdirectories.")
-            
+            frame = cv2.imread(image_file)
+
             # Perform pose estimation on the image
             keypoints, scores = pose_tracker(frame)
 

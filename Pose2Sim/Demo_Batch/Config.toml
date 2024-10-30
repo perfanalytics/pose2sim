@@ -36,7 +36,7 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 [pose]
 # Webcam parameters
-webcam_id = 0 # your webcam id 0, or [0, 1, ...] (0 is default)
+webcam_ids = 0 # your webcam id 0, or [0, 1, ...] (0 is default)
 input_size = [1280, 720] # [W, H]. Lower resolution will be faster but less precise.
 
 vid_img_extension = 'mp4' # any video or image extension # 'webcam' for webcam

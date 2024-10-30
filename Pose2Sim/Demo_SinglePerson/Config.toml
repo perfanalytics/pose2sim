@@ -22,8 +22,8 @@ multi_person = false # true for trials with multiple participants. If false, onl
 participant_height = 1.72 # m # float if single person, list of float if multi-person (same order as the Static trials) # Only used for marker augmentation
 participant_mass = 70.0 # kg # Only used for marker augmentation and scaling
 
-frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
-frame_range = [] # For example [10,300], or [] for all frames. 
+frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images)
+frame_range = [] # For example [10,300], or [] for all frames.
 ## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
@@ -36,7 +36,7 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 [pose]
 # Webcam parameters
-webcam_id = 0 # your webcam id 0, or [0, 1, ...] (0 is default)
+webcam_ids = 0 # your webcam id 0, or [0, 1, ...] (0 is default)
 input_size = [1280, 720] # [W, H]. Lower resolution will be faster but less precise.
 
 vid_img_extension = 'mp4' # any video or image extension # 'webcam' for webcam
