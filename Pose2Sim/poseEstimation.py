@@ -41,6 +41,7 @@ import cv2
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor
 
 from rtmlib import draw_skeleton
 from Pose2Sim.common import natural_sort_key
@@ -94,19 +95,15 @@ def rtm_estimator(config_dict):
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     frame_range = config_dict.get('project').get('frame_range')
     output_dir = config_dict.get('project').get('project_dir')
+    multi_person = config_dict.get('project').get('multi_person')
     video_dir = os.path.join(project_dir, 'videos')
     pose_dir = os.path.join(project_dir, 'pose')
 
-    pose_model = config_dict['pose']['pose_model']
-    mode = config_dict['pose']['mode'] # lightweight, balanced, performance
     vid_img_extension = config_dict['pose']['vid_img_extension']
     
     webcam_id =  config_dict.get('pose').get('webcam_ids')
     
     overwrite_pose = config_dict['pose']['overwrite_pose']
-    det_frequency = config_dict['pose']['det_frequency']
-
-    pose_tracker = setup_pose_tracker(det_frequency, mode, pose_model)
 
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
@@ -126,37 +123,44 @@ def rtm_estimator(config_dict):
                 video_paths = [f'webcam{webcam_id}']
             frame_ranges = [None] * len(video_paths)
         else:
-            video_paths = [f for f in Path(video_dir).iterdir() if f.is_file() and f.suffix == vid_img_extension]
+            video_paths = [f for f in Path(video_dir).rglob('*' + vid_img_extension) if f.is_file()]
             frame_ranges = process_video_frames(config_dict, video_paths)
-        
+
         if video_paths:
             logging.info(f'Found video files/webcams with extension {vid_img_extension}.')
+            logging.info(f'Multi-person is {"" if multi_person else "not "}selected.')
             for video_path, frame_range in zip(video_paths, frame_ranges):
-                pose_tracker.reset()
                 logging.info(f'Processing video file or webcam {video_path}.')
-                process_video(config_dict, video_path, pose_tracker, frame_range, output_dir)
+                process_video(config_dict, video_path, frame_range, output_dir)
+            
+            # with ThreadPoolExecutor() as executor:
+            #     futures = [
+            #         executor.submit(process_video, config_dict, video_path, frame_range, output_dir)
+            #         for video_path, frame_range in zip(video_paths, frame_ranges)
+            #     ]
+            #     for future in futures:
+            #         future.result()
+
         else:
             image_folders = [f for f in Path(video_dir).iterdir() if f.is_dir()]
             if image_folders:
                 logging.info('Found image folders.')
                 for image_folder in image_folders:
-                    pose_tracker.reset()
                     image_folder_path = str(image_folder)
                     video_files_in_folder = list(image_folder.glob('*' + vid_img_extension))
                     if video_files_in_folder:
                         raise NameError(f"{video_files_in_folder[0]} is not an image. Videos must be put in the video directory, not in subdirectories.")
                     else:
-                        process_images(config_dict, image_folder_path, pose_tracker, frame_range)
+                        process_images(config_dict, image_folder_path, frame_range)
             else:
                 raise FileNotFoundError(f'No video files or image folders found in {video_dir}.')
 
-def process_video(config_dict, video_file_path, pose_tracker, input_frame_range, output_dir):
+def process_video(config_dict, video_file_path, input_frame_range, output_dir):
     '''
     Estimate pose from a video file
     
     INPUTS:
     - video_file_path: str. Path to the input video file
-    - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
@@ -183,7 +187,11 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
     
     output_format = config_dict['pose']['output_format']
 
-    logging.info(f'Multi-person is {"" if multi_person else "not "}selected.')
+    pose_model = config_dict['pose']['pose_model']
+    mode = config_dict['pose']['mode'] # lightweight, balanced, performance
+    det_frequency = config_dict['pose']['det_frequency']
+
+    pose_tracker = setup_pose_tracker(det_frequency, mode, pose_model)
 
     output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(video_file_path, output_dir, save_images)
 
@@ -251,14 +259,13 @@ def process_video(config_dict, video_file_path, pose_tracker, input_frame_range,
     if show_realtime_results:
         cv2.destroyAllWindows()
 
-def process_images(config_dict, image_folder_path, pose_tracker, input_frame_range, output_dir):
+def process_images(config_dict, image_folder_path, input_frame_range, output_dir):
     '''
     Estimate pose estimation from a folder of images
     
     INPUTS:
     - image_folder_path: str. Path to the input image folder
     - vid_img_extension: str. Extension of the image files
-    - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
@@ -284,6 +291,12 @@ def process_images(config_dict, image_folder_path, pose_tracker, input_frame_ran
     output_format = config_dict['pose']['output_format']
      
     vid_img_extension = config_dict['pose']['vid_img_extension']
+
+    pose_model = config_dict['pose']['pose_model']
+    mode = config_dict['pose']['mode'] # lightweight, balanced, performance
+    det_frequency = config_dict['pose']['det_frequency']
+
+    pose_tracker = setup_pose_tracker(det_frequency, mode, pose_model)
 
     output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(image_folder_path, output_dir)
 
