@@ -649,8 +649,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
     extrinsics_method = extrinsics_config_dict.get('extrinsics_method')
     ret, R, T = [], [], []
     
-    if extrinsics_method in ('board', 'scene'):
-    
+    if extrinsics_method in {'board', 'scene'}:
                 
         # Define 3D object points
         if extrinsics_method == 'board':
@@ -691,7 +690,8 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
 
             # Find corners or label by hand
             if extrinsics_method == 'board':
-                imgp, objp = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=object_coords_3d, show=show_reprojection_error)
+                imgp = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=object_coords_3d, show=show_reprojection_error)
+                objp = object_coords_3d
                 if len(imgp) == 0:
                     logging.exception('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
                     raise ValueError('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
@@ -779,8 +779,8 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
     INPUTS:
     - img_path: path to image (or video)
     - corner_nb: [H, W] internal corners in checkerboard: list of two integers [4,7]
-    - optionnal: show: choose whether to show corner detections
-    - optionnal: objp: array [3d corner coordinates]
+    - optional: show: choose whether to show corner detections
+    - optional: objp: array [3d corner coordinates]
 
     OUTPUTS:
     - imgp_confirmed: array of [[2d corner coordinates]]
@@ -820,14 +820,16 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
             imgp_objp_confirmed = imgp_objp_visualizer_clicker(img, imgp=imgp, objp=objp, img_path=img_path)
         else:
             imgp_objp_confirmed = imgp
+            
 
     # If corners are not found, dismiss or click points by hand
     else:
-        logging.info(f'{os.path.basename(img_path)}: Corners not found. To label them by hand, set "show_detection_intrinsics" to true in the Config.toml file.')
         if show:
             # Visualizer and key press event handler
+            logging.info(f'{os.path.basename(img_path)}: Corners not found: please label them by hand.')
             imgp_objp_confirmed = imgp_objp_visualizer_clicker(img, imgp=[], objp=objp, img_path=img_path)
         else:
+            logging.info(f'{os.path.basename(img_path)}: Corners not found. To label them by hand, set "show_detection_intrinsics" to true in the Config.toml file.')
             imgp_objp_confirmed = []
 
     return imgp_objp_confirmed
@@ -852,7 +854,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     INPUTS:
     - img: image opened with openCV
     - optional: imgp: detected image points, to be accepted or not. Array of [[2d corner coordinates]]
-    - optionnal: objp: array of [3d corner coordinates]
+    - optional: objp: array of [3d corner coordinates]
     - optional: img_path: path to image
 
     OUTPUTS:
