@@ -586,7 +586,7 @@ def synchronize_cams_all(config_dict):
     # Get parameters from Config.toml
     project_dir = config_dict.get('project').get('project_dir')
     pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
-    pose_model = config_dict.get('pose').get('pose_model')
+    pose_model = config_dict.get('pose').get('pose_model').upper()
     multi_person = config_dict.get('project').get('multi_person')
     fps =  config_dict.get('project').get('frame_rate')
     frame_range = config_dict.get('project').get('frame_range')

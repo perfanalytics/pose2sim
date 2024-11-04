@@ -37,16 +37,20 @@ import glob
 import json
 import logging
 import cv2
+import time
+import threading
+import queue
+import concurrent.futures
 
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
-from multiprocessing import Pool
+from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 
 from rtmlib import draw_skeleton
 from Pose2Sim.common import natural_sort_key
-from Sports2D.Utilities.config import setup_pose_tracker, setup_video_capture, setup_capture_directories, process_video_frames
+from Sports2D.Utilities.config import setup_pose_tracker, setup_video_capture, setup_capture_directories, process_video_frames, WebcamStream
 from Sports2D.Utilities.video_management import display_realtime_results, finalize_video_processing, track_people
 from Sports2D.Utilities.utilities import read_frame
 
@@ -100,9 +104,11 @@ def rtm_estimator(config_dict):
     video_dir = os.path.join(project_dir, 'videos')
     pose_dir = os.path.join(project_dir, 'pose')
 
+    show_realtime_results = config_dict['pose'].get('show_realtime_results')
+
     vid_img_extension = config_dict['pose']['vid_img_extension']
     
-    webcam_id =  config_dict.get('pose').get('webcam_ids')
+    webcam_ids = config_dict.get('pose').get('webcam_ids')
     
     overwrite_pose = config_dict['pose']['overwrite_pose']
 
@@ -117,16 +123,16 @@ def rtm_estimator(config_dict):
             
     except:
         logging.info('\nEstimating pose...')
+
         if vid_img_extension == 'webcam':
-            if isinstance(webcam_id, list):
-                video_paths = [f'webcam{cam_id}' for cam_id in webcam_id]
+            if isinstance(webcam_ids, list):
+                video_paths = [f'webcam{cam_id}' for cam_id in webcam_ids]
             else:
-                video_paths = [f'webcam{webcam_id}']
+                video_paths = [f'webcam{webcam_ids}']
             frame_ranges = [None] * len(video_paths)
-        else:
+        else :
             video_paths = [f for f in Path(video_dir).rglob('*' + vid_img_extension) if f.is_file()]
             frame_ranges = process_video_frames(config_dict, video_paths)
-
         if video_paths:
             logging.info(f'Found video files/webcams with extension {vid_img_extension}.')
             logging.info(f'Multi-person is {"" if multi_person else "not "}selected.')
@@ -137,22 +143,28 @@ def rtm_estimator(config_dict):
                 config_dict['pose']['pose_model']
             )
 
-            def process_video_thread(args):
-                process_video(pose_tracker, *args)
+            if vid_img_extension == 'webcam':
+                process_synchronized_webcams(config_dict, webcam_ids, pose_tracker, output_dir)
+            else:
+                def process_video_thread(args):
+                    process_video(pose_tracker, *args)
 
-            process_args = []
-            for idx, (video_path, frame_range) in enumerate(zip(video_paths, frame_ranges)):
-                position = idx
-                process_args.append((config_dict, video_path, frame_range, output_dir, position))
+                process_args = []
+                for idx, (video_path, frame_range) in enumerate(zip(video_paths, frame_ranges)):
+                    position = idx
+                    process_args.append((config_dict, video_path, frame_range, output_dir, position))
 
-            num_threads = min(len(video_paths), os.cpu_count())
-            with ThreadPoolExecutor(max_workers=num_threads) as executor:
-                futures = [executor.submit(process_video_thread, arg) for arg in process_args]
-                for future in futures:
-                    try:
-                        future.result()
-                    except Exception as e:
-                        logging.error(f"Error processing video: {e}")
+                num_threads = min(len(video_paths), os.cpu_count())
+                with ThreadPoolExecutor(max_workers=num_threads) as executor:
+                    futures = [executor.submit(process_video_thread, arg) for arg in process_args]
+                    for future in futures:
+                        try:
+                            future.result()
+                        except Exception as e:
+                            logging.error(f"Error processing video: {e}")
+
+                if show_realtime_results:
+                    cv2.destroyAllWindows()
 
         else:
             image_folders = [f for f in Path(video_dir).iterdir() if f.is_dir()]
@@ -189,6 +201,8 @@ def process_video(pose_tracker, config_dict, video_file_path, input_frame_range,
 
     save_video = True if 'to_video' in config_dict['project']['save_video'] else False
     save_images = True if 'to_images' in config_dict['project']['save_video'] else False
+
+    vid_img_extension = config_dict['pose']['vid_img_extension']
     
     multi_person = config_dict.get('project').get('multi_person')
     show_realtime_results = config_dict['pose'].get('show_realtime_results')
@@ -209,7 +223,7 @@ def process_video(pose_tracker, config_dict, video_file_path, input_frame_range,
     if show_realtime_results:
         display_realtime_results(video_file_path)
     
-    if video_file_path == 'webcam' and save_video:
+    if vid_img_extension == 'webcam' and save_video:
         total_processing_start_time = datetime.now()
 
     frames_processed = 0
@@ -255,17 +269,18 @@ def process_video(pose_tracker, config_dict, video_file_path, input_frame_range,
 
         frames_processed += 1
 
-    cap.release()
+    if hasattr(cap, 'stop'):
+        cap.stop()
+    if hasattr(cap, 'release'):
+        cap.release()
 
     if save_video:
         out_vid.release()
-        if video_file_path == 'webcam' and frames_processed > 0:
+        if vid_img_extension == 'webcam' and frames_processed > 0:
             fps = finalize_video_processing(frames_processed, total_processing_start_time, output_video_path, fps)
         logging.info(f"--> Output video saved to {output_video_path}.")
     if save_images:
         logging.info(f"--> Output images saved to {img_output_dir}.")
-    if show_realtime_results:
-        cv2.destroyAllWindows()
 
 def process_images(config_dict, image_folder_path, input_frame_range, output_dir):
     '''
@@ -300,11 +315,11 @@ def process_images(config_dict, image_folder_path, input_frame_range, output_dir
      
     vid_img_extension = config_dict['pose']['vid_img_extension']
 
-    pose_model = config_dict['pose']['pose_model']
-    mode = config_dict['pose']['mode'] # lightweight, balanced, performance
-    det_frequency = config_dict['pose']['det_frequency']
-
-    pose_tracker = setup_pose_tracker(det_frequency, mode, pose_model)
+    pose_tracker = setup_pose_tracker(
+        config_dict['pose']['det_frequency'],
+        config_dict['pose']['mode'],
+        config_dict['pose']['pose_model']
+    )
 
     output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(image_folder_path, output_dir)
 
@@ -404,3 +419,252 @@ def save_to_openpose(json_file_path, keypoints, scores):
     if not os.path.isdir(json_output_dir): os.makedirs(json_output_dir)
     with open(json_file_path, 'w') as json_file:
         json.dump(json_output, json_file)
+
+
+def process_synchronized_webcams(config_dict, webcam_ids, pose_tracker, output_dir):
+    '''
+    Processes multiple webcams by synchronizing frames between them,
+    then processing the frames asynchronously and multithreaded.
+
+    Args:
+        config_dict (dict): Configuration dictionary.
+        webcam_ids (list): List of webcam IDs.
+        pose_tracker: Pose tracker object.
+        output_dir (str): Output directory path.
+    '''
+    input_size = config_dict['pose'].get('input_size')
+    save_video = 'to_video' in config_dict['project'].get('save_video', [])
+    save_images = 'to_images' in config_dict['project'].get('save_video', [])
+    multi_person = config_dict['project'].get('multi_person')
+    show_realtime_results = config_dict['pose'].get('show_realtime_results', False)
+    output_format = config_dict['pose'].get('output_format', 'openpose')
+
+    # Create synchronized webcam streams
+    webcam_streams = SynchronizedWebcamStreams(webcam_ids, input_size, save_video, output_dir)
+
+    # Prepare outputs for each webcam
+    outputs = []
+    for idx, webcam_id in enumerate(webcam_ids):
+        video_file_path = f'webcam{webcam_id}'
+        output_dirs = setup_capture_directories(video_file_path, output_dir, save_images)
+        outputs.append(output_dirs)
+
+    frame_idx = 0
+    total_processing_start_time = datetime.now()
+    frames_processed = 0
+
+    # Create a lock for each output video to ensure thread-safe access
+    out_vid_locks = [threading.Lock() for _ in webcam_ids]
+
+    # Create ThreadPoolExecutor for asynchronous frame processing
+    max_workers = len(webcam_ids) * 2  # Adjust this number as needed
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Create display thread
+        display_thread = DisplayThread()
+        display_thread.start()
+
+        try:
+            while True:
+                # Read synchronized frames
+                frames = webcam_streams.read()
+                if frames is None:
+                    break  # End of stream
+
+                # List to store futures
+                futures = []
+
+                # Asynchronous processing of frames
+                for idx, frame in enumerate(frames):
+                    if frame is None:
+                        continue  # Webcam not available for this frame
+
+                    # Prepare arguments for processing
+                    args = (
+                        config_dict, frame, idx, frame_idx, outputs[idx], pose_tracker,
+                        multi_person, output_format, save_video, save_images,
+                        show_realtime_results, webcam_streams.out_videos[idx],
+                        out_vid_locks[idx], webcam_ids[idx], display_thread
+                    )
+                    # Submit task to ThreadPoolExecutor
+                    futures.append(executor.submit(process_single_frame, *args))
+
+                # Optionally wait for all futures to complete
+                concurrent.futures.wait(futures)
+
+                frames_processed += 1
+                frame_idx += 1
+
+                # Check if user requested to stop
+                if display_thread.stopped:
+                    break
+
+        except KeyboardInterrupt:
+            logging.info("Processing interrupted by user.")
+        finally:
+            # Release resources
+            webcam_streams.stop()
+            if save_video:
+                for out_vid in webcam_streams.out_videos:
+                    if out_vid is not None:
+                        out_vid.release()
+            display_thread.stop()
+            display_thread.join()
+            if frames_processed > 0:
+                total_time = (datetime.now() - total_processing_start_time).total_seconds()
+                fps = frames_processed / total_time
+                logging.info(f"Processed {frames_processed} frames at {fps:.2f} FPS.")
+
+def process_single_frame(
+    config_dict, frame, idx, frame_idx, output_dirs, pose_tracker, multi_person,
+    output_format, save_video, save_images, show_realtime_results, out_vid,
+    out_vid_lock, webcam_id, display_thread
+):
+    '''
+    Processes a single frame from a webcam.
+
+    Args:
+        config_dict (dict): Configuration dictionary.
+        frame (ndarray): Frame image.
+        idx (int): Index of the webcam.
+        frame_idx (int): Frame index.
+        output_dirs (tuple): Output directories.
+        pose_tracker: Pose tracker object.
+        multi_person (bool): Whether to track multiple persons.
+        output_format (str): Output format.
+        save_video (bool): Whether to save the output video.
+        save_images (bool): Whether to save output images.
+        show_realtime_results (bool): Whether to display results in real time.
+        out_vid (cv2.VideoWriter): Video writer object.
+        out_vid_lock (threading.Lock): Lock for video writer.
+        webcam_id (int): Webcam ID.
+        display_thread (DisplayThread): Display thread object.
+    '''
+    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
+
+    # Perform pose estimation on the frame
+    keypoints, scores = pose_tracker(frame)
+
+    # Tracking people IDs across frames (if needed)
+    keypoints, scores, _ = track_people(
+        keypoints, scores, multi_person, None, None, pose_tracker
+    )
+
+    if 'openpose' in output_format:
+        json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
+        save_to_openpose(json_file_path, keypoints, scores)
+
+    # Draw skeleton on the frame
+    if show_realtime_results or save_video or save_images:
+        img_show = frame.copy()
+        img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1)
+
+    # Real-time display
+    if show_realtime_results:
+        # Use display thread to show the image
+        display_thread.display(img_show, f"Pose Estimation Webcam {webcam_id}")
+
+    # Save video and images
+    if save_video:
+        if out_vid is not None:
+            with out_vid_lock:
+                out_vid.write(img_show)
+    if save_images:
+        cv2.imwrite(
+            os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'),
+            img_show
+        )
+
+class DisplayThread(threading.Thread):
+    '''
+    Thread for displaying images to avoid thread-safety issues with OpenCV.
+    '''
+    def __init__(self):
+        super().__init__()
+        self.display_queue = Queue()
+        self.stopped = False
+        self.daemon = True  # Thread will exit when main program exits
+
+    def run(self):
+        while not self.stopped:
+            try:
+                img_show, window_name = self.display_queue.get(timeout=0.1)
+                cv2.imshow(window_name, img_show)
+                if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
+                    logging.info("Display window closed by user.")
+                    self.stopped = True
+            except queue.Empty:
+                continue
+        cv2.destroyAllWindows()
+
+    def display(self, img_show, window_name):
+        self.display_queue.put((img_show, window_name))
+
+    def stop(self):
+        self.stopped = True
+
+class SynchronizedWebcamStreams:
+    def __init__(self, webcam_ids, input_size=(640, 480), save_video=False, output_dir=None):
+        self.streams = []
+        self.queues = []
+        self.input_size = input_size
+        self.stopped = False
+        self.num_cameras = len(webcam_ids)
+        self.webcam_ids = webcam_ids
+
+        # Initialize webcam streams
+        for webcam_id in webcam_ids:
+            stream = WebcamStream(int(webcam_id), input_size)
+            self.streams.append(stream)
+            self.queues.append(queue.Queue(maxsize=1))
+
+        # Threads to fill the queues
+        self.threads = []
+        for idx, stream in enumerate(self.streams):
+            t = threading.Thread(target=self.update, args=(idx, stream))
+            t.daemon = True
+            t.start()
+            self.threads.append(t)
+
+        # Output videos
+        self.out_videos = []
+        if save_video and output_dir:
+            for idx, webcam_id in enumerate(webcam_ids):
+                video_file_path = f'webcam{webcam_id}'
+                _, _, _, _, output_video_path = setup_capture_directories(video_file_path, output_dir, False)
+                cam_width = stream.cam_width
+                cam_height = stream.cam_height
+                fps = stream.fps
+                fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+                out_vid = cv2.VideoWriter(output_video_path, fourcc, fps, (cam_width, cam_height))
+                self.out_videos.append(out_vid)
+        else:
+            self.out_videos = [None] * self.num_cameras
+
+    def update(self, idx, stream):
+        while not self.stopped:
+            frame = stream.read()
+            if frame is None:
+                # Wait for the webcam to reconnect
+                time.sleep(0.1)
+                continue
+
+            try:
+                self.queues[idx].put(frame, timeout=0.1)
+            except queue.Full:
+                # Queue is full, skip
+                continue
+
+    def read(self):
+        frames = []
+        for idx in range(self.num_cameras):
+            try:
+                frame = self.queues[idx].get(timeout=1)
+                frames.append(frame)
+            except queue.Empty:
+                frames.append(None)  # Webcam not available
+        return frames
+
+    def stop(self):
+        self.stopped = True
+        for stream in self.streams:
+            stream.stop()

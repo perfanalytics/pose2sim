@@ -692,7 +692,7 @@ def triangulate_all(config_dict):
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     multi_person = config_dict.get('project').get('multi_person')
-    pose_model = config_dict.get('pose').get('pose_model')
+    pose_model = config_dict.get('pose').get('pose_model').upper()
     frame_range = config_dict.get('project').get('frame_range')
     likelihood_threshold = config_dict.get('triangulation').get('likelihood_threshold_triangulation')
     interpolation_kind = config_dict.get('triangulation').get('interpolation')
