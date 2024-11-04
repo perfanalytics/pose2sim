@@ -50,7 +50,7 @@ from anytree.importer import DictImporter
 import logging
 
 from Pose2Sim.common import sort_stringlist_by_last_number, bounding_boxes
-from Pose2Sim.skeletons import *
+from Sports2D.Utilities.skeletons import *
 
 
 ## AUTHORSHIP INFORMATION

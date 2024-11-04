@@ -45,7 +45,7 @@ from anytree import PreOrderIter
 import opensim
 
 from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean
-from Pose2Sim.skeletons import *
+from Sports2D.Utilities.skeletons import *
 
 
 
@@ -123,15 +123,15 @@ def get_model_path(model_name, osim_setup_dir):
         pose_model_file = 'Model_Pose2Sim_Body135.osim'
     elif model_name == 'BLAZEPOSE':
         pose_model_file = 'Model_Pose2Sim_Blazepose.osim'
-    elif model_name == 'HALPE_26':
+    elif model_name in ('HALPE_26', 'BODY_WITH_FEET'):
         pose_model_file = 'Model_Pose2Sim_Halpe26.osim'
-    elif model_name == 'HALPE_68' or model_name == 'HALPE_136':
+    elif model_name in ('HALPE_68', 'HALPE_136'):
         pose_model_file = 'Model_Pose2Sim_Halpe68_136.osim'
-    elif model_name == 'COCO_133':
+    elif model_name in ('COCO_133', 'WHOLE_BODY'):
         pose_model_file = 'Model_Pose2Sim_Coco133.osim'
     # elif model_name == 'COCO' or model_name == 'MPII':
     #     pose_model_file = 'Model_Pose2Sim_Coco.osim'
-    elif model_name == 'COCO_17':
+    elif model_name in ('COCO_17', 'BODY'):
         pose_model_file = 'Model_Pose2Sim_Coco17.osim'
     elif model_name == 'LSTM':
         pose_model_file = 'Model_Pose2Sim_LSTM.osim'
@@ -163,15 +163,15 @@ def get_scaling_setup(model_name, osim_setup_dir):
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Body135.xml'
     elif model_name == 'BLAZEPOSE':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Blazepose.xml'
-    elif model_name == 'HALPE_26':
+    elif model_name in ('HALPE_26', 'BODY_WITH_FEET'):
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Halpe26.xml'
-    elif model_name == 'HALPE_68' or model_name == 'HALPE_136':
+    elif model_name in ('HALPE_68', 'HALPE_136'):
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Halpe68_136.xml'
-    elif model_name == 'COCO_133':
+    elif model_name in ('COCO_133', 'WHOLE_BODY'):
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco133.xml'
     # elif model_name == 'COCO' or model_name == 'MPII':
     #     scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco.xml'
-    elif model_name == 'COCO_17':
+    elif model_name in ('COCO_17', 'BODY'):
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco17.xml'
     elif model_name == 'LSTM':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_LSTM.xml'
@@ -203,15 +203,15 @@ def get_IK_Setup(model_name, osim_setup_dir):
         ik_setup_file = 'IK_Setup_Pose2Sim_Body135.xml'
     elif model_name == 'BLAZEPOSE':
         ik_setup_file = 'IK_Setup_Pose2Sim_Blazepose.xml'
-    elif model_name == 'HALPE_26':
+    elif model_name in ('HALPE_26', 'BODY_WITH_FEET'):
         ik_setup_file = 'IK_Setup_Pose2Sim_Halpe26.xml'
-    elif model_name == 'HALPE_68' or model_name == 'HALPE_136':
+    elif model_name in ('HALPE_68', 'HALPE_136'):
         ik_setup_file = 'IK_Setup_Pose2Sim_Halpe68_136.xml'
-    elif model_name == 'COCO_133':
+    elif model_name in ('COCO_133', 'WHOLE_BODY'):
         ik_setup_file = 'IK_Setup_Pose2Sim_Coco133.xml'
     # elif model_name == 'COCO' or model_name == 'MPII':
     #     ik_setup_file = 'IK_Setup_Pose2Sim_Coco.xml'
-    elif model_name == 'COCO_17':
+    elif model_name in ('COCO_17', 'BODY'):
         ik_setup_file = 'IK_Setup_Pose2Sim_Coco17.xml'
     elif model_name == 'LSTM':
         ik_setup_file = 'IK_Setup_Pose2Sim_LSTM.xml'
