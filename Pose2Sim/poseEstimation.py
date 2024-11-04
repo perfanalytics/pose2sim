@@ -41,6 +41,7 @@ import cv2
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
+from multiprocessing import Pool
 from concurrent.futures import ThreadPoolExecutor
 
 from rtmlib import draw_skeleton
@@ -129,17 +130,29 @@ def rtm_estimator(config_dict):
         if video_paths:
             logging.info(f'Found video files/webcams with extension {vid_img_extension}.')
             logging.info(f'Multi-person is {"" if multi_person else "not "}selected.')
-            for video_path, frame_range in zip(video_paths, frame_ranges):
-                logging.info(f'Processing video file or webcam {video_path}.')
-                process_video(config_dict, video_path, frame_range, output_dir)
-            
-            # with ThreadPoolExecutor() as executor:
-            #     futures = [
-            #         executor.submit(process_video, config_dict, video_path, frame_range, output_dir)
-            #         for video_path, frame_range in zip(video_paths, frame_ranges)
-            #     ]
-            #     for future in futures:
-            #         future.result()
+
+            pose_tracker = setup_pose_tracker(
+                config_dict['pose']['det_frequency'],
+                config_dict['pose']['mode'],
+                config_dict['pose']['pose_model']
+            )
+
+            def process_video_thread(args):
+                process_video(pose_tracker, *args)
+
+            process_args = []
+            for idx, (video_path, frame_range) in enumerate(zip(video_paths, frame_ranges)):
+                position = idx
+                process_args.append((config_dict, video_path, frame_range, output_dir, position))
+
+            num_threads = min(len(video_paths), os.cpu_count())
+            with ThreadPoolExecutor(max_workers=num_threads) as executor:
+                futures = [executor.submit(process_video_thread, arg) for arg in process_args]
+                for future in futures:
+                    try:
+                        future.result()
+                    except Exception as e:
+                        logging.error(f"Error processing video: {e}")
 
         else:
             image_folders = [f for f in Path(video_dir).iterdir() if f.is_dir()]
@@ -155,7 +168,7 @@ def rtm_estimator(config_dict):
             else:
                 raise FileNotFoundError(f'No video files or image folders found in {video_dir}.')
 
-def process_video(config_dict, video_file_path, input_frame_range, output_dir):
+def process_video(pose_tracker, config_dict, video_file_path, input_frame_range, output_dir, position):
     '''
     Estimate pose from a video file
     
@@ -172,7 +185,6 @@ def process_video(config_dict, video_file_path, input_frame_range, output_dir):
     - if save_video: Video file with the detected keypoints and confidence scores drawn on the frames
     - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
     '''
-
     input_size = config_dict.get('pose').get('input_size')
 
     save_video = True if 'to_video' in config_dict['project']['save_video'] else False
@@ -187,15 +199,11 @@ def process_video(config_dict, video_file_path, input_frame_range, output_dir):
     
     output_format = config_dict['pose']['output_format']
 
-    pose_model = config_dict['pose']['pose_model']
-    mode = config_dict['pose']['mode'] # lightweight, balanced, performance
-    det_frequency = config_dict['pose']['det_frequency']
-
-    pose_tracker = setup_pose_tracker(det_frequency, mode, pose_model)
-
     output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(video_file_path, output_dir, save_images)
 
-    cap, frame_iterator, out_vid, cam_width, cam_height, fps = setup_video_capture(video_file_path, save_video, output_video_path, input_size, input_frame_range)
+    cap, frame_iterator, out_vid, cam_width, cam_height, fps = setup_video_capture(
+        video_file_path, save_video, output_video_path, input_size, input_frame_range, position
+    )
 
     # Call to display real-time results if needed
     if show_realtime_results:
@@ -313,6 +321,7 @@ def process_images(config_dict, image_folder_path, input_frame_range, output_dir
         display_realtime_results(image_folder_path)
     
     frame_range = [[len(image_files)] if input_frame_range==[] else input_frame_range][0]
+    prev_keypoints = None
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
         if frame_idx in range(*frame_range):
             frame = cv2.imread(image_file)
