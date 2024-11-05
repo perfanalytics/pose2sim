@@ -443,11 +443,13 @@ def process_synchronized_webcams(config_dict, webcam_ids, output_dir):
     outputs = {id: setup_capture_directories(f'webcam{id}', output_dir, save_images) for id in webcam_ids}
 
     # Initialize pose tracker
-    pose_tracker = setup_pose_tracker(
-                config_dict['pose']['det_frequency'],
-                config_dict['pose']['mode'],
-                config_dict['pose']['pose_model']
-    )
+    pose_trackers = {
+        webcam_id: setup_pose_tracker(
+            config_dict['pose']['det_frequency'],
+            config_dict['pose']['mode'],
+            config_dict['pose']['pose_model']
+        ) for webcam_id in webcam_ids
+    }
 
     # Create display queue
     display_queue = queue.Queue()
@@ -478,7 +480,7 @@ def process_synchronized_webcams(config_dict, webcam_ids, output_dir):
                         webcam_id,
                         frame_idx,
                         outputs[webcam_id],
-                        pose_tracker,
+                        pose_trackers[webcam_id],  # Use per-webcam pose_tracker
                         config_dict['project'].get('multi_person'),
                         save_video,
                         save_images,
@@ -595,11 +597,12 @@ class CombinedDisplayThread(threading.Thread):
         try:
             while not self.stopped:
                 try:
-                    webcam_id, frame = self.display_queue.get(timeout=0.1)
-                    if frame is not None:
-                        self.frames[webcam_id] = frame
-                    else:
-                        self.frames[webcam_id] = self.get_placeholder_frame(webcam_id, 'Disconnected')
+                    frames_dict = self.display_queue.get(timeout=0.1)
+                    for webcam_id, frame in frames_dict.items():
+                        if frame is not None:
+                            self.frames[webcam_id] = frame
+                        else:
+                            self.frames[webcam_id] = self.get_placeholder_frame(webcam_id, 'Disconnected')
                     combined_image = self.combine_frames()
                     if combined_image is not None:
                         cv2.imshow(self.window_name, combined_image)
