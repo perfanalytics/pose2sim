@@ -626,6 +626,7 @@ class SynchronizedWebcamStreams:
         self.queues = {webcam_id: queue.Queue(maxsize=1) for webcam_id in webcam_ids}
         self.identifying_infos = {}
         self.out_videos = {}
+        self.update_threads = []
 
         # Initialize streams and queues
         for webcam_id in webcam_ids:
@@ -633,7 +634,9 @@ class SynchronizedWebcamStreams:
             if stream:
                 self.streams[webcam_id] = stream
                 self.identifying_infos[webcam_id] = stream.identifying_info
-                threading.Thread(target=self.update, args=(webcam_id,), daemon=True).start()
+                t = threading.Thread(target=self.update, args=(webcam_id,), daemon=True)
+                t.start()
+                self.update_threads.append(t)
                 if save_video and output_dir:
                     for webcam_id in list(self.streams.keys()):
                         stream = self.streams[webcam_id]
@@ -662,12 +665,18 @@ class SynchronizedWebcamStreams:
                 except queue.Full:
                     continue
             else:
+                if self.stopped:
+                    break
                 logging.warning(f"Webcam {webcam_id} disconnected. Attempting to reconnect...")
                 time.sleep(1)  # Pause before attempting to read again
+                if self.stopped:
+                    break
                 self.reidentify_webcams()
                 continue
 
     def reidentify_webcams(self):
+        if self.stopped:
+            return
         available_ids = []
         for i in range(10):
             cap = cv2.VideoCapture(i)
@@ -678,6 +687,8 @@ class SynchronizedWebcamStreams:
                 break 
 
         for physical_id in available_ids:
+            if self.stopped:
+                return
             cap = cv2.VideoCapture(physical_id)
             if cap.isOpened():
                 ret, frame = cap.read()
@@ -689,7 +700,9 @@ class SynchronizedWebcamStreams:
                         if self.compare_histograms(hist, stored_hist):
                             logging.info(f"Webcam {webcam_id} reidentified as physical ID {physical_id}")
                             self.streams[webcam_id] = WebcamStream(physical_id, self.input_size)
-                            threading.Thread(target=self.update, args=(webcam_id,), daemon=True).start()
+                            t = threading.Thread(target=self.update, args=(webcam_id,), daemon=True)
+                            t.start()
+                            self.update_threads.append(t)
                             break
                 cap.release()
 
@@ -719,6 +732,9 @@ class SynchronizedWebcamStreams:
         self.stopped = True
         for stream in self.streams.values():
             stream.stop()
+        for t in self.update_threads:
+            if t.is_alive():
+                t.join()
         logging.info("All webcams have been stopped.")
 
 
@@ -737,7 +753,6 @@ class WebcamStream:
 
     def open_camera(self):
         self.cap = cv2.VideoCapture(self.src)
-        time.sleep(2)
         if not self.cap.isOpened():
             logging.warning(f"Could not open webcam #{self.src}. Retrying...")
             self.cap = None
@@ -745,14 +760,17 @@ class WebcamStream:
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.input_size[0])
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.input_size[1])
         self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30
+        self.identifying_info = self.get_identifying_info()
+        logging.info(f"Webcam #{self.src} opened with resolution {self.input_size[0]}x{self.input_size[1]} at {self.fps} FPS.")
+        return True
+
+    def get_identifying_info(self):
         ret, frame = self.cap.read()
         if ret and frame is not None:
-            self.identifying_info = self.get_identifying_info(frame)
-            logging.info(f"Webcam #{self.src} opened with resolution {self.input_size[0]}x{self.input_size[1]} at {self.fps} FPS.")
             hist = cv2.calcHist([frame], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256])
             hist = cv2.normalize(hist, hist).flatten()
             return hist
-        return False
+        return None
 
     def update(self):
         while not self.stopped:
