@@ -50,7 +50,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from rtmlib import draw_skeleton
 from Pose2Sim.common import natural_sort_key
-from Sports2D.Utilities.config import setup_pose_tracker, setup_video_capture, setup_capture_directories, process_video_frames, WebcamStream
+from Sports2D.Utilities.config import setup_pose_tracker, setup_video_capture, setup_capture_directories, process_video_frames
 from Sports2D.Utilities.video_management import display_realtime_results, finalize_video_processing, track_people
 from Sports2D.Utilities.utilities import read_frame
 
@@ -479,15 +479,21 @@ def process_synchronized_webcams(config_dict, webcam_ids, pose_tracker, output_d
 
                 # Asynchronous processing of frames
                 for webcam_id, frame in frames.items():
-                    # Prepare arguments for processing
-                    args = (
-                        config_dict, frame, webcam_id, frame_idx, outputs[webcam_id], pose_tracker,
-                        multi_person, output_format, save_video, save_images,
-                        show_realtime_results, webcam_streams.out_videos.get(webcam_id),
-                        out_vid_locks[webcam_id]
-                    )
-                    # Submit task to ThreadPoolExecutor
-                    futures.append(executor.submit(process_single_frame, *args))
+                    if frame is not None:
+                        # Prepare arguments for processing
+                        args = (
+                            config_dict, frame, webcam_id, frame_idx, outputs[webcam_id], pose_tracker,
+                            multi_person, output_format, save_video, save_images,
+                            show_realtime_results, webcam_streams.out_videos.get(webcam_id),
+                            out_vid_locks[webcam_id]
+                        )
+                        # Submit task to ThreadPoolExecutor
+                        futures.append(executor.submit(process_single_frame, *args))
+                    else:
+                        img_show = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
+                        cv2.putText(img_show, f'Webcam {webcam_id} déconnectée', (50, input_size[1] // 2),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+                        processed_frames[webcam_id] = img_show
 
                 # Collect processed frames
                 for future in concurrent.futures.as_completed(futures):
@@ -636,7 +642,14 @@ class CombinedDisplayThread(threading.Thread):
         frames_list = []
         for webcam_id in self.webcam_ids:
             frame = processed_frames.get(webcam_id)
-            frames_list.append(frame)
+            if frame is None:
+                # Create placeholder image
+                img_show = np.zeros((self.input_size[1], self.input_size[0], 3), dtype=np.uint8)
+                cv2.putText(img_show, f'Webcam {webcam_id} Disconnected', (50, self.input_size[1] // 2),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+                frames_list.append(img_show)
+            else:
+                frames_list.append(frame)
 
         # Resize frames if necessary
         resized_frames = [cv2.resize(frame, self.input_size) for frame in frames_list]
@@ -679,16 +692,25 @@ class SynchronizedWebcamStreams:
         self.input_size = input_size
         self.stopped = False
         self.webcam_ids = webcam_ids
+        self.webcam_mappings = {}
+        self.identifying_infos = {}
 
         # Initialize webcam streams with consistent mapping
         for webcam_id in webcam_ids:
             stream = WebcamStream(int(webcam_id), input_size)
-            self.streams[webcam_id] = stream
-            self.queues[webcam_id] = queue.Queue(maxsize=1)
+            if stream.identifying_info is not None:
+                self.streams[webcam_id] = stream
+                self.queues[webcam_id] = queue.Queue(maxsize=1)
+                self.webcam_mappings[webcam_id] = int(webcam_id)
+                self.identifying_infos[webcam_id] = stream.identifying_info
+            else:
+                logging.warning(f"Impossible to initialise webcam with ID {webcam_id}")
 
         # Threads to fill the queues
         self.threads = []
-        for webcam_id, stream in self.streams.items():
+        streams_items = list(self.streams.items())
+
+        for webcam_id, stream in streams_items:
             t = threading.Thread(target=self.update, args=(webcam_id, stream))
             t.daemon = True
             t.start()
@@ -697,7 +719,8 @@ class SynchronizedWebcamStreams:
         # Output videos, using webcam IDs as keys
         self.out_videos = {}
         if save_video and output_dir:
-            for webcam_id, stream in self.streams.items():
+            for webcam_id in list(self.streams.keys()):
+                stream = self.streams[webcam_id]
                 video_file_path = f'webcam{webcam_id}'
                 _, _, _, _, output_video_path = setup_capture_directories(video_file_path, output_dir, False)
                 cam_width = stream.cam_width
@@ -713,25 +736,74 @@ class SynchronizedWebcamStreams:
         while not self.stopped:
             frame = stream.read()
             if frame is None:
-                # Wait for the webcam to reconnect
-                time.sleep(0.1)
+                # Log the disconnection
+                logging.warning(f"Webcam {webcam_id} frame is None. Attempting to reconnect.")
+                # Attempt to handle the disconnection
+                self.handle_disconnect(webcam_id)
+                # Wait before retrying to avoid rapid looping
+                time.sleep(1)
                 continue
-
             try:
                 self.queues[webcam_id].put(frame, timeout=0.1)
             except queue.Full:
-                # Queue is full, skip
                 continue
+
+    def handle_disconnect(self, disconnected_webcam_id):
+        logging.warning(f"Webcam {disconnected_webcam_id} seems disconnected")
+        if disconnected_webcam_id in self.streams:
+            stream = self.streams[disconnected_webcam_id]
+            if stream is not None:
+                stream.stop()
+                stream.open_camera()
+
+        self.reidentify_webcams()
+
+    def reidentify_webcams(self):
+        available_ids = []
+        for index in range(10):
+            cap = cv2.VideoCapture(index)
+            if cap.isOpened():
+                cap.release()
+                available_ids.append(index)
+
+        for physical_id in available_ids:
+            cap = cv2.VideoCapture(physical_id)
+            if cap.isOpened():
+                ret, frame = cap.read()
+                if ret and frame is not None:
+                    hist = cv2.calcHist([frame], [0, 1, 2], None, [8, 8, 8],
+                                        [0, 256, 0, 256, 0, 256])
+                    hist = cv2.normalize(hist, hist).flatten()
+                    for webcam_id, stored_hist in self.identifying_infos.items():
+                        if self.compare_histograms(hist, stored_hist):
+                            logging.info(f"Webcam {webcam_id} mapped to physical ID {physical_id}")
+                            stream = WebcamStream(physical_id, self.input_size)
+                            self.streams[webcam_id] = stream
+                            self.queues[webcam_id] = queue.Queue(maxsize=1)
+                            t = threading.Thread(target=self.update, args=(webcam_id, stream))
+                            t.daemon = True
+                            t.start()
+                            self.threads.append(t)
+                            available_ids.remove(physical_id)
+                            break
+                cap.release()
+
+    def compare_histograms(self, hist1, hist2, threshold=0.9):
+        correlation = cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)
+        return correlation >= threshold
 
     def read(self):
         frames = {}
         webcams_available = False
         for webcam_id in self.webcam_ids:
-            try:
-                frame = self.queues[webcam_id].get(timeout=1)
-                frames[webcam_id] = frame
-                webcams_available = True
-            except queue.Empty:
+            if webcam_id in self.queues:
+                try:
+                    frame = self.queues[webcam_id].get(timeout=1)
+                    frames[webcam_id] = frame
+                    webcams_available = True
+                except queue.Empty:
+                    frames[webcam_id] = None  # Webcam not available
+            else:
                 frames[webcam_id] = None  # Webcam not available
         if not webcams_available:
             return None  # No webcams available
@@ -741,3 +813,79 @@ class SynchronizedWebcamStreams:
         self.stopped = True
         for stream in self.streams.values():
             stream.stop()
+
+
+class WebcamStream:
+    def __init__(self, src=0, input_size=(640, 480)):
+        self.src = src
+        self.input_size = input_size
+        self.cap = None
+        self.cam_width = None
+        self.cam_height = None
+        self.fps = None
+        self.frame = None
+        self.identifying_info = None
+        self.open_camera()
+        self.stopped = False
+        self.lock = threading.Lock()
+        threading.Thread(target=self.update, args=(), daemon=True).start()
+
+    def open_camera(self):
+        self.cap = cv2.VideoCapture(self.src)
+        if not self.cap.isOpened():
+            logging.warning(f"Could not open webcam #{self.src}. Retrying...")
+            self.cap = None
+        else:
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.input_size[0])
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.input_size[1])
+            self.cam_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.cam_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30
+            self.identifying_info = self.get_identifying_info()
+            logging.info(f"Opened webcam #{self.src} with resolution {self.cam_width}x{self.cam_height} at {self.fps} FPS.")
+
+    def get_identifying_info(self):
+        ret, frame = self.cap.read()
+        if ret and frame is not None:
+            hist = cv2.calcHist([frame], [0, 1, 2], None, [8, 8, 8],
+                                [0, 256, 0, 256, 0, 256])
+            hist = cv2.normalize(hist, hist).flatten()
+            return hist
+        else:
+            return None
+
+    def update(self):
+        reconnection_attempts = 0
+        max_reconnection_attempts = 5
+        while not self.stopped:
+            if self.cap is None or not self.cap.isOpened():
+                if reconnection_attempts >= max_reconnection_attempts:
+                    logging.error(f"Failed to reconnect webcam #{self.src} after {max_reconnection_attempts} attempts.")
+                    break
+                self.open_camera()
+                reconnection_attempts += 1
+                time.sleep(1)
+                continue
+            reconnection_attempts = 0
+            ret, frame = self.cap.read()
+            if not ret or frame is None:
+                # Reading failed, release and try again
+                self.cap.release()
+                self.cap = None
+                with self.lock:
+                    self.frame = None
+                # Wait before retrying
+                time.sleep(1)
+                continue
+            with self.lock:
+                self.frame = frame
+
+    def read(self):
+        with self.lock:
+            return self.frame.copy() if self.frame is not None else None
+
+    def stop(self):
+        self.stopped = True
+        for stream in self.streams.values():
+            if stream is not None:
+                stream.stop()
