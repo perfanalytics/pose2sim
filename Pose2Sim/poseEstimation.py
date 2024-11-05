@@ -642,7 +642,7 @@ class SynchronizedWebcamStreams:
                         stream = self.streams[webcam_id]
                         video_file_path = f'webcam{webcam_id}'
                         _, _, _, _, output_video_path = setup_capture_directories(video_file_path, output_dir, False)
-                        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+                        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                         out_vid = cv2.VideoWriter(output_video_path, fourcc, stream.fps, (self.input_size[0], self.input_size[1]))
                         self.out_videos[webcam_id] = out_vid
                 else:
@@ -759,9 +759,12 @@ class WebcamStream:
             return False
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.input_size[0])
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.input_size[1])
+        time.sleep(1)
+        actual_width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        actual_height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30
+        logging.info(f"Webcam #{self.src} opened with resolution {actual_width}x{actual_height} at {self.fps} FPS.")
         self.identifying_info = self.get_identifying_info()
-        logging.info(f"Webcam #{self.src} opened with resolution {self.input_size[0]}x{self.input_size[1]} at {self.fps} FPS.")
         return True
 
     def get_identifying_info(self):
@@ -783,6 +786,7 @@ class WebcamStream:
             ret, frame = self.cap.read()
             if not ret or frame is None:
                 logging.warning(f"Frame capture failed on webcam #{self.src}")
+                time.sleep(0.5)
                 continue
 
             with self.lock:
