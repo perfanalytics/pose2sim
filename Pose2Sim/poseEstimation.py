@@ -490,9 +490,11 @@ def process_synchronized_webcams(config_dict, webcam_ids, pose_tracker, output_d
                         # Submit task to ThreadPoolExecutor
                         futures.append(executor.submit(process_single_frame, *args))
                     else:
+                        logging.debug(f"No frame received from webcam {webcam_id}, using placeholder image.")
                         img_show = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
-                        cv2.putText(img_show, f'Webcam {webcam_id} déconnectée', (50, input_size[1] // 2),
+                        cv2.putText(img_show, f'Webcam {webcam_id} Disconnected', (50, input_size[1] // 2),
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+                        processed_frames[webcam_id] = img_show
                         processed_frames[webcam_id] = img_show
 
                 # Collect processed frames
@@ -558,14 +560,6 @@ def process_single_frame(
     '''
     output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
 
-    if frame is None:
-        logging.debug(f"No frame received from webcam {webcam_id}, using placeholder image.")
-        width, height = config_dict['pose']['input_size']
-        img_show = np.zeros((height, width, 3), dtype=np.uint8)
-        cv2.putText(img_show, f'Webcam {webcam_id} Disconnected', (50, height // 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-        return webcam_id, img_show
-
     # Perform pose estimation on the frame
     keypoints, scores = pose_tracker(frame)
 
@@ -599,85 +593,46 @@ class CombinedDisplayThread(threading.Thread):
     '''
     Thread for displaying combined images to avoid thread-safety issues with OpenCV.
     '''
-    def __init__(self, webcam_ids, input_size):
+    def __init__(self, sources, input_size):
         super().__init__()
         self.display_queue = Queue()
         self.stopped = False
         self.daemon = True  # Thread will exit when main program exits
-        self.webcam_ids = webcam_ids
+        self.sources = sources
         self.input_size = input_size
         self.window_name = "Combined Webcam Feeds"
-        self.num_cams = len(webcam_ids)
-        # Determine grid size for display (e.g., 2x2 for 4 cams)
-        self.grid_size = self.calculate_grid_size(self.num_cams)
+        self.grid_size = self.calculate_grid_size(len(sources))
+        self.black_frame = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)  # Create a black frame only once
 
     def run(self):
-        while not self.stopped:
-            try:
-                combined_image = self.display_queue.get(timeout=0.1)
-                cv2.imshow(self.window_name, combined_image)
-                if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
-                    logging.info("Display window closed by user.")
-                    self.stopped = True
-                    break
-            except queue.Empty:
-                continue
-        # Destroy window when stopping
-        cv2.destroyAllWindows()
+        try:
+            while not self.stopped:
+                try:
+                    combined_image = self.display_queue.get(timeout=0.1)
+                    cv2.imshow(self.window_name, combined_image)
+                    if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
+                        logging.info("Display window closed by user.")
+                        self.stopped = True
+                        break
+                except queue.Empty:
+                    continue
+        finally:
+            cv2.destroyAllWindows()
 
     def display(self, combined_image):
         self.display_queue.put(combined_image)
 
     def combine_frames(self, processed_frames):
-        '''
-        Combine frames from different webcams into a single image.
-
-        Args:
-            processed_frames (dict): Dictionary of processed frames with webcam_id as keys.
-
-        Returns:
-            ndarray: Combined image.
-        '''
-        # Create a list to hold frames in order of webcam_ids
-        frames_list = []
-        for webcam_id in self.webcam_ids:
-            frame = processed_frames.get(webcam_id)
-            if frame is None:
-                # Create placeholder image
-                img_show = np.zeros((self.input_size[1], self.input_size[0], 3), dtype=np.uint8)
-                cv2.putText(img_show, f'Webcam {webcam_id} Disconnected', (50, self.input_size[1] // 2),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-                frames_list.append(img_show)
-            else:
-                frames_list.append(frame)
-
-        # Resize frames if necessary
-        resized_frames = [cv2.resize(frame, self.input_size) for frame in frames_list]
-
-        # Arrange frames in a grid
+        frames_list = [processed_frames.get(source, self.black_frame) for source in self.sources]
+        resized_frames = [cv2.resize(frame, self.input_size) for frame in frames_list if frame is not None]
         rows = []
         for i in range(0, len(resized_frames), self.grid_size[1]):
             row_frames = resized_frames[i:i + self.grid_size[1]]
-            if len(row_frames) < self.grid_size[1]:
-                # Fill the remaining spots with black images
-                for _ in range(self.grid_size[1] - len(row_frames)):
-                    black_frame = np.zeros((self.input_size[1], self.input_size[0], 3), dtype=np.uint8)
-                    row_frames.append(black_frame)
-            row = np.hstack(row_frames)
-            rows.append(row)
-        combined_image = np.vstack(rows)
-        return combined_image
+            row_frames.extend([self.black_frame] * (self.grid_size[1] - len(row_frames)))
+            rows.append(np.hstack(row_frames))
+        return np.vstack(rows)
 
     def calculate_grid_size(self, num_cams):
-        '''
-        Calculate grid size (rows, cols) for displaying frames.
-
-        Args:
-            num_cams (int): Number of webcams.
-
-        Returns:
-            tuple: (rows, cols)
-        '''
         cols = int(np.ceil(np.sqrt(num_cams)))
         rows = int(np.ceil(num_cams / cols))
         return (rows, cols)
@@ -723,11 +678,8 @@ class SynchronizedWebcamStreams:
                 stream = self.streams[webcam_id]
                 video_file_path = f'webcam{webcam_id}'
                 _, _, _, _, output_video_path = setup_capture_directories(video_file_path, output_dir, False)
-                cam_width = stream.cam_width
-                cam_height = stream.cam_height
-                fps = stream.fps
                 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-                out_vid = cv2.VideoWriter(output_video_path, fourcc, fps, (cam_width, cam_height))
+                out_vid = cv2.VideoWriter(output_video_path, fourcc, stream.fps, (self.input_size[0], self.input_size[1]))
                 self.out_videos[webcam_id] = out_vid
         else:
             self.out_videos = {webcam_id: None for webcam_id in webcam_ids}
@@ -813,6 +765,7 @@ class SynchronizedWebcamStreams:
         self.stopped = True
         for stream in self.streams.values():
             stream.stop()
+        logging.info("All webcams have been stopped and released.")
 
 
 class WebcamStream:
@@ -820,63 +773,47 @@ class WebcamStream:
         self.src = src
         self.input_size = input_size
         self.cap = None
-        self.cam_width = None
-        self.cam_height = None
-        self.fps = None
         self.frame = None
         self.identifying_info = None
-        self.open_camera()
         self.stopped = False
         self.lock = threading.Lock()
-        threading.Thread(target=self.update, args=(), daemon=True).start()
+        self.open_camera()
+        self.thread = threading.Thread(target=self.update, args=(), daemon=True)
+        self.thread.start()
 
     def open_camera(self):
         self.cap = cv2.VideoCapture(self.src)
         if not self.cap.isOpened():
             logging.warning(f"Could not open webcam #{self.src}. Retrying...")
             self.cap = None
-        else:
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.input_size[0])
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.input_size[1])
-            self.cam_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            self.cam_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30
-            self.identifying_info = self.get_identifying_info()
-            logging.info(f"Opened webcam #{self.src} with resolution {self.cam_width}x{self.cam_height} at {self.fps} FPS.")
-
+            return False
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.input_size[0])
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.input_size[1])
+        self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30
+        self.identifying_info = self.get_identifying_info()
+        logging.info(f"Webcam #{self.src} opened with resolution {self.input_size[0]}x{self.input_size[1]} at {self.fps} FPS.")
+        return True
+   
     def get_identifying_info(self):
         ret, frame = self.cap.read()
         if ret and frame is not None:
-            hist = cv2.calcHist([frame], [0, 1, 2], None, [8, 8, 8],
-                                [0, 256, 0, 256, 0, 256])
+            hist = cv2.calcHist([frame], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256])
             hist = cv2.normalize(hist, hist).flatten()
             return hist
-        else:
-            return None
+        return None
 
     def update(self):
-        reconnection_attempts = 0
-        max_reconnection_attempts = 5
         while not self.stopped:
-            if self.cap is None or not self.cap.isOpened():
-                if reconnection_attempts >= max_reconnection_attempts:
-                    logging.error(f"Failed to reconnect webcam #{self.src} after {max_reconnection_attempts} attempts.")
-                    break
-                self.open_camera()
-                reconnection_attempts += 1
+            if self.cap is None or not self.cap.isOpened() and not self.open_camera():
                 time.sleep(1)
                 continue
-            reconnection_attempts = 0
+
             ret, frame = self.cap.read()
-            if not ret or frame is None:
-                # Reading failed, release and try again
-                self.cap.release()
-                self.cap = None
-                with self.lock:
-                    self.frame = None
-                # Wait before retrying
+            if not ret:
+                logging.warning(f"Frame capture failed on webcam #{self.src}.")
                 time.sleep(1)
                 continue
+
             with self.lock:
                 self.frame = frame
 
@@ -886,6 +823,7 @@ class WebcamStream:
 
     def stop(self):
         self.stopped = True
-        for stream in self.streams.values():
-            if stream is not None:
-                stream.stop()
+        self.thread.join()
+        if self.cap:
+            self.cap.release()
+        logging.info(f"Webcam #{self.src} has been stopped and released.")
