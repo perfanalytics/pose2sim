@@ -462,8 +462,6 @@ def process_synchronized_webcams(config_dict, webcam_ids, pose_tracker, output_d
             while not webcam_streams.stopped:
                 # Read synchronized frames with consistent mapping
                 frames = webcam_streams.read()
-                if frames is None:
-                    break
                 
                 futures = []
                 processed_frames = {}
@@ -482,8 +480,15 @@ def process_synchronized_webcams(config_dict, webcam_ids, pose_tracker, output_d
 
                 # Collect processed frames
                 for future in concurrent.futures.as_completed(futures):
-                    id, img = future.result()
-                    processed_frames[id] = img
+                    try:
+                        id, img = future.result()
+                        processed_frames[id] = img
+                    except Exception as e:
+                        logging.error(f"Error in future for webcam {id}: {e}")
+                        img_placeholder = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
+                        cv2.putText(img_placeholder, f'Error on Webcam {id}', (50, input_size[1] // 2),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+                        processed_frames[id] = img_placeholder
 
                 for id in webcam_ids:
                     if id not in processed_frames:
@@ -537,41 +542,50 @@ def process_single_frame(config_dict, frame, webcam_id, frame_idx, output_dirs, 
     Returns:
         tuple: (webcam_id, img_show)
     '''
-    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
+    try:
+        output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
 
-    if frame is None:
-        logging.warning(f"Received None frame for webcam {webcam_id}.")
-        return webcam_id, None
+        if frame is None:
+            logging.warning(f"Received None frame for webcam {webcam_id}.")
+            return webcam_id, None
 
-    # Perform pose estimation on the frame
-    with pose_tracker_lock:
-        keypoints, scores = pose_tracker(frame)
+        # Perform pose estimation on the frame
+        with pose_tracker_lock:
+            keypoints, scores = pose_tracker(frame)
 
-    # Tracking people IDs across frames (if needed)
-    keypoints, scores, _ = track_people(
-        keypoints, scores, multi_person, None, None, pose_tracker
-    )
-
-    if 'openpose' in output_format:
-        json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
-        save_to_openpose(json_file_path, keypoints, scores)
-
-    # Draw skeleton on the frame
-    img_show = frame.copy()
-    img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1)
-
-    # Save video and images
-    if save_video:
-        if out_vid is not None:
-            with out_vid_lock:
-                out_vid.write(img_show)
-    if save_images:
-        cv2.imwrite(
-            os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'),
-            img_show
+        # Tracking people IDs across frames (if needed)
+        keypoints, scores, _ = track_people(
+            keypoints, scores, multi_person, None, None, pose_tracker
         )
 
-    return webcam_id, img_show
+        if 'openpose' in output_format:
+            json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
+            save_to_openpose(json_file_path, keypoints, scores)
+
+        # Draw skeleton on the frame
+        img_show = frame.copy()
+        img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1)
+
+        # Save video and images
+        if save_video:
+            if out_vid is not None:
+                with out_vid_lock:
+                    out_vid.write(img_show)
+        if save_images:
+            cv2.imwrite(
+                os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'),
+                img_show
+            )
+
+        return webcam_id, img_show
+
+    except Exception as e:
+        logging.error(f"Error processing frame from webcam {webcam_id}: {e}")
+        # Return a placeholder image to indicate an error occurred
+        img_placeholder = np.zeros((config_dict['pose']['input_size'][1], config_dict['pose']['input_size'][0], 3), dtype=np.uint8)
+        cv2.putText(img_placeholder, f'Error on Webcam {webcam_id}', (50, config_dict['pose']['input_size'][1] // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+        return webcam_id, img_placeholder
 
 class CombinedDisplayThread(threading.Thread):
     '''
@@ -630,7 +644,7 @@ class SynchronizedWebcamStreams:
         self.stopped = False
         self.webcam_ids = webcam_ids
         self.streams = {}
-        self.queues = {webcam_id: queue.Queue(maxsize=1) for webcam_id in webcam_ids}
+        self.queues = {webcam_id: queue.Queue(maxsize=5) for webcam_id in webcam_ids}
         self.identifying_infos = {}
         self.out_videos = {}
         self.update_threads = []
@@ -640,7 +654,7 @@ class SynchronizedWebcamStreams:
 
         # Initialize streams and queues
         for webcam_id in webcam_ids:
-            stream = self.init_stream(webcam_id)
+            stream = WebcamStream(int(webcam_id), self.input_size)
             if stream:
                 self.streams[webcam_id] = stream
                 self.identifying_infos[webcam_id] = stream.identifying_info
@@ -658,38 +672,17 @@ class SynchronizedWebcamStreams:
                 else:
                     self.out_videos = {webcam_id: None for webcam_id in webcam_ids}
 
-    def init_stream(self, webcam_id):
-        stream = WebcamStream(int(webcam_id), self.input_size)
-        if stream.identifying_info is None:
-            logging.warning(f"Failed to initialize webcam {webcam_id}")
-            return None
-        return stream
-
     def update(self, webcam_id):
         stream = self.streams.get(webcam_id)
-        failed_frames = 0
-        max_failed_frames = 5
         while not self.stopped:
             frame = stream.read()
             if frame is not None:
-                failed_frames = 0
                 try:
                     self.queues[webcam_id].put(frame, timeout=0.1)
                 except queue.Full:
                     continue
             else:
-                failed_frames += 1
-                if failed_frames >= max_failed_frames:
-                    if self.stopped:
-                        break
-                    logging.warning(f"Webcam {webcam_id} disconected after {failed_frames} read fails. Reconnexion attempt...")
-                    time.sleep(1)
-                    if self.stopped:
-                        break
-                    failed_frames = 0
-                else:
-                    logging.info(f"Read failed for webcam {webcam_id}. Attempt {failed_frames}/{max_failed_frames}")
-                    time.sleep(0.1)
+                time.sleep(0.1)
                 continue
 
     def reidentify_webcams(self):
@@ -701,7 +694,9 @@ class SynchronizedWebcamStreams:
             cap = cv2.VideoCapture(i)
             if cap.isOpened():
                 available_ids.append(i)
-            cap.release() 
+                cap.release()
+            else:
+                break
         logging.debug(f"Available webcams: {available_ids}")
 
         if set(available_ids) == self.previous_available_ids:
@@ -754,10 +749,7 @@ class SynchronizedWebcamStreams:
             except queue.Empty:
                 logging.warning(f"Queue empty for webcam {webcam_id}.")
                 frames[webcam_id] = None
-        if any(frame is not None for frame in frames.values()):
-            return frames
-        else:
-            return None
+        return frames
 
     def stop(self):
         self.stopped = True
@@ -796,7 +788,7 @@ class WebcamStream:
         actual_width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         actual_height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30
-        logging.info(f"Webcam #{self.src} opened with resolution {actual_width}x{actual_height} at {self.fps} FPS.")
+        logging.info(f"Webcam {self.src} opened with resolution {actual_width}x{actual_height} at {self.fps} FPS.")
         self.identifying_info = self.get_identifying_info()
         return True
 
@@ -810,10 +802,10 @@ class WebcamStream:
 
     def update(self):
         failed_reads = 0
-        max_failed_reads = 5
+        max_failed_reads = 10
         while not self.stopped:
             if self.cap is None or not self.cap.isOpened():
-                logging.warning(f"Webcam #{self.src} n'est pas ouverte. Tentative d'ouverture...")
+                logging.warning(f"Webcam {self.src} not opened. Attempting to open...")
                 if not self.open_camera():
                     time.sleep(1)
                     continue
@@ -821,10 +813,17 @@ class WebcamStream:
             ret, frame = self.cap.read()
             if not ret or frame is None:
                 failed_reads += 1
-                logging.warning(f"Échec de capture sur la webcam #{self.src}. Tentative {failed_reads}/{max_failed_reads}")
+                logging.warning(f"Capture failed on webcam {self.src}. Attempt {failed_reads}/{max_failed_reads}")
+                with self.lock:
+                    self.frame = None  # Ensure self.frame is None when read fails
                 if failed_reads >= max_failed_reads:
-                    logging.error(f"Webcam {self.src} not answering. Stream stopped.")
-                    break
+                    logging.error(f"Webcam {self.src} not responding. Attempting to reopen.")
+                    if self.cap:
+                        self.cap.release()
+                    self.cap = None
+                    failed_reads = 0  # Reset counter after attempting to reopen
+                    time.sleep(1)
+                    continue
                 time.sleep(0.1)
                 continue
             else:
@@ -842,4 +841,4 @@ class WebcamStream:
             self.thread.join()
         if self.cap:
             self.cap.release()
-        logging.info(f"Webcam #{self.src} has been stopped and released.")
+        logging.info(f"Webcam {self.src} has been stopped and released.")
