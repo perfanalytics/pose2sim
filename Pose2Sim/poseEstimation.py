@@ -463,24 +463,20 @@ def process_synchronized_webcams(config_dict, webcam_ids, output_dir):
 
     try:
         while not webcam_streams.stopped and not display_thread.stopped:
-            # Read synchronized frames
+            # Read frames (may contain None frames)
             frames = webcam_streams.read()
 
-            # Check if all frames are available
-            if not all(frame is not None for frame in frames.values()):
-                continue
-
-            # Process frames in parallel
+            # Proceed to process frames even if some are None
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(webcam_ids)) as executor:
                 futures = {
                     executor.submit(
                         process_single_frame,
                         config_dict,
-                        frames[webcam_id],
+                        frames.get(webcam_id, None),
                         webcam_id,
                         frame_idx,
                         outputs[webcam_id],
-                        pose_trackers[webcam_id],  # Use per-webcam pose_tracker
+                        pose_trackers[webcam_id],
                         config_dict['project'].get('multi_person'),
                         save_video,
                         save_images,
@@ -539,7 +535,9 @@ def process_single_frame(config_dict, frame, webcam_id, frame_idx, output_dirs, 
 
         if frame is None:
             logging.warning(f"Received None frame for webcam {webcam_id}.")
-            return webcam_id, None
+            # Return a placeholder image to indicate that the frame is missing
+            img_placeholder = get_placeholder_frame(config_dict['pose']['input_size'], webcam_id, 'No Frame')
+            return webcam_id, img_placeholder
 
         # Perform pose estimation on the frame
         keypoints, scores = pose_tracker(frame)
@@ -576,6 +574,12 @@ def process_single_frame(config_dict, frame, webcam_id, frame_idx, output_dirs, 
         cv2.putText(img_placeholder, f'Error on Webcam {webcam_id}', (50, config_dict['pose']['input_size'][1] // 2),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
         return webcam_id, img_placeholder
+    
+def get_placeholder_frame(input_size, webcam_id, message):
+    img_placeholder = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
+    cv2.putText(img_placeholder, f'Webcam {webcam_id}: {message}', (50, input_size[1] // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+    return img_placeholder
 
 class CombinedDisplayThread(threading.Thread):
     '''
@@ -597,12 +601,9 @@ class CombinedDisplayThread(threading.Thread):
         try:
             while not self.stopped:
                 try:
-                    frames_dict = self.display_queue.get(timeout=0.1)
-                    for webcam_id, frame in frames_dict.items():
-                        if frame is not None:
-                            self.frames[webcam_id] = frame
-                        else:
-                            self.frames[webcam_id] = self.get_placeholder_frame(webcam_id, 'Disconnected')
+                    processed_frames = self.display_queue.get(timeout=0.1)
+                    for webcam_id, frame in processed_frames.items():
+                        self.frames[webcam_id] = frame
                     combined_image = self.combine_frames()
                     if combined_image is not None:
                         cv2.imshow(self.window_name, combined_image)
@@ -655,6 +656,7 @@ class SynchronizedWebcamStreams:
         self.new_frame_events = {webcam_id: threading.Event() for webcam_id in webcam_ids}
         self.out_videos = {}
         self.threads = []
+        self.active_webcams = set(webcam_ids)
 
         # Initialize streams
         for webcam_id in webcam_ids:
@@ -676,9 +678,9 @@ class SynchronizedWebcamStreams:
                 time.sleep(0.01)
 
     def read(self):
-        # Wait for all webcams to have a new frame
+        # Wait for new frames with a timeout
         for event in self.new_frame_events.values():
-            event.wait()
+            event.wait(timeout=1.0)  # Wait up to 1 second
 
         # Collect frames
         frames = {}
