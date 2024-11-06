@@ -86,40 +86,29 @@ def rtm_estimator(config_dict):
 
     OUTPUTS:
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
-    - Optionally, videos and/or image files with the detected keypoints 
+    - Optionally, videos and/or image files with the detected keypoints
     '''
 
     # Read config
-    project_dir = config_dict['project']['project_dir']
-    frame_range = config_dict.get('project').get('frame_range', [])
-    output_dir = config_dict.get('project').get('project_dir')
-    multi_person = config_dict.get('project').get('multi_person')
-    video_dir = os.path.join(project_dir, 'videos')
-    pose_dir = os.path.join(project_dir, 'pose')
+    output_dir = config_dict['project']['project_dir']
+    frame_range = config_dict['project'].get('frame_range', [])
+    multi_person = config_dict['project'].get('multi_person', False)
+    video_dir = os.path.join(output_dir, 'videos')
+    pose_dir = os.path.join(output_dir, 'pose')
 
     show_realtime_results = config_dict['pose'].get('show_realtime_results', False)
 
     vid_img_extension = config_dict['pose']['vid_img_extension']
-    webcam_ids = config_dict.get('pose').get('webcam_ids', [])
+    webcam_ids = config_dict['pose'].get('webcam_ids', [])
 
-    overwrite_pose = config_dict['pose']['overwrite_pose']
+    overwrite_pose = config_dict['pose'].get('overwrite_pose', False)
 
-    try:
-        pose_listdirs_names = next(os.walk(pose_dir))[1]
-        os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
-        if not overwrite_pose:
-            logging.info('Skipping pose estimation as it has already been done. Set overwrite_pose to true in Config.toml if you want to run it again.')
-            return
-        else:
-            logging.info('Overwriting previous pose estimation. Set overwrite_pose to false in Config.toml if you want to keep the previous results.')
-            raise
-
-    except StopIteration:
-        pass  # No existing pose directory, proceed with pose estimation
-
-    except Exception as e:
-        logging.debug(f"Exception occurred: {e}")
-        pass  # Some other exception occurred, proceed with pose estimation
+    # Check if pose estimation has already been done
+    if os.path.exists(pose_dir) and not overwrite_pose:
+        logging.info('Skipping pose estimation as it has already been done. Set overwrite_pose to true in Config.toml if you want to run it again.')
+        return
+    elif overwrite_pose:
+        logging.info('Overwriting previous pose estimation.')
 
     logging.info('\nEstimating pose...')
 
@@ -146,10 +135,17 @@ def rtm_estimator(config_dict):
 
     if not sources:
         raise FileNotFoundError(f'No video files, image folders, or webcams found in {video_dir}.')
+    
+    process_functions = {}
+    for source in sources:
+        if source['type'] == 'webcam':
+            process_functions[source['id']] = process_single_frame
+        else:
+            process_functions[source['id']] = process_single_frame
 
     logging.info(f'Processing sources: {sources}')
 
-    # Initialize pose tracker
+    # Initialize pose trackers
     pose_trackers = {}
     for source in sources:
         pose_tracker = setup_pose_tracker(
@@ -162,68 +158,33 @@ def rtm_estimator(config_dict):
     # Create display queue
     display_queue = queue.Queue()
 
-    # Create and start display thread
-    input_size = config_dict['pose'].get('input_size', (640, 480))
-    display_thread = CombinedDisplayThread(sources, input_size, display_queue)
-    display_thread.start()
-
     # Initialize streams
-    stream_manager = StreamManager(sources, config_dict, pose_trackers, display_queue, output_dir, frame_range)
+    stream_manager = StreamManager(sources, config_dict, pose_trackers, display_queue, output_dir, frame_range, process_functions)
     stream_manager.start()
 
+    # Start display thread only if show_realtime_results is True
+    if show_realtime_results:
+        # Create and start display thread
+        input_size = config_dict['pose'].get('input_size', (640, 480))
+        display_thread = CombinedDisplayThread(sources, input_size, display_queue)
+        display_thread.start()
+    else:
+        display_thread = None
+
     try:
-        while not display_thread.stopped:
+        while True:
+            if stream_manager.stopped:
+                break
+            if display_thread and display_thread.stopped:
+                break
             time.sleep(0.1)
     except KeyboardInterrupt:
         logging.info("Processing interrupted by user.")
     finally:
         stream_manager.stop()
-        display_thread.stop()
-        display_thread.join()
-
-
-def save_to_openpose(json_file_path, keypoints, scores):
-    '''
-    Save the keypoints and scores to a JSON file in the OpenPose format
-
-    INPUTS:
-    - json_file_path: Path to save the JSON file
-    - keypoints: Detected keypoints
-    - scores: Confidence scores for each keypoint
-
-    OUTPUTS:
-    - JSON file with the detected keypoints and confidence scores in the OpenPose format
-    '''
-
-    # Prepare keypoints with confidence scores for JSON output
-    nb_detections = len(keypoints)
-    # print('results: ', keypoints, scores)
-    detections = []
-    for i in range(nb_detections): # nb of detected people
-        keypoints_with_confidence_i = []
-        for kp, score in zip(keypoints[i], scores[i]):
-            keypoints_with_confidence_i.extend([kp[0].item(), kp[1].item(), score.item()])
-        detections.append({
-                    "person_id": [-1],
-                    "pose_keypoints_2d": keypoints_with_confidence_i,
-                    "face_keypoints_2d": [],
-                    "hand_left_keypoints_2d": [],
-                    "hand_right_keypoints_2d": [],
-                    "pose_keypoints_3d": [],
-                    "face_keypoints_3d": [],
-                    "hand_left_keypoints_3d": [],
-                    "hand_right_keypoints_3d": []
-                })
-            
-    # Create JSON output structure
-    json_output = {"version": 1.3, "people": detections}
-    
-    # Save JSON output for each frame
-    json_output_dir = os.path.abspath(os.path.join(json_file_path, '..'))
-    if not os.path.isdir(json_output_dir): os.makedirs(json_output_dir)
-    with open(json_file_path, 'w') as json_file:
-        json.dump(json_output, json_file)
-
+        if display_thread:
+            display_thread.stop()
+            display_thread.join()
 
 def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, out_vid, output_format):
     '''
@@ -250,10 +211,8 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
         output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
 
         if frame is None:
-            logging.warning(f"No frame received from source {source_id}. Using placeholder.")
-            img_show = np.zeros((config_dict['pose']['input_size'][1], config_dict['pose']['input_size'][0], 3), dtype=np.uint8)
-            cv2.putText(img_show, f'Source {source_id} Disconnected', (50, config_dict['pose']['input_size'][1] // 2),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+            logging.warning(f"No frame received from source {source_id}. Displaying placeholder.")
+            img_show = get_placeholder_frame(config_dict['pose']['input_size'], source_id, 'Disconnected')
         else:
             # Perform pose estimation on the frame
             keypoints, scores = pose_tracker(frame)
@@ -288,11 +247,14 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
 
     except Exception as e:
         logging.error(f"Error processing frame from source {source_id}: {e}")
-        img_placeholder = np.zeros((config_dict['pose']['input_size'][1], config_dict['pose']['input_size'][0], 3), dtype=np.uint8)
-        cv2.putText(img_placeholder, f'Error on Source {source_id}', (50, config_dict['pose']['input_size'][1] // 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+        img_placeholder = get_placeholder_frame(config_dict['pose']['input_size'], source_id, 'Error')
         return source_id, img_placeholder, out_vid
 
+def get_placeholder_frame(input_size, source_id, message):
+    img_placeholder = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
+    cv2.putText(img_placeholder, f'Source {source_id}: {message}', (50, input_size[1] // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+    return img_placeholder
 
 class CombinedDisplayThread(threading.Thread):
     '''
@@ -310,20 +272,25 @@ class CombinedDisplayThread(threading.Thread):
         self.black_frame = np.zeros((self.input_size[1], self.input_size[0], 3), dtype=np.uint8)
         self.frames = {}  # Store the latest frame from each source
 
-        # Initialize placeholders for sources that are not connected at all
+        # Initialize placeholders for sources
         for source in self.sources:
-            self.frames[source['id']] = self.get_placeholder_frame(source['id'], 'Not Connected')
+            self.frames[source['id']] = get_placeholder_frame(self.input_size, source['id'], 'Not Connected')
+
+        # Create a consistent order of source IDs for display
+        self.source_ids = [source['id'] for source in self.sources]
 
     def run(self):
         try:
             while not self.stopped:
                 try:
                     frames_dict = self.display_queue.get(timeout=0.1)
-                    for source_id, frame in frames_dict.items():
+                    for source_id in self.source_ids:
+                        frame = frames_dict.get(source_id)
                         if frame is not None:
                             self.frames[source_id] = frame
                         else:
-                            self.frames[source_id] = self.get_placeholder_frame(source_id, 'Disconnected')
+                            # If frame is None or missing, display placeholder
+                            self.frames[source_id] = get_placeholder_frame(self.input_size, source_id, 'Disconnected')
                     combined_image = self.combine_frames()
                     if combined_image is not None:
                         cv2.imshow(self.window_name, combined_image)
@@ -339,18 +306,25 @@ class CombinedDisplayThread(threading.Thread):
             cv2.destroyAllWindows()
 
     def combine_frames(self):
-        frames_list = [self.frames.get(source['id'], self.black_frame) for source in self.sources]
+        # Use the consistent order of source IDs
+        frames_list = []
+        for source_id in self.source_ids:
+            frame = self.frames.get(source_id, self.black_frame)
+            frames_list.append(frame)
+
         if not frames_list:
             return None
+
         # Resize frames for display
         resized_frames = []
         for frame in frames_list:
-            if frame.shape[1] > self.input_size[0] or frame.shape[0] > self.input_size[1]:
-                # Resize frame if it's larger than input_size
+            if frame.shape[1] != self.input_size[0] or frame.shape[0] != self.input_size[1]:
                 resized_frame = cv2.resize(frame, self.input_size)
             else:
                 resized_frame = frame
             resized_frames.append(resized_frame)
+
+        # Combine frames into a grid
         rows = []
         for i in range(0, len(resized_frames), self.grid_size[1]):
             row_frames = resized_frames[i:i + self.grid_size[1]]
@@ -366,12 +340,6 @@ class CombinedDisplayThread(threading.Thread):
         combined_image = np.vstack(rows)
         return combined_image
 
-    def get_placeholder_frame(self, source_id, message):
-        img_placeholder = self.black_frame.copy()
-        cv2.putText(img_placeholder, f'Source {source_id} {message}', (10, self.input_size[1] // 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
-        return img_placeholder
-
     def calculate_grid_size(self, num_sources):
         cols = int(np.ceil(np.sqrt(num_sources)))
         rows = int(np.ceil(num_sources / cols))
@@ -381,7 +349,7 @@ class CombinedDisplayThread(threading.Thread):
         self.stopped = True
 
 class StreamManager:
-    def __init__(self, sources, config_dict, pose_trackers, display_queue, output_dir, frame_range):
+    def __init__(self, sources, config_dict, pose_trackers, display_queue, output_dir, frame_range, process_functions):
         self.sources = sources
         self.config_dict = config_dict
         self.pose_trackers = pose_trackers
@@ -391,6 +359,7 @@ class StreamManager:
         self.executor = ThreadPoolExecutor(max_workers=len(sources))
         self.frame_ranges = frame_range if frame_range else []
         self.active_streams = set()
+        self.process_functions = process_functions
 
         self.streams = {}
         self.outputs = {}
@@ -419,20 +388,16 @@ class StreamManager:
             frames = {}
             for source_id, stream in self.streams.items():
                 frame = stream.read()
-                if frame is not None:
-                    frames[source_id] = frame
-                else:
-                    # If the stream is finished and it's not a webcam, remove it from active streams
-                    if stream.stopped and stream.source['type'] != 'webcam':
-                        self.active_streams.discard(source_id)
+                frames[source_id] = frame  # frame can be None if not available
 
             # Process frames in parallel
             futures = {}
             for source_id in self.active_streams:
                 frame = frames.get(source_id)
                 if frame is not None:
+                    process_function = self.process_functions.get(source_id)
                     futures[self.executor.submit(
-                        process_single_frame,
+                        process_function,
                         self.config_dict,
                         frame,
                         source_id,
@@ -459,7 +424,7 @@ class StreamManager:
                     continue
 
             processed_frames = {}
-            for future in concurrent.futures.as_completed(futures):
+            for future in futures:
                 source_id = futures[future]
                 try:
                     source_id, img_show, out_vid = future.result()
@@ -469,7 +434,7 @@ class StreamManager:
                         self.out_videos[source_id] = out_vid
                 except Exception as e:
                     logging.error(f"Error processing frame from source {source_id}: {e}")
-                    processed_frames[source_id] = self.get_placeholder_frame(source_id, 'Error')
+                    processed_frames[source_id] = get_placeholder_frame(self.config_dict['pose']['input_size'], source_id, 'Error')
 
             # Put processed frames into display queue
             if processed_frames:
@@ -488,14 +453,6 @@ class StreamManager:
             if out_vid is not None:
                 out_vid.release()
 
-    def get_placeholder_frame(self, source_id, message):
-        input_size = self.config_dict['pose'].get('input_size', (640, 480))
-        img_placeholder = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
-        cv2.putText(img_placeholder, f'Source {source_id} {message}', (10, input_size[1] // 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
-        return img_placeholder
-
-
 class GenericStream(threading.Thread):
     def __init__(self, source, input_size=(640, 480), frame_ranges=[]):
         super().__init__()
@@ -505,24 +462,19 @@ class GenericStream(threading.Thread):
         self.stopped = False
         self.frame = None
         self.lock = threading.Lock()
-        self.new_frame_event = threading.Event()
         self.daemon = True
         self.frame_idx = 0
         self.total_frames = None
+        self.cap = None
+        self.image_files = []
+        self.image_index = 0
         self.pbar = None
 
     def run(self):
         source_type = self.source['type']
         if source_type == 'webcam':
-            self.cap = cv2.VideoCapture(int(self.source['id']))
-            if not self.cap.isOpened():
-                logging.error(f"Cannot open webcam {self.source['id']}")
-                self.stopped = True
-                return
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.input_size[0])
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.input_size[1])
+            self.open_webcam()
             time.sleep(1)  # Give some time for the webcam to initialize
-
         elif source_type == 'video':
             self.cap = cv2.VideoCapture(self.source['path'])
             if not self.cap.isOpened():
@@ -531,12 +483,10 @@ class GenericStream(threading.Thread):
                 return
             self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.setup_progress_bar()
-
         elif source_type == 'images':
             image_files = glob.glob(os.path.join(self.source['path'], '*' + self.source['path'].split('.')[-1]))
             self.image_files = sorted(image_files, key=lambda x: int(''.join(filter(str.isdigit, x)) or 0))
             self.total_frames = len(self.image_files)
-            self.image_index = 0
             self.setup_progress_bar()
         else:
             logging.error(f"Unknown source type: {source_type}")
@@ -544,18 +494,18 @@ class GenericStream(threading.Thread):
             return
 
         while not self.stopped:
-            if source_type in ['webcam', 'video']:
+            if source_type == 'webcam':
+                frame = self.read_webcam_frame()
+                if frame is None:
+                    time.sleep(0.1)
+                    continue
+            elif source_type == 'video':
                 ret, frame = self.cap.read()
                 if not ret:
-                    if source_type == 'video':
-                        self.stopped = True
-                        if self.pbar is not None:
-                            self.pbar.close()
-                        break
-                    else:
-                        logging.error(f"Failed to read frame from {self.source['path']}")
-                        time.sleep(0.1)
-                        continue
+                    self.stopped = True
+                    if self.pbar is not None:
+                        self.pbar.close()
+                    break
             elif source_type == 'images':
                 if self.image_index >= len(self.image_files):
                     self.stopped = True
@@ -574,26 +524,53 @@ class GenericStream(threading.Thread):
                 self.frame_idx += 1
                 if self.pbar is not None:
                     self.pbar.update(1)
-                self.new_frame_event.set()
             else:
                 with self.lock:
                     self.frame = None
                 time.sleep(0.1)
 
+    def open_webcam(self):
+        try:
+            self.cap = cv2.VideoCapture(int(self.source['id']), cv2.CAP_DSHOW)
+            if self.cap.isOpened():
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.input_size[0])
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.input_size[1])
+                logging.info(f"Webcam {self.source['id']} opened.")
+            else:
+                logging.error(f"Cannot open webcam {self.source['id']}.")
+                self.cap = None
+        except Exception as e:
+            logging.error(f"Exception occurred while opening webcam {self.source['id']}: {e}")
+            self.cap = None
+
+    def read_webcam_frame(self):
+        if self.cap is None or not self.cap.isOpened():
+            logging.warning(f"Webcam {self.source['id']} not opened. Attempting to open...")
+            self.open_webcam()
+            if self.cap is None or not self.cap.isOpened():
+                return None
+        ret, frame = self.cap.read()
+        if not ret or frame is None:
+            logging.warning(f"Failed to read frame from webcam {self.source['id']}.")
+            self.cap.release()
+            self.cap = None
+            return None
+        return frame
+
     def read(self):
         with self.lock:
-            frame = self.frame.copy() if self.frame is not None else None
-        return frame
+            return self.frame.copy() if self.frame is not None else None
 
     def stop(self):
         self.stopped = True
-        if hasattr(self, 'cap') and self.cap is not None:
+        if self.cap:
             self.cap.release()
         if self.pbar is not None:
             self.pbar.close()
 
     def setup_progress_bar(self):
-        self.pbar = tqdm(total=self.total_frames, desc=f'Processing {os.path.basename(str(self.source["path"]))}', position=self.source['id'], leave=False)
+        if self.total_frames is not None:
+            self.pbar = tqdm(total=self.total_frames, desc=f'Processing {os.path.basename(str(self.source["path"]))}', position=self.source['id'], leave=False)
 
 def setup_capture_directories(source_path, output_dir, save_images):
     '''
@@ -606,10 +583,6 @@ def setup_capture_directories(source_path, output_dir, save_images):
         # Handle webcam source
         current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_dir_name = f'webcam{source_path}_{current_date}'
-    elif str(source_path).startswith("webcam"):
-        # Handle string starting with 'webcam'
-        current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir_name = f'{source_path}_{current_date}'
     else:
         output_dir_name = os.path.basename(os.path.splitext(str(source_path))[0])
 
@@ -632,3 +605,45 @@ def setup_capture_directories(source_path, output_dir, save_images):
     output_video_path = os.path.join(output_dir_full, f'{output_dir_name}_pose.mp4')
 
     return output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path
+
+def save_to_openpose(json_file_path, keypoints, scores):
+    '''
+    Save the keypoints and scores to a JSON file in the OpenPose format
+
+    INPUTS:
+    - json_file_path: Path to save the JSON file
+    - keypoints: Detected keypoints
+    - scores: Confidence scores for each keypoint
+
+    OUTPUTS:
+    - JSON file with the detected keypoints and confidence scores in the OpenPose format
+    '''
+
+    # Prepare keypoints with confidence scores for JSON output
+    nb_detections = len(keypoints)
+    detections = []
+    for i in range(nb_detections):  # Number of detected people
+        keypoints_with_confidence_i = []
+        for kp, score in zip(keypoints[i], scores[i]):
+            keypoints_with_confidence_i.extend([kp[0].item(), kp[1].item(), score.item()])
+        detections.append({
+            "person_id": [-1],
+            "pose_keypoints_2d": keypoints_with_confidence_i,
+            "face_keypoints_2d": [],
+            "hand_left_keypoints_2d": [],
+            "hand_right_keypoints_2d": [],
+            "pose_keypoints_3d": [],
+            "face_keypoints_3d": [],
+            "hand_left_keypoints_3d": [],
+            "hand_right_keypoints_3d": []
+        })
+
+    # Create JSON output structure
+    json_output = {"version": 1.3, "people": detections}
+
+    # Save JSON output for each frame
+    json_output_dir = os.path.abspath(os.path.join(json_file_path, '..'))
+    if not os.path.isdir(json_output_dir):
+        os.makedirs(json_output_dir)
+    with open(json_file_path, 'w') as json_file:
+        json.dump(json_output, json_file)
