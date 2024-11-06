@@ -203,7 +203,7 @@ All of them are clearly documented: feel free to play with them!
   Pose2Sim.runAll()
   # or: Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_kinematics=True)
   ```
-- Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
+- Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](hhttps://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
 - Note that **Pose2Sim.markerAugmentation()** does not necessarily improve results--*in fact, results are worse half of the time.* You can choose to not run this command, and save an additional 1.3 GB by uninstalling tensorflow: `pip uninstall tensorflow`.
 
 </br>
@@ -273,7 +273,7 @@ You can visualize your results with Blender as explained in [Demonstration Part-
 <br>
 
 ***N.B.:***
-- In Config.toml, set `project` > `multi_person = true` for each trial that contains multiple persons.
+- In [Config.toml](hhttps://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), set `project` > `multi_person = true` for each trial that contains multiple persons.
 - Make sure that the order of `markerAugmentation` > `participant_height` and `participant_mass` matches the person's IDs.
 
 <br/>
@@ -452,7 +452,7 @@ Output file:
 
 ### Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
 
-If you already have a calibration file, set `calibration_type` type to `convert` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Empty_project/User/Config.toml) file.\
+If you already have a calibration file, set `calibration_type` type to `convert` in your [Config.toml](hhttps://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.\
 ***N.B.:** If the original calibration file does not provide any residual errors, they will be logged as NaN. This is not an error and can be ignored.*
 - **From [Caliscope](https://mprib.github.io/caliscope/), [AniPose](https://github.com/lambdaloop/anipose) or [FreeMocap](https://github.com/freemocap/freemocap):**  
   - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
@@ -552,15 +552,14 @@ Pose2Sim.synchronization()
 
 <img src="Content/P2S_synchronization.png" width="760">
 
-</br>
-
 In `multi_person` mode, a video will pop up to let the user choose on which person to synchronize.\
-All keypoints can be taken into account, or a subset of them.\
-The whole capture can be used for synchronization, or you can choose a time range when the participant is roughly horizontally static but with a clear vertical motion (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly). 
-
 <img src="Content/synchro_multi.jpg" width="380">
 
 <img src="Content/synchro.jpg" width="760">
+
+If results are not satisfying, edit your [Config.toml](hhttps://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file:\
+All keypoints can be taken into account, or a subset of them.\
+The whole capture can be used for synchronization, or you can choose a time range when the participant is roughly horizontally static but with a clear vertical motion (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly). 
 
 *N.B.:* Works best when:
 - the participant does not move towards or away from the cameras
@@ -590,7 +589,7 @@ Pose2Sim.personAssociation()
    
 </br>
 
-Check printed output. If results are not satisfying, try and release the constraints in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/S00_Demo_Session/Config.toml) file.
+Check printed output. If results are not satisfying, try and release the constraints in the [Config.toml](hhttps://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
 </br>
 
@@ -612,7 +611,7 @@ Pose2Sim.triangulation()
 </br>
 
 Check printed output, and visualize your trc in OpenSim: `File -> Preview experimental data`.\
-If your triangulation is not satisfying, try and release the constraints in the `Config.toml` file.
+If your triangulation is not satisfying, try and release the constraints in the [Config.toml](hhttps://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
 </br>
 
@@ -632,7 +631,7 @@ Pose2Sim.filtering()
 
 </br>
 
-Check your filtration with the displayed figures, and visualize your .trc file in OpenSim. If your filtering is not satisfying, try and change the parameters in the `Config.toml` file.
+Check your filtration with the displayed figures, and visualize your .trc file in OpenSim. If your filtering is not satisfying, try and change the parameters in the [Config.toml](hhttps://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
 Output:\
 <img src="Content/FilterPlot.png" width="760">
@@ -645,7 +644,7 @@ _**Note that inverse kinematic results are not necessarily better after marker a
 
 *N.B.:* Marker augmentation tends to give a more stable, but less precise output. In practice, it is mostly beneficial when using less than 4 cameras. 
 
-**Make sure that `participant_height` is correct in your `Config.toml` file.** `participant_mass` is mostly optional for IK.\
+**Make sure that `participant_height` is correct in your [Config.toml](hhttps://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.** `participant_mass` is mostly optional for IK.\
 Only works with models estimating at least the following keypoints (e.g., not COCO):
 ``` python
  ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
@@ -802,7 +801,7 @@ Converts a Pose2Sim .toml calibration file (e.g., from a checkerboard) to a Qual
 Converts an OpenCV .toml calibration file to OpenCap .pickle calibration files.
 
 [calib_toml_to_opencap.py]( )
-To convert OpenCap calibration tiles to a .toml file, please use Pose2Sim.calibration() and set convert_from = 'opencap' in Config.toml.
+To convert OpenCap calibration tiles to a .toml file, please use Pose2Sim.calibration() and set convert_from = 'opencap' in [Config.toml](hhttps://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
    </pre>
 </details>
 
