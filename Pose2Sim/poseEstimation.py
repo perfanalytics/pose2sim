@@ -367,7 +367,7 @@ class StreamManager:
 
         # Initialize streams and outputs
         for source in sources:
-            stream = GenericStream(source, config_dict['pose'].get('input_size', (640, 480)), self.frame_ranges)
+            stream = GenericStream(source, config_dict, self.frame_ranges)
             self.streams[source['id']] = stream
             self.outputs[source['id']] = setup_capture_directories(
                 source['path'], self.output_dir, 'to_images' in config_dict['project'].get('save_video', [])
@@ -454,11 +454,12 @@ class StreamManager:
                 out_vid.release()
 
 class GenericStream(threading.Thread):
-    def __init__(self, source, input_size=(640, 480), frame_ranges=[]):
+    def __init__(self, source, config_dict, frame_ranges=[]):
         super().__init__()
         self.source = source
-        self.input_size = input_size
-        self.frame_ranges = frame_ranges
+        self.input_size = config_dict['pose'].get('input_size', (640, 480))
+        self.image_extension = config_dict['pose']['vid_img_extension']
+        self.frame_ranges = frame_ranges if frame_ranges else None
         self.stopped = False
         self.frame = None
         self.lock = threading.Lock()
@@ -484,8 +485,8 @@ class GenericStream(threading.Thread):
             self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.setup_progress_bar()
         elif source_type == 'images':
-            image_files = glob.glob(os.path.join(self.source['path'], '*' + self.source['path'].split('.')[-1]))
-            self.image_files = sorted(image_files, key=lambda x: int(''.join(filter(str.isdigit, x)) or 0))
+            image_files = glob.glob(os.path.join(self.source['path'], f'*{self.image_extension}'))
+            self.image_files = sorted(image_files)
             self.total_frames = len(self.image_files)
             self.setup_progress_bar()
         else:
@@ -494,26 +495,43 @@ class GenericStream(threading.Thread):
             return
 
         while not self.stopped:
+            frame = None
             if source_type == 'webcam':
                 frame = self.read_webcam_frame()
                 if frame is None:
+                    with self.lock:
+                        self.frame = None
                     time.sleep(0.1)
                     continue
             elif source_type == 'video':
+                if self.frame_ranges is not None and self.frame_idx not in self.frame_ranges:
+                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.frame_idx + 1)
+                    self.frame_idx += 1
+                    continue
                 ret, frame = self.cap.read()
-                if not ret:
+                if not ret or frame is None:
                     self.stopped = True
                     if self.pbar is not None:
                         self.pbar.close()
                     break
+                frame = cv2.resize(frame, self.input_size)
+                with self.lock:
+                    self.frame = frame.copy()
+                if self.pbar is not None:
+                    self.pbar.update(1)
+                self.frame_idx += 1 
             elif source_type == 'images':
-                if self.image_index >= len(self.image_files):
+                if self.frame_index >= len(self.image_files):
                     self.stopped = True
                     if self.pbar is not None:
                         self.pbar.close()
                     break
-                frame = cv2.imread(self.image_files[self.image_index])
-                self.image_index += 1
+                if self.frame_ranges is not None and len(self.frame_ranges) > 0 and self.frame_idx not in self.frame_ranges:
+                    self.frame_idx += 1
+                    self.frame_index += 1
+                    continue
+                frame = cv2.imread(self.image_files[self.frame_index])
+                self.frame_index += 1
             else:
                 frame = None
 
@@ -530,12 +548,14 @@ class GenericStream(threading.Thread):
                 time.sleep(0.1)
 
     def open_webcam(self):
+        self.connected = False  # Add this attribute
         try:
             self.cap = cv2.VideoCapture(int(self.source['id']), cv2.CAP_DSHOW)
             if self.cap.isOpened():
                 self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.input_size[0])
                 self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.input_size[1])
                 logging.info(f"Webcam {self.source['id']} opened.")
+                self.connected = True
             else:
                 logging.error(f"Cannot open webcam {self.source['id']}.")
                 self.cap = None
@@ -548,12 +568,16 @@ class GenericStream(threading.Thread):
             logging.warning(f"Webcam {self.source['id']} not opened. Attempting to open...")
             self.open_webcam()
             if self.cap is None or not self.cap.isOpened():
+                with self.lock:
+                    self.frame = None
                 return None
         ret, frame = self.cap.read()
         if not ret or frame is None:
             logging.warning(f"Failed to read frame from webcam {self.source['id']}.")
             self.cap.release()
             self.cap = None
+            with self.lock:
+                self.frame = None
             return None
         return frame
 
