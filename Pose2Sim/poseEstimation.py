@@ -69,19 +69,16 @@ __status__ = "Development"
 ## FUNCTIONS
 def rtm_estimator(config_dict):
     '''
-    Estimate pose from a video file or a folder of images and 
-    write the results to JSON files, videos, and/or images.
-    Results can optionally be displayed in real time.
+    Estimate pose from webcams, video files, or a folder of images, and write the results to JSON files, videos, and/or images.
+    Results can optionally be displayed in real-time.
 
     Supported models: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands), COCO_17 (body)
-    Supported modes: lightweight, balanced, performance (edit paths at rtmlib/tools/solutions if you 
-    need nother detection or pose models)
+    Supported modes: lightweight, balanced, performance (edit paths at rtmlib/tools/solutions if you need another detection or pose models)
 
     Optionally gives consistent person ID across frames (slower but good for 2D analysis)
-    Optionally runs detection every n frames and inbetween tracks points (faster but less accurate).
+    Optionally runs detection every n frames and in between tracks points (faster but less accurate).
 
-    If a valid cuda installation is detected, uses the GPU with the ONNXRuntime backend. Otherwise, 
-    uses the CPU with the OpenVINO backend.
+    If a valid CUDA installation is detected, uses the GPU with the ONNXRuntime backend. Otherwise, uses the CPU with the OpenVINO backend.
 
     INPUTS:
     - videos or image folders from the video directory
@@ -94,22 +91,17 @@ def rtm_estimator(config_dict):
 
     # Read config
     project_dir = config_dict['project']['project_dir']
-    # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
-    # if single trial
-    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-    frame_range = config_dict.get('project').get('frame_range')
+    frame_range = config_dict.get('project').get('frame_range', [])
     output_dir = config_dict.get('project').get('project_dir')
     multi_person = config_dict.get('project').get('multi_person')
     video_dir = os.path.join(project_dir, 'videos')
     pose_dir = os.path.join(project_dir, 'pose')
 
-    show_realtime_results = config_dict['pose'].get('show_realtime_results')
+    show_realtime_results = config_dict['pose'].get('show_realtime_results', False)
 
     vid_img_extension = config_dict['pose']['vid_img_extension']
-    
-    webcam_ids = config_dict.get('pose').get('webcam_ids')
-    
+    webcam_ids = config_dict.get('pose').get('webcam_ids', [])
+
     overwrite_pose = config_dict['pose']['overwrite_pose']
 
     try:
@@ -117,266 +109,78 @@ def rtm_estimator(config_dict):
         os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
         if not overwrite_pose:
             logging.info('Skipping pose estimation as it has already been done. Set overwrite_pose to true in Config.toml if you want to run it again.')
+            return
         else:
             logging.info('Overwriting previous pose estimation. Set overwrite_pose to false in Config.toml if you want to keep the previous results.')
             raise
-            
-    except:
-        logging.info('\nEstimating pose...')
 
-        if vid_img_extension == 'webcam':
-            if isinstance(webcam_ids, list):
-                video_paths = [f'webcam{cam_id}' for cam_id in webcam_ids]
-            else:
-                video_paths = [f'webcam{webcam_ids}']
-            frame_ranges = [None] * len(video_paths)
-        else :
-            video_paths = [f for f in Path(video_dir).rglob('*' + vid_img_extension) if f.is_file()]
-            frame_ranges = process_video_frames(config_dict, video_paths)
-        if video_paths:
-            logging.info(f'Found video files/webcams with extension {vid_img_extension}.')
-            logging.info(f'Multi-person is {"" if multi_person else "not "}selected.')
+    except StopIteration:
+        pass  # No existing pose directory, proceed with pose estimation
 
-            pose_tracker = setup_pose_tracker(
-                config_dict['pose']['det_frequency'],
-                config_dict['pose']['mode'],
-                config_dict['pose']['pose_model']
-            )
+    except Exception as e:
+        logging.debug(f"Exception occurred: {e}")
+        pass  # Some other exception occurred, proceed with pose estimation
 
-            if vid_img_extension == 'webcam':
-                process_synchronized_webcams(config_dict, webcam_ids, output_dir)
-            else:
-                def process_video_thread(args):
-                    process_video(pose_tracker, *args)
+    logging.info('\nEstimating pose...')
 
-                process_args = []
-                for idx, (video_path, frame_range) in enumerate(zip(video_paths, frame_ranges)):
-                    position = idx
-                    process_args.append((config_dict, video_path, frame_range, output_dir, position))
+    # Prepare list of sources (webcams, videos, image folders)
+    sources = []
 
-                num_threads = min(len(video_paths), os.cpu_count())
-                with ThreadPoolExecutor(max_workers=num_threads) as executor:
-                    futures = [executor.submit(process_video_thread, arg) for arg in process_args]
-                    for future in futures:
-                        try:
-                            future.result()
-                        except Exception as e:
-                            logging.error(f"Error processing video: {e}")
+    if vid_img_extension == 'webcam':
+        if not isinstance(webcam_ids, list):
+            webcam_ids = [webcam_ids]
+        for cam_id in webcam_ids:
+            sources.append({'type': 'webcam', 'id': cam_id, 'path': cam_id})
+    else:
+        # Add video files
+        video_paths = [str(f) for f in Path(video_dir).rglob('*' + vid_img_extension) if f.is_file()]
+        for idx, video_path in enumerate(video_paths):
+            sources.append({'type': 'video', 'id': idx, 'path': video_path})
 
-                if show_realtime_results:
-                    cv2.destroyAllWindows()
+        # Add image folders
+        image_folders = [str(f) for f in Path(video_dir).iterdir() if f.is_dir()]
+        for idx, image_folder in enumerate(image_folders, start=len(sources)):
+            image_files = list(Path(image_folder).glob('*' + vid_img_extension))
+            if image_files:
+                sources.append({'type': 'images', 'id': idx, 'path': image_folder})
 
-        else:
-            image_folders = [f for f in Path(video_dir).iterdir() if f.is_dir()]
-            if image_folders:
-                logging.info('Found image folders.')
-                for image_folder in image_folders:
-                    image_folder_path = str(image_folder)
-                    video_files_in_folder = list(image_folder.glob('*' + vid_img_extension))
-                    if video_files_in_folder:
-                        raise NameError(f"{video_files_in_folder[0]} is not an image. Videos must be put in the video directory, not in subdirectories.")
-                    else:
-                        process_images(config_dict, image_folder_path, frame_range)
-            else:
-                raise FileNotFoundError(f'No video files or image folders found in {video_dir}.')
+    if not sources:
+        raise FileNotFoundError(f'No video files, image folders, or webcams found in {video_dir}.')
 
-def process_video(pose_tracker, config_dict, video_file_path, input_frame_range, output_dir, position):
-    '''
-    Estimate pose from a video file
-    
-    INPUTS:
-    - video_file_path: str. Path to the input video file
-    - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
-    - save_video: bool. Whether to save the output video
-    - save_images: bool. Whether to save the output images
-    - show_realtime_results: bool. Whether to show real-time visualization
-    - frame_range: list. Range of frames to process
+    logging.info(f'Processing sources: {sources}')
 
-    OUTPUTS:
-    - JSON files with the detected keypoints and confidence scores in the OpenPose format
-    - if save_video: Video file with the detected keypoints and confidence scores drawn on the frames
-    - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
-    '''
-    input_size = config_dict.get('pose').get('input_size')
-
-    save_video = True if 'to_video' in config_dict['project']['save_video'] else False
-    save_images = True if 'to_images' in config_dict['project']['save_video'] else False
-
-    vid_img_extension = config_dict['pose']['vid_img_extension']
-    
-    multi_person = config_dict.get('project').get('multi_person')
-    show_realtime_results = config_dict['pose'].get('show_realtime_results')
-    if show_realtime_results is None:
-        show_realtime_results = config_dict['pose'].get('display_detection')
-        if show_realtime_results is not None:
-            print("Warning: 'display_detection' is deprecated. Please use 'show_realtime_results' instead.")
-    
-    output_format = config_dict['pose']['output_format']
-
-    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(video_file_path, output_dir, save_images)
-
-    cap, frame_iterator, out_vid, cam_width, cam_height, fps = setup_video_capture(
-        video_file_path, save_video, output_video_path, input_size, input_frame_range, position
-    )
-
-    # Call to display real-time results if needed
-    if show_realtime_results:
-        display_realtime_results(video_file_path)
-    
-    if vid_img_extension == 'webcam' and save_video:
-        total_processing_start_time = datetime.now()
-
-    frames_processed = 0
-    prev_keypoints = None
-    for frame_idx in frame_iterator:
-        frame = read_frame(cap, frame_idx)
-
-        # If frame not grabbed
-        if frame is None:
-            logging.warning(f"Failed to grab frame {frame_idx}.")
-            continue
-
-        # Perform pose estimation on the frame
-        keypoints, scores = pose_tracker(frame)
-
-        # Tracking people IDs across frames
-        keypoints, scores, prev_keypoints = track_people(
-            keypoints, scores, multi_person, None, prev_keypoints, pose_tracker
+    # Initialize pose tracker
+    pose_trackers = {}
+    for source in sources:
+        pose_tracker = setup_pose_tracker(
+            config_dict['pose']['det_frequency'],
+            config_dict['pose']['mode'],
+            config_dict['pose']['pose_model']
         )
+        pose_trackers[source['id']] = pose_tracker
 
-        if 'openpose' in output_format:
-            json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
-            save_to_openpose(json_file_path, keypoints, scores)
+    # Create display queue
+    display_queue = queue.Queue()
 
-        # Draw skeleton on the frame
-        if show_realtime_results or save_video or save_images:
-            img_show = frame.copy()
-            img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+    # Create and start display thread
+    input_size = config_dict['pose'].get('input_size', (640, 480))
+    display_thread = CombinedDisplayThread(sources, input_size, display_queue)
+    display_thread.start()
 
-        if show_realtime_results:
-            cv2.imshow(f"Pose Estimation {os.path.basename(video_file_path)}", img_show)
-            if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
-                break
+    # Initialize streams
+    stream_manager = StreamManager(sources, config_dict, pose_trackers, display_queue, output_dir, frame_range)
+    stream_manager.start()
 
-        # Sauvegarde de la vidéo et des images
-        if save_video:
-            out_vid.write(img_show)
-        if save_images:
-            cv2.imwrite(
-                os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'),
-                img_show
-            )
+    try:
+        while not display_thread.stopped:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        logging.info("Processing interrupted by user.")
+    finally:
+        stream_manager.stop()
+        display_thread.stop()
+        display_thread.join()
 
-        frames_processed += 1
-
-    if hasattr(cap, 'stop'):
-        cap.stop()
-    if hasattr(cap, 'release'):
-        cap.release()
-
-    if save_video:
-        out_vid.release()
-        if vid_img_extension == 'webcam' and frames_processed > 0:
-            fps = finalize_video_processing(frames_processed, total_processing_start_time, output_video_path, fps)
-        logging.info(f"--> Output video saved to {output_video_path}.")
-    if save_images:
-        logging.info(f"--> Output images saved to {img_output_dir}.")
-
-def process_images(config_dict, image_folder_path, input_frame_range, output_dir):
-    '''
-    Estimate pose estimation from a folder of images
-    
-    INPUTS:
-    - image_folder_path: str. Path to the input image folder
-    - vid_img_extension: str. Extension of the image files
-    - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
-    - save_video: bool. Whether to save the output video
-    - save_images: bool. Whether to save the output images
-    - show_realtime_results: bool. Whether to show real-time visualization
-    - frame_range: list. Range of frames to process
-
-    OUTPUTS:
-    - JSON files with the detected keypoints and confidence scores in the OpenPose format
-    - if save_video: Video file with the detected keypoints and confidence scores drawn on the frames
-    - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
-    '''
-
-    save_video = True if 'to_video' in config_dict['project']['save_video'] else False
-    save_images = True if 'to_images' in config_dict['project']['save_video'] else False
-    
-    multi_person = config_dict.get('project').get('multi_person')
-    show_realtime_results = config_dict['pose'].get('show_realtime_results')
-    if show_realtime_results is None:
-        show_realtime_results = config_dict['pose'].get('display_detection')
-        if show_realtime_results is not None:
-            print("Warning: 'display_detection' is deprecated. Please use 'show_realtime_results' instead.")
-
-    output_format = config_dict['pose']['output_format']
-     
-    vid_img_extension = config_dict['pose']['vid_img_extension']
-
-    pose_tracker = setup_pose_tracker(
-        config_dict['pose']['det_frequency'],
-        config_dict['pose']['mode'],
-        config_dict['pose']['pose_model']
-    )
-
-    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = setup_capture_directories(image_folder_path, output_dir)
-
-    image_files = glob.glob(os.path.join(image_folder_path, '*' + vid_img_extension))
-    sorted(image_files, key=natural_sort_key)
-
-    if save_video: # Set up video writer
-        logging.warning('Using default framerate of 60 fps.')
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
-        W, H = cv2.imread(image_files[0]).shape[:2][::-1] # Get the width and height from the first image (assuming all images have the same size)
-        cap = cv2.VideoWriter(output_video_path, fourcc, 60, (W, H)) # Create the output video file
-
-    if show_realtime_results:
-        display_realtime_results(image_folder_path)
-    
-    frame_range = [[len(image_files)] if input_frame_range==[] else input_frame_range][0]
-    prev_keypoints = None
-    for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
-        if frame_idx in range(*frame_range):
-            frame = cv2.imread(image_file)
-
-            # Perform pose estimation on the image
-            keypoints, scores = pose_tracker(frame)
-
-            # Tracking people IDs across frames
-            keypoints, scores, prev_keypoints = track_people(
-                keypoints, scores, multi_person, None, prev_keypoints, pose_tracker
-            )
-            
-            # Extract frame number from the filename
-            if 'openpose' in output_format:
-                json_file_path = os.path.join(json_output_dir, f"{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.json")
-                save_to_openpose(json_file_path, keypoints, scores)
-
-            # Draw skeleton on the image
-            if show_realtime_results or save_video or save_images:
-                img_show = frame.copy()
-                img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
-
-            if show_realtime_results:
-                cv2.imshow(f"Pose Estimation {os.path.basename(image_folder_path)}", img_show)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-
-            if save_video:
-                cap.write(img_show)
-
-            if save_images:
-                if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
-                cv2.imwrite(os.path.join(img_output_dir, f'{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.png'), img_show)
-
-    if save_video:
-        logging.info(f"--> Output video saved to {output_video_path}.")
-    if save_images:
-        logging.info(f"--> Output images saved to {img_output_dir}.")
-    if show_realtime_results:
-        cv2.destroyAllWindows()
 
 def save_to_openpose(json_file_path, keypoints, scores):
     '''
@@ -421,102 +225,14 @@ def save_to_openpose(json_file_path, keypoints, scores):
         json.dump(json_output, json_file)
 
 
-def process_synchronized_webcams(config_dict, webcam_ids, output_dir):
+def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, out_vid, output_format):
     '''
-    Processes multiple webcams by synchronizing frames between them,
-    then processing the frames asynchronously and multithreaded.
-    Combines the frames into a single image and displays them in one window.
-
-    Args:
-        config_dict (dict): Configuration dictionary.
-        webcam_ids (list): List of webcam IDs.
-        output_dir (str): Output directory path.
-    '''
-    input_size = config_dict['pose'].get('input_size', (640, 480))
-    save_video = 'to_video' in config_dict['project'].get('save_video', [])
-    save_images = 'to_images' in config_dict['project'].get('save_video', [])
-    show_realtime_results = config_dict['pose'].get('show_realtime_results', False)
-    output_format = config_dict['pose'].get('output_format', 'openpose')
-
-    # Create synchronized webcam streams
-    webcam_streams = SynchronizedWebcamStreams(webcam_ids, input_size)
-    outputs = {id: setup_capture_directories(f'webcam{id}', output_dir, save_images) for id in webcam_ids}
-
-    # Initialize pose tracker
-    pose_trackers = {
-        webcam_id: setup_pose_tracker(
-            config_dict['pose']['det_frequency'],
-            config_dict['pose']['mode'],
-            config_dict['pose']['pose_model']
-        ) for webcam_id in webcam_ids
-    }
-
-    # Create display queue
-    display_queue = queue.Queue()
-
-    # Create and start display thread
-    display_thread = CombinedDisplayThread(webcam_ids, input_size, display_queue)
-    display_thread.start()
-
-    # Initialize frame index
-    frame_idx = 0
-
-    try:
-        while not webcam_streams.stopped and not display_thread.stopped:
-            # Read frames (may contain None frames)
-            frames = webcam_streams.read()
-
-            # Proceed to process frames even if some are None
-            with concurrent.futures.ThreadPoolExecutor(max_workers=len(webcam_ids)) as executor:
-                futures = {
-                    executor.submit(
-                        process_single_frame,
-                        config_dict,
-                        frames.get(webcam_id, None),
-                        webcam_id,
-                        frame_idx,
-                        outputs[webcam_id],
-                        pose_trackers[webcam_id],
-                        config_dict['project'].get('multi_person'),
-                        save_video,
-                        save_images,
-                        show_realtime_results,
-                        webcam_streams.out_videos.get(webcam_id),
-                        output_format
-                    ): webcam_id for webcam_id in webcam_ids
-                }
-
-                processed_frames = {}
-                for future in concurrent.futures.as_completed(futures):
-                    webcam_id = futures[future]
-                    try:
-                        _, img_show = future.result()
-                        processed_frames[webcam_id] = img_show
-                    except Exception as e:
-                        logging.error(f"Error processing frame from webcam {webcam_id}: {e}")
-                        processed_frames[webcam_id] = display_thread.get_placeholder_frame(webcam_id, 'Error')
-
-            # Put processed frames into display queue
-            display_queue.put(processed_frames)
-
-            frame_idx += 1
-
-    except KeyboardInterrupt:
-        logging.info("Processing interrupted by user.")
-    finally:
-        webcam_streams.stop()
-        display_thread.stop()
-        display_thread.join()
-
-
-def process_single_frame(config_dict, frame, webcam_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, out_vid, output_format):
-    '''
-    Processes a single frame from a webcam.
+    Processes a single frame from a source.
 
     Args:
         config_dict (dict): Configuration dictionary.
         frame (ndarray): Frame image.
-        webcam_id (int): Webcam ID.
+        source_id (int): Source ID.
         frame_idx (int): Frame index.
         output_dirs (tuple): Output directories.
         pose_tracker: Pose tracker object.
@@ -528,58 +244,55 @@ def process_single_frame(config_dict, frame, webcam_id, frame_idx, output_dirs, 
         out_vid (cv2.VideoWriter): Video writer object.
 
     Returns:
-        tuple: (webcam_id, img_show)
+        tuple: (source_id, img_show, out_vid)
     '''
     try:
         output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
 
         if frame is None:
-            logging.warning(f"Received None frame for webcam {webcam_id}.")
-            # Return a placeholder image to indicate that the frame is missing
-            img_placeholder = get_placeholder_frame(config_dict['pose']['input_size'], webcam_id, 'No Frame')
-            return webcam_id, img_placeholder
+            logging.warning(f"No frame received from source {source_id}. Using placeholder.")
+            img_show = np.zeros((config_dict['pose']['input_size'][1], config_dict['pose']['input_size'][0], 3), dtype=np.uint8)
+            cv2.putText(img_show, f'Source {source_id} Disconnected', (50, config_dict['pose']['input_size'][1] // 2),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+        else:
+            # Perform pose estimation on the frame
+            keypoints, scores = pose_tracker(frame)
 
-        # Perform pose estimation on the frame
-        keypoints, scores = pose_tracker(frame)
-
-        # Tracking people IDs across frames (if needed)
-        keypoints, scores, _ = track_people(
-            keypoints, scores, multi_person, None, None, pose_tracker
-        )
-
-        if 'openpose' in output_format:
-            json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
-            save_to_openpose(json_file_path, keypoints, scores)
-
-        # Draw skeleton on the frame
-        img_show = frame.copy()
-        img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1)
-
-        # Save video and images
-        if save_video:
-            if out_vid is not None:
-                out_vid.write(img_show)
-        if save_images:
-            cv2.imwrite(
-                os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'),
-                img_show
+            # Tracking people IDs across frames (if needed)
+            keypoints, scores, _ = track_people(
+                keypoints, scores, multi_person, None, None, pose_tracker
             )
 
-        return webcam_id, img_show
+            if 'openpose' in output_format:
+                json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
+                save_to_openpose(json_file_path, keypoints, scores)
+
+            # Draw skeleton on the frame
+            img_show = draw_skeleton(frame.copy(), keypoints, scores, kpt_thr=0.1)
+
+            # Save video and images
+            if save_video:
+                if out_vid is None:
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    H, W = img_show.shape[:2]
+                    fps = config_dict['pose'].get('fps', 30)
+                    out_vid = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H))
+                out_vid.write(img_show)
+            if save_images:
+                cv2.imwrite(
+                    os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'),
+                    img_show
+                )
+
+        return source_id, img_show, out_vid
 
     except Exception as e:
-        logging.error(f"Error processing frame from webcam {webcam_id}: {e}")
-        # Return a placeholder image to indicate an error occurred
+        logging.error(f"Error processing frame from source {source_id}: {e}")
         img_placeholder = np.zeros((config_dict['pose']['input_size'][1], config_dict['pose']['input_size'][0], 3), dtype=np.uint8)
-        cv2.putText(img_placeholder, f'Error on Webcam {webcam_id}', (50, config_dict['pose']['input_size'][1] // 2),
+        cv2.putText(img_placeholder, f'Error on Source {source_id}', (50, config_dict['pose']['input_size'][1] // 2),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-        return webcam_id, img_placeholder
-    
-def get_placeholder_frame(input_size, webcam_id, message):
-    img_placeholder = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
-    cv2.putText(img_placeholder, f'Webcam {webcam_id}: {message}', (50, input_size[1] // 2),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-    return img_placeholder
+        return source_id, img_placeholder, out_vid
+
 
 class CombinedDisplayThread(threading.Thread):
     '''
@@ -592,18 +305,25 @@ class CombinedDisplayThread(threading.Thread):
         self.daemon = True  # Thread will exit when main program exits
         self.sources = sources
         self.input_size = input_size
-        self.window_name = "Combined Webcam Feeds"
+        self.window_name = "Combined Feeds"
         self.grid_size = self.calculate_grid_size(len(sources))
-        self.black_frame = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)  # Create a black frame only once
+        self.black_frame = np.zeros((self.input_size[1], self.input_size[0], 3), dtype=np.uint8)
         self.frames = {}  # Store the latest frame from each source
+
+        # Initialize placeholders for sources that are not connected at all
+        for source in self.sources:
+            self.frames[source['id']] = self.get_placeholder_frame(source['id'], 'Not Connected')
 
     def run(self):
         try:
             while not self.stopped:
                 try:
-                    processed_frames = self.display_queue.get(timeout=0.1)
-                    for webcam_id, frame in processed_frames.items():
-                        self.frames[webcam_id] = frame
+                    frames_dict = self.display_queue.get(timeout=0.1)
+                    for source_id, frame in frames_dict.items():
+                        if frame is not None:
+                            self.frames[source_id] = frame
+                        else:
+                            self.frames[source_id] = self.get_placeholder_frame(source_id, 'Disconnected')
                     combined_image = self.combine_frames()
                     if combined_image is not None:
                         cv2.imshow(self.window_name, combined_image)
@@ -611,162 +331,304 @@ class CombinedDisplayThread(threading.Thread):
                             logging.info("Display window closed by user.")
                             self.stopped = True
                             break
+                    else:
+                        time.sleep(0.01)
                 except queue.Empty:
                     continue
         finally:
             cv2.destroyAllWindows()
 
     def combine_frames(self):
-        frames_list = [self.frames.get(source, self.black_frame) for source in self.sources]
-        resized_frames = [cv2.resize(frame, self.input_size) for frame in frames_list if frame is not None]
-        if not resized_frames:
+        frames_list = [self.frames.get(source['id'], self.black_frame) for source in self.sources]
+        if not frames_list:
             return None
+        # Resize frames for display
+        resized_frames = []
+        for frame in frames_list:
+            if frame.shape[1] > self.input_size[0] or frame.shape[0] > self.input_size[1]:
+                # Resize frame if it's larger than input_size
+                resized_frame = cv2.resize(frame, self.input_size)
+            else:
+                resized_frame = frame
+            resized_frames.append(resized_frame)
         rows = []
         for i in range(0, len(resized_frames), self.grid_size[1]):
             row_frames = resized_frames[i:i + self.grid_size[1]]
             if len(row_frames) < self.grid_size[1]:
                 row_frames.extend([self.black_frame] * (self.grid_size[1] - len(row_frames)))
+            # Ensure all frames in the row have the same height
+            min_height = min(frame.shape[0] for frame in row_frames)
+            row_frames = [cv2.resize(frame, (frame.shape[1], min_height)) for frame in row_frames]
             rows.append(np.hstack(row_frames))
+        # Ensure all rows have the same width
+        min_width = min(row.shape[1] for row in rows)
+        rows = [cv2.resize(row, (min_width, row.shape[0])) for row in rows]
         combined_image = np.vstack(rows)
         return combined_image
 
-    def get_placeholder_frame(self, webcam_id, message):
-        img_placeholder = np.zeros((self.input_size[1], self.input_size[0], 3), dtype=np.uint8)
-        cv2.putText(img_placeholder, f'Webcam {webcam_id} {message}', (50, self.input_size[1] // 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+    def get_placeholder_frame(self, source_id, message):
+        img_placeholder = self.black_frame.copy()
+        cv2.putText(img_placeholder, f'Source {source_id} {message}', (10, self.input_size[1] // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
         return img_placeholder
 
-    def calculate_grid_size(self, num_cams):
-        cols = int(np.ceil(np.sqrt(num_cams)))
-        rows = int(np.ceil(num_cams / cols))
+    def calculate_grid_size(self, num_sources):
+        cols = int(np.ceil(np.sqrt(num_sources)))
+        rows = int(np.ceil(num_sources / cols))
         return (rows, cols)
 
     def stop(self):
         self.stopped = True
 
-class SynchronizedWebcamStreams:
-    def __init__(self, webcam_ids, input_size=(640, 480)):
-        self.input_size = input_size
+class StreamManager:
+    def __init__(self, sources, config_dict, pose_trackers, display_queue, output_dir, frame_range):
+        self.sources = sources
+        self.config_dict = config_dict
+        self.pose_trackers = pose_trackers
+        self.display_queue = display_queue
+        self.output_dir = output_dir
         self.stopped = False
-        self.webcam_ids = webcam_ids
+        self.executor = ThreadPoolExecutor(max_workers=len(sources))
+        self.frame_ranges = frame_range if frame_range else []
+        self.active_streams = set()
+
         self.streams = {}
-        self.frames = {}
-        self.locks = {webcam_id: threading.Lock() for webcam_id in webcam_ids}
-        self.conditions = {webcam_id: threading.Condition(self.locks[webcam_id]) for webcam_id in webcam_ids}
-        self.new_frame_events = {webcam_id: threading.Event() for webcam_id in webcam_ids}
+        self.outputs = {}
         self.out_videos = {}
-        self.threads = []
-        self.active_webcams = set(webcam_ids)
 
-        # Initialize streams
-        for webcam_id in webcam_ids:
-            stream = WebcamStream(int(webcam_id), input_size)
-            self.streams[webcam_id] = stream
-            thread = threading.Thread(target=self.update, args=(webcam_id,), daemon=True)
-            thread.start()
-            self.threads.append(thread)
+        # Initialize streams and outputs
+        for source in sources:
+            stream = GenericStream(source, config_dict['pose'].get('input_size', (640, 480)), self.frame_ranges)
+            self.streams[source['id']] = stream
+            self.outputs[source['id']] = setup_capture_directories(
+                source['path'], self.output_dir, 'to_images' in config_dict['project'].get('save_video', [])
+            )
+            self.out_videos[source['id']] = None  # Placeholder for video writer
+            self.active_streams.add(source['id'])
 
-    def update(self, webcam_id):
-        stream = self.streams[webcam_id]
-        while not self.stopped:
-            frame = stream.read()
-            if frame is not None:
-                with self.locks[webcam_id]:
-                    self.frames[webcam_id] = frame
-                    self.new_frame_events[webcam_id].set()
+    def start(self):
+        # Start all streams
+        for stream in self.streams.values():
+            stream.start()
+
+        # Start processing loop
+        threading.Thread(target=self.process_streams, daemon=True).start()
+
+    def process_streams(self):
+        while not self.stopped and self.active_streams:
+            frames = {}
+            for source_id, stream in self.streams.items():
+                frame = stream.read()
+                if frame is not None:
+                    frames[source_id] = frame
+                else:
+                    # If the stream is finished and it's not a webcam, remove it from active streams
+                    if stream.stopped and stream.source['type'] != 'webcam':
+                        self.active_streams.discard(source_id)
+
+            # Process frames in parallel
+            futures = {}
+            for source_id in self.active_streams:
+                frame = frames.get(source_id)
+                if frame is not None:
+                    futures[self.executor.submit(
+                        process_single_frame,
+                        self.config_dict,
+                        frame,
+                        source_id,
+                        self.streams[source_id].frame_idx,
+                        self.outputs[source_id],
+                        self.pose_trackers[source_id],
+                        self.config_dict['project'].get('multi_person'),
+                        'to_video' in self.config_dict['project'].get('save_video', []),
+                        'to_images' in self.config_dict['project'].get('save_video', []),
+                        self.config_dict['pose'].get('show_realtime_results', False),
+                        self.out_videos.get(source_id),
+                        self.config_dict['pose'].get('output_format', 'openpose')
+                    )] = source_id
+
+            if not futures:
+                if not any(stream.source['type'] == 'webcam' for stream in self.streams.values()):
+                    # No frames to process and no webcams running, stop processing
+                    logging.info("All streams have finished processing.")
+                    self.stopped = True
+                    break
+                else:
+                    # Wait for frames from webcams
+                    time.sleep(0.1)
+                    continue
+
+            processed_frames = {}
+            for future in concurrent.futures.as_completed(futures):
+                source_id = futures[future]
+                try:
+                    source_id, img_show, out_vid = future.result()
+                    processed_frames[source_id] = img_show
+                    # Update out_videos dictionary with the video writer returned from process_single_frame
+                    if out_vid is not None:
+                        self.out_videos[source_id] = out_vid
+                except Exception as e:
+                    logging.error(f"Error processing frame from source {source_id}: {e}")
+                    processed_frames[source_id] = self.get_placeholder_frame(source_id, 'Error')
+
+            # Put processed frames into display queue
+            if processed_frames:
+                self.display_queue.put(processed_frames)
             else:
+                # Sleep briefly to prevent high CPU usage when no frames are available
                 time.sleep(0.01)
-
-    def read(self):
-        # Wait for new frames with a timeout
-        for event in self.new_frame_events.values():
-            event.wait(timeout=1.0)  # Wait up to 1 second
-
-        # Collect frames
-        frames = {}
-        for webcam_id in self.webcam_ids:
-            with self.locks[webcam_id]:
-                frames[webcam_id] = self.frames.get(webcam_id, None)
-                self.new_frame_events[webcam_id].clear()
-        return frames
 
     def stop(self):
         self.stopped = True
         for stream in self.streams.values():
             stream.stop()
-        for thread in self.threads:
-            if thread.is_alive():
-                thread.join()
-        logging.info("All webcams have been stopped.")
+        self.executor.shutdown()
+        # Release video writers
+        for out_vid in self.out_videos.values():
+            if out_vid is not None:
+                out_vid.release()
+
+    def get_placeholder_frame(self, source_id, message):
+        input_size = self.config_dict['pose'].get('input_size', (640, 480))
+        img_placeholder = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
+        cv2.putText(img_placeholder, f'Source {source_id} {message}', (10, input_size[1] // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
+        return img_placeholder
 
 
-class WebcamStream:
-    def __init__(self, src=0, input_size=(640, 480)):
-        self.src = src
+class GenericStream(threading.Thread):
+    def __init__(self, source, input_size=(640, 480), frame_ranges=[]):
+        super().__init__()
+        self.source = source
         self.input_size = input_size
-        self.cap = None
-        self.frame = None
-        self.identifying_info = None
+        self.frame_ranges = frame_ranges
         self.stopped = False
+        self.frame = None
         self.lock = threading.Lock()
-        self.open_camera()
-        self.thread = threading.Thread(target=self.update, args=(), daemon=True)
-        self.thread.start()
+        self.new_frame_event = threading.Event()
+        self.daemon = True
+        self.frame_idx = 0
+        self.total_frames = None
+        self.pbar = None
 
-    def open_camera(self):
-        self.cap = cv2.VideoCapture(self.src)
-        if not self.cap.isOpened():
-            logging.warning(f"Could not open webcam {self.src}. Retrying...")
-            self.cap = None
-            return False
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.input_size[0])
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.input_size[1])
-        time.sleep(1)
-        actual_width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-        actual_height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30
-        logging.info(f"Webcam {self.src} opened with resolution {actual_width}x{actual_height} at {self.fps} FPS.")
-        self.identifying_info = self.get_identifying_info()
-        return True
+    def run(self):
+        source_type = self.source['type']
+        if source_type == 'webcam':
+            self.cap = cv2.VideoCapture(int(self.source['id']))
+            if not self.cap.isOpened():
+                logging.error(f"Cannot open webcam {self.source['id']}")
+                self.stopped = True
+                return
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.input_size[0])
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.input_size[1])
+            time.sleep(1)  # Give some time for the webcam to initialize
 
-    def get_identifying_info(self):
-        ret, frame = self.cap.read()
-        if ret and frame is not None:
-            hist = cv2.calcHist([frame], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256])
-            hist = cv2.normalize(hist, hist).flatten()
-            return hist
-        return None
+        elif source_type == 'video':
+            self.cap = cv2.VideoCapture(self.source['path'])
+            if not self.cap.isOpened():
+                logging.error(f"Cannot open video file {self.source['path']}")
+                self.stopped = True
+                return
+            self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.setup_progress_bar()
 
-    def update(self):
-            while not self.stopped:
-                if self.cap is None or not self.cap.isOpened():
-                    logging.warning(f"Webcam {self.src} not opened. Attempting to open...")
-                    if not self.open_camera():
-                        time.sleep(1)
-                        continue
+        elif source_type == 'images':
+            image_files = glob.glob(os.path.join(self.source['path'], '*' + self.source['path'].split('.')[-1]))
+            self.image_files = sorted(image_files, key=lambda x: int(''.join(filter(str.isdigit, x)) or 0))
+            self.total_frames = len(self.image_files)
+            self.image_index = 0
+            self.setup_progress_bar()
+        else:
+            logging.error(f"Unknown source type: {source_type}")
+            self.stopped = True
+            return
 
+        while not self.stopped:
+            if source_type in ['webcam', 'video']:
                 ret, frame = self.cap.read()
-                if not ret or frame is None:
-                    with self.lock:
-                        self.frame = None  # Ensure self.frame is None when read fails
-                    logging.error(f"Webcam {self.src} not responding. Attempting to reopen.")
-                    if self.cap:
-                        self.cap.release()
-                    self.cap = None
-                    time.sleep(2)
-                    continue
-                else:
-                    with self.lock:
-                        self.frame = frame
+                if not ret:
+                    if source_type == 'video':
+                        self.stopped = True
+                        if self.pbar is not None:
+                            self.pbar.close()
+                        break
+                    else:
+                        logging.error(f"Failed to read frame from {self.source['path']}")
+                        time.sleep(0.1)
+                        continue
+            elif source_type == 'images':
+                if self.image_index >= len(self.image_files):
+                    self.stopped = True
+                    if self.pbar is not None:
+                        self.pbar.close()
+                    break
+                frame = cv2.imread(self.image_files[self.image_index])
+                self.image_index += 1
+            else:
+                frame = None
+
+            if frame is not None:
+                frame = cv2.resize(frame, self.input_size)
+                with self.lock:
+                    self.frame = frame.copy()
+                self.frame_idx += 1
+                if self.pbar is not None:
+                    self.pbar.update(1)
+                self.new_frame_event.set()
+            else:
+                with self.lock:
+                    self.frame = None
+                time.sleep(0.1)
 
     def read(self):
         with self.lock:
-            return self.frame.copy() if self.frame is not None else None
+            frame = self.frame.copy() if self.frame is not None else None
+        return frame
 
     def stop(self):
         self.stopped = True
-        if self.thread.is_alive():
-            self.thread.join()
-        if self.cap:
+        if hasattr(self, 'cap') and self.cap is not None:
             self.cap.release()
-        logging.info(f"Webcam {self.src} has been stopped and released.")
+        if self.pbar is not None:
+            self.pbar.close()
+
+    def setup_progress_bar(self):
+        self.pbar = tqdm(total=self.total_frames, desc=f'Processing {os.path.basename(str(self.source["path"]))}', position=self.source['id'], leave=False)
+
+def setup_capture_directories(source_path, output_dir, save_images):
+    '''
+    Set up output directories for saving images and JSON files.
+
+    Returns:
+        tuple: (output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path)
+    '''
+    if isinstance(source_path, int):
+        # Handle webcam source
+        current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_dir_name = f'webcam{source_path}_{current_date}'
+    elif str(source_path).startswith("webcam"):
+        # Handle string starting with 'webcam'
+        current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_dir_name = f'{source_path}_{current_date}'
+    else:
+        output_dir_name = os.path.basename(os.path.splitext(str(source_path))[0])
+
+    # Define the full path for the output directory
+    output_dir_full = os.path.abspath(os.path.join(output_dir, "pose"))
+
+    # Create output directories if they do not exist
+    if not os.path.isdir(output_dir_full):
+        os.makedirs(output_dir_full)
+
+    # Prepare directories for images and JSON outputs
+    img_output_dir = os.path.join(output_dir_full, f'{output_dir_name}_img')
+    json_output_dir = os.path.join(output_dir_full, f'{output_dir_name}_json')
+    if save_images and not os.path.isdir(img_output_dir):
+        os.makedirs(img_output_dir)
+    if not os.path.isdir(json_output_dir):
+        os.makedirs(json_output_dir)
+
+    # Define the path for the output video file
+    output_video_path = os.path.join(output_dir_full, f'{output_dir_name}_pose.mp4')
+
+    return output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path
