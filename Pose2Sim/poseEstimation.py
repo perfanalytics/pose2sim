@@ -91,9 +91,7 @@ def rtm_estimator(config_dict):
 
     # Read config
     output_dir = config_dict['project']['project_dir']
-    frame_range = config_dict['project'].get('frame_range', [])
-    multi_person = config_dict['project'].get('multi_person', False)
-    video_dir = os.path.join(output_dir, 'videos')
+    source_dir = os.path.join(output_dir, 'videos')
     pose_dir = os.path.join(output_dir, 'pose')
 
     show_realtime_results = config_dict['pose'].get('show_realtime_results', False)
@@ -118,15 +116,14 @@ def rtm_estimator(config_dict):
     if vid_img_extension == 'webcam':
         sources.extend({'type': 'webcam', 'id': cam_id, 'path': cam_id} for cam_id in (webcam_ids if isinstance(webcam_ids, list) else [webcam_ids]))
     else:
-        video_paths = [str(f) for f in Path(video_dir).rglob('*' + vid_img_extension) if f.is_file()]
-        sources.extend({'type': 'video', 'id': idx, 'path': video_path} for idx, video_path in enumerate(video_paths))
-        image_folders = [str(f) for f in Path(video_dir).iterdir() if f.is_dir()]
-        sources.extend({'type': 'images', 'id': idx, 'path': folder} for idx, folder in enumerate(image_folders, start=len(video_paths)))
-
+        video_files = [str(f) for f in Path(source_dir).rglob('*' + vid_img_extension) if f.is_file()]
+        sources.extend({'type': 'video', 'id': idx, 'path': video_path} for idx, video_path in enumerate(video_files))
+        image_dirs = [str(f) for f in Path(source_dir).iterdir() if f.is_dir()]
+        sources.extend({'type': 'images', 'id': idx, 'path': folder} for idx, folder in enumerate(image_dirs, start=len(video_files)))
 
     if not sources:
-        raise FileNotFoundError(f'No video files, image folders, or webcams found in {video_dir}.')
-    
+        raise FileNotFoundError(f'No Webcams or no media files found in {source_dir}.')
+
     process_functions = {}
     for source in sources:
         if source['type'] == 'webcam':
@@ -143,17 +140,15 @@ def rtm_estimator(config_dict):
     display_queue = queue.Queue()
 
     # Initialize streams
-    stream_manager = StreamManager(sources, config_dict, pose_trackers, display_queue, output_dir, frame_range, process_functions)
+    stream_manager = StreamManager(sources, config_dict, pose_trackers, display_queue, output_dir, process_functions)
     stream_manager.start()
 
     # Start display thread only if show_realtime_results is True
+    display_thread = None
     if show_realtime_results:
-        # Create and start display thread
         input_size = config_dict['pose'].get('input_size', (640, 480))
         display_thread = CombinedDisplayThread(sources, input_size, display_queue)
         display_thread.start()
-    else:
-        display_thread = None
 
     try:
         while not stream_manager.stopped:
@@ -192,45 +187,33 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
 
     logging.info(f"Processing frame {frame_idx} from source {source_id}")
 
-    try:
-        output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
+    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
         
-        # Perform pose estimation on the frame
-        keypoints, scores = pose_tracker(frame)
+    # Perform pose estimation on the frame
+    keypoints, scores = pose_tracker(frame)
 
-        # Tracking people IDs across frames (if needed)
-        keypoints, scores, _ = track_people(
-            keypoints, scores, multi_person, None, None, pose_tracker
-        )
+    # Tracking people IDs across frames (if needed)
+    keypoints, scores, _ = track_people(
+        keypoints, scores, multi_person, None, None, pose_tracker
+    )
 
-        if 'openpose' in output_format:
-            json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
-            save_to_openpose(json_file_path, keypoints, scores)
+    if 'openpose' in output_format:
+        json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
+        save_to_openpose(json_file_path, keypoints, scores)
 
-        # Draw skeleton on the frame
-        img_show = draw_skeleton(frame.copy(), keypoints, scores, kpt_thr=0.1)
+    # Draw skeleton on the frame
+    img_show = draw_skeleton(frame.copy(), keypoints, scores, kpt_thr=0.1)
 
-        # Save video and images
-        if save_video:
-            if out_vid is not None:
-                out_vid.write(img_show)
+    # Save video and images
+    if save_video and out_vid:
+        out_vid.write(img_show)
 
-        if save_images:
-            cv2.imwrite(os.path.join(img_output_dir, f'{frame_idx:06d}.jpg'), img_show)
+    if save_images:
+        cv2.imwrite(os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'), img_show)
+
+    return source_id, img_show, out_vid
 
 
-        return source_id, img_show, out_vid
-
-    except Exception as e:
-        logging.error(f"Error processing frame from source {source_id}: {e}")
-        img_placeholder = get_placeholder_frame(config_dict['pose']['input_size'], source_id, 'Error')
-        return source_id, img_placeholder, out_vid
-
-def get_placeholder_frame(input_size, source_id, message):
-    img_placeholder = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
-    cv2.putText(img_placeholder, f'Source {source_id}: {message}', (50, input_size[1] // 2),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-    return img_placeholder
 
 class CombinedDisplayThread(threading.Thread):
     '''
@@ -244,22 +227,15 @@ class CombinedDisplayThread(threading.Thread):
         self.input_size = input_size
         self.window_name = "Combined Feeds"
         self.grid_size = self.calculate_grid_size(len(sources))
-        self.black_frame = np.zeros((self.input_size[1], self.input_size[0], 3), dtype=np.uint8)
-        self.frames = {}  # Store the latest frame from each source
-
-        # Initialize placeholders for sources
-        for source in self.sources:
-            self.frames[source['id']] = get_placeholder_frame(self.input_size, source['id'], 'Not Connected')
-
-        # Create a consistent order of source IDs for display
+        self.img_placeholder = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
+        self.frames = {source['id']: self.get_placeholder_frame(source['id'], 'Not Connected') for source in sources}
         self.source_ids = [source['id'] for source in self.sources]
 
     def run(self):
         while not self.stopped:
             try:
                 frames_dict = self.display_queue.get(timeout=0.1)
-                for source_id in self.source_ids:
-                    self.frames[source_id] = frames_dict.get(source_id, self.frames[source_id])
+                self.frames.update({source_id: frames_dict.get(source_id, self.frames[source_id]) for source_id in self.source_ids})
                 self.display_combined_image()
             except queue.Empty:
                 continue
@@ -273,29 +249,9 @@ class CombinedDisplayThread(threading.Thread):
                 self.stopped = True
 
     def combine_frames(self):
-        # Use the consistent order of source IDs
-        frames_list = []
-        for source_id in self.source_ids:
-            frame = self.frames.get(source_id, self.black_frame)
-            frames_list.append(frame)
-
-        if not frames_list:
-            return None
-
-        # Resize frames for display
-        resized_frames = []
-        for frame in frames_list:
-            if frame.shape[1] != self.input_size[0] or frame.shape[0] != self.input_size[1]:
-                resized_frame = cv2.resize(frame, self.input_size)
-            else:
-                resized_frame = frame
-            resized_frames.append(resized_frame)
-
-        rows = []
-        for i in range(0, len(resized_frames), self.grid_size[1]):
-            row_frames = resized_frames[i:i + self.grid_size[1]]
-            rows.append(np.hstack(row_frames))
-
+        resized_frames = [cv2.resize(frame, self.input_size) if frame.shape[:2] != self.input_size else frame
+                          for frame in (self.frames.get(source_id, self.img_placeholder) for source_id in self.source_ids)]
+        rows = [np.hstack(resized_frames[i:i + self.grid_size[1]]) for i in range(0, len(resized_frames), self.grid_size[1])]
         return np.vstack(rows)
 
     def calculate_grid_size(self, num_sources):
@@ -306,24 +262,27 @@ class CombinedDisplayThread(threading.Thread):
     def stop(self):
         self.stopped = True
 
+    def get_placeholder_frame(self, source_id, message):
+        return cv2.putText(self.img_placeholder, f'Source {source_id}: {message}', (50, self.input_size[1] // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+
     def __del__(self):
         cv2.destroyAllWindows()
 
 
 class StreamManager:
-    def __init__(self, sources, config_dict, pose_trackers, display_queue, output_dir, frame_range, process_functions):
+    def __init__(self, sources, config_dict, pose_trackers, display_queue, output_dir, process_functions):
         self.sources = sources
         self.config_dict = config_dict
         self.pose_trackers = pose_trackers
         self.display_queue = display_queue
         self.output_dir = output_dir
+        self.process_functions = process_functions
         self.executor = ThreadPoolExecutor(max_workers=len(sources))
         self.active_streams = set()
-        self.process_functions = process_functions
-        self.frame_ranges = frame_range or []
+        self.frame_ranges = config_dict['project'].get('frame_range', [])
         self.stopped = False
         self.streams, self.outputs, self.out_videos = {}, {}, {}
-
         self.initialize_streams_and_outputs()
 
     def initialize_streams_and_outputs(self):
@@ -331,8 +290,7 @@ class StreamManager:
             stream = GenericStream(source, self.config_dict, self.frame_ranges)
             self.streams[source['id']] = stream
             self.outputs[source['id']] = setup_capture_directories(
-                source['path'], self.output_dir, 'to_images' in self.config_dict['project'].get('save_video', [])
-            )
+                source['path'], self.output_dir, 'to_images' in self.config_dict['project'].get('save_video', []))
             self.out_videos[source['id']] = None
             self.active_streams.add(source['id'])
 
@@ -418,7 +376,7 @@ class StreamManager:
 
 class GenericStream(threading.Thread):
     def __init__(self, source, config_dict, frame_ranges=None):
-        super().__init__()
+        super().__init__(daemon=True)
         self.source = source
         self.input_size = config_dict['pose'].get('input_size', (640, 480))
         self.image_extension = config_dict['pose']['vid_img_extension']
@@ -426,9 +384,8 @@ class GenericStream(threading.Thread):
         self.stopped = False
         self.frame = None
         self.lock = threading.Lock()
-        self.daemon = True
         self.frame_idx = 0
-        self.total_frames = None
+        self.total_frames = 0
         self.cap = None
         self.image_files = []
         self.image_index = 0
@@ -458,35 +415,30 @@ class GenericStream(threading.Thread):
         if not self.cap.isOpened():
             logging.error(f"Cannot open video file {self.source['path']}")
             self.stopped = True
+            return
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.setup_progress_bar()
 
     def load_images(self):
-        image_files = glob.glob(os.path.join(self.source['path'], f'*{self.image_extension}'))
-        self.image_files = sorted(image_files)
+        path_pattern = os.path.join(self.source['path'], f'*{self.image_extension}')
+        self.image_files = sorted(glob.glob(path_pattern))
         self.total_frames = len(self.image_files)
         self.setup_progress_bar()
 
     def process_frame(self):
+        frame = None
         if self.source['type'] == 'webcam':
-            frame = self.read_webcam_frame()
-        elif self.source['type'] == 'video':
-            if not self.frame_ranges or self.frame_idx in self.frame_ranges:
-                ret, frame = self.cap.read()
-                if not ret:
-                    logging.info(f"End of video {self.source['path']}")
-                    self.stopped = True
-                    if self.pbar:
-                        self.pbar.close()
-                    return
-                frame = cv2.resize(frame, self.input_size)
-                with self.lock:
-                    self.frame = frame
-                self.frame_idx += 1
+            ret, frame = self.read_webcam_frame()
+        elif self.source['type'] == 'video' and (not self.frame_ranges or self.frame_idx in self.frame_ranges):
+            ret, frame = self.cap.read()
+            if not ret:
+                logging.info(f"End of video {self.source['path']}")
+                self.stopped = True
                 if self.pbar:
-                    self.pbar.update(1)
-        elif self.source['type'] == 'images':
-            frame = cv2.imread(self.image_files[self.image_index]) if self.image_index < len(self.image_files) else None
+                    self.pbar.close()
+                return
+        elif self.source['type'] == 'images' and self.image_index < len(self.image_files):
+            frame = cv2.imread(self.image_files[self.image_index])
             self.image_index += 1
 
         if frame is not None:
@@ -500,7 +452,7 @@ class GenericStream(threading.Thread):
             time.sleep(0.1)
 
     def open_webcam(self):
-        self.connected = False  # Add this attribute
+        self.connected = False
         try:
             self.cap = cv2.VideoCapture(int(self.source['id']), cv2.CAP_DSHOW)
             if self.cap.isOpened():
