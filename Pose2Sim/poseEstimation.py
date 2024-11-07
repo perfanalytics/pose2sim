@@ -110,28 +110,19 @@ def rtm_estimator(config_dict):
     elif overwrite_pose:
         logging.info('Overwriting previous pose estimation.')
 
-    logging.info('\nEstimating pose...')
+    logging.info('Estimating pose...')
 
     # Prepare list of sources (webcams, videos, image folders)
     sources = []
 
     if vid_img_extension == 'webcam':
-        if not isinstance(webcam_ids, list):
-            webcam_ids = [webcam_ids]
-        for cam_id in webcam_ids:
-            sources.append({'type': 'webcam', 'id': cam_id, 'path': cam_id})
+        sources.extend({'type': 'webcam', 'id': cam_id, 'path': cam_id} for cam_id in (webcam_ids if isinstance(webcam_ids, list) else [webcam_ids]))
     else:
-        # Add video files
         video_paths = [str(f) for f in Path(video_dir).rglob('*' + vid_img_extension) if f.is_file()]
-        for idx, video_path in enumerate(video_paths):
-            sources.append({'type': 'video', 'id': idx, 'path': video_path})
-
-        # Add image folders
+        sources.extend({'type': 'video', 'id': idx, 'path': video_path} for idx, video_path in enumerate(video_paths))
         image_folders = [str(f) for f in Path(video_dir).iterdir() if f.is_dir()]
-        for idx, image_folder in enumerate(image_folders, start=len(sources)):
-            image_files = list(Path(image_folder).glob('*' + vid_img_extension))
-            if image_files:
-                sources.append({'type': 'images', 'id': idx, 'path': image_folder})
+        sources.extend({'type': 'images', 'id': idx, 'path': folder} for idx, folder in enumerate(image_folders, start=len(video_paths)))
+
 
     if not sources:
         raise FileNotFoundError(f'No video files, image folders, or webcams found in {video_dir}.')
@@ -146,14 +137,7 @@ def rtm_estimator(config_dict):
     logging.info(f'Processing sources: {sources}')
 
     # Initialize pose trackers
-    pose_trackers = {}
-    for source in sources:
-        pose_tracker = setup_pose_tracker(
-            config_dict['pose']['det_frequency'],
-            config_dict['pose']['mode'],
-            config_dict['pose']['pose_model']
-        )
-        pose_trackers[source['id']] = pose_tracker
+    pose_trackers = {source['id']: setup_pose_tracker(config_dict['pose']['det_frequency'], config_dict['pose']['mode'], config_dict['pose']['pose_model']) for source in sources}
 
     # Create display queue
     display_queue = queue.Queue()
@@ -172,9 +156,7 @@ def rtm_estimator(config_dict):
         display_thread = None
 
     try:
-        while True:
-            if stream_manager.stopped:
-                break
+        while not stream_manager.stopped:
             if display_thread and display_thread.stopped:
                 break
             time.sleep(0.1)
@@ -207,41 +189,35 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
     Returns:
         tuple: (source_id, img_show, out_vid)
     '''
+
+    logging.info(f"Processing frame {frame_idx} from source {source_id}")
+
     try:
         output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
+        
+        # Perform pose estimation on the frame
+        keypoints, scores = pose_tracker(frame)
 
-        if frame is None:
-            logging.warning(f"No frame received from source {source_id}. Displaying placeholder.")
-            img_show = get_placeholder_frame(config_dict['pose']['input_size'], source_id, 'Disconnected')
-        else:
-            # Perform pose estimation on the frame
-            keypoints, scores = pose_tracker(frame)
+        # Tracking people IDs across frames (if needed)
+        keypoints, scores, _ = track_people(
+            keypoints, scores, multi_person, None, None, pose_tracker
+        )
 
-            # Tracking people IDs across frames (if needed)
-            keypoints, scores, _ = track_people(
-                keypoints, scores, multi_person, None, None, pose_tracker
-            )
+        if 'openpose' in output_format:
+            json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
+            save_to_openpose(json_file_path, keypoints, scores)
 
-            if 'openpose' in output_format:
-                json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
-                save_to_openpose(json_file_path, keypoints, scores)
+        # Draw skeleton on the frame
+        img_show = draw_skeleton(frame.copy(), keypoints, scores, kpt_thr=0.1)
 
-            # Draw skeleton on the frame
-            img_show = draw_skeleton(frame.copy(), keypoints, scores, kpt_thr=0.1)
-
-            # Save video and images
-            if save_video:
-                if out_vid is None:
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                    H, W = img_show.shape[:2]
-                    fps = config_dict['pose'].get('fps', 30)
-                    out_vid = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H))
+        # Save video and images
+        if save_video:
+            if out_vid is not None:
                 out_vid.write(img_show)
-            if save_images:
-                cv2.imwrite(
-                    os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'),
-                    img_show
-                )
+
+        if save_images:
+            cv2.imwrite(os.path.join(img_output_dir, f'{frame_idx:06d}.jpg'), img_show)
+
 
         return source_id, img_show, out_vid
 
@@ -261,10 +237,9 @@ class CombinedDisplayThread(threading.Thread):
     Thread for displaying combined images to avoid thread-safety issues with OpenCV.
     '''
     def __init__(self, sources, input_size, display_queue):
-        super().__init__()
+        super().__init__(daemon=True)
         self.display_queue = display_queue
         self.stopped = False
-        self.daemon = True  # Thread will exit when main program exits
         self.sources = sources
         self.input_size = input_size
         self.window_name = "Combined Feeds"
@@ -280,30 +255,22 @@ class CombinedDisplayThread(threading.Thread):
         self.source_ids = [source['id'] for source in self.sources]
 
     def run(self):
-        try:
-            while not self.stopped:
-                try:
-                    frames_dict = self.display_queue.get(timeout=0.1)
-                    for source_id in self.source_ids:
-                        frame = frames_dict.get(source_id)
-                        if frame is not None:
-                            self.frames[source_id] = frame
-                        else:
-                            # If frame is None or missing, display placeholder
-                            self.frames[source_id] = get_placeholder_frame(self.input_size, source_id, 'Disconnected')
-                    combined_image = self.combine_frames()
-                    if combined_image is not None:
-                        cv2.imshow(self.window_name, combined_image)
-                        if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
-                            logging.info("Display window closed by user.")
-                            self.stopped = True
-                            break
-                    else:
-                        time.sleep(0.01)
-                except queue.Empty:
-                    continue
-        finally:
-            cv2.destroyAllWindows()
+        while not self.stopped:
+            try:
+                frames_dict = self.display_queue.get(timeout=0.1)
+                for source_id in self.source_ids:
+                    self.frames[source_id] = frames_dict.get(source_id, self.frames[source_id])
+                self.display_combined_image()
+            except queue.Empty:
+                continue
+
+    def display_combined_image(self):
+        combined_image = self.combine_frames()
+        if combined_image is not None:
+            cv2.imshow(self.window_name, combined_image)
+            if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
+                logging.info("Display window closed by user.")
+                self.stopped = True
 
     def combine_frames(self):
         # Use the consistent order of source IDs
@@ -324,21 +291,12 @@ class CombinedDisplayThread(threading.Thread):
                 resized_frame = frame
             resized_frames.append(resized_frame)
 
-        # Combine frames into a grid
         rows = []
         for i in range(0, len(resized_frames), self.grid_size[1]):
             row_frames = resized_frames[i:i + self.grid_size[1]]
-            if len(row_frames) < self.grid_size[1]:
-                row_frames.extend([self.black_frame] * (self.grid_size[1] - len(row_frames)))
-            # Ensure all frames in the row have the same height
-            min_height = min(frame.shape[0] for frame in row_frames)
-            row_frames = [cv2.resize(frame, (frame.shape[1], min_height)) for frame in row_frames]
             rows.append(np.hstack(row_frames))
-        # Ensure all rows have the same width
-        min_width = min(row.shape[1] for row in rows)
-        rows = [cv2.resize(row, (min_width, row.shape[0])) for row in rows]
-        combined_image = np.vstack(rows)
-        return combined_image
+
+        return np.vstack(rows)
 
     def calculate_grid_size(self, num_sources):
         cols = int(np.ceil(np.sqrt(num_sources)))
@@ -348,6 +306,10 @@ class CombinedDisplayThread(threading.Thread):
     def stop(self):
         self.stopped = True
 
+    def __del__(self):
+        cv2.destroyAllWindows()
+
+
 class StreamManager:
     def __init__(self, sources, config_dict, pose_trackers, display_queue, output_dir, frame_range, process_functions):
         self.sources = sources
@@ -355,50 +317,67 @@ class StreamManager:
         self.pose_trackers = pose_trackers
         self.display_queue = display_queue
         self.output_dir = output_dir
-        self.stopped = False
         self.executor = ThreadPoolExecutor(max_workers=len(sources))
-        self.frame_ranges = frame_range if frame_range else []
         self.active_streams = set()
         self.process_functions = process_functions
+        self.frame_ranges = frame_range or []
+        self.stopped = False
+        self.streams, self.outputs, self.out_videos = {}, {}, {}
 
-        self.streams = {}
-        self.outputs = {}
-        self.out_videos = {}
+        self.initialize_streams_and_outputs()
 
-        # Initialize streams and outputs
-        for source in sources:
-            stream = GenericStream(source, config_dict, self.frame_ranges)
+    def initialize_streams_and_outputs(self):
+        for source in self.sources:
+            stream = GenericStream(source, self.config_dict, self.frame_ranges)
             self.streams[source['id']] = stream
             self.outputs[source['id']] = setup_capture_directories(
-                source['path'], self.output_dir, 'to_images' in config_dict['project'].get('save_video', [])
+                source['path'], self.output_dir, 'to_images' in self.config_dict['project'].get('save_video', [])
             )
-            self.out_videos[source['id']] = None  # Placeholder for video writer
+            self.out_videos[source['id']] = None
             self.active_streams.add(source['id'])
 
     def start(self):
-        # Start all streams
         for stream in self.streams.values():
             stream.start()
-
-        # Start processing loop
         threading.Thread(target=self.process_streams, daemon=True).start()
 
     def process_streams(self):
+        logging.info("Début du traitement des flux")
         while not self.stopped and self.active_streams:
             frames = {}
             for source_id, stream in self.streams.items():
-                frame = stream.read()
-                frames[source_id] = frame  # frame can be None if not available
+                if not stream.stopped:
+                    frame = stream.read()
+                    if frame is not None:
+                        frames[source_id] = frame
+                        logging.info(f"Frame {stream.frame_idx} lue depuis la source {source_id}")
+                    else:
+                        logging.info(f"Aucune frame lue depuis la source {source_id}")
+                else:
+                    logging.info(f"Le flux {source_id} est arrêté")
+                    if source_id in self.active_streams:
+                        self.active_streams.discard(source_id)
+                        logging.info(f"Flux {source_id} retiré des flux actifs.")
 
-            # Process frames in parallel
-            futures = {}
-            for source_id in self.active_streams:
-                frame = frames.get(source_id)
-                if frame is not None:
-                    process_function = self.process_functions.get(source_id)
-                    futures[self.executor.submit(
-                        process_function,
-                        self.config_dict,
+            if not frames:
+                if not self.active_streams:
+                    logging.info("Tous les flux ont terminé le traitement.")
+                    self.stopped = True
+                    break
+                else:
+                    logging.info("Aucune frame disponible actuellement, attente...")
+                    time.sleep(0.1)
+                    continue
+
+            logging.info(f"Soumission de {len(frames)} frames pour le traitement")
+            futures = {self.executor.submit(self.process_frame, source_id, frame): source_id
+                    for source_id, frame in frames.items() if frame is not None}
+
+            self.handle_future_results(futures)
+
+    def process_frame(self, source_id, frame):
+        process_function = self.process_functions.get(source_id)
+        return process_function(self.config_dict,
                         frame,
                         source_id,
                         self.streams[source_id].frame_idx,
@@ -409,57 +388,41 @@ class StreamManager:
                         'to_images' in self.config_dict['project'].get('save_video', []),
                         self.config_dict['pose'].get('show_realtime_results', False),
                         self.out_videos.get(source_id),
-                        self.config_dict['pose'].get('output_format', 'openpose')
-                    )] = source_id
+                        self.config_dict['pose'].get('output_format', 'openpose'))
 
-            if not futures:
-                if not any(stream.source['type'] == 'webcam' for stream in self.streams.values()):
-                    # No frames to process and no webcams running, stop processing
-                    logging.info("All streams have finished processing.")
-                    self.stopped = True
-                    break
-                else:
-                    # Wait for frames from webcams
-                    time.sleep(0.1)
-                    continue
+    def handle_future_results(self, futures):
+        for future in futures:
+            source_id = futures[future]
+            try:
+                result = future.result()
+                source_id, processed_frame, out_vid = result
+                self.display_queue.put({source_id: processed_frame})
+            except Exception as e:
+                logging.error(f"Error processing frame from source {source_id}: {e}")
 
-            processed_frames = {}
-            for future in futures:
-                source_id = futures[future]
-                try:
-                    source_id, img_show, out_vid = future.result()
-                    processed_frames[source_id] = img_show
-                    # Update out_videos dictionary with the video writer returned from process_single_frame
-                    if out_vid is not None:
-                        self.out_videos[source_id] = out_vid
-                except Exception as e:
-                    logging.error(f"Error processing frame from source {source_id}: {e}")
-                    processed_frames[source_id] = get_placeholder_frame(self.config_dict['pose']['input_size'], source_id, 'Error')
-
-            # Put processed frames into display queue
-            if processed_frames:
-                self.display_queue.put(processed_frames)
-            else:
-                # Sleep briefly to prevent high CPU usage when no frames are available
-                time.sleep(0.01)
+    def initialize_video_writer(self, img_show, source_id):
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        H, W = img_show.shape[:2]
+        fps = self.config_dict['pose'].get('fps', 30)
+        output_video_path = f"{self.outputs[source_id]}/{source_id}_output.mp4"
+        return cv2.VideoWriter(output_video_path, fourcc, fps, (W, H))
 
     def stop(self):
         self.stopped = True
         for stream in self.streams.values():
             stream.stop()
         self.executor.shutdown()
-        # Release video writers
         for out_vid in self.out_videos.values():
             if out_vid is not None:
                 out_vid.release()
 
 class GenericStream(threading.Thread):
-    def __init__(self, source, config_dict, frame_ranges=[]):
+    def __init__(self, source, config_dict, frame_ranges=None):
         super().__init__()
         self.source = source
         self.input_size = config_dict['pose'].get('input_size', (640, 480))
         self.image_extension = config_dict['pose']['vid_img_extension']
-        self.frame_ranges = frame_ranges if frame_ranges else None
+        self.frame_ranges = frame_ranges
         self.stopped = False
         self.frame = None
         self.lock = threading.Lock()
@@ -472,80 +435,69 @@ class GenericStream(threading.Thread):
         self.pbar = None
 
     def run(self):
-        source_type = self.source['type']
-        if source_type == 'webcam':
-            self.open_webcam()
-            time.sleep(1)  # Give some time for the webcam to initialize
-        elif source_type == 'video':
-            self.cap = cv2.VideoCapture(self.source['path'])
-            if not self.cap.isOpened():
-                logging.error(f"Cannot open video file {self.source['path']}")
-                self.stopped = True
-                return
-            self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            self.setup_progress_bar()
-        elif source_type == 'images':
-            image_files = glob.glob(os.path.join(self.source['path'], f'*{self.image_extension}'))
-            self.image_files = sorted(image_files)
-            self.total_frames = len(self.image_files)
-            self.setup_progress_bar()
+        if self.source['type'] == 'webcam':
+            self.setup_webcam()
+        elif self.source['type'] == 'video':
+            self.open_video()
+        elif self.source['type'] == 'images':
+            self.load_images()
         else:
-            logging.error(f"Unknown source type: {source_type}")
+            logging.error(f"Unknown source type: {self.source['type']}")
             self.stopped = True
             return
 
         while not self.stopped:
-            frame = None
-            if source_type == 'webcam':
-                frame = self.read_webcam_frame()
-                if frame is None:
-                    with self.lock:
-                        self.frame = None
-                    time.sleep(0.1)
-                    continue
-            elif source_type == 'video':
-                if self.frame_ranges is not None and self.frame_idx not in self.frame_ranges:
-                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.frame_idx + 1)
-                    self.frame_idx += 1
-                    continue
-                ret, frame = self.cap.read()
-                if not ret or frame is None:
-                    self.stopped = True
-                    if self.pbar is not None:
-                        self.pbar.close()
-                    break
-                frame = cv2.resize(frame, self.input_size)
-                with self.lock:
-                    self.frame = frame.copy()
-                if self.pbar is not None:
-                    self.pbar.update(1)
-                self.frame_idx += 1 
-            elif source_type == 'images':
-                if self.frame_index >= len(self.image_files):
-                    self.stopped = True
-                    if self.pbar is not None:
-                        self.pbar.close()
-                    break
-                if self.frame_ranges is not None and len(self.frame_ranges) > 0 and self.frame_idx not in self.frame_ranges:
-                    self.frame_idx += 1
-                    self.frame_index += 1
-                    continue
-                frame = cv2.imread(self.image_files[self.frame_index])
-                self.frame_index += 1
-            else:
-                frame = None
+            self.process_frame()
 
-            if frame is not None:
+    def setup_webcam(self):
+        self.open_webcam()
+        time.sleep(1)  # Give time for the webcam to initialize
+
+    def open_video(self):
+        self.cap = cv2.VideoCapture(self.source['path'])
+        if not self.cap.isOpened():
+            logging.error(f"Cannot open video file {self.source['path']}")
+            self.stopped = True
+        self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.setup_progress_bar()
+
+    def load_images(self):
+        image_files = glob.glob(os.path.join(self.source['path'], f'*{self.image_extension}'))
+        self.image_files = sorted(image_files)
+        self.total_frames = len(self.image_files)
+        self.setup_progress_bar()
+
+    def process_frame(self):
+        if self.source['type'] == 'webcam':
+            frame = self.read_webcam_frame()
+        elif self.source['type'] == 'video':
+            if not self.frame_ranges or self.frame_idx in self.frame_ranges:
+                ret, frame = self.cap.read()
+                if not ret:
+                    logging.info(f"End of video {self.source['path']}")
+                    self.stopped = True
+                    if self.pbar:
+                        self.pbar.close()
+                    return
                 frame = cv2.resize(frame, self.input_size)
                 with self.lock:
-                    self.frame = frame.copy()
+                    self.frame = frame
                 self.frame_idx += 1
-                if self.pbar is not None:
+                if self.pbar:
                     self.pbar.update(1)
-            else:
-                with self.lock:
-                    self.frame = None
-                time.sleep(0.1)
+        elif self.source['type'] == 'images':
+            frame = cv2.imread(self.image_files[self.image_index]) if self.image_index < len(self.image_files) else None
+            self.image_index += 1
+
+        if frame is not None:
+            frame = cv2.resize(frame, self.input_size)
+            with self.lock:
+                self.frame = frame
+            self.frame_idx += 1
+            if self.pbar:
+                self.pbar.update(1)
+        else:
+            time.sleep(0.1)
 
     def open_webcam(self):
         self.connected = False  # Add this attribute
@@ -589,12 +541,12 @@ class GenericStream(threading.Thread):
         self.stopped = True
         if self.cap:
             self.cap.release()
-        if self.pbar is not None:
+        if self.pbar:
             self.pbar.close()
 
     def setup_progress_bar(self):
-        if self.total_frames is not None:
-            self.pbar = tqdm(total=self.total_frames, desc=f'Processing {os.path.basename(str(self.source["path"]))}', position=self.source['id'], leave=False)
+        self.pbar = tqdm(total=self.total_frames, desc=f'Processing {os.path.basename(str(self.source["path"]))}', position=self.source['id'])
+
 
 def setup_capture_directories(source_path, output_dir, save_images):
     '''
