@@ -305,11 +305,11 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
         file_name = coords_df.index[i]
         w, h = img_size
         # id from concatenation of numbers from path
-        file_id = ''.join(re.findall(r'\d+', str(file_name)))
+        file_id = int(''.join(re.findall(r'\d+', str(file_name))))
 
         labels2d_json_data['images'] += [{'file_name': file_name, 
-                                            'height': str(h), 
-                                            'width': str(w), 
+                                            'height': h, 
+                                            'width': w, 
                                             'id': file_id, 
                                             'license': 1}]
         
