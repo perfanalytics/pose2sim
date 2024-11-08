@@ -40,7 +40,6 @@ import cv2
 import time
 import threading
 import queue
-import concurrent.futures
 import numpy as np
 from datetime import datetime
 from pathlib import Path
@@ -49,10 +48,8 @@ from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 
 from rtmlib import draw_skeleton
-from Pose2Sim.common import natural_sort_key
-from Sports2D.Utilities.config import setup_pose_tracker, setup_video_capture, setup_capture_directories, process_video_frames
-from Sports2D.Utilities.video_management import display_realtime_results, finalize_video_processing, track_people
-from Sports2D.Utilities.utilities import read_frame
+from Sports2D.Utilities.config import setup_pose_tracker, setup_capture_directories
+from Sports2D.Utilities.video_management import track_people
 
 
 ## AUTHORSHIP INFORMATION
@@ -163,6 +160,7 @@ def rtm_estimator(config_dict):
             display_thread.stop()
             display_thread.join()
 
+
 def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, out_vid, output_format):
     '''
     Processes a single frame from a source.
@@ -212,7 +210,6 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
         cv2.imwrite(os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'), img_show)
 
     return source_id, img_show, out_vid
-
 
 
 class CombinedDisplayThread(threading.Thread):
@@ -374,6 +371,7 @@ class StreamManager:
             if out_vid is not None:
                 out_vid.release()
 
+
 class GenericStream(threading.Thread):
     def __init__(self, source, config_dict, frame_ranges=None):
         super().__init__(daemon=True)
@@ -428,7 +426,7 @@ class GenericStream(threading.Thread):
     def process_frame(self):
         frame = None
         if self.source['type'] == 'webcam':
-            ret, frame = self.read_webcam_frame()
+            frame = self.read_webcam_frame()
         elif self.source['type'] == 'video' and (not self.frame_ranges or self.frame_idx in self.frame_ranges):
             ret, frame = self.cap.read()
             if not ret:
