@@ -44,8 +44,7 @@ import numpy as np
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
-from queue import Queue
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from rtmlib import draw_skeleton
 from Sports2D.Utilities.config import setup_pose_tracker, setup_capture_directories
@@ -278,9 +277,9 @@ class StreamManager:
         self.executor = ThreadPoolExecutor(max_workers=len(sources))
         self.active_streams = set()
         self.frame_ranges = config_dict['project'].get('frame_range', [])
-        self.stopped = False
         self.streams, self.outputs, self.out_videos = {}, {}, {}
         self.initialize_streams_and_outputs()
+        self.stopped = False
 
     def initialize_streams_and_outputs(self):
         for source in self.sources:
@@ -292,43 +291,22 @@ class StreamManager:
             self.active_streams.add(source['id'])
 
     def start(self):
-        for stream in self.streams.values():
-            stream.start()
+        for source in self.sources:
+            self.streams[source['id']].start()
         threading.Thread(target=self.process_streams, daemon=True).start()
 
     def process_streams(self):
         logging.info("Début du traitement des flux")
-        while not self.stopped and self.active_streams:
-            frames = {}
-            for source_id, stream in self.streams.items():
-                if not stream.stopped:
-                    frame = stream.read()
-                    if frame is not None:
-                        frames[source_id] = frame
-                        logging.info(f"Frame {stream.frame_idx} lue depuis la source {source_id}")
-                    else:
-                        logging.info(f"Aucune frame lue depuis la source {source_id}")
-                else:
-                    logging.info(f"Le flux {source_id} est arrêté")
-                    if source_id in self.active_streams:
-                        self.active_streams.discard(source_id)
-                        logging.info(f"Flux {source_id} retiré des flux actifs.")
+        while not self.stopped and any(stream.stopped is False for stream in self.streams.values()):
+            frames = {source_id: stream.read() for source_id, stream in self.streams.items() if not stream.stopped}
 
-            if not frames:
-                if not self.active_streams:
-                    logging.info("Tous les flux ont terminé le traitement.")
-                    self.stopped = True
-                    break
-                else:
-                    logging.info("Aucune frame disponible actuellement, attente...")
-                    time.sleep(0.1)
-                    continue
-
-            logging.info(f"Soumission de {len(frames)} frames pour le traitement")
-            futures = {self.executor.submit(self.process_frame, source_id, frame): source_id
-                    for source_id, frame in frames.items() if frame is not None}
-
-            self.handle_future_results(futures)
+            if frames:
+                futures = {self.executor.submit(self.process_frame, source_id, frame): source_id
+                           for source_id, frame in frames.items() if frame is not None}
+                self.handle_future_results(futures)
+            else:
+                logging.info("Aucune frame disponible actuellement, attente...")
+                time.sleep(0.1)
 
     def process_frame(self, source_id, frame):
         process_function = self.process_functions.get(source_id)
@@ -346,7 +324,7 @@ class StreamManager:
                         self.config_dict['pose'].get('output_format', 'openpose'))
 
     def handle_future_results(self, futures):
-        for future in futures:
+        for future in as_completed(futures):
             source_id = futures[future]
             try:
                 result = future.result()
@@ -380,7 +358,7 @@ class GenericStream(threading.Thread):
         self.image_extension = config_dict['pose']['vid_img_extension']
         self.frame_ranges = frame_ranges
         self.stopped = False
-        self.frame = None
+        self.frame_queue = queue.Queue()
         self.lock = threading.Lock()
         self.frame_idx = 0
         self.total_frames = 0
@@ -402,7 +380,15 @@ class GenericStream(threading.Thread):
             return
 
         while not self.stopped:
-            self.process_frame()
+            frame = self.capture_frame()
+            if frame is not None:
+                frame = cv2.resize(frame, self.input_size)
+                self.frame_queue.put(frame)
+                self.frame_idx += 1
+                if self.pbar:
+                    self.pbar.update(1)
+            else:
+                time.sleep(0.1)
 
     def setup_webcam(self):
         self.open_webcam()
@@ -423,7 +409,7 @@ class GenericStream(threading.Thread):
         self.total_frames = len(self.image_files)
         self.setup_progress_bar()
 
-    def process_frame(self):
+    def capture_frame(self):
         frame = None
         if self.source['type'] == 'webcam':
             frame = self.read_webcam_frame()
@@ -439,15 +425,10 @@ class GenericStream(threading.Thread):
             frame = cv2.imread(self.image_files[self.image_index])
             self.image_index += 1
 
-        if frame is not None:
-            frame = cv2.resize(frame, self.input_size)
-            with self.lock:
-                self.frame = frame
-            self.frame_idx += 1
-            if self.pbar:
-                self.pbar.update(1)
         else:
             time.sleep(0.1)
+
+        return frame
 
     def open_webcam(self):
         self.connected = False
@@ -484,8 +465,10 @@ class GenericStream(threading.Thread):
         return frame
 
     def read(self):
-        with self.lock:
-            return self.frame.copy() if self.frame is not None else None
+        try:
+            return self.frame_queue.get(block=False)
+        except queue.Empty:
+            return None
 
     def stop(self):
         self.stopped = True
