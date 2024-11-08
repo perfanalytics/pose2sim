@@ -329,15 +329,15 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
             x_coords = coords.loc[coords.index.get_level_values(3)=='x']
             y_coords = coords.loc[coords.index.get_level_values(3)=='y']
             min_x, min_y, max_x, max_y = np.nanmin(x_coords), np.nanmin(y_coords), np.nanmax(x_coords), np.nanmax(y_coords)
-            bbox_width = max_x - min_x
-            bbox_height = max_y - min_y
+            bbox_width = np.round(max_x - min_x, decimals=1)
+            bbox_height = np.round(max_y - min_y, decimals=1)
             # bbox = [min_x, min_y, max_x, max_y]
             bbox = [min_x, min_y, bbox_width, bbox_height] # coco format
 
             id = person_ids[p]
             category_id = 1
             segmentation = [[min_x, min_y, min_x, max_y, max_x, max_y, max_x, min_y]] # no segmentation
-            area = bbox_width * bbox_height
+            area = np.round(bbox_width * bbox_height, decimals=1)
             iscrowd = 0 # each annotation represents one single person
             
             if not np.isnan(bbox).any():
