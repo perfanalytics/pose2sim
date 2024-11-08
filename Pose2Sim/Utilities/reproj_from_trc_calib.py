@@ -327,19 +327,18 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
             x_coords = coords.loc[coords.index.get_level_values(3)=='x']
             y_coords = coords.loc[coords.index.get_level_values(3)=='y']
             min_x, min_y, max_x, max_y = np.nanmin(x_coords), np.nanmin(y_coords), np.nanmax(x_coords), np.nanmax(y_coords)
-            bbox = [min_x, min_y, max_x, max_y]
-            # bbox_width = max_x - min_x
-            # bbox_height = max_y - min_y
-            # bbox = [min_x, min_y, bbox_width, bbox_height]
-
+            bbox_width = max_x - min_x
+            bbox_height = max_y - min_y
+            
             # num_keypoints, id, category_id
             num_keypoints = len(marker_list)
+            # bbox = [min_x, min_y, max_x, max_y]
+            bbox = [min_x, min_y, bbox_width, bbox_height] # coco format
             id = person_ids[p]
             category_id = 1
-            # segmentation and area not filled, and each annotation represents one single person
-            segmentation = []
-            area = 0
-            iscrowd = 0 # 1 if len(persons)>1 else 0
+            segmentation = [] # no segmentation
+            area = bbox_width * bbox_height
+            iscrowd = 0 # each annotation represents one single person
             
             if not np.isnan(bbox).any():
                 labels2d_json_data['annotations'] += [{ 'keypoints': coords_list, 
