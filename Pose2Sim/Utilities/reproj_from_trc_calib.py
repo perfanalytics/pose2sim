@@ -446,8 +446,8 @@ def reproj_from_trc_calib_func(**args):
     
     # Replace by nan when reprojection out of image
     for cam in range(len(P_all_frame)):
-        x_valid = data_proj[cam].iloc[:,::2] < calib_params_size[cam][0]
-        y_valid = data_proj[cam].iloc[:,1::2] < calib_params_size[cam][1]
+        x_valid = (data_proj[cam].iloc[:, ::2] >= 0) & (data_proj[cam].iloc[:, ::2] < calib_params_size[cam][0])
+        y_valid = (data_proj[cam].iloc[:, 1::2] >= 0) & (data_proj[cam].iloc[:, 1::2] < calib_params_size[cam][1])
         data_proj[cam].iloc[:, ::2] = data_proj[cam].iloc[:, ::2].where(x_valid, np.nan)
         data_proj[cam].iloc[:, ::2] = np.where(y_valid==False, np.nan, data_proj[cam].iloc[:, ::2])
         data_proj[cam].iloc[:, 1::2] = data_proj[cam].iloc[:, 1::2].where(y_valid, np.nan)
