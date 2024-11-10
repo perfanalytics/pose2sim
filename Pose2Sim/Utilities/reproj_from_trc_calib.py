@@ -334,7 +334,7 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
             # bbox = [min_x, min_y, max_x, max_y]
             bbox = [min_x, min_y, bbox_width, bbox_height] # coco format
 
-            id = person_ids[p]
+            person_id = person_ids[p]
             category_id = 1
             segmentation = [[min_x, min_y, min_x, max_y, max_x, max_y, max_x, min_y]] # no segmentation
             area = np.round(bbox_width * bbox_height, decimals=1)
@@ -344,7 +344,7 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
                 labels2d_json_data['annotations'] += [{ 'keypoints': coords_list, 
                                                         'num_keypoints': num_keypoints, 
                                                         'bbox': bbox, 
-                                                        'id': id, 
+                                                        'id': person_id, 
                                                         'image_id': file_id, 
                                                         'category_id': category_id,
                                                         'segmentation': segmentation,
