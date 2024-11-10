@@ -33,7 +33,7 @@ import toml
 import cv2
 import json
 import re
-from anytree import Node, RenderTree
+import hashlib
 from copy import deepcopy
 import argparse
 
@@ -56,11 +56,16 @@ biocvplus_markers = ['ACROM_R', 'ACROM_L', 'C7', 'T10', 'CLAV', 'XIP_PROC', 'UA_
 
 
 ## FUNCTIONS
-def str_to_id(string):
+def str_to_id(string, length=8):
     '''
     Convert a string to an integer id
     '''
-    return ''.join([str(abs(ord(char) - 96)) for char in string])
+
+    # return ''.join([str(abs(ord(char) - 96)) for char in string])
+
+    hash_int = int(hashlib.md5(string.encode()).hexdigest(), 16) 
+    return hash_int % (10 ** length)  # Trim to desired length
+
 
 
 def computeP(calib_file, undistort=False):
@@ -305,7 +310,8 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
         file_name = coords_df.index[i]
         w, h = img_size
         # id from concatenation of numbers from path
-        file_id = int(''.join(re.findall(r'\d+', str(file_name))))
+        # file_id = int(''.join(re.findall(r'\d+', str(file_name))))
+        file_id = int(hashlib.md5(file_name.encode()).hexdigest(), 16) % (10**12)  # Keep only 12 digits
 
         labels2d_json_data['images'] += [{'file_name': file_name, 
                                             'height': h, 
