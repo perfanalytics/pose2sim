@@ -67,7 +67,6 @@ def str_to_id(string, length=8):
     return hash_int % (10 ** length)  # Trim to desired length
 
 
-
 def computeP(calib_file, undistort=False):
     '''
     Compute projection matrices from toml calibration file.
@@ -288,7 +287,7 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
 
     # transform first name in integer, and append other numbers from persons
     persons = list(set(['_'.join(item.split('_')[:5]) for item in coords_df.columns.levels[1]]))
-    person_ids = [str_to_id(p.split('_')[1]) + ''.join(p.split('_')[3:]) if len(p.split('_'))>=3 
+    person_ids = [int(str(str_to_id(p.split('_')[1])) + ''.join(p.split('_')[3:])) if len(p.split('_'))>=3 
                   else str_to_id(p.split('_')[0]) 
                   for p in persons]
     
