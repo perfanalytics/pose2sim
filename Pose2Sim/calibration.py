@@ -610,7 +610,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
         img = cv2.imread(str(img_path))
         objpoints = np.array(objpoints)
         ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
-                                    None, None, flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_PRINCIPAL_POINT))
+                                    None, None, flags=(cv2.CALIB_FIX_K3))# + cv2.CALIB_FIX_PRINCIPAL_POINT))
         h, w = [np.float32(i) for i in img.shape[:-1]]
         ret.append(ret_cam)
         C.append(cam)
@@ -709,8 +709,9 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             
             # Calculate extrinsics
             mtx, dist = np.array(K[i]), np.array(D[i])
-            _, r, t = cv2.solvePnP(np.array(objp), imgp, mtx, dist)
+            _, r, t = cv2.solvePnP(np.array(objp)*1000, imgp, mtx, dist)
             r, t = r.flatten(), t.flatten()
+            t /= 1000 
 
             # Projection of object points to image plane
             # # Former way, distortions used to be ignored
