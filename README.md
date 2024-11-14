@@ -152,6 +152,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
 
    Finally, install ONNX Runtime with GPU support:
    ```
+   pip uninstall onnxruntime
    pip install onnxruntime-gpu
    ```
 
@@ -461,6 +462,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
   - Export calibration to `.qca.txt` within QTM.
   - Copy it in the `Calibration` Pose2Sim folder.
   - set `convert_from` to 'qualisys' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
+  - If you set your cameras vertically and the videos are rendered sideways, you need to rotate them and the calibration file before running pose estimation. [Use this script](https://github.com/perfanalytics/pose2sim/issues/136#issuecomment-2398110061).
 - **From [Optitrack](https://optitrack.com/):** Exporting calibration will be available in Motive 3.2. In the meantime:
   - Calculate intrinsics with a board (see next section).
   - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28).
