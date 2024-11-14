@@ -182,8 +182,6 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
         tuple: (source_id, img_show, out_vid)
     '''
 
-    logging.info(f"Processing frame {frame_idx} from source {source_id}")
-
     output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
         
     # Perform pose estimation on the frame
@@ -274,7 +272,7 @@ class StreamManager:
         self.display_queue = display_queue
         self.output_dir = output_dir
         self.process_functions = process_functions
-        self.executor = ThreadPoolExecutor(max_workers=len(sources))
+        self.executor = ThreadPoolExecutor(max_workers=len(sources) * 2)
         self.active_streams = set()
         self.frame_ranges = config_dict['project'].get('frame_range', [])
         self.streams, self.outputs, self.out_videos = {}, {}, {}
@@ -309,6 +307,7 @@ class StreamManager:
                 time.sleep(0.1)
 
     def process_frame(self, source_id, frame):
+        logging.info(f"Processing frame {self.streams[source_id].frame_idx} from source {source_id}")
         process_function = self.process_functions.get(source_id)
         return process_function(self.config_dict,
                         frame,
@@ -413,20 +412,22 @@ class GenericStream(threading.Thread):
         frame = None
         if self.source['type'] == 'webcam':
             frame = self.read_webcam_frame()
-        elif self.source['type'] == 'video' and (not self.frame_ranges or self.frame_idx in self.frame_ranges):
+        elif self.source['type'] == 'video':
+            if self.frame_ranges and self.frame_idx not in self.frame_ranges:
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.frame_idx + 1)
+                self.frame_idx += 1
+                return None
+
             ret, frame = self.cap.read()
             if not ret:
                 logging.info(f"End of video {self.source['path']}")
                 self.stopped = True
                 if self.pbar:
                     self.pbar.close()
-                return
+                return None
         elif self.source['type'] == 'images' and self.image_index < len(self.image_files):
             frame = cv2.imread(self.image_files[self.image_index])
             self.image_index += 1
-
-        else:
-            time.sleep(0.1)
 
         return frame
 
@@ -466,7 +467,7 @@ class GenericStream(threading.Thread):
 
     def read(self):
         try:
-            return self.frame_queue.get(block=False)
+            return self.frame_queue.get(timeout=0.1)
         except queue.Empty:
             return None
 
