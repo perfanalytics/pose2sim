@@ -152,6 +152,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
 
    Finally, install ONNX Runtime with GPU support:
    ```
+   pip uninstall onnxruntime
    pip install onnxruntime-gpu
    ```
 
