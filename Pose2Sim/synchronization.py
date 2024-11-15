@@ -50,7 +50,7 @@ from anytree.importer import DictImporter
 import logging
 
 from Pose2Sim.common import sort_stringlist_by_last_number, bounding_boxes
-from Pose2Sim.skeletons import *
+from Sports2D.Utilities.skeletons import *
 
 
 ## AUTHORSHIP INFORMATION
@@ -586,7 +586,7 @@ def synchronize_cams_all(config_dict):
     # Get parameters from Config.toml
     project_dir = config_dict.get('project').get('project_dir')
     pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
-    pose_model = config_dict.get('pose').get('pose_model')
+    pose_model = config_dict.get('pose').get('pose_model').upper()
     multi_person = config_dict.get('project').get('multi_person')
     fps =  config_dict.get('project').get('frame_rate')
     frame_range = config_dict.get('project').get('frame_range')

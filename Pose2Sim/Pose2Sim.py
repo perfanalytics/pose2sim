@@ -52,6 +52,8 @@ from copy import deepcopy
 import logging, logging.handlers
 from datetime import datetime
 
+from Sports2D.Utilities.config import setup_logging
+
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -65,15 +67,6 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def setup_logging(session_dir):
-    '''
-    Create logging file and stream handlers
-    '''
-
-    logging.basicConfig(format='%(message)s', level=logging.INFO,
-        handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(session_dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
-
-
 def recursive_update(dict_to_update, dict_with_new_values):
     '''
     Update nested dictionaries without overwriting existing keys in any level of nesting
