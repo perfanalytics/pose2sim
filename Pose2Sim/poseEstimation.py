@@ -274,7 +274,7 @@ class StreamManager:
         self.process_functions = process_functions
         self.executor = ThreadPoolExecutor(max_workers=len(sources) * 2)
         self.active_streams = set()
-        self.frame_ranges = config_dict['project'].get('frame_range', [])
+        self.frame_ranges = self.parse_frame_ranges(config_dict['project'].get('frame_range', []))
         self.streams, self.outputs, self.out_videos = {}, {}, {}
         self.initialize_streams_and_outputs()
         self.stopped = False
@@ -287,6 +287,18 @@ class StreamManager:
                 source['path'], self.output_dir, 'to_images' in self.config_dict['project'].get('save_video', []))
             self.out_videos[source['id']] = None
             self.active_streams.add(source['id'])
+
+    def parse_frame_ranges(self, frame_ranges):
+        if not frame_ranges:
+            return None
+        elif isinstance(frame_ranges, list):
+            if len(frame_ranges) == 2 and all(isinstance(x, int) for x in frame_ranges):
+                start_frame, end_frame = frame_ranges
+                return set(range(start_frame, end_frame + 1))
+            else:
+                return set(frame_ranges)
+        else:
+            return None
 
     def start(self):
         for source in self.sources:
@@ -316,7 +328,7 @@ class StreamManager:
         return process_function(self.config_dict,
                         frame,
                         source_id,
-                        self.streams[source_id].frame_idx,
+                        frame_idx,
                         self.outputs[source_id],
                         self.pose_trackers[source_id],
                         self.config_dict['project'].get('multi_person'),
@@ -556,8 +568,5 @@ def save_to_openpose(json_file_path, keypoints, scores):
     json_output = {"version": 1.3, "people": detections}
 
     # Save JSON output for each frame
-    json_output_dir = os.path.abspath(os.path.join(json_file_path, '..'))
-    if not os.path.isdir(json_output_dir):
-        os.makedirs(json_output_dir)
     with open(json_file_path, 'w') as json_file:
         json.dump(json_output, json_file)
