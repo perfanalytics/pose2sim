@@ -40,16 +40,16 @@ import cv2
 import time
 import threading
 import queue
+
 import numpy as np
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from rtmlib import draw_skeleton
-from Sports2D.Utilities.config import setup_pose_tracker, setup_capture_directories
+from Sports2D.Utilities.config import determine_tracker_settings, setup_pose_tracker
 from Sports2D.Utilities.video_management import track_people
-
 
 ## AUTHORSHIP INFORMATION
 __author__ = "HunMin Kim, David Pagnon"
@@ -129,14 +129,13 @@ def rtm_estimator(config_dict):
 
     logging.info(f'Processing sources: {sources}')
 
-    # Initialize pose trackers
-    pose_trackers = {source['id']: setup_pose_tracker(config_dict['pose']['det_frequency'], config_dict['pose']['mode'], config_dict['pose']['pose_model']) for source in sources}
-
     # Create display queue
     display_queue = queue.Queue()
 
+    pose_tracker_settings = determine_tracker_settings(config_dict)
+
     # Initialize streams
-    stream_manager = StreamManager(sources, config_dict, pose_trackers, display_queue, output_dir, process_functions)
+    stream_manager = StreamManager(sources, config_dict, display_queue, output_dir, process_functions, pose_tracker_settings)
     stream_manager.start()
 
     # Start display thread only if show_realtime_results is True
@@ -158,9 +157,10 @@ def rtm_estimator(config_dict):
         if display_thread:
             display_thread.stop()
             display_thread.join()
+        logging.shutdown()
 
 
-def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, out_vid, output_format):
+def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, output_format, out_vid):
     '''
     Processes a single frame from a source.
 
@@ -200,7 +200,12 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
     img_show = draw_skeleton(frame.copy(), keypoints, scores, kpt_thr=0.1)
 
     # Save video and images
-    if save_video and out_vid:
+    if save_video:
+        if out_vid is None:
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            H, W = img_show.shape[:2]
+            fps = config_dict['pose'].get('fps', 30)
+            out_vid = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H))
         out_vid.write(img_show)
 
     if save_images:
@@ -229,8 +234,9 @@ class CombinedDisplayThread(threading.Thread):
         while not self.stopped:
             try:
                 frames_dict = self.display_queue.get(timeout=0.1)
-                self.frames.update({source_id: frames_dict.get(source_id, self.frames[source_id]) for source_id in self.source_ids})
-                self.display_combined_image()
+                if frames_dict:
+                    self.frames.update(frames_dict)
+                    self.display_combined_image()
             except queue.Empty:
                 continue
 
@@ -265,18 +271,18 @@ class CombinedDisplayThread(threading.Thread):
 
 
 class StreamManager:
-    def __init__(self, sources, config_dict, pose_trackers, display_queue, output_dir, process_functions):
+    def __init__(self, sources, config_dict, display_queue, output_dir, process_functions, pose_tracker_settings):
         self.sources = sources
         self.config_dict = config_dict
-        self.pose_trackers = pose_trackers
         self.display_queue = display_queue
         self.output_dir = output_dir
         self.process_functions = process_functions
-        self.executor = ThreadPoolExecutor(max_workers=len(sources) * 2)
+        self.executor = ProcessPoolExecutor(max_workers=len(sources))
         self.active_streams = set()
         self.streams, self.outputs, self.out_videos = {}, {}, {}
         self.initialize_streams_and_outputs()
         self.stopped = False
+        self.pose_tracker_settings = pose_tracker_settings
 
     def initialize_streams_and_outputs(self):
         for source in self.sources:
@@ -293,8 +299,8 @@ class StreamManager:
         threading.Thread(target=self.process_streams, daemon=True).start()
 
     def process_streams(self):
-        logging.info("Début du traitement des flux")
-        while not self.stopped and any(stream.stopped is False for stream in self.streams.values()):
+        logging.info("Starting stream processing")
+        while not self.stopped and any(not stream.stopped for stream in self.streams.values()):
             frames = {}
             for source_id, stream in self.streams.items():
                 if not stream.stopped:
@@ -302,28 +308,25 @@ class StreamManager:
                     if frame is not None:
                         frames[source_id] = (frame_idx, frame)
             if frames:
-                futures = {self.executor.submit(self.process_frame, source_id, frame_idx, frame): source_id
-                        for source_id, (frame_idx, frame) in frames.items()}
-                self.handle_future_results(futures)
-            else:
-                logging.info("Aucune frame disponible actuellement, attente...")
-                time.sleep(0.1)
-
-    def process_frame(self, source_id, frame_idx, frame):
-        logging.info(f"Processing frame {frame_idx} from source {source_id}")
-        process_function = self.process_functions.get(source_id)
-        return process_function(self.config_dict,
-                        frame,
+                args_list = [
+                    (
                         source_id,
                         frame_idx,
-                        self.outputs[source_id],
-                        self.pose_trackers[source_id],
-                        self.config_dict['project'].get('multi_person'),
-                        'to_video' in self.config_dict['project'].get('save_video', []),
-                        'to_images' in self.config_dict['project'].get('save_video', []),
-                        self.config_dict['pose'].get('show_realtime_results', False),
-                        self.out_videos.get(source_id),
-                        self.config_dict['pose'].get('output_format', 'openpose'))
+                        frame,
+                        self.config_dict,
+                        self.outputs,
+                        self.pose_tracker_settings,
+                    )
+                    for source_id, (frame_idx, frame) in frames.items()
+                ]
+                futures = {
+                    self.executor.submit(process_frame, args): args[0]
+                    for args in args_list
+                }
+                self.handle_future_results(futures)
+            else:
+                logging.info("No frames available currently, waiting...")
+                time.sleep(0.1)
 
     def handle_future_results(self, futures):
         for future in as_completed(futures):
@@ -335,13 +338,6 @@ class StreamManager:
             except Exception as e:
                 logging.error(f"Error processing frame from source {source_id}: {e}")
 
-    def initialize_video_writer(self, img_show, source_id):
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        H, W = img_show.shape[:2]
-        fps = self.config_dict['pose'].get('fps', 30)
-        output_video_path = f"{self.outputs[source_id]}/{source_id}_output.mp4"
-        return cv2.VideoWriter(output_video_path, fourcc, fps, (W, H))
-
     def stop(self):
         self.stopped = True
         for stream in self.streams.values():
@@ -350,6 +346,29 @@ class StreamManager:
         for out_vid in self.out_videos.values():
             if out_vid is not None:
                 out_vid.release()
+
+def process_frame(args):
+    source_id, frame_idx, frame, config_dict, outputs, pose_tracker_settings = args
+    logging.info(f"Processing frame {frame_idx} from source {source_id}")
+
+    # Initialize pose tracker inside the process
+    pose_tracker = setup_pose_tracker(pose_tracker_settings)
+
+    # Call the process_single_frame function
+    return process_single_frame(
+        config_dict,
+        frame,
+        source_id,
+        frame_idx,
+        outputs[source_id],
+        pose_tracker,
+        config_dict['project'].get('multi_person', False),
+        'to_video' in config_dict['project'].get('save_video', []),
+        'to_images' in config_dict['project'].get('save_video', []),
+        config_dict['project'].get('show_realtime_results', False),
+        config_dict['project'].get('output_format', 'openpose'),
+        None
+    )
 
 
 class GenericStream(threading.Thread):
@@ -361,7 +380,6 @@ class GenericStream(threading.Thread):
         self.frame_ranges = self.parse_frame_ranges(config_dict['project'].get('frame_range', []))
         self.stopped = False
         self.frame_queue = queue.Queue()
-        self.lock = threading.Lock()
         self.frame_idx = 0
         self.total_frames = 0
         self.cap = None
@@ -381,6 +399,7 @@ class GenericStream(threading.Thread):
     def run(self):
         if self.source['type'] == 'webcam':
             self.setup_webcam()
+            time.sleep(1)
         elif self.source['type'] == 'video':
             self.open_video()
         elif self.source['type'] == 'images':
@@ -464,16 +483,12 @@ class GenericStream(threading.Thread):
             logging.warning(f"Webcam {self.source['id']} not opened. Attempting to open...")
             self.open_webcam()
             if self.cap is None or not self.cap.isOpened():
-                with self.lock:
-                    self.frame = None
                 return None
         ret, frame = self.cap.read()
         if not ret or frame is None:
             logging.warning(f"Failed to read frame from webcam {self.source['id']}.")
             self.cap.release()
             self.cap = None
-            with self.lock:
-                self.frame = None
             return None
         return frame
 
