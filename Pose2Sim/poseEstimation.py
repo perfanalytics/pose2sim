@@ -296,18 +296,22 @@ class StreamManager:
     def process_streams(self):
         logging.info("Début du traitement des flux")
         while not self.stopped and any(stream.stopped is False for stream in self.streams.values()):
-            frames = {source_id: stream.read() for source_id, stream in self.streams.items() if not stream.stopped}
-
+            frames = {}
+            for source_id, stream in self.streams.items():
+                if not stream.stopped:
+                    frame_idx, frame = stream.read()
+                    if frame is not None:
+                        frames[source_id] = (frame_idx, frame)
             if frames:
-                futures = {self.executor.submit(self.process_frame, source_id, frame): source_id
-                           for source_id, frame in frames.items() if frame is not None}
+                futures = {self.executor.submit(self.process_frame, source_id, frame_idx, frame): source_id
+                        for source_id, (frame_idx, frame) in frames.items()}
                 self.handle_future_results(futures)
             else:
                 logging.info("Aucune frame disponible actuellement, attente...")
                 time.sleep(0.1)
 
-    def process_frame(self, source_id, frame):
-        logging.info(f"Processing frame {self.streams[source_id].frame_idx} from source {source_id}")
+    def process_frame(self, source_id, frame_idx, frame):
+        logging.info(f"Processing frame {frame_idx} from source {source_id}")
         process_function = self.process_functions.get(source_id)
         return process_function(self.config_dict,
                         frame,
@@ -382,10 +386,10 @@ class GenericStream(threading.Thread):
             frame = self.capture_frame()
             if frame is not None:
                 frame = cv2.resize(frame, self.input_size)
-                self.frame_queue.put(frame)
-                self.frame_idx += 1
+                self.frame_queue.put((self.frame_idx, frame))
                 if self.pbar:
                     self.pbar.update(1)
+                self.frame_idx += 1
             else:
                 time.sleep(0.1)
 
@@ -469,7 +473,7 @@ class GenericStream(threading.Thread):
         try:
             return self.frame_queue.get(timeout=0.1)
         except queue.Empty:
-            return None
+            return None, None
 
     def stop(self):
         self.stopped = True
