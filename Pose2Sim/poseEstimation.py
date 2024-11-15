@@ -274,31 +274,18 @@ class StreamManager:
         self.process_functions = process_functions
         self.executor = ThreadPoolExecutor(max_workers=len(sources) * 2)
         self.active_streams = set()
-        self.frame_ranges = self.parse_frame_ranges(config_dict['project'].get('frame_range', []))
         self.streams, self.outputs, self.out_videos = {}, {}, {}
         self.initialize_streams_and_outputs()
         self.stopped = False
 
     def initialize_streams_and_outputs(self):
         for source in self.sources:
-            stream = GenericStream(source, self.config_dict, self.frame_ranges)
+            stream = GenericStream(source, self.config_dict)
             self.streams[source['id']] = stream
             self.outputs[source['id']] = setup_capture_directories(
                 source['path'], self.output_dir, 'to_images' in self.config_dict['project'].get('save_video', []))
             self.out_videos[source['id']] = None
             self.active_streams.add(source['id'])
-
-    def parse_frame_ranges(self, frame_ranges):
-        if not frame_ranges:
-            return None
-        elif isinstance(frame_ranges, list):
-            if len(frame_ranges) == 2 and all(isinstance(x, int) for x in frame_ranges):
-                start_frame, end_frame = frame_ranges
-                return set(range(start_frame, end_frame + 1))
-            else:
-                return set(frame_ranges)
-        else:
-            return None
 
     def start(self):
         for source in self.sources:
@@ -366,12 +353,12 @@ class StreamManager:
 
 
 class GenericStream(threading.Thread):
-    def __init__(self, source, config_dict, frame_ranges=None):
+    def __init__(self, source, config_dict):
         super().__init__(daemon=True)
         self.source = source
         self.input_size = config_dict['pose'].get('input_size', (640, 480))
         self.image_extension = config_dict['pose']['vid_img_extension']
-        self.frame_ranges = frame_ranges
+        self.frame_ranges = self.parse_frame_ranges(config_dict['project'].get('frame_range', []))
         self.stopped = False
         self.frame_queue = queue.Queue()
         self.lock = threading.Lock()
@@ -381,6 +368,15 @@ class GenericStream(threading.Thread):
         self.image_files = []
         self.image_index = 0
         self.pbar = None
+
+    def parse_frame_ranges(self, frame_ranges):
+        if len(frame_ranges) == 2 and all(isinstance(x, int) for x in frame_ranges):
+            start_frame, end_frame = frame_ranges
+            return set(range(start_frame, end_frame + 1))
+        elif len(frame_ranges) == 0:
+            return set(range(0, int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))))
+        else:
+            return set(frame_ranges)
 
     def run(self):
         if self.source['type'] == 'webcam':
@@ -415,7 +411,7 @@ class GenericStream(threading.Thread):
             logging.error(f"Cannot open video file {self.source['path']}")
             self.stopped = True
             return
-        self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.total_frames = len(self.frame_ranges)
         self.setup_progress_bar()
 
     def load_images(self):
