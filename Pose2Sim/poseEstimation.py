@@ -45,7 +45,7 @@ import numpy as np
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import Process, Queue
 
 from rtmlib import draw_skeleton
 from Sports2D.Utilities.config import determine_tracker_settings, setup_pose_tracker
@@ -130,7 +130,7 @@ def rtm_estimator(config_dict):
     logging.info(f'Processing sources: {sources}')
 
     # Create display queue
-    display_queue = queue.Queue()
+    display_queue = Queue()
 
     pose_tracker_settings = determine_tracker_settings(config_dict)
 
@@ -277,98 +277,85 @@ class StreamManager:
         self.display_queue = display_queue
         self.output_dir = output_dir
         self.process_functions = process_functions
-        self.executor = ProcessPoolExecutor(max_workers=len(sources))
-        self.active_streams = set()
-        self.streams, self.outputs, self.out_videos = {}, {}, {}
-        self.initialize_streams_and_outputs()
         self.stopped = False
         self.pose_tracker_settings = pose_tracker_settings
-
-    def initialize_streams_and_outputs(self):
-        for source in self.sources:
-            stream = GenericStream(source, self.config_dict)
-            self.streams[source['id']] = stream
-            self.outputs[source['id']] = setup_capture_directories(
-                source['path'], self.output_dir, 'to_images' in self.config_dict['project'].get('save_video', []))
-            self.out_videos[source['id']] = None
-            self.active_streams.add(source['id'])
+        self.processes = {}
 
     def start(self):
         for source in self.sources:
-            self.streams[source['id']].start()
-        threading.Thread(target=self.process_streams, daemon=True).start()
+            process = SourceProcess(
+                source,
+                self.config_dict,
+                self.output_dir,
+                self.pose_tracker_settings,
+                self.display_queue
+            )
+            process.start()
+            self.processes[source['id']] = process
 
-    def process_streams(self):
-        logging.info("Starting stream processing")
-        while not self.stopped and any(not stream.stopped for stream in self.streams.values()):
-            frames = {}
-            for source_id, stream in self.streams.items():
-                if not stream.stopped:
-                    frame_idx, frame = stream.read()
-                    if frame is not None:
-                        frames[source_id] = (frame_idx, frame)
-            if frames:
-                args_list = [
-                    (
-                        source_id,
-                        frame_idx,
-                        frame,
-                        self.config_dict,
-                        self.outputs,
-                        self.pose_tracker_settings,
-                    )
-                    for source_id, (frame_idx, frame) in frames.items()
-                ]
-                futures = {
-                    self.executor.submit(process_frame, args): args[0]
-                    for args in args_list
-                }
-                self.handle_future_results(futures)
-            else:
-                logging.info("No frames available currently, waiting...")
-                time.sleep(0.1)
+        threading.Thread(target=self.monitor_processes, daemon=True).start()
 
-    def handle_future_results(self, futures):
-        for future in as_completed(futures):
-            source_id = futures[future]
-            try:
-                result = future.result()
-                source_id, processed_frame, out_vid = result
-                self.display_queue.put({source_id: processed_frame})
-            except Exception as e:
-                logging.error(f"Error processing frame from source {source_id}: {e}")
+    def monitor_processes(self):
+        while not self.stopped and any(process.is_alive() for process in self.processes.values()):
+            time.sleep(0.1)
 
     def stop(self):
         self.stopped = True
-        for stream in self.streams.values():
-            stream.stop()
-        self.executor.shutdown()
-        for out_vid in self.out_videos.values():
-            if out_vid is not None:
-                out_vid.release()
+        for process in self.processes.values():
+            process.stopped = True
+            process.join()
+        logging.info("All source processes have been stopped.")
 
-def process_frame(args):
-    source_id, frame_idx, frame, config_dict, outputs, pose_tracker_settings = args
-    logging.info(f"Processing frame {frame_idx} from source {source_id}")
 
-    # Initialize pose tracker inside the process
-    pose_tracker = setup_pose_tracker(pose_tracker_settings)
+class SourceProcess(Process):
+    def __init__(self, source, config_dict, output_dir, pose_tracker_settings, display_queue):
+        super().__init__()
+        self.source = source
+        self.config_dict = config_dict
+        self.output_dir = output_dir
+        self.pose_tracker_settings = pose_tracker_settings
+        self.display_queue = display_queue
+        self.stopped = False
 
-    # Call the process_single_frame function
-    return process_single_frame(
-        config_dict,
-        frame,
-        source_id,
-        frame_idx,
-        outputs[source_id],
-        pose_tracker,
-        config_dict['project'].get('multi_person', False),
-        'to_video' in config_dict['project'].get('save_video', []),
-        'to_images' in config_dict['project'].get('save_video', []),
-        config_dict['project'].get('show_realtime_results', False),
-        config_dict['project'].get('output_format', 'openpose'),
-        None
-    )
+    def run(self):
+        logging.basicConfig(level=logging.INFO)
+        
+        pose_tracker = setup_pose_tracker(self.pose_tracker_settings)
+
+        stream = GenericStream(self.source, self.config_dict)
+        stream.start()
+
+        outputs = setup_capture_directories(
+            self.source['path'], self.output_dir, 'to_images' in self.config_dict['project'].get('save_video', [])
+        )
+        out_vid = None
+
+        while not self.stopped and not stream.stopped:
+            frame_idx, frame = stream.read()
+            if frame is not None:
+                result = process_single_frame(
+                    self.config_dict,
+                    frame,
+                    self.source['id'],
+                    frame_idx,
+                    outputs,
+                    pose_tracker,
+                    self.config_dict['project'].get('multi_person', False),
+                    'to_video' in self.config_dict['project'].get('save_video', []),
+                    'to_images' in self.config_dict['project'].get('save_video', []),
+                    self.config_dict['project'].get('show_realtime_results', False),
+                    self.config_dict['project'].get('output_format', 'openpose'),
+                    out_vid
+                )
+                source_id, img_show, out_vid = result
+
+                if self.display_queue:
+                    self.display_queue.put({source_id: img_show})
+            else:
+                time.sleep(0.1)
+        stream.stop()
+        if out_vid is not None:
+            out_vid.release()
 
 
 class GenericStream(threading.Thread):
