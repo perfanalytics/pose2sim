@@ -38,6 +38,7 @@ import json
 import logging
 import cv2
 import time
+import uuid
 import threading
 import queue
 
@@ -45,7 +46,7 @@ import numpy as np
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
-from multiprocessing import Process, Queue, cpu_count
+from multiprocessing import Process, Queue, shared_memory, Manager
 
 from rtmlib import draw_skeleton
 from Sports2D.Utilities.config import determine_tracker_settings, setup_pose_tracker
@@ -130,7 +131,8 @@ def rtm_estimator(config_dict):
     logging.info(f'Processing sources: {sources}')
 
     # Create display queue
-    display_queue = Queue()
+    manager = Manager()
+    display_queue = manager.Queue()
 
     pose_tracker_settings = determine_tracker_settings(config_dict)
 
@@ -183,7 +185,7 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
     '''
 
     output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
-        
+
     # Perform pose estimation on the frame
     keypoints, scores = pose_tracker(frame)
 
@@ -288,7 +290,7 @@ class StreamManager:
                 self.config_dict,
                 self.output_dir,
                 self.pose_tracker_settings,
-                self.display_queue
+                self.display_queue,
             )
             process.start()
             self.processes[source['id']] = process
@@ -319,10 +321,10 @@ class SourceProcess(Process):
 
     def run(self):
         logging.basicConfig(level=logging.INFO)
-        
+
         # Initialize queues for inter-process communication
-        frame_queue = Queue(maxsize=10)
-        result_queue = Queue(maxsize=10)
+        frame_queue = Queue(maxsize=1)
+        result_queue = Queue()
 
         # Determine the number of worker processes
         num_workers = 1
@@ -358,7 +360,7 @@ class SourceProcess(Process):
                         # All workers have finished
                         break
                 else:
-                    source_id, img_show, _ = result
+                    source_id, img_show = result
                     # Handle display
                     if self.display_queue:
                         self.display_queue.put({source_id: img_show})
@@ -368,11 +370,11 @@ class SourceProcess(Process):
                     for _ in range(len(workers)):
                         frame_queue.put(None)
         # Clean up
-        stream.stop()
-        stream.join()
         for worker in workers:
             worker.stop()
             worker.join()
+        stream.stop()
+        stream.join()
 
         if out_vid is not None:
             out_vid.release()
@@ -406,8 +408,11 @@ class WorkerProcess(Process):
                     if item is None:
                         break  # No more frames to process
 
-                    frame_idx, frame, source_id = item
-
+                    frame_idx, shm_name, frame_shape, frame_dtype_str, source_id = item
+                    # Access shared memory
+                    existing_shm = shared_memory.SharedMemory(name=shm_name)
+                    frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype_str), buffer=existing_shm.buf)
+                    # Process the frame
                     result = process_single_frame(
                         self.config_dict,
                         frame,
@@ -421,8 +426,11 @@ class WorkerProcess(Process):
                         show_realtime_results,
                         output_format,
                     )
+                    # Clean up shared memory
+                    existing_shm.close()
+                    existing_shm.unlink()  # Remove the shared memory segment
 
-                    self.result_queue.put(result)
+                    self.result_queue.put((source_id, result[1]))  # Pass img_show for display
 
                 except queue.Empty:
                     continue
@@ -433,13 +441,13 @@ class WorkerProcess(Process):
         except Exception as e:
             logging.error(f"Error in WorkerProcess: {e}")
             self.stopped = True
-            # Optionally, signal that the worker is done
             self.result_queue.put(None)
 
     def stop(self):
         self.stopped = True
 
-class GenericStream(threading.Thread):
+
+class GenericStream(Process):
     def __init__(self, source, config_dict, frame_queue, num_workers):
         super().__init__(daemon=True)
         self.source = source
@@ -488,16 +496,28 @@ class GenericStream(threading.Thread):
                 logging.error(f"Unknown source type: {self.source['type']}")
                 self.stopped = True
                 return
-
             while not self.stopped:
                 frame = self.capture_frame()
                 if frame is not None:
                     frame = cv2.resize(frame, self.input_size)
-                    item = (self.frame_idx, frame, self.source['id'])
-                    self.frame_queue.put(item)
+                    # Generate a unique name for the shared memory segment
+                    unique_name = f"frame_{uuid.uuid4().hex}"
+                    # Create shared memory
+                    shm = shared_memory.SharedMemory(name=unique_name, create=True, size=frame.nbytes)
+                    np_frame = np.ndarray(frame.shape, dtype=frame.dtype, buffer=shm.buf)
+                    np.copyto(np_frame, frame)
+                    item = (self.frame_idx, unique_name, frame.shape, frame.dtype.str, self.source['id'])
+                    try:
+                        self.frame_queue.put_nowait(item)
+                        logging.debug(f"Frame {self.frame_idx} from source {self.source['id']} added to queue.")
+                        # Do not close shm here
+                    except queue.Full:
+                        # Discard frame and continue capturing
+                        logging.debug(f"Frame queue is full. Discarding frame {self.frame_idx} from source {self.source['id']}.")
+                        shm.close()
+                        shm.unlink()
                     if self.pbar:
                         self.pbar.update(1)
-                    logging.debug(f"Frame {self.frame_idx} from source {self.source['id']} added to queue.")
                     self.frame_idx += 1
                 else:
                     # Signal the workers that there are no more frames
