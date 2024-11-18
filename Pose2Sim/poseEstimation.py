@@ -38,10 +38,9 @@ import json
 import logging
 import cv2
 import time
-import uuid
 import threading
 import queue
-import sys
+import multiprocessing
 
 import numpy as np
 from datetime import datetime
@@ -137,8 +136,13 @@ def rtm_estimator(config_dict):
 
     pose_tracker_settings = determine_tracker_settings(config_dict)
 
+    # Initialize shared counts for each source
+    shared_counts = manager.dict()
+    for source in sources:
+        shared_counts[source['id']] = manager.dict({'queued': 0, 'processed': 0})
+
     # Initialize streams
-    stream_manager = StreamManager(sources, config_dict, display_queue, output_dir, process_functions, pose_tracker_settings)
+    stream_manager = StreamManager(sources, config_dict, display_queue, output_dir, process_functions, pose_tracker_settings, shared_counts)
     stream_manager.start()
 
     # Start display thread only if show_realtime_results is True
@@ -148,11 +152,28 @@ def rtm_estimator(config_dict):
         display_thread = CombinedDisplayThread(sources, input_size, display_queue)
         display_thread.start()
 
+    # Initialize progress bars
+    progress_bars = {}
+    for source in sources:
+        source_id = source['id']
+        desc = f"Source {source_id}"
+        progress_bars[source_id] = tqdm(total=0, desc=desc, position=source_id, leave=True)
+
     try:
         while not stream_manager.stopped:
+            for source in sources:
+                source_id = source['id']
+                counts = shared_counts[source_id]
+                queued = counts.get('queued', 0)
+                processed = counts.get('processed', 0)
+                pending = queued - processed
+                progress_bars[source_id].total = max(progress_bars[source_id].total, queued)
+                progress_bars[source_id].n = pending
+                progress_bars[source_id].refresh()
+            time.sleep(0.5)
+
             if display_thread and display_thread.stopped:
                 break
-            time.sleep(0.1)
     except KeyboardInterrupt:
         logging.info("Processing interrupted by user.")
     finally:
@@ -160,6 +181,8 @@ def rtm_estimator(config_dict):
         if display_thread:
             display_thread.stop()
             display_thread.join()
+        for pb in progress_bars.values():
+            pb.close()
         logging.shutdown()
 
 
@@ -268,7 +291,7 @@ class CombinedDisplayThread(threading.Thread):
 
 
 class StreamManager:
-    def __init__(self, sources, config_dict, display_queue, output_dir, process_functions, pose_tracker_settings):
+    def __init__(self, sources, config_dict, display_queue, output_dir, process_functions, pose_tracker_settings, shared_counts):
         self.sources = sources
         self.config_dict = config_dict
         self.display_queue = display_queue
@@ -276,6 +299,7 @@ class StreamManager:
         self.process_functions = process_functions
         self.stopped = False
         self.pose_tracker_settings = pose_tracker_settings
+        self.shared_counts = shared_counts
         self.processes = {}
 
     def start(self):
@@ -286,6 +310,7 @@ class StreamManager:
                 self.output_dir,
                 self.pose_tracker_settings,
                 self.display_queue,
+                self.shared_counts
             )
             process.start()
             self.processes[source['id']] = process
@@ -305,20 +330,21 @@ class StreamManager:
 
 
 class SourceProcess(Process):
-    def __init__(self, source, config_dict, output_dir, pose_tracker_settings, display_queue):
+    def __init__(self, source, config_dict, output_dir, pose_tracker_settings, display_queue, shared_counts):
         super().__init__()
         self.source = source
         self.config_dict = config_dict
         self.output_dir = output_dir
         self.pose_tracker_settings = pose_tracker_settings
         self.display_queue = display_queue
+        self.shared_counts = shared_counts
         self.stopped = False
 
     def run(self):
         logging.basicConfig(level=logging.INFO)
 
         # Initialize queues for inter-process communication
-        frame_queue = Queue(maxsize=1)
+        frame_queue = Queue(maxsize=10)
         result_queue = Queue()
 
         # Determine the number of worker processes
@@ -326,7 +352,22 @@ class SourceProcess(Process):
         outputs = setup_capture_directories(
             self.source['path'], self.output_dir, 'to_images' in self.config_dict['project'].get('save_video', [])
         )
-        out_vid = None
+
+        # Preallocate shared memory buffers
+        expected_frame_size = self.config_dict['pose'].get('input_size', (640, 480))
+        expected_frame_size = expected_frame_size[0] * expected_frame_size[1] * 3  # Assuming 3 channels
+        num_buffers = 10  # Adjust as needed
+        available_buffers = Queue()
+        shared_buffers = {}
+        for i in range(num_buffers):
+            unique_name = f"frame_buffer_{self.source['id']}_{i}"
+            shm = shared_memory.SharedMemory(name=unique_name, create=True, size=expected_frame_size)
+            shared_buffers[unique_name] = shm
+            available_buffers.put(unique_name)
+
+        # Initialize shared counters
+        self.shared_counts['queued'] = 0
+        self.shared_counts['processed'] = 0
 
         # Start worker processes
         workers = []
@@ -336,12 +377,23 @@ class SourceProcess(Process):
                 frame_queue,
                 result_queue,
                 outputs,
+                available_buffers,
+                shared_buffers,
+                self.shared_counts
             )
             worker.start()
             workers.append(worker)
 
         # Start frame reader thread
-        stream = GenericStream(self.source, self.config_dict, frame_queue, num_workers)
+        stream = GenericStream(
+            self.source,
+            self.config_dict,
+            frame_queue,
+            num_workers,
+            available_buffers,
+            shared_buffers,
+            self.shared_counts
+        )
         stream.start()
 
         active_workers = num_workers
@@ -371,17 +423,24 @@ class SourceProcess(Process):
         stream.stop()
         stream.join()
 
-        if out_vid is not None:
-            out_vid.release()
+        # Clean up shared memory
+        for shm in shared_buffers.values():
+            shm.close()
+            shm.unlink()
+
+        logging.info(f"Source {self.source['id']} processing completed.")
 
 
 class WorkerProcess(Process):
-    def __init__(self, config_dict, frame_queue, result_queue, outputs):
+    def __init__(self, config_dict, frame_queue, result_queue, outputs, available_buffers, shared_buffers, shared_counts):
         super().__init__()
         self.config_dict = config_dict
         self.frame_queue = frame_queue
         self.result_queue = result_queue
         self.outputs = outputs
+        self.available_buffers = available_buffers
+        self.shared_buffers = shared_buffers
+        self.shared_counts = shared_counts
         self.stopped = False
 
     def run(self):
@@ -408,11 +467,11 @@ class WorkerProcess(Process):
                 try:
                     item = self.frame_queue.get(timeout=1)
                     if item is None:
-                        break  # No more frames to process
-
-                    frame_idx, shm_name, frame_shape, frame_dtype_str, source_id = item
-                    existing_shm = shared_memory.SharedMemory(name=shm_name)
-                    frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype_str), buffer=existing_shm.buf)
+                        logging.info("A worker has finished")
+                        break
+                    frame_idx, buffer_name, frame_shape, frame_dtype_str, source_id = item
+                    shm = self.shared_buffers[buffer_name]
+                    frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype_str), buffer=shm.buf)
                     # Process the frame
                     result = process_single_frame(
                         self.config_dict,
@@ -428,20 +487,15 @@ class WorkerProcess(Process):
                         output_format,
                         out_vid
                     )
-                    # Clean up shared memory
-                    existing_shm.close()
-                    # Do not unlink on Windows
-                    if sys.platform != 'win32':
-                        existing_shm.unlink()
-
+                    # Release the buffer back to the available queue
+                    self.available_buffers.put(buffer_name)
+                    with self.shared_counts_lock():
+                        self.shared_counts['processed'] += 1
                     self.result_queue.put((source_id, result[1]))
-
                 except queue.Empty:
                     continue
-
             # Signal that this worker is done
             self.result_queue.put(None)
-
         except Exception as e:
             logging.error(f"Error in WorkerProcess: {e}")
             self.stopped = True
@@ -450,9 +504,12 @@ class WorkerProcess(Process):
     def stop(self):
         self.stopped = True
 
+    def shared_counts_lock(self):
+        return multiprocessing.Lock()
+
 
 class GenericStream(Process):
-    def __init__(self, source, config_dict, frame_queue, num_workers):
+    def __init__(self, source, config_dict, frame_queue, num_workers, available_buffers, shared_buffers, shared_counts):
         super().__init__(daemon=True)
         self.source = source
         self.config_dict = config_dict
@@ -468,7 +525,9 @@ class GenericStream(Process):
         self.image_index = 0
         self.pbar = None
         self.frame_ranges = None
-        self.shm_list = []
+        self.available_buffers = available_buffers
+        self.shared_buffers = shared_buffers
+        self.shared_counts = shared_counts 
 
     def parse_frame_ranges(self, frame_ranges):
         if self.source['type'] != 'webcam':
@@ -505,22 +564,18 @@ class GenericStream(Process):
                 frame = self.capture_frame()
                 if frame is not None:
                     frame = cv2.resize(frame, self.input_size)
-                    unique_name = f"frame_{uuid.uuid4().hex}"
-                    shm = shared_memory.SharedMemory(name=unique_name, create=True, size=frame.nbytes)
+                    try:
+                        buffer_name = self.available_buffers.get(timeout=1)
+                    except queue.Empty:
+                        logging.warning("No available buffers.")
+                        continue
+                    shm = self.shared_buffers[buffer_name]
                     np_frame = np.ndarray(frame.shape, dtype=frame.dtype, buffer=shm.buf)
                     np.copyto(np_frame, frame)
-                    item = (self.frame_idx, unique_name, frame.shape, frame.dtype.str, self.source['id'])
-                    try:
-                        self.frame_queue.put_nowait(item)
-                        logging.debug(f"Frame {self.frame_idx} from source {self.source['id']} added to queue.")
-                        self.shm_list.append(shm)
-                    except queue.Full:
-                        # Discard frame and continue capturing
-                        logging.debug(f"Frame queue is full. Discarding frame {self.frame_idx} from source {self.source['id']}.")
-                        shm.close()
-                        shm.unlink()
-                    if self.pbar:
-                        self.pbar.update(1)
+                    item = (self.frame_idx, buffer_name, frame.shape, frame.dtype.str, self.source['id'])
+                    self.frame_queue.put_nowait(item)
+                    with self.shared_counts_lock():
+                        self.shared_counts['queued'] += 1
                     self.frame_idx += 1
                 else:
                     # Signal the workers that there are no more frames
@@ -530,8 +585,9 @@ class GenericStream(Process):
         except Exception as e:
             logging.error(f"Error in GenericStream: {e}")
             self.stopped = True
-        finally:
-            self.cleanup_shared_memory()
+
+    def shared_counts_lock(self):
+        return multiprocessing.Lock()
 
     def cleanup_shared_memory(self):
         for shm in self.shm_list:
@@ -617,12 +673,6 @@ class GenericStream(Process):
             self.cap = None
             return None
         return frame
-
-    def read(self):
-        try:
-            return self.frame_queue.get(timeout=0.1)
-        except queue.Empty:
-            return None, None
 
     def stop(self):
         self.stopped = True
