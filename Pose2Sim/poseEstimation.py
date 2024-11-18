@@ -163,7 +163,7 @@ def rtm_estimator(config_dict):
         logging.shutdown()
 
 
-def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, output_format):
+def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, output_format, out_vid):
     '''
     Processes a single frame from a source.
 
@@ -182,9 +182,8 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
         out_vid (cv2.VideoWriter): Video writer object.
 
     Returns:
-        tuple: (source_id, img_show, out_vid)
+        tuple: (source_id, img_show)
     '''
-
     output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
 
     # Perform pose estimation on the frame
@@ -200,16 +199,11 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
         save_to_openpose(json_file_path, keypoints, scores)
 
     # Draw skeleton on the frame
-    img_show = draw_skeleton(frame.copy(), keypoints, scores, kpt_thr=0.1)
+    img_show = draw_skeleton(frame, keypoints, scores, kpt_thr=0.1)
 
     # Save video and images
-    if save_video:
-        if not hasattr(process_single_frame, 'out_vid'):
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            H, W = img_show.shape[:2]
-            fps = config_dict['pose'].get('fps', 30)
-            process_single_frame.out_vid = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H))
-        process_single_frame.out_vid.write(img_show)
+    if save_video and out_vid is not None:
+        out_vid.write(img_show)
 
     if save_images:
         cv2.imwrite(os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'), img_show)
@@ -401,7 +395,14 @@ class WorkerProcess(Process):
             save_images = 'to_images' in self.config_dict['project'].get('save_video', [])
             show_realtime_results = self.config_dict['project'].get('show_realtime_results', False)
             output_format = self.config_dict['project'].get('output_format', 'openpose')
-            out_vid = None  # Each worker can handle its own video writer if needed
+            out_vid = None
+            if save_video:
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                fps = self.config_dict['pose'].get('fps', 30)
+                input_size = self.config_dict['pose'].get('input_size', (640, 480))
+                H, W = input_size[1], input_size[0]
+                output_video_path = self.outputs[4] 
+                out_vid = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H))
 
             while not self.stopped:
                 try:
@@ -425,6 +426,7 @@ class WorkerProcess(Process):
                         save_images,
                         show_realtime_results,
                         output_format,
+                        out_vid
                     )
                     # Clean up shared memory
                     existing_shm.close()
@@ -432,7 +434,7 @@ class WorkerProcess(Process):
                     if sys.platform != 'win32':
                         existing_shm.unlink()
 
-                    self.result_queue.put((source_id, result[1]))  # Pass img_show for display
+                    self.result_queue.put((source_id, result[1]))
 
                 except queue.Empty:
                     continue
@@ -539,7 +541,7 @@ class GenericStream(Process):
 
     def setup_webcam(self):
         self.open_webcam()
-        time.sleep(1)  # Give time for the webcam to initialize
+        time.sleep(1)
 
     def open_video(self):
         self.cap = cv2.VideoCapture(self.source['path'])
