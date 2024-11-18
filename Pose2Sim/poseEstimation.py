@@ -41,6 +41,7 @@ import time
 import uuid
 import threading
 import queue
+import sys
 
 import numpy as np
 from datetime import datetime
@@ -409,7 +410,6 @@ class WorkerProcess(Process):
                         break  # No more frames to process
 
                     frame_idx, shm_name, frame_shape, frame_dtype_str, source_id = item
-                    # Access shared memory
                     existing_shm = shared_memory.SharedMemory(name=shm_name)
                     frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype_str), buffer=existing_shm.buf)
                     # Process the frame
@@ -428,7 +428,9 @@ class WorkerProcess(Process):
                     )
                     # Clean up shared memory
                     existing_shm.close()
-                    existing_shm.unlink()  # Remove the shared memory segment
+                    # Do not unlink on Windows
+                    if sys.platform != 'win32':
+                        existing_shm.unlink()
 
                     self.result_queue.put((source_id, result[1]))  # Pass img_show for display
 
@@ -464,6 +466,7 @@ class GenericStream(Process):
         self.image_index = 0
         self.pbar = None
         self.frame_ranges = None
+        self.shm_list = []
 
     def parse_frame_ranges(self, frame_ranges):
         if self.source['type'] != 'webcam':
@@ -500,9 +503,7 @@ class GenericStream(Process):
                 frame = self.capture_frame()
                 if frame is not None:
                     frame = cv2.resize(frame, self.input_size)
-                    # Generate a unique name for the shared memory segment
                     unique_name = f"frame_{uuid.uuid4().hex}"
-                    # Create shared memory
                     shm = shared_memory.SharedMemory(name=unique_name, create=True, size=frame.nbytes)
                     np_frame = np.ndarray(frame.shape, dtype=frame.dtype, buffer=shm.buf)
                     np.copyto(np_frame, frame)
@@ -510,7 +511,7 @@ class GenericStream(Process):
                     try:
                         self.frame_queue.put_nowait(item)
                         logging.debug(f"Frame {self.frame_idx} from source {self.source['id']} added to queue.")
-                        # Do not close shm here
+                        self.shm_list.append(shm)
                     except queue.Full:
                         # Discard frame and continue capturing
                         logging.debug(f"Frame queue is full. Discarding frame {self.frame_idx} from source {self.source['id']}.")
@@ -527,6 +528,14 @@ class GenericStream(Process):
         except Exception as e:
             logging.error(f"Error in GenericStream: {e}")
             self.stopped = True
+        finally:
+            self.cleanup_shared_memory()
+
+    def cleanup_shared_memory(self):
+        for shm in self.shm_list:
+            shm.close()
+            shm.unlink()
+        self.shm_list.clear()
 
     def setup_webcam(self):
         self.open_webcam()
