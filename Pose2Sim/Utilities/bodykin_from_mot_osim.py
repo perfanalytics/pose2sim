@@ -123,8 +123,9 @@ def bodykin_from_mot_osim_func(*args):
                 model.getCoordinateSet().get(coord).setValue(state, motion_data_np[n,c], enforceContraints=False)
             except:
                 pass
-        model.assemble(state)
-        
+        # model.assemble(state)
+        model.realizePosition(state) # much faster (IK already done, no need to compute it again)
+           
         # Use state of model to get body coordinates in ground
         loc_rot_frame = []
         for b in bodies:
