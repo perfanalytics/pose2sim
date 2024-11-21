@@ -52,8 +52,6 @@ from copy import deepcopy
 import logging, logging.handlers
 from datetime import datetime
 
-from Sports2D.Utilities.config import setup_logging
-
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -607,3 +605,12 @@ def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchron
     end = time.time()
     elapsed = end-start
     logging.info(f'\nRUNNING ALL FUNCTIONS TOOK  {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
+
+
+def setup_logging(dir):
+    '''
+    Create logging file and stream handlers
+    '''
+
+    logging.basicConfig(format='%(message)s', level=logging.INFO,
+        handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
