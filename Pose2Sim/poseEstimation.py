@@ -42,15 +42,13 @@ import threading
 import queue
 import multiprocessing
 
+import itertools as it
 import numpy as np
+
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
-from multiprocessing import Process, Queue, shared_memory, Manager
-
-from rtmlib import draw_skeleton
-from Sports2D.Utilities.config import determine_tracker_settings, setup_pose_tracker
-from Sports2D.Utilities.video_management import track_people
+from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, draw_skeleton
 
 ## AUTHORSHIP INFORMATION
 __author__ = "HunMin Kim, David Pagnon"
@@ -131,7 +129,7 @@ def rtm_estimator(config_dict):
     logging.info(f'Processing sources: {sources}')
 
     # Create display queue
-    manager = Manager()
+    manager = multiprocessing.Manager()
     display_queue = manager.Queue()
 
     pose_tracker_settings = determine_tracker_settings(config_dict)
@@ -141,9 +139,58 @@ def rtm_estimator(config_dict):
     for source in sources:
         shared_counts[source['id']] = manager.dict({'queued': 0, 'processed': 0})
 
-    # Initialize streams
-    stream_manager = StreamManager(sources, config_dict, display_queue, output_dir, process_functions, pose_tracker_settings, shared_counts)
-    stream_manager.start()
+    # Create a global frame queue
+    frame_queue = multiprocessing.Queue(maxsize=100)
+
+    # Initialize shared memory buffers
+    expected_frame_size = config_dict['pose'].get('input_size', (640, 480))
+    frame_width, frame_height = expected_frame_size
+    expected_frame_size_bytes = frame_width * frame_height * 3  # Assuming 3 channels
+    num_buffers = 10  # Adjust as needed
+
+    # Preallocate shared memory buffers
+    shared_buffers = {}
+    available_buffers = multiprocessing.Queue()
+    for i in range(num_buffers):
+        unique_name = f"frame_buffer_{i}"
+        shm = multiprocessing.shared_memory.SharedMemory(name=unique_name, create=True, size=expected_frame_size_bytes)
+        shared_buffers[unique_name] = shm
+        available_buffers.put(unique_name)
+
+    # Start reading processes for each source
+    reading_processes = []
+    for source in sources:
+        process = SourceProcess(
+            source,
+            config_dict,
+            frame_queue,
+            available_buffers,
+            shared_buffers,
+            shared_counts
+        )
+        process.start()
+        reading_processes.append(process)
+
+    # Compute the maximum number of worker processes
+    cpu_count = multiprocessing.cpu_count()
+    num_sources = len(sources)
+    max_workers = max(1, cpu_count - num_sources - 2)
+    logging.info(f"Starting {max_workers} worker processes.")
+
+    # Start worker processes
+    worker_processes = []
+    for _ in range(max_workers):
+        worker = WorkerProcess(
+            config_dict,
+            frame_queue,
+            available_buffers,
+            shared_buffers,
+            shared_counts,
+            pose_tracker_settings,
+            display_queue
+        )
+        worker.start()
+        worker_processes.append(worker)
 
     # Start display thread only if show_realtime_results is True
     display_thread = None
@@ -154,22 +201,13 @@ def rtm_estimator(config_dict):
 
     # Initialize progress bars
     progress_bars = {}
-    for source in sources:
+    for idx, source in enumerate(sources):
         source_id = source['id']
         desc = f"Source {source_id}"
-        progress_bars[source_id] = tqdm(total=0, desc=desc, position=source_id, leave=True)
+        progress_bars[source_id] = tqdm(total=0, desc=desc, position=idx, leave=True)
 
     try:
-        while not stream_manager.stopped:
-            for source in sources:
-                source_id = source['id']
-                counts = shared_counts[source_id]
-                queued = counts.get('queued', 0)
-                processed = counts.get('processed', 0)
-                pending = queued - processed
-                progress_bars[source_id].total = max(progress_bars[source_id].total, queued)
-                progress_bars[source_id].n = pending
-                progress_bars[source_id].refresh()
+        while any(process.is_alive() for process in reading_processes) or not frame_queue.empty():
             time.sleep(0.5)
 
             if display_thread and display_thread.stopped:
@@ -177,14 +215,27 @@ def rtm_estimator(config_dict):
     except KeyboardInterrupt:
         logging.info("Processing interrupted by user.")
     finally:
-        stream_manager.stop()
+        # Wait for reading processes to finish
+        for process in reading_processes:
+            process.join()
+        # Signal worker processes to stop
+        for _ in worker_processes:
+            frame_queue.put(None)
+        # Wait for worker processes to finish
+        for worker in worker_processes:
+            worker.join()
+
+        # Clean up shared memory
+        for shm in shared_buffers.values():
+            shm.close()
+            shm.unlink()
+
         if display_thread:
             display_thread.stop()
             display_thread.join()
         for pb in progress_bars.values():
             pb.close()
         logging.shutdown()
-
 
 def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, output_format, out_vid):
     '''
@@ -290,164 +341,23 @@ class CombinedDisplayThread(threading.Thread):
         cv2.destroyAllWindows()
 
 
-class StreamManager:
-    def __init__(self, sources, config_dict, display_queue, output_dir, process_functions, pose_tracker_settings, shared_counts):
-        self.sources = sources
-        self.config_dict = config_dict
-        self.display_queue = display_queue
-        self.output_dir = output_dir
-        self.process_functions = process_functions
-        self.stopped = False
-        self.pose_tracker_settings = pose_tracker_settings
-        self.shared_counts = shared_counts
-        self.processes = {}
-
-    def start(self):
-        for source in self.sources:
-            process = SourceProcess(
-                source,
-                self.config_dict,
-                self.output_dir,
-                self.pose_tracker_settings,
-                self.display_queue,
-                self.shared_counts
-            )
-            process.start()
-            self.processes[source['id']] = process
-
-        threading.Thread(target=self.monitor_processes, daemon=True).start()
-
-    def monitor_processes(self):
-        while not self.stopped and any(process.is_alive() for process in self.processes.values()):
-            time.sleep(0.1)
-
-    def stop(self):
-        self.stopped = True
-        for process in self.processes.values():
-            process.stopped = True
-            process.join()
-        logging.info("All source processes have been stopped.")
-
-
-class SourceProcess(Process):
-    def __init__(self, source, config_dict, output_dir, pose_tracker_settings, display_queue, shared_counts):
-        super().__init__()
-        self.source = source
-        self.config_dict = config_dict
-        self.output_dir = output_dir
-        self.pose_tracker_settings = pose_tracker_settings
-        self.display_queue = display_queue
-        self.shared_counts = shared_counts
-        self.stopped = False
-
-    def run(self):
-        logging.basicConfig(level=logging.INFO)
-
-        # Initialize queues for inter-process communication
-        frame_queue = Queue(maxsize=10)
-        result_queue = Queue()
-
-        # Determine the number of worker processes
-        num_workers = 1
-        outputs = setup_capture_directories(
-            self.source['path'], self.output_dir, 'to_images' in self.config_dict['project'].get('save_video', [])
-        )
-
-        # Preallocate shared memory buffers
-        expected_frame_size = self.config_dict['pose'].get('input_size', (640, 480))
-        expected_frame_size = expected_frame_size[0] * expected_frame_size[1] * 3  # Assuming 3 channels
-        num_buffers = 10  # Adjust as needed
-        available_buffers = Queue()
-        shared_buffers = {}
-        for i in range(num_buffers):
-            unique_name = f"frame_buffer_{self.source['id']}_{i}"
-            shm = shared_memory.SharedMemory(name=unique_name, create=True, size=expected_frame_size)
-            shared_buffers[unique_name] = shm
-            available_buffers.put(unique_name)
-
-        # Initialize shared counters
-        self.shared_counts['queued'] = 0
-        self.shared_counts['processed'] = 0
-
-        # Start worker processes
-        workers = []
-        for _ in range(num_workers):
-            worker = WorkerProcess(
-                self.config_dict,
-                frame_queue,
-                result_queue,
-                outputs,
-                available_buffers,
-                shared_buffers,
-                self.shared_counts
-            )
-            worker.start()
-            workers.append(worker)
-
-        # Start frame reader thread
-        stream = GenericStream(
-            self.source,
-            self.config_dict,
-            frame_queue,
-            num_workers,
-            available_buffers,
-            shared_buffers,
-            self.shared_counts
-        )
-        stream.start()
-
-        active_workers = num_workers
-        while not self.stopped:
-            try:
-                result = result_queue.get(timeout=1)
-                if result is None:
-                    # A worker has finished
-                    active_workers -= 1
-                    if active_workers == 0:
-                        # All workers have finished
-                        break
-                else:
-                    source_id, img_show = result
-                    # Handle display
-                    if self.display_queue:
-                        self.display_queue.put({source_id: img_show})
-            except queue.Empty:
-                if not stream.is_alive() and frame_queue.empty():
-                    # If stream is done and queue is empty, ensure workers are stopped
-                    for _ in range(len(workers)):
-                        frame_queue.put(None)
-        # Clean up
-        for worker in workers:
-            worker.stop()
-            worker.join()
-        stream.stop()
-        stream.join()
-
-        # Clean up shared memory
-        for shm in shared_buffers.values():
-            shm.close()
-            shm.unlink()
-
-        logging.info(f"Source {self.source['id']} processing completed.")
-
-
-class WorkerProcess(Process):
-    def __init__(self, config_dict, frame_queue, result_queue, outputs, available_buffers, shared_buffers, shared_counts):
+class WorkerProcess(multiprocessing.Process):
+    def __init__(self, config_dict, frame_queue, available_buffers, shared_buffers, shared_counts, pose_tracker_settings, display_queue):
         super().__init__()
         self.config_dict = config_dict
         self.frame_queue = frame_queue
-        self.result_queue = result_queue
-        self.outputs = outputs
         self.available_buffers = available_buffers
         self.shared_buffers = shared_buffers
         self.shared_counts = shared_counts
+        self.pose_tracker_settings = pose_tracker_settings
+        self.display_queue = display_queue
         self.stopped = False
 
     def run(self):
         try:
-            # Initialize the pose tracker here
-            pose_tracker = setup_pose_tracker(determine_tracker_settings(self.config_dict))
-
+            # Initialize the pose tracker
+            pose_tracker = setup_pose_tracker(self.pose_tracker_settings)
+        
             # Prepare other necessary parameters
             multi_person = self.config_dict['project'].get('multi_person', False)
             save_video = 'to_video' in self.config_dict['project'].get('save_video', [])
@@ -463,58 +373,52 @@ class WorkerProcess(Process):
                 output_video_path = self.outputs[4] 
                 out_vid = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H))
 
-            while not self.stopped:
-                try:
-                    item = self.frame_queue.get(timeout=1)
-                    if item is None:
-                        logging.info("A worker has finished")
-                        break
-                    frame_idx, buffer_name, frame_shape, frame_dtype_str, source_id = item
-                    shm = self.shared_buffers[buffer_name]
-                    frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype_str), buffer=shm.buf)
-                    # Process the frame
-                    result = process_single_frame(
-                        self.config_dict,
-                        frame,
-                        source_id,
-                        frame_idx,
-                        self.outputs,
-                        pose_tracker,
-                        multi_person,
-                        save_video,
-                        save_images,
-                        show_realtime_results,
-                        output_format,
-                        out_vid
-                    )
-                    # Release the buffer back to the available queue
-                    self.available_buffers.put(buffer_name)
-                    with self.shared_counts_lock():
-                        self.shared_counts['processed'] += 1
-                    self.result_queue.put((source_id, result[1]))
-                except queue.Empty:
-                    continue
-            # Signal that this worker is done
-            self.result_queue.put(None)
+            while True:
+                item = self.frame_queue.get()
+                if item is None:
+                    # No more frames to process
+                    break
+                buffer_name, frame_shape, frame_dtype_str, source_id, frame_idx = item
+                shm = self.shared_buffers[buffer_name]
+                frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype_str), buffer=shm.buf)
+
+                # Process the frame
+                result = process_single_frame(
+                    self.config_dict,
+                    frame,
+                    source_id,
+                    frame_idx,
+                    self.outputs,
+                    pose_tracker,
+                    multi_person,
+                    save_video,
+                    save_images,
+                    show_realtime_results,
+                    output_format,
+                    out_vid
+                )
+
+                # Update shared counts
+                counts = self.shared_counts[source_id]
+                counts['processed'] += 1
+
+                # Release the buffer back to available_buffers
+                self.available_buffers.put(buffer_name)
+
+                # Handle display
+                if self.display_queue:
+                    self.display_queue.put({source_id: result[1]})
+
         except Exception as e:
             logging.error(f"Error in WorkerProcess: {e}")
             self.stopped = True
-            self.result_queue.put(None)
-
-    def stop(self):
-        self.stopped = True
-
-    def shared_counts_lock(self):
-        return multiprocessing.Lock()
 
 
-class GenericStream(Process):
-    def __init__(self, source, config_dict, frame_queue, num_workers, available_buffers, shared_buffers, shared_counts):
-        super().__init__(daemon=True)
+class SourceProcess(multiprocessing.Process):
+    def __init__(self, source, config_dict, frame_queue, available_buffers, shared_buffers, shared_counts):
         self.source = source
         self.config_dict = config_dict
         self.frame_queue = frame_queue
-        self.num_workers = num_workers
         self.input_size = config_dict['pose'].get('input_size', (640, 480))
         self.image_extension = config_dict['pose']['vid_img_extension']
         self.stopped = False
@@ -527,7 +431,10 @@ class GenericStream(Process):
         self.frame_ranges = None
         self.available_buffers = available_buffers
         self.shared_buffers = shared_buffers
-        self.shared_counts = shared_counts 
+        self.shared_counts = shared_counts
+        # Initialize other variables as needed
+
+
 
     def parse_frame_ranges(self, frame_ranges):
         if self.source['type'] != 'webcam':
@@ -563,24 +470,19 @@ class GenericStream(Process):
             while not self.stopped:
                 frame = self.capture_frame()
                 if frame is not None:
-                    frame = cv2.resize(frame, self.input_size)
-                    try:
-                        buffer_name = self.available_buffers.get(timeout=1)
-                    except queue.Empty:
-                        logging.warning("No available buffers.")
-                        continue
+                    # Get a buffer from available_buffers
+                    buffer_name = self.available_buffers.get()
                     shm = self.shared_buffers[buffer_name]
                     np_frame = np.ndarray(frame.shape, dtype=frame.dtype, buffer=shm.buf)
                     np.copyto(np_frame, frame)
-                    item = (self.frame_idx, buffer_name, frame.shape, frame.dtype.str, self.source['id'])
-                    self.frame_queue.put_nowait(item)
-                    with self.shared_counts_lock():
-                        self.shared_counts['queued'] += 1
+                    # Put the buffer info into frame_queue
+                    item = (buffer_name, frame.shape, frame.dtype.str, self.source['id'], self.frame_idx)
+                    self.frame_queue.put(item)
+                    # Update shared_counts
+                    counts = self.shared_counts[self.source['id']]
+                    counts['queued'] += 1
                     self.frame_idx += 1
                 else:
-                    # Signal the workers that there are no more frames
-                    for _ in range(self.num_workers):
-                        self.frame_queue.put(None)
                     break
         except Exception as e:
             logging.error(f"Error in GenericStream: {e}")
@@ -757,3 +659,242 @@ def save_to_openpose(json_file_path, keypoints, scores):
     # Save JSON output for each frame
     with open(json_file_path, 'w') as json_file:
         json.dump(json_output, json_file)
+
+
+def determine_tracker_settings(config_dict):
+    det_frequency = config_dict['pose']['det_frequency']
+    mode = config_dict['pose']['mode']
+    pose_model = config_dict['pose']['pose_model']
+
+    try:
+        import torch
+        import onnxruntime as ort
+        if torch.cuda.is_available() and 'CUDAExecutionProvider' in ort.get_available_providers():
+            device = 'cuda'
+            backend = 'onnxruntime'
+            logging.info(f"Valid CUDA installation found: using ONNXRuntime backend with GPU.")
+        elif torch.cuda.is_available() and 'ROCMExecutionProvider' in ort.get_available_providers():
+            device = 'rocm'
+            backend = 'onnxruntime'
+            logging.info(f"Valid ROCM installation found: using ONNXRuntime backend with GPU.")
+        else:
+            raise
+    except:
+        try:
+            import onnxruntime as ort
+            if 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
+                device = 'mps'
+                backend = 'onnxruntime'
+                logging.info(f"Valid MPS installation found: using ONNXRuntime backend with GPU.")
+            else:
+                raise
+        except:
+            device = 'cpu'
+            backend = 'openvino'
+            logging.info(f"No valid CUDA installation found: using OpenVINO backend with CPU.")
+
+        logging.info(f"Using device: {device}, backend: {backend}")
+
+    if det_frequency > 1:
+        logging.info(f'Inference run every {det_frequency} frames. In between, pose estimation tracks previously detected points.')
+    elif det_frequency == 1:
+        logging.info(f'Inference run on every single frame.')
+    else:
+        raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
+
+    # Select the appropriate model based on the model_type
+    if pose_model.upper() in ('HALPE_26', 'BODY_WITH_FEET'):
+        model_class = BodyWithFeet
+        logging.info(f"Using HALPE_26 model (body and feet) for pose estimation.")
+    elif pose_model.upper() in ('COCO_133', 'WHOLE_BODY'):
+        model_class = Wholebody
+        logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation.")
+    elif pose_model.upper() in ('COCO_17', 'BODY'):
+        model_class = Body
+        logging.info(f"Using COCO_17 model (body) for pose estimation.")
+    else:
+        raise ValueError(f"Invalid model_type: {pose_model}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'.")
+
+    logging.info(f'Mode: {mode}.')
+
+    return (model_class, det_frequency, mode, backend, device)
+
+
+def setup_pose_tracker(pose_tracker_settings):
+    # Initialize the pose tracker with the selected model
+    model_class, det_frequency, mode, backend, device = pose_tracker_settings
+    
+    pose_tracker = PoseTracker(
+        model_class,
+        det_frequency=det_frequency,
+        mode=mode,
+        backend=backend,
+        device=device,
+        tracking=False,
+        to_openpose=False)
+
+    return pose_tracker
+
+
+def track_people(keypoints, scores, multi_person, tracking_mode, prev_keypoints, pose_tracker=None):
+    if multi_person:
+        if tracking_mode == 'rtmlib':
+            keypoints, scores = sort_people_rtmlib(pose_tracker, keypoints, scores)
+        else:
+            if prev_keypoints is None: prev_keypoints = keypoints
+            prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores)
+    else:
+        keypoints, scores = np.array([keypoints[0]]), np.array([scores[0]])
+        
+    return keypoints, scores, prev_keypoints
+
+
+def sort_people_rtmlib(pose_tracker, keypoints, scores):
+    '''
+    Associate persons across frames (RTMLib method)
+
+    INPUTS:
+    - pose_tracker: PoseTracker. The initialized RTMLib pose tracker object
+    - keypoints: array of shape K, L, M with K the number of detected persons,
+    L the number of detected keypoints, M their 2D coordinates
+    - scores: array of shape K, L with K the number of detected persons,
+    L the confidence of detected keypoints
+
+    OUTPUT:
+    - sorted_keypoints: array with reordered persons
+    - sorted_scores: array with reordered scores
+    '''
+    
+    try:
+        desired_size = max(pose_tracker.track_ids_last_frame)+1
+        sorted_keypoints = np.full((desired_size, keypoints.shape[1], 2), np.nan)
+        sorted_keypoints[pose_tracker.track_ids_last_frame] = keypoints[:len(pose_tracker.track_ids_last_frame), :, :]
+        sorted_scores = np.full((desired_size, scores.shape[1]), np.nan)
+        sorted_scores[pose_tracker.track_ids_last_frame] = scores[:len(pose_tracker.track_ids_last_frame), :]
+    except:
+        sorted_keypoints, sorted_scores = keypoints, scores
+
+    return sorted_keypoints, sorted_scores
+
+
+def sort_people_sports2d(keyptpre, keypt, scores):
+    '''
+    Associate persons across frames (Pose2Sim method)
+    Persons' indices are sometimes swapped when changing frame
+    A person is associated to another in the next frame when they are at a small distance
+    
+    N.B.: Requires min_with_single_indices and euclidian_distance function (see common.py)
+
+    INPUTS:
+    - keyptpre: array of shape K, L, M with K the number of detected persons,
+    L the number of detected keypoints, M their 2D coordinates
+    - keypt: idem keyptpre, for current frame
+    - score: array of shape K, L with K the number of detected persons,
+    L the confidence of detected keypoints
+    
+    OUTPUTS:
+    - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
+    - sorted_keypoints: array with reordered persons
+    - sorted_scores: array with reordered scores
+    '''
+    
+    # Generate possible person correspondences across frames
+    if len(keyptpre) < len(keypt):
+        keyptpre = np.concatenate((keyptpre, np.full((len(keypt)-len(keyptpre), keypt.shape[1], 2), np.nan)))
+    if len(keypt) < len(keyptpre):
+        keypt = np.concatenate((keypt, np.full((len(keyptpre)-len(keypt), keypt.shape[1], 2), np.nan)))
+        scores = np.concatenate((scores, np.full((len(keyptpre)-len(scores), scores.shape[1]), np.nan)))
+    personsIDs_comb = sorted(list(it.product(range(len(keyptpre)), range(len(keypt)))))
+    
+    # Compute distance between persons from one frame to another
+    frame_by_frame_dist = []
+    for comb in personsIDs_comb:
+        frame_by_frame_dist += [euclidean_distance(keyptpre[comb[0]],keypt[comb[1]])]
+    # frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
+    
+    # Sort correspondences by distance
+    _, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
+    
+    # Associate points to same index across frames, nan if no correspondence
+    sorted_keypoints, sorted_scores = [], []
+    for i in range(len(keyptpre)):
+        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+        if len(id_in_old) > 0:
+            sorted_keypoints += [keypt[id_in_old[0]]]
+            sorted_scores += [scores[id_in_old[0]]]
+        else:
+            sorted_keypoints += [keypt[i]]
+            sorted_scores += [scores[i]]
+    sorted_keypoints, sorted_scores = np.array(sorted_keypoints), np.array(sorted_scores)
+
+    # Keep track of previous values even when missing for more than one frame
+    sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints) & ~np.isnan(keyptpre), keyptpre, sorted_keypoints)
+    
+    return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+
+
+def euclidean_distance(q1, q2):
+    '''
+    Euclidean distance between 2 points (N-dim).
+
+    INPUTS:
+    - q1: list of N_dimensional coordinates of point
+    - q2: idem
+
+    OUTPUTS:
+    - euc_dist: float. Euclidian distance between q1 and q2
+    '''
+
+    q1 = np.array(q1)
+    q2 = np.array(q2)
+    dist = q2 - q1
+
+    euc_dist = np.sqrt(np.sum( [d**2 for d in dist]))
+
+    return euc_dist
+
+
+def min_with_single_indices(L, T):
+    '''
+    Let L be a list (size s) with T associated tuple indices (size s).
+    Select the smallest values of L, considering that 
+    the next smallest value cannot have the same numbers 
+    in the associated tuple as any of the previous ones.
+
+    Example:
+    L = [  20,   27,  51,    33,   43,   23,   37,   24,   4,   68,   84,    3  ]
+    T = list(it.product(range(2),range(3)))
+      = [(0,0),(0,1),(0,2),(0,3),(1,0),(1,1),(1,2),(1,3),(2,0),(2,1),(2,2),(2,3)]
+
+    - 1st smallest value: 3 with tuple (2,3), index 11
+    - 2nd smallest value when excluding indices (2,.) and (.,3), i.e. [(0,0),(0,1),(0,2),X,(1,0),(1,1),(1,2),X,X,X,X,X]:
+    20 with tuple (0,0), index 0
+    - 3rd smallest value when excluding [X,X,X,X,X,(1,1),(1,2),X,X,X,X,X]:
+    23 with tuple (1,1), index 5
+    
+    INPUTS:
+    - L: list (size s)
+    - T: T associated tuple indices (size s)
+
+    OUTPUTS: 
+    - minL: list of smallest values of L, considering constraints on tuple indices
+    - argminL: list of indices of smallest values of L (indices of best combinations)
+    - T_minL: list of tuples associated with smallest values of L
+    '''
+
+    minL = [np.nanmin(L)]
+    argminL = [np.nanargmin(L)]
+    T_minL = [T[argminL[0]]]
+    
+    mask_tokeep = np.array([True for t in T])
+    i=0
+    while mask_tokeep.any()==True:
+        mask_tokeep = mask_tokeep & np.array([t[0]!=T_minL[i][0] and t[1]!=T_minL[i][1] for t in T])
+        if mask_tokeep.any()==True:
+            indicesL_tokeep = np.where(mask_tokeep)[0]
+            minL += [np.nanmin(np.array(L)[indicesL_tokeep]) if not np.isnan(np.array(L)[indicesL_tokeep]).all() else np.nan]
+            argminL += [indicesL_tokeep[np.nanargmin(np.array(L)[indicesL_tokeep])] if not np.isnan(minL[-1]) else indicesL_tokeep[0]]
+            T_minL += (T[argminL[i+1]],)
+            i+=1
+    
+    return np.array(minL), np.array(argminL), np.array(T_minL)
