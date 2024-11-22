@@ -297,6 +297,7 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
     labels2d_json_data['images'] = []
     labels2d_json_data['annotations'] = []
     labels2d_json_data['categories'] = [{'id': 1, 'name': 'person'}]
+    padding = 0.05
 
     # for each image
     persons = list(set(['_'.join(item.split('_')[:5]) for item in coords_df.columns.levels[1]]))
@@ -332,7 +333,11 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
             bbox_height = np.round(max_y - min_y, decimals=1)
             # bbox = [min_x, min_y, max_x, max_y]
             bbox = [min_x, min_y, bbox_width, bbox_height] # coco format
-            # bbox = [min_x-bbox_width*0.1, min_y-bbox_height*0.1, bbox_width*1.2, bbox_height]*1.2 # + 10 % margin
+            # add padding
+            bbox = [min(0, min_x-bbox_width*padding),
+                    min(0, min_y-bbox_height*padding),
+                    bbox_width*(1+padding*2) if max_x+bbox_width*padding < w else bbox_width*(1+padding),
+                    bbox_height*(1+padding*2) if max_y+bbox_height*padding < h else bbox_height*(1+padding)]
 
             ann_id = str_to_id(person+file_name) 
             category_id = 1
