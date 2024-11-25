@@ -798,19 +798,19 @@ def setup_pose_tracker(pose_tracker_settings):
 
 
 def track_people(keypoints, scores, multi_person, tracking_mode, prev_keypoints, pose_tracker=None):
-    if multi_person:
-        if tracking_mode == 'rtmlib':
-            keypoints, scores = sort_people_rtmlib(pose_tracker, keypoints, scores)
-        else:
-            if prev_keypoints is None: prev_keypoints = keypoints
-            prev_keypoints, keypoints, scores = sort_people_hungarian(prev_keypoints, keypoints, scores)
+    return_first_only = not multi_person
+
+    if tracking_mode == 'rtmlib':
+        keypoints, scores = sort_people_rtmlib(pose_tracker, keypoints, scores, return_first_only)
     else:
-        keypoints, scores = np.array([keypoints[0]]), np.array([scores[0]])
-        
+        if prev_keypoints is None:
+            prev_keypoints = keypoints
+        prev_keypoints, keypoints, scores = sort_people_hungarian(prev_keypoints, keypoints, scores, return_first_only)
+
     return keypoints, scores, prev_keypoints
 
 
-def sort_people_rtmlib(pose_tracker, keypoints, scores):
+def sort_people_rtmlib(pose_tracker, keypoints, scores, return_first_only=False):
     '''
     Associate persons across frames (RTMLib method)
 
@@ -835,10 +835,14 @@ def sort_people_rtmlib(pose_tracker, keypoints, scores):
     except:
         sorted_keypoints, sorted_scores = keypoints, scores
 
+    if return_first_only and sorted_keypoints.shape[0] > 0:
+        sorted_keypoints = np.array([sorted_keypoints[0]])
+        sorted_scores = np.array([sorted_scores[0]])
+
     return sorted_keypoints, sorted_scores
 
 
-def sort_people_hungarian(keyptpre, keypt, scores):
+def sort_people_hungarian(keyptpre, keypt, scores, return_first_only=False):
     '''
     Matches people across frames using the Hungarian algorithm.
 
@@ -886,50 +890,8 @@ def sort_people_hungarian(keyptpre, keypt, scores):
     # Keep previous keypoints if no new ones are assigned
     sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints), keyptpre, sorted_keypoints)
 
+    if return_first_only and sorted_keypoints.shape[0] > 0:
+        sorted_keypoints = np.array([sorted_keypoints[0]])
+        sorted_scores = np.array([sorted_scores[0]])
+
     return sorted_prev_keypoints, sorted_keypoints, sorted_scores
-
-
-def min_with_single_indices(L, T):
-    '''
-    Let L be a list (size s) with T associated tuple indices (size s).
-    Select the smallest values of L, considering that 
-    the next smallest value cannot have the same numbers 
-    in the associated tuple as any of the previous ones.
-
-    Example:
-    L = [  20,   27,  51,    33,   43,   23,   37,   24,   4,   68,   84,    3  ]
-    T = list(it.product(range(2),range(3)))
-      = [(0,0),(0,1),(0,2),(0,3),(1,0),(1,1),(1,2),(1,3),(2,0),(2,1),(2,2),(2,3)]
-
-    - 1st smallest value: 3 with tuple (2,3), index 11
-    - 2nd smallest value when excluding indices (2,.) and (.,3), i.e. [(0,0),(0,1),(0,2),X,(1,0),(1,1),(1,2),X,X,X,X,X]:
-    20 with tuple (0,0), index 0
-    - 3rd smallest value when excluding [X,X,X,X,X,(1,1),(1,2),X,X,X,X,X]:
-    23 with tuple (1,1), index 5
-    
-    INPUTS:
-    - L: list (size s)
-    - T: T associated tuple indices (size s)
-
-    OUTPUTS: 
-    - minL: list of smallest values of L, considering constraints on tuple indices
-    - argminL: list of indices of smallest values of L (indices of best combinations)
-    - T_minL: list of tuples associated with smallest values of L
-    '''
-
-    minL = [np.nanmin(L)]
-    argminL = [np.nanargmin(L)]
-    T_minL = [T[argminL[0]]]
-    
-    mask_tokeep = np.array([True for t in T])
-    i=0
-    while mask_tokeep.any()==True:
-        mask_tokeep = mask_tokeep & np.array([t[0]!=T_minL[i][0] and t[1]!=T_minL[i][1] for t in T])
-        if mask_tokeep.any()==True:
-            indicesL_tokeep = np.where(mask_tokeep)[0]
-            minL += [np.nanmin(np.array(L)[indicesL_tokeep]) if not np.isnan(np.array(L)[indicesL_tokeep]).all() else np.nan]
-            argminL += [indicesL_tokeep[np.nanargmin(np.array(L)[indicesL_tokeep])] if not np.isnan(minL[-1]) else indicesL_tokeep[0]]
-            T_minL += (T[argminL[i+1]],)
-            i+=1
-    
-    return np.array(minL), np.array(argminL), np.array(T_minL)
