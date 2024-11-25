@@ -40,10 +40,11 @@ import cv2
 import time
 import queue
 import multiprocessing
+import psutil
 
-import itertools as it
 import numpy as np
 
+from multiprocessing import shared_memory
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
@@ -138,16 +139,18 @@ def rtm_estimator(config_dict):
 
     # Initialize shared memory buffers
     expected_frame_size = config_dict['pose'].get('input_size', (640, 480))
+    available_memory = psutil.virtual_memory().available
     frame_width, frame_height = expected_frame_size
     expected_frame_size_bytes = frame_width * frame_height * 3  # Assuming 3 channels
-    num_buffers = 10  # Adjust as needed
+    num_buffers = min(100, int((available_memory / 2) / expected_frame_size_bytes))
+    logging.info(f"Number of buffers set to: {num_buffers}")
 
     # Preallocate shared memory buffers
     shared_buffers = {}
     available_buffers = multiprocessing.Queue()
     for i in range(num_buffers):
         unique_name = f"frame_buffer_{i}"
-        shm = multiprocessing.shared_memory.SharedMemory(name=unique_name, create=True, size=expected_frame_size_bytes)
+        shm = shared_memory.SharedMemory(name=unique_name, create=True, size=expected_frame_size_bytes)
         shared_buffers[unique_name] = shm
         available_buffers.put(unique_name)
 
@@ -160,7 +163,8 @@ def rtm_estimator(config_dict):
     for source in sources:
         shared_counts[source['id']] = {
             'queued': multiprocessing.Value('i', 0),
-            'processed': multiprocessing.Value('i', 0)
+            'processed': multiprocessing.Value('i', 0),
+            'total': multiprocessing.Value('i', 0)
         }
         # Initialize outputs for each source
         outputs = setup_capture_directories(
@@ -213,22 +217,43 @@ def rtm_estimator(config_dict):
 
     # Initialize progress bars
     progress_bars = {}
+    position_counter = 0  # Position for progress bars
     for idx, source in enumerate(sources):
-        source_id = source['id']
-        desc = f"Source {source_id}"
-        progress_bars[source_id] = tqdm(total=0, desc=desc, position=idx, leave=True)
+        if source['type'] != 'webcam':
+            source_id = source['id']
+            desc = f"Source {source_id}"
+            progress_bars[source_id] = tqdm(total=0, desc=desc, position=position_counter, leave=True)
+            position_counter += 1 
+
+    buffer_bar = tqdm(total=num_buffers, desc='Buffers Free', position=position_counter, leave=True)
 
     try:
         while any(process.is_alive() for process in reading_processes) or not frame_queue.empty():
             for source_id, pb in progress_bars.items():
                 counts = shared_counts[source_id]
-                queued = counts['queued'].value
+                total_frames = counts['total'].value
                 processed = counts['processed'].value
-                pb.total = queued
-                pb.n = processed
-                pb.refresh()
+                if total_frames > 0:
+                    pb.total = total_frames
+                    pb.n = processed
+                    pb.refresh()
+            # Update buffer bar
+            free_buffers = available_buffers.qsize()
+            buffer_bar.n = free_buffers
+            buffer_bar.total = num_buffers
+            if free_buffers >= 0.9 * num_buffers:
+                red_text = '\033[91m'
+                reset_text = '\033[0m'
+                buffer_bar.set_description(f'{red_text}Buffers Free: {free_buffers}/{num_buffers}{reset_text}')
+            else:
+                buffer_bar.set_description(f'Buffers Free: {free_buffers}/{num_buffers}')
+            buffer_bar.refresh()
             if display_thread and display_thread.stopped:
                 break
+        # Final refresh to update progress bars at the end
+        for pb in progress_bars.values():
+            pb.refresh()
+        buffer_bar.refresh()
     except KeyboardInterrupt:
         logging.info("Processing interrupted by user.")
     finally:
@@ -252,6 +277,7 @@ def rtm_estimator(config_dict):
             display_thread.join()
         for pb in progress_bars.values():
             pb.close()
+        buffer_bar.close()
         logging.shutdown()
 
 
@@ -302,7 +328,6 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
 
     return (source_id, img_show), keypoints
 
-
 class DisplayProcess(multiprocessing.Process):
     '''
     Thread for displaying combined images to avoid thread-safety issues with OpenCV.
@@ -317,8 +342,8 @@ class DisplayProcess(multiprocessing.Process):
         self.window_size = (1920, 1080)
         self.grid_size = self.calculate_grid_size(len(sources))
         self.img_placeholder = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
-        self.frames = {source['id']: self.get_placeholder_frame(source['id'], 'Not Connected') for source in sources}
-        self.source_ids = [source['id'] for source in self.sources]
+        self.source_ids = sorted([source['id'] for source in self.sources])
+        self.frames = {source_id: self.get_placeholder_frame(source_id, 'Not Connected') for source_id in self.source_ids}
 
     def run(self):
         while not self.stopped:
@@ -488,7 +513,6 @@ class SourceProcess(multiprocessing.Process):
         self.cap = None
         self.image_files = []
         self.image_index = 0
-        self.pbar = None
         self.frame_ranges = None
         self.available_buffers = available_buffers
         self.shared_buffers = shared_buffers
@@ -519,9 +543,10 @@ class SourceProcess(multiprocessing.Process):
                     self.total_frames = len(self.frame_ranges)
                 else:
                     self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                self.setup_progress_bar()
+                self.shared_counts[self.source['id']]['total'].value = self.total_frames
             elif self.source['type'] == 'images':
                 self.load_images()
+                self.shared_counts[self.source['id']]['total'].value = self.total_frames
             else:
                 logging.error(f"Unknown source type: {self.source['type']}")
                 self.stopped = True
@@ -571,7 +596,6 @@ class SourceProcess(multiprocessing.Process):
         path_pattern = os.path.join(self.source['path'], f'*{self.image_extension}')
         self.image_files = sorted(glob.glob(path_pattern))
         self.total_frames = len(self.image_files)
-        self.setup_progress_bar()
 
     def capture_frame(self):
         frame = None
@@ -584,8 +608,6 @@ class SourceProcess(multiprocessing.Process):
             if not ret:
                 logging.info(f"End of video {self.source['path']}")
                 self.stopped = True
-                if self.pbar:
-                    self.pbar.close()
                 return None
             if self.frame_ranges and self.frame_idx not in self.frame_ranges:
                 logging.debug(f"Skipping frame {self.frame_idx} as it's not in the specified frame range.")
@@ -643,11 +665,6 @@ class SourceProcess(multiprocessing.Process):
         self.stopped = True
         if self.cap:
             self.cap.release()
-        if self.pbar:
-            self.pbar.close()
-
-    def setup_progress_bar(self):
-        self.pbar = tqdm(total=self.total_frames, desc=f'Processing {os.path.basename(str(self.source["path"]))}', position=self.source['id'])
 
 
 def setup_capture_directories(source_path, output_dir, save_images):
@@ -665,20 +682,19 @@ def setup_capture_directories(source_path, output_dir, save_images):
         output_dir_name = os.path.basename(os.path.splitext(str(source_path))[0])
 
     # Define the full path for the output directory
-    output_dir_full = os.path.abspath(os.path.join(output_dir, "pose"))
 
     # Create output directories if they do not exist
-    os.makedirs(output_dir_full, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
 
     # Prepare directories for images and JSON outputs
-    img_output_dir = os.path.join(output_dir_full, f'{output_dir_name}_img')
-    json_output_dir = os.path.join(output_dir_full, f'{output_dir_name}_json')
+    img_output_dir = os.path.join(output_dir, f'{output_dir_name}_img')
+    json_output_dir = os.path.join(output_dir, f'{output_dir_name}_json')
     if save_images:
         os.makedirs(img_output_dir, exist_ok=True)
     os.makedirs(json_output_dir, exist_ok=True)
 
     # Define the path for the output video file
-    output_video_path = os.path.join(output_dir_full, f'{output_dir_name}_pose.mp4')
+    output_video_path = os.path.join(output_dir, f'{output_dir_name}_pose.mp4')
 
     return output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path
 
