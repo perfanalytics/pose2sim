@@ -133,11 +133,6 @@ def rtm_estimator(config_dict):
 
     pose_tracker_settings = determine_tracker_settings(config_dict)
 
-    # Initialize shared counts for each source
-    shared_counts = manager.dict()
-    for source in sources:
-        shared_counts[source['id']] = manager.dict({'queued': 0, 'processed': 0})
-
     # Create a global frame queue
     frame_queue = multiprocessing.Queue(maxsize=100)
 
@@ -161,7 +156,10 @@ def rtm_estimator(config_dict):
 
     # Start reading processes for each source
     reading_processes = []
+    manager = multiprocessing.Manager()
+    shared_counts = manager.dict()
     for source in sources:
+        shared_counts[source['id']] = manager.dict({'queued': 0, 'processed': 0})
         # Initialize outputs for each source
         outputs = setup_capture_directories(
             source['path'], pose_dir, 'to_images' in config_dict['project'].get('save_video', [])
@@ -175,7 +173,8 @@ def rtm_estimator(config_dict):
             frame_queue,
             available_buffers,
             shared_buffers,
-            shared_counts
+            shared_counts,
+            expected_frame_size
         )
         process.start()
         reading_processes.append(process)
@@ -220,7 +219,14 @@ def rtm_estimator(config_dict):
     try:
         while any(process.is_alive() for process in reading_processes) or not frame_queue.empty():
             time.sleep(0.5)
-
+            # Mettre à jour les barres de progression
+            for source_id, pb in progress_bars.items():
+                counts = shared_counts[source_id]
+                queued = counts.get('queued', 0)
+                processed = counts.get('processed', 0)
+                pb.total = queued
+                pb.n = processed
+                pb.refresh()
             if display_thread and display_thread.stopped:
                 break
     except KeyboardInterrupt:
@@ -308,6 +314,7 @@ class DisplayProcess(multiprocessing.Process):
         self.sources = sources
         self.input_size = input_size
         self.window_name = "Combined Feeds"
+        self.window_size = (1920, 1080)
         self.grid_size = self.calculate_grid_size(len(sources))
         self.img_placeholder = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
         self.frames = {source['id']: self.get_placeholder_frame(source['id'], 'Not Connected') for source in sources}
@@ -332,10 +339,30 @@ class DisplayProcess(multiprocessing.Process):
                 self.stopped = True
 
     def combine_frames(self):
-        resized_frames = [cv2.resize(frame, self.input_size) if frame.shape[:2] != self.input_size else frame
-                          for frame in (self.frames.get(source_id, self.img_placeholder) for source_id in self.source_ids)]
-        rows = [np.hstack(resized_frames[i:i + self.grid_size[1]]) for i in range(0, len(resized_frames), self.grid_size[1])]
-        return np.vstack(rows)
+        window_width, window_height = self.window_size
+        rows, cols = self.grid_size
+        frame_width = window_width // cols
+        frame_height = window_height // rows
+        frame_size = (frame_width, frame_height)
+        
+        combined_image = np.zeros((window_height, window_width, 3), dtype=np.uint8)
+        
+        idx = 0
+        for i in range(rows):
+            for j in range(cols):
+                if idx < len(self.source_ids):
+                    source_id = self.source_ids[idx]
+                    frame = self.frames.get(source_id, self.img_placeholder)
+                    resized_frame = cv2.resize(frame, frame_size)
+                    y1 = i * frame_height
+                    y2 = y1 + frame_height
+                    x1 = j * frame_width
+                    x2 = x1 + frame_width
+                    combined_image[y1:y2, x1:x2] = resized_frame
+                    idx += 1
+                else:
+                    continue
+        return combined_image
 
     def calculate_grid_size(self, num_sources):
         cols = int(np.ceil(np.sqrt(num_sources)))
@@ -443,12 +470,11 @@ class WorkerProcess(multiprocessing.Process):
 
 
 class SourceProcess(multiprocessing.Process):
-    def __init__(self, source, config_dict, frame_queue, available_buffers, shared_buffers, shared_counts):
+    def __init__(self, source, config_dict, frame_queue, available_buffers, shared_buffers, shared_counts, frame_size):
         super().__init__()
         self.source = source
         self.config_dict = config_dict
         self.frame_queue = frame_queue
-        self.input_size = config_dict['pose'].get('input_size', (640, 480))
         self.image_extension = config_dict['pose']['vid_img_extension']
         self.stopped = False
         self.frame_idx = 0
@@ -461,6 +487,7 @@ class SourceProcess(multiprocessing.Process):
         self.available_buffers = available_buffers
         self.shared_buffers = shared_buffers
         self.shared_counts = shared_counts
+        self.frame_size = frame_size
 
     def parse_frame_ranges(self, frame_ranges):
         if self.source['type'] != 'webcam':
@@ -546,7 +573,6 @@ class SourceProcess(multiprocessing.Process):
             frame = self.read_webcam_frame()
             if frame is not None:
                 self.frame_idx += 1
-            return frame
         elif self.source['type'] == 'video':
             ret, frame = self.cap.read()
             if not ret:
@@ -561,24 +587,27 @@ class SourceProcess(multiprocessing.Process):
                 return self.capture_frame()
             else:
                 logging.debug(f"Reading frame {self.frame_idx} from video {self.source['path']}.")
-                return frame
         elif self.source['type'] == 'images':
             if self.image_index < len(self.image_files):
                 frame = cv2.imread(self.image_files[self.image_index])
                 self.image_index += 1
                 self.frame_idx += 1
-                return frame
             else:
                 self.stopped = True
                 return None
+
+        if frame is not None:
+            frame = cv2.resize(frame, (self.frame_size[0], self.frame_size[1]))
+            return frame
+        return None
 
     def open_webcam(self):
         self.connected = False
         try:
             self.cap = cv2.VideoCapture(int(self.source['id']), cv2.CAP_DSHOW)
             if self.cap.isOpened():
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.input_size[0])
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.input_size[1])
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_size[0])
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_size[1])
                 logging.info(f"Webcam {self.source['id']} opened.")
                 self.connected = True
             else:

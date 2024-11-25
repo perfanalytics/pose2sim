@@ -45,7 +45,7 @@ from anytree import PreOrderIter
 import opensim
 
 from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean
-from Sports2D.Utilities.skeletons import *
+from Pose2Sim.Utilities.skeletons import *
 
 
 
