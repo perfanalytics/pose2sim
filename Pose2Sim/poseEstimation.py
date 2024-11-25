@@ -48,6 +48,7 @@ from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, draw_skeleton
+from scipy.optimize import linear_sum_assignment
 
 ## AUTHORSHIP INFORMATION
 __author__ = "HunMin Kim, David Pagnon"
@@ -128,8 +129,7 @@ def rtm_estimator(config_dict):
     logging.info(f'Processing sources: {sources}')
 
     # Create display queue
-    manager = multiprocessing.Manager()
-    display_queue = manager.Queue()
+    display_queue = multiprocessing.Queue()
 
     pose_tracker_settings = determine_tracker_settings(config_dict)
 
@@ -156,10 +156,12 @@ def rtm_estimator(config_dict):
 
     # Start reading processes for each source
     reading_processes = []
-    manager = multiprocessing.Manager()
-    shared_counts = manager.dict()
+    shared_counts = {}
     for source in sources:
-        shared_counts[source['id']] = manager.dict({'queued': 0, 'processed': 0})
+        shared_counts[source['id']] = {
+            'queued': multiprocessing.Value('i', 0),
+            'processed': multiprocessing.Value('i', 0)
+        }
         # Initialize outputs for each source
         outputs = setup_capture_directories(
             source['path'], pose_dir, 'to_images' in config_dict['project'].get('save_video', [])
@@ -218,12 +220,10 @@ def rtm_estimator(config_dict):
 
     try:
         while any(process.is_alive() for process in reading_processes) or not frame_queue.empty():
-            time.sleep(0.5)
-            # Mettre à jour les barres de progression
             for source_id, pb in progress_bars.items():
                 counts = shared_counts[source_id]
-                queued = counts.get('queued', 0)
-                processed = counts.get('processed', 0)
+                queued = counts['queued'].value
+                processed = counts['processed'].value
                 pb.total = queued
                 pb.n = processed
                 pb.refresh()
@@ -255,7 +255,7 @@ def rtm_estimator(config_dict):
         logging.shutdown()
 
 
-def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, output_format, out_vid):
+def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, output_format, out_vid, prev_keypoints):
     '''
     Processes a single frame from a source.
 
@@ -282,8 +282,8 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
     keypoints, scores = pose_tracker(frame)
 
     # Tracking people IDs across frames (if needed)
-    keypoints, scores, _ = track_people(
-        keypoints, scores, multi_person, None, None, pose_tracker
+    keypoints, scores, prev_keypoints = track_people(
+        keypoints, scores, multi_person, None, prev_keypoints, pose_tracker
     )
 
     if 'openpose' in output_format:
@@ -300,7 +300,7 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
     if save_images:
         cv2.imwrite(os.path.join(img_output_dir, f'{output_dir_name}_{frame_idx:06d}.jpg'), img_show)
 
-    return source_id, img_show
+    return (source_id, img_show), keypoints
 
 
 class DisplayProcess(multiprocessing.Process):
@@ -373,7 +373,7 @@ class DisplayProcess(multiprocessing.Process):
         self.stopped = True
 
     def get_placeholder_frame(self, source_id, message):
-        return cv2.putText(self.img_placeholder, f'Source {source_id}: {message}', (50, self.input_size[1] // 2),
+        return cv2.putText(self.img_placeholder.copy(), f'Source {source_id}: {message}', (50, self.input_size[1] // 2),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
 
     def __del__(self):
@@ -392,6 +392,7 @@ class WorkerProcess(multiprocessing.Process):
         self.display_queue = display_queue
         self.stopped = False
         self.source_outputs = source_outputs
+        self.prev_keypoints = {}
 
     def run(self):
         try:
@@ -426,15 +427,17 @@ class WorkerProcess(multiprocessing.Process):
                     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                     fps = self.config_dict['pose'].get('fps', 30)
                     input_size = self.config_dict['pose'].get('input_size', (640, 480))
-                    H, W = input_size[1], input_size[0]
+                    W, H = input_size
                     output_video_path = outputs[4]
                     out_vid = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H))
                     local_out_vids[source_id] = out_vid
                 else:
                     out_vid = local_out_vids.get(source_id)
 
+                prev_keypoints = self.prev_keypoints.get(source_id, None)
+
                 # Process the frame
-                result = process_single_frame(
+                result, current_keypoints = process_single_frame(
                     self.config_dict,
                     frame,
                     source_id,
@@ -446,12 +449,15 @@ class WorkerProcess(multiprocessing.Process):
                     save_images,
                     show_realtime_results,
                     output_format,
-                    out_vid
+                    out_vid,
+                    prev_keypoints
                 )
 
+                self.prev_keypoints[source_id] = current_keypoints
+
                 # Update shared counts
-                counts = self.shared_counts[source_id]
-                counts['processed'] += 1
+                with self.shared_counts[source_id]['processed'].get_lock():
+                    self.shared_counts[source_id]['processed'].value += 1
 
                 # Release the buffer back to available_buffers
                 self.available_buffers.put(buffer_name)
@@ -532,13 +538,13 @@ class SourceProcess(multiprocessing.Process):
                     item = (buffer_name, frame.shape, frame.dtype.str, self.source['id'], self.frame_idx)
                     self.frame_queue.put(item)
                     # Update shared_counts
-                    counts = self.shared_counts[self.source['id']]
-                    counts['queued'] += 1
+                    with self.shared_counts[self.source['id']]['queued'].get_lock():
+                        self.shared_counts[self.source['id']]['queued'].value += 1
                     self.frame_idx += 1
                 else:
                     break
         except Exception as e:
-            logging.error(f"Error in GenericStream: {e}")
+            logging.error(f"Error in SourceProcess: {e}")
             self.stopped = True
 
     def shared_counts_lock(self):
@@ -597,7 +603,9 @@ class SourceProcess(multiprocessing.Process):
                 return None
 
         if frame is not None:
-            frame = cv2.resize(frame, (self.frame_size[0], self.frame_size[1]))
+            # Avoid unnecessary resizing if frame already matches expected size
+            if frame.shape[1] != self.frame_size[0] or frame.shape[0] != self.frame_size[1]:
+                frame = cv2.resize(frame, (self.frame_size[0], self.frame_size[1]))
             return frame
         return None
 
@@ -660,16 +668,14 @@ def setup_capture_directories(source_path, output_dir, save_images):
     output_dir_full = os.path.abspath(os.path.join(output_dir, "pose"))
 
     # Create output directories if they do not exist
-    if not os.path.isdir(output_dir_full):
-        os.makedirs(output_dir_full)
+    os.makedirs(output_dir_full, exist_ok=True)
 
     # Prepare directories for images and JSON outputs
     img_output_dir = os.path.join(output_dir_full, f'{output_dir_name}_img')
     json_output_dir = os.path.join(output_dir_full, f'{output_dir_name}_json')
-    if save_images and not os.path.isdir(img_output_dir):
-        os.makedirs(img_output_dir)
-    if not os.path.isdir(json_output_dir):
-        os.makedirs(json_output_dir)
+    if save_images:
+        os.makedirs(img_output_dir, exist_ok=True)
+    os.makedirs(json_output_dir, exist_ok=True)
 
     # Define the path for the output video file
     output_video_path = os.path.join(output_dir_full, f'{output_dir_name}_pose.mp4')
@@ -690,15 +696,13 @@ def save_to_openpose(json_file_path, keypoints, scores):
     '''
 
     # Prepare keypoints with confidence scores for JSON output
-    nb_detections = len(keypoints)
-    detections = []
-    for i in range(nb_detections):  # Number of detected people
-        keypoints_with_confidence_i = []
-        for kp, score in zip(keypoints[i], scores[i]):
-            keypoints_with_confidence_i.extend([kp[0].item(), kp[1].item(), score.item()])
-        detections.append({
+    keypoints_with_confidence = np.concatenate([keypoints, scores[:, :, np.newaxis]], axis=2)
+    keypoints_with_confidence_flat = keypoints_with_confidence.reshape((keypoints.shape[0], -1))
+
+    detections = [
+        {
             "person_id": [-1],
-            "pose_keypoints_2d": keypoints_with_confidence_i,
+            "pose_keypoints_2d": person_keypoints.tolist(),
             "face_keypoints_2d": [],
             "hand_left_keypoints_2d": [],
             "hand_right_keypoints_2d": [],
@@ -706,7 +710,9 @@ def save_to_openpose(json_file_path, keypoints, scores):
             "face_keypoints_3d": [],
             "hand_left_keypoints_3d": [],
             "hand_right_keypoints_3d": []
-        })
+        }
+        for person_keypoints in keypoints_with_confidence_flat
+    ]
 
     # Create JSON output structure
     json_output = {"version": 1.3, "people": detections}
@@ -797,7 +803,7 @@ def track_people(keypoints, scores, multi_person, tracking_mode, prev_keypoints,
             keypoints, scores = sort_people_rtmlib(pose_tracker, keypoints, scores)
         else:
             if prev_keypoints is None: prev_keypoints = keypoints
-            prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores)
+            prev_keypoints, keypoints, scores = sort_people_hungarian(prev_keypoints, keypoints, scores)
     else:
         keypoints, scores = np.array([keypoints[0]]), np.array([scores[0]])
         
@@ -832,81 +838,55 @@ def sort_people_rtmlib(pose_tracker, keypoints, scores):
     return sorted_keypoints, sorted_scores
 
 
-def sort_people_sports2d(keyptpre, keypt, scores):
+def sort_people_hungarian(keyptpre, keypt, scores):
     '''
-    Associate persons across frames (Pose2Sim method)
-    Persons' indices are sometimes swapped when changing frame
-    A person is associated to another in the next frame when they are at a small distance
-    
-    N.B.: Requires min_with_single_indices and euclidian_distance function (see common.py)
+    Matches people across frames using the Hungarian algorithm.
 
     INPUTS:
-    - keyptpre: array of shape K, L, M with K the number of detected persons,
-    L the number of detected keypoints, M their 2D coordinates
-    - keypt: idem keyptpre, for current frame
-    - score: array of shape K, L with K the number of detected persons,
-    L the confidence of detected keypoints
-    
+    - keyptpre: array of shape (K_prev, L, 2)
+    - keypt: array of shape (K_curr, L, 2)
+    - scores: array of shape (K_curr, L)
+
     OUTPUTS:
-    - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
-    - sorted_keypoints: array with reordered persons
+    - sorted_prev_keypoints: array with reordered people with the values from the previous frame if the current is empty
+    - sorted_keypoints: array with reordered people
     - sorted_scores: array with reordered scores
     '''
-    
-    # Generate possible person correspondences across frames
-    if len(keyptpre) < len(keypt):
-        keyptpre = np.concatenate((keyptpre, np.full((len(keypt)-len(keyptpre), keypt.shape[1], 2), np.nan)))
-    if len(keypt) < len(keyptpre):
-        keypt = np.concatenate((keypt, np.full((len(keyptpre)-len(keypt), keypt.shape[1], 2), np.nan)))
-        scores = np.concatenate((scores, np.full((len(keyptpre)-len(scores), scores.shape[1]), np.nan)))
-    personsIDs_comb = sorted(list(it.product(range(len(keyptpre)), range(len(keypt)))))
-    
-    # Compute distance between persons from one frame to another
-    frame_by_frame_dist = []
-    for comb in personsIDs_comb:
-        frame_by_frame_dist += [euclidean_distance(keyptpre[comb[0]],keypt[comb[1]])]
-    # frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
-    
-    # Sort correspondences by distance
-    _, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
-    
-    # Associate points to same index across frames, nan if no correspondence
-    sorted_keypoints, sorted_scores = [], []
-    for i in range(len(keyptpre)):
-        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
-        if len(id_in_old) > 0:
-            sorted_keypoints += [keypt[id_in_old[0]]]
-            sorted_scores += [scores[id_in_old[0]]]
+
+    K_prev = len(keyptpre)
+    K_curr = len(keypt)
+
+    # Calculate the cost matrix
+    cost_matrix = np.zeros((K_prev, K_curr))
+
+    for i in range(K_prev):
+        for j in range(K_curr):
+            # Calculate the average Euclidean distance between keypoints
+            dist = np.linalg.norm(keyptpre[i] - keypt[j], axis=1)
+            valid = ~np.isnan(dist)
+            if np.any(valid):
+                cost_matrix[i, j] = np.nanmean(dist[valid])
+            else:
+                cost_matrix[i, j] = np.inf
+
+    # Solve the assignment problem
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+    # Initialize the sorted arrays
+    sorted_keypoints = np.full_like(keyptpre, np.nan)
+    sorted_scores = np.full((K_prev, keypt.shape[1]), np.nan)
+
+    for r, c in zip(row_ind, col_ind):
+        if cost_matrix[r, c] != np.inf:
+            sorted_keypoints[r] = keypt[c]
+            sorted_scores[r] = scores[c]
         else:
-            sorted_keypoints += [keypt[i]]
-            sorted_scores += [scores[i]]
-    sorted_keypoints, sorted_scores = np.array(sorted_keypoints), np.array(sorted_scores)
+            pass  # No valid assignment
 
-    # Keep track of previous values even when missing for more than one frame
-    sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints) & ~np.isnan(keyptpre), keyptpre, sorted_keypoints)
-    
+    # Keep previous keypoints if no new ones are assigned
+    sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints), keyptpre, sorted_keypoints)
+
     return sorted_prev_keypoints, sorted_keypoints, sorted_scores
-
-
-def euclidean_distance(q1, q2):
-    '''
-    Euclidean distance between 2 points (N-dim).
-
-    INPUTS:
-    - q1: list of N_dimensional coordinates of point
-    - q2: idem
-
-    OUTPUTS:
-    - euc_dist: float. Euclidian distance between q1 and q2
-    '''
-
-    q1 = np.array(q1)
-    q2 = np.array(q2)
-    dist = q2 - q1
-
-    euc_dist = np.sqrt(np.sum( [d**2 for d in dist]))
-
-    return euc_dist
 
 
 def min_with_single_indices(L, T):
