@@ -120,13 +120,6 @@ def rtm_estimator(config_dict):
     if not sources:
         raise FileNotFoundError(f'No Webcams or no media files found in {source_dir}.')
 
-    process_functions = {}
-    for source in sources:
-        if source['type'] == 'webcam':
-            process_functions[source['id']] = process_single_frame
-        else:
-            process_functions[source['id']] = process_single_frame
-
     logging.info(f'Processing sources: {sources}')
 
     pose_tracker_settings = determine_tracker_settings(config_dict)
@@ -314,7 +307,7 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
         json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
         save_to_openpose(json_file_path, keypoints, scores)
 
-    if show_realtime_results:
+    if show_realtime_results or save_video or save_images:
         # Draw skeleton on the frame
         img_show = draw_skeleton(frame, keypoints, scores, kpt_thr=0.1)
 
