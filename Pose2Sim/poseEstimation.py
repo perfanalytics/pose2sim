@@ -156,6 +156,7 @@ def rtm_estimator(config_dict):
 
     # Start display thread only if show_realtime_results is True
     display_thread = None
+    display_queue = None
     if show_realtime_results:
         # Create display queue
         display_queue = multiprocessing.Queue()
@@ -255,7 +256,6 @@ def rtm_estimator(config_dict):
             if display_thread and display_thread.stopped:
                 for process in reading_processes:
                     process.stop()
-                # Ne pas break ici, laissez les WorkerProcess continuer
             time.sleep(0.1)
     except KeyboardInterrupt:
         logging.info("Processing interrupted by user.")
@@ -263,11 +263,20 @@ def rtm_estimator(config_dict):
         # Wait for reading processes to finish
         for process in reading_processes:
             process.join()
-        # Les WorkerProcess s'arrêteront automatiquement lorsque la file d'attente sera vide et que active_source_processes.value == 0
         for worker in worker_processes:
             worker.join()
+        # Clean up shared memory
+        for shm in shared_buffers.values():
+            shm.close()
+            shm.unlink()
 
-        # ... code existant ...
+        if display_thread:
+            display_thread.stop()
+            display_thread.join()
+        for pb in progress_bars.values():
+            pb.close()
+        buffer_bar.close()
+        logging.shutdown()
 
 
 def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, output_format, out_vid, prev_keypoints, tracking_mode):
