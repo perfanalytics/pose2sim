@@ -45,7 +45,7 @@
 # det_frequency = 100 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
                   # # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
 # # overwrite_pose = true # set to false if you don't want to recalculate pose estimation when it has already been done
-# display_detection = true
+# show_realtime_results = true
 # save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 # output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 

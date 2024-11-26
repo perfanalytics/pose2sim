@@ -29,11 +29,17 @@ frame_range = [] # For example [10,300], or [] for all frames.
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
 ## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
 
+save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
+
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
 [pose]
-vid_img_extension = 'mp4' # any video or image extension
+# Webcam parameters
+webcam_ids = 0 # your webcam id 0, or [0, 1, ...] (0 is default)
+input_size = [1280, 720] # [W, H]. Lower resolution will be faster but less precise.
+
+vid_img_extension = 'mp4' # any video or image extension # 'webcam' for webcam
 pose_model = 'HALPE_26'  #With RTMLib: HALPE_26 (body and feet, default), COCO_133 (body, feet, hands), COCO_17 (body)
                          # /!\ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the output files if needed
                          #With MMPose: HALPE_26, COCO_133, COCO_17, CUSTOM. See CUSTOM example at the end of the file
@@ -44,9 +50,8 @@ pose_model = 'HALPE_26'  #With RTMLib: HALPE_26 (body and feet, default), COCO_1
 mode = 'balanced' # 'lightweight', 'balanced', 'performance'
 det_frequency = 1 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
                   # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
-display_detection = true
+show_realtime_results = true
 overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
-save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 

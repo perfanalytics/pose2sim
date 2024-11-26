@@ -47,7 +47,7 @@ import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
     reprojection, euclidean_distance, sort_stringlist_by_last_number
-from Pose2Sim.skeletons import *
+from Pose2Sim.Utilities.skeletons import *
 
 
 ## AUTHORSHIP INFORMATION
@@ -638,7 +638,7 @@ def associate_all(config_dict):
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     multi_person = config_dict.get('project').get('multi_person')
-    pose_model = config_dict.get('pose').get('pose_model')
+    pose_model = config_dict.get('pose').get('pose_model').upper()
     tracked_keypoint = config_dict.get('personAssociation').get('single_person').get('tracked_keypoint')
     min_cameras_for_triangulation = config_dict.get('triangulation').get('min_cameras_for_triangulation')
     reconstruction_error_threshold = config_dict.get('personAssociation').get('multi_person').get('reconstruction_error_threshold')

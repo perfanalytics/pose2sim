@@ -65,15 +65,6 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def setup_logging(session_dir):
-    '''
-    Create logging file and stream handlers
-    '''
-
-    logging.basicConfig(format='%(message)s', level=logging.INFO,
-        handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(session_dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
-
-
 def recursive_update(dict_to_update, dict_with_new_values):
     '''
     Update nested dictionaries without overwriting existing keys in any level of nesting
@@ -614,3 +605,12 @@ def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchron
     end = time.time()
     elapsed = end-start
     logging.info(f'\nRUNNING ALL FUNCTIONS TOOK  {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
+
+
+def setup_logging(dir):
+    '''
+    Create logging file and stream handlers
+    '''
+
+    logging.basicConfig(format='%(message)s', level=logging.INFO,
+        handlers = [logging.handlers.TimedRotatingFileHandler(os.path.join(dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
