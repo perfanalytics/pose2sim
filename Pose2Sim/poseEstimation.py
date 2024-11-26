@@ -43,6 +43,7 @@ import multiprocessing
 import psutil
 
 import numpy as np
+import itertools as it
 
 from multiprocessing import shared_memory
 from datetime import datetime
@@ -90,11 +91,6 @@ def rtm_estimator(config_dict):
     source_dir = os.path.join(output_dir, 'videos')
     pose_dir = os.path.join(output_dir, 'pose')
 
-    show_realtime_results = config_dict['pose'].get('show_realtime_results', False)
-
-    vid_img_extension = config_dict['pose']['vid_img_extension']
-    webcam_ids = config_dict['pose'].get('webcam_ids', [])
-
     overwrite_pose = config_dict['pose'].get('overwrite_pose', False)
 
     # Check if pose estimation has already been done
@@ -106,15 +102,19 @@ def rtm_estimator(config_dict):
 
     logging.info('Estimating pose...')
 
+    show_realtime_results = config_dict['pose'].get('show_realtime_results', False)
+    vid_img_extension = config_dict['pose']['vid_img_extension']
+    webcam_ids = config_dict['pose'].get('webcam_ids', [])
+
     # Prepare list of sources (webcams, videos, image folders)
     sources = []
 
     if vid_img_extension == 'webcam':
         sources.extend({'type': 'webcam', 'id': cam_id, 'path': cam_id} for cam_id in (webcam_ids if isinstance(webcam_ids, list) else [webcam_ids]))
     else:
-        video_files = [str(f) for f in Path(source_dir).rglob('*' + vid_img_extension) if f.is_file()]
+        video_files = sorted([str(f) for f in Path(source_dir).rglob('*' + vid_img_extension) if f.is_file()])
         sources.extend({'type': 'video', 'id': idx, 'path': video_path} for idx, video_path in enumerate(video_files))
-        image_dirs = [str(f) for f in Path(source_dir).iterdir() if f.is_dir()]
+        image_dirs = sorted([str(f) for f in Path(source_dir).iterdir() if f.is_dir()])
         sources.extend({'type': 'images', 'id': idx, 'path': folder} for idx, folder in enumerate(image_dirs, start=len(video_files)))
 
     if not sources:
@@ -129,20 +129,17 @@ def rtm_estimator(config_dict):
 
     logging.info(f'Processing sources: {sources}')
 
-    # Create display queue
-    display_queue = multiprocessing.Queue()
-
     pose_tracker_settings = determine_tracker_settings(config_dict)
 
     # Create a global frame queue
     frame_queue = multiprocessing.Queue(maxsize=100)
 
     # Initialize shared memory buffers
-    expected_frame_size = config_dict['pose'].get('input_size', (640, 480))
+    frame_size = config_dict['pose'].get('input_size', (640, 480))
     available_memory = psutil.virtual_memory().available
-    frame_width, frame_height = expected_frame_size
-    expected_frame_size_bytes = frame_width * frame_height * 3  # Assuming 3 channels
-    num_buffers = min(100, int((available_memory / 2) / expected_frame_size_bytes))
+    frame_width, frame_height = frame_size
+    frame_size_bytes = frame_width * frame_height * 3  # Assuming 3 channels
+    num_buffers = min(100, int((available_memory / 2) / frame_size_bytes))
     logging.info(f"Number of buffers set to: {num_buffers}")
 
     # Preallocate shared memory buffers
@@ -150,12 +147,22 @@ def rtm_estimator(config_dict):
     available_buffers = multiprocessing.Queue()
     for i in range(num_buffers):
         unique_name = f"frame_buffer_{i}"
-        shm = shared_memory.SharedMemory(name=unique_name, create=True, size=expected_frame_size_bytes)
+        shm = shared_memory.SharedMemory(name=unique_name, create=True, size=frame_size_bytes)
         shared_buffers[unique_name] = shm
         available_buffers.put(unique_name)
 
     # Create dictionaries to hold outputs for each source
     source_outputs = {}
+
+    # Start display thread only if show_realtime_results is True
+    display_thread = None
+    if show_realtime_results:
+        # Create display queue
+        display_queue = multiprocessing.Queue()
+        display_thread = DisplayProcess(sources, frame_size, display_queue)
+        display_thread.start()
+
+    active_source_processes = multiprocessing.Value('i', len(sources))
 
     # Start reading processes for each source
     reading_processes = []
@@ -180,11 +187,11 @@ def rtm_estimator(config_dict):
             available_buffers,
             shared_buffers,
             shared_counts,
-            expected_frame_size
+            frame_size,
+            active_source_processes
         )
         process.start()
         reading_processes.append(process)
-
 
     # Compute the maximum number of worker processes
     cpu_count = multiprocessing.cpu_count()
@@ -203,17 +210,11 @@ def rtm_estimator(config_dict):
             shared_counts,
             pose_tracker_settings,
             display_queue,
-            source_outputs
+            source_outputs,
+            active_source_processes
         )
         worker.start()
         worker_processes.append(worker)
-
-    # Start display thread only if show_realtime_results is True
-    display_thread = None
-    if show_realtime_results:
-        input_size = config_dict['pose'].get('input_size', (640, 480))
-        display_thread = DisplayProcess(sources, input_size, display_queue)
-        display_thread.start()
 
     # Initialize progress bars
     progress_bars = {}
@@ -226,9 +227,14 @@ def rtm_estimator(config_dict):
             position_counter += 1 
 
     buffer_bar = tqdm(total=num_buffers, desc='Buffers Free', position=position_counter, leave=True)
+    position_counter += 1  # Increment position counter for the next bar
+
+    # Add worker progress bar
+    worker_bar = tqdm(total=max_workers, desc='Active Workers', position=position_counter, leave=True)
 
     try:
         while any(process.is_alive() for process in reading_processes) or not frame_queue.empty():
+            # Update progress bars for sources
             for source_id, pb in progress_bars.items():
                 counts = shared_counts[source_id]
                 total_frames = counts['total'].value
@@ -240,48 +246,31 @@ def rtm_estimator(config_dict):
             # Update buffer bar
             free_buffers = available_buffers.qsize()
             buffer_bar.n = free_buffers
-            buffer_bar.total = num_buffers
-            if free_buffers >= 0.9 * num_buffers:
-                red_text = '\033[91m'
-                reset_text = '\033[0m'
-                buffer_bar.set_description(f'{red_text}Buffers Free: {free_buffers}/{num_buffers}{reset_text}')
-            else:
-                buffer_bar.set_description(f'Buffers Free: {free_buffers}/{num_buffers}')
             buffer_bar.refresh()
+
+            # Update worker progress bar
+            active_workers = sum(1 for worker in worker_processes if worker.is_alive())
+            worker_bar.n = active_workers
+            worker_bar.refresh()
             if display_thread and display_thread.stopped:
-                break
-        # Final refresh to update progress bars at the end
-        for pb in progress_bars.values():
-            pb.refresh()
-        buffer_bar.refresh()
+                for process in reading_processes:
+                    process.stop()
+                # Ne pas break ici, laissez les WorkerProcess continuer
+            time.sleep(0.1)
     except KeyboardInterrupt:
         logging.info("Processing interrupted by user.")
     finally:
         # Wait for reading processes to finish
         for process in reading_processes:
             process.join()
-        # Signal worker processes to stop
-        for _ in worker_processes:
-            frame_queue.put(None)
-        # Wait for worker processes to finish
+        # Les WorkerProcess s'arrêteront automatiquement lorsque la file d'attente sera vide et que active_source_processes.value == 0
         for worker in worker_processes:
             worker.join()
 
-        # Clean up shared memory
-        for shm in shared_buffers.values():
-            shm.close()
-            shm.unlink()
-
-        if display_thread:
-            display_thread.stop()
-            display_thread.join()
-        for pb in progress_bars.values():
-            pb.close()
-        buffer_bar.close()
-        logging.shutdown()
+        # ... code existant ...
 
 
-def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, output_format, out_vid, prev_keypoints):
+def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, pose_tracker, multi_person, save_video, save_images, show_realtime_results, output_format, out_vid, prev_keypoints, tracking_mode):
     '''
     Processes a single frame from a source.
 
@@ -309,15 +298,16 @@ def process_single_frame(config_dict, frame, source_id, frame_idx, output_dirs, 
 
     # Tracking people IDs across frames (if needed)
     keypoints, scores, prev_keypoints = track_people(
-        keypoints, scores, multi_person, None, prev_keypoints, pose_tracker
+        keypoints, scores, multi_person, tracking_mode, prev_keypoints, pose_tracker
     )
 
     if 'openpose' in output_format:
         json_file_path = os.path.join(json_output_dir, f'{output_dir_name}_{frame_idx:06d}.json')
         save_to_openpose(json_file_path, keypoints, scores)
 
-    # Draw skeleton on the frame
-    img_show = draw_skeleton(frame, keypoints, scores, kpt_thr=0.1)
+    if show_realtime_results:
+        # Draw skeleton on the frame
+        img_show = draw_skeleton(frame, keypoints, scores, kpt_thr=0.1)
 
     # Save video and images
     if save_video and out_vid is not None:
@@ -343,6 +333,7 @@ class DisplayProcess(multiprocessing.Process):
         self.grid_size = self.calculate_grid_size(len(sources))
         self.img_placeholder = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
         self.source_ids = sorted([source['id'] for source in self.sources])
+        self.source_positions = self.create_source_positions()
         self.frames = {source_id: self.get_placeholder_frame(source_id, 'Not Connected') for source_id in self.source_ids}
 
     def run(self):
@@ -363,30 +354,35 @@ class DisplayProcess(multiprocessing.Process):
                 logging.info("Display window closed by user.")
                 self.stopped = True
 
+    def create_source_positions(self):
+        positions = {}
+        idx = 0
+        for i in range(self.grid_size[0]):
+            for j in range(self.grid_size[1]):
+                if idx < len(self.source_ids):
+                    source_id = self.source_ids[idx]
+                    positions[source_id] = (i, j)
+                    idx += 1
+        return positions
+
     def combine_frames(self):
         window_width, window_height = self.window_size
         rows, cols = self.grid_size
         frame_width = window_width // cols
         frame_height = window_height // rows
         frame_size = (frame_width, frame_height)
-        
+
         combined_image = np.zeros((window_height, window_width, 3), dtype=np.uint8)
-        
-        idx = 0
-        for i in range(rows):
-            for j in range(cols):
-                if idx < len(self.source_ids):
-                    source_id = self.source_ids[idx]
-                    frame = self.frames.get(source_id, self.img_placeholder)
-                    resized_frame = cv2.resize(frame, frame_size)
-                    y1 = i * frame_height
-                    y2 = y1 + frame_height
-                    x1 = j * frame_width
-                    x2 = x1 + frame_width
-                    combined_image[y1:y2, x1:x2] = resized_frame
-                    idx += 1
-                else:
-                    continue
+
+        for source_id in self.source_ids:
+            i, j = self.source_positions[source_id]
+            frame = self.frames.get(source_id, self.img_placeholder)
+            resized_frame = cv2.resize(frame, frame_size)
+            y1 = i * frame_height
+            y2 = y1 + frame_height
+            x1 = j * frame_width
+            x2 = x1 + frame_width
+            combined_image[y1:y2, x1:x2] = resized_frame
         return combined_image
 
     def calculate_grid_size(self, num_sources):
@@ -406,7 +402,7 @@ class DisplayProcess(multiprocessing.Process):
 
 
 class WorkerProcess(multiprocessing.Process):
-    def __init__(self, config_dict, frame_queue, available_buffers, shared_buffers, shared_counts, pose_tracker_settings, display_queue, source_outputs):
+    def __init__(self, config_dict, frame_queue, available_buffers, shared_buffers, shared_counts, pose_tracker_settings, display_queue, source_outputs, active_source_processes):
         super().__init__()
         self.config_dict = config_dict
         self.frame_queue = frame_queue
@@ -418,6 +414,7 @@ class WorkerProcess(multiprocessing.Process):
         self.stopped = False
         self.source_outputs = source_outputs
         self.prev_keypoints = {}
+        self.active_source_processes = active_source_processes
 
     def run(self):
         try:
@@ -430,66 +427,77 @@ class WorkerProcess(multiprocessing.Process):
             save_images = 'to_images' in self.config_dict['project'].get('save_video', [])
             show_realtime_results = self.config_dict['pose'].get('show_realtime_results', False)
             output_format = self.config_dict['project'].get('output_format', 'openpose')
+            tracking_mode = self.config_dict['pose'].get('tracking_mode')
 
             # Initialize a dictionary to store out_vids for each source inside the process
             local_out_vids = {}
 
             while True:
-                item = self.frame_queue.get()
-                if item is None:
-                    # No more frames to process
+                
+                if self.frame_queue.empty() and self.active_source_processes.value == 0:
+                    logging.info(f"WorkerProcess {self.pid} is terminating.")
                     break
-                buffer_name, frame_shape, frame_dtype_str, source_id, frame_idx = item
-                shm = self.shared_buffers[buffer_name]
-                frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype_str), buffer=shm.buf)
+                try:
+                    item = self.frame_queue.get(timeout=0.1)
+                    if item is None:
+                        # No more frames to process
+                        break
+                    buffer_name, frame_shape, frame_dtype_str, source_id, frame_idx = item
+                    shm = self.shared_buffers[buffer_name]
+                    frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype_str), buffer=shm.buf)
 
-                # Get the outputs for this source
-                outputs = self.source_outputs[source_id]
+                    # Get the outputs for this source
+                    outputs = self.source_outputs[source_id]
 
-                # Create out_vid for this source if needed and not already created
-                if save_video and source_id not in local_out_vids:
-                    # Create VideoWriter for this source
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                    fps = self.config_dict['pose'].get('fps', 30)
-                    input_size = self.config_dict['pose'].get('input_size', (640, 480))
-                    W, H = input_size
-                    output_video_path = outputs[4]
-                    out_vid = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H))
-                    local_out_vids[source_id] = out_vid
-                else:
-                    out_vid = local_out_vids.get(source_id)
+                    # Create out_vid for this source if needed and not already created
+                    if save_video and source_id not in local_out_vids:
+                        # Create VideoWriter for this source
+                        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                        fps = self.config_dict['pose'].get('fps', 30)
+                        input_size = self.config_dict['pose'].get('input_size', (640, 480))
+                        W, H = input_size
+                        output_video_path = outputs[4]
+                        out_vid = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H))
+                        local_out_vids[source_id] = out_vid
+                    else:
+                        out_vid = local_out_vids.get(source_id)
 
-                prev_keypoints = self.prev_keypoints.get(source_id, None)
+                    prev_keypoints = self.prev_keypoints.get(source_id, None)
 
-                # Process the frame
-                result, current_keypoints = process_single_frame(
-                    self.config_dict,
-                    frame,
-                    source_id,
-                    frame_idx,
-                    outputs,
-                    pose_tracker,
-                    multi_person,
-                    save_video,
-                    save_images,
-                    show_realtime_results,
-                    output_format,
-                    out_vid,
-                    prev_keypoints
-                )
+                    # Process the frame
+                    result, current_keypoints = process_single_frame(
+                        self.config_dict,
+                        frame,
+                        source_id,
+                        frame_idx,
+                        outputs,
+                        pose_tracker,
+                        multi_person,
+                        save_video,
+                        save_images,
+                        show_realtime_results,
+                        output_format,
+                        out_vid,
+                        prev_keypoints,
+                        tracking_mode
+                    )
 
-                self.prev_keypoints[source_id] = current_keypoints
+                    self.prev_keypoints[source_id] = current_keypoints
 
-                # Update shared counts
-                with self.shared_counts[source_id]['processed'].get_lock():
-                    self.shared_counts[source_id]['processed'].value += 1
+                    # Update shared counts
+                    with self.shared_counts[source_id]['processed'].get_lock():
+                        self.shared_counts[source_id]['processed'].value += 1
 
-                # Release the buffer back to available_buffers
-                self.available_buffers.put(buffer_name)
+                    # Release the buffer back to available_buffers
+                    self.available_buffers.put(buffer_name)
 
-                # Handle display
-                if self.display_queue:
-                    self.display_queue.put({source_id: result[1]})
+                    # Handle display
+                    if show_realtime_results:
+                        self.display_queue.put({source_id: result[1]})
+
+                except queue.Empty:
+                    time.sleep(0.1)
+                    continue
 
             # Release VideoWriters
             for out_vid in local_out_vids.values():
@@ -501,7 +509,7 @@ class WorkerProcess(multiprocessing.Process):
 
 
 class SourceProcess(multiprocessing.Process):
-    def __init__(self, source, config_dict, frame_queue, available_buffers, shared_buffers, shared_counts, frame_size):
+    def __init__(self, source, config_dict, frame_queue, available_buffers, shared_buffers, shared_counts, frame_size, active_source_processes):
         super().__init__()
         self.source = source
         self.config_dict = config_dict
@@ -518,24 +526,14 @@ class SourceProcess(multiprocessing.Process):
         self.shared_buffers = shared_buffers
         self.shared_counts = shared_counts
         self.frame_size = frame_size
-
-    def parse_frame_ranges(self, frame_ranges):
-        if self.source['type'] != 'webcam':
-            if len(frame_ranges) == 2 and all(isinstance(x, int) for x in frame_ranges):
-                start_frame, end_frame = frame_ranges
-                return set(range(start_frame, end_frame + 1))
-            elif len(frame_ranges) == 0:
-                return None
-            else:
-                return set(frame_ranges)
-        else:
-            return None
+        self.active_source_processes = active_source_processes
 
     def run(self):
         try:
             if self.source['type'] == 'webcam':
                 self.setup_webcam()
                 time.sleep(1)
+                self.shared_counts[self.source['id']]['total'].value = 0
             elif self.source['type'] == 'video':
                 self.open_video()
                 self.frame_ranges = self.parse_frame_ranges(self.config_dict['project'].get('frame_range', []))
@@ -558,7 +556,7 @@ class SourceProcess(multiprocessing.Process):
                     buffer_name = self.available_buffers.get()
                     shm = self.shared_buffers[buffer_name]
                     np_frame = np.ndarray(frame.shape, dtype=frame.dtype, buffer=shm.buf)
-                    np.copyto(np_frame, frame)
+                    np_frame[:] = frame
                     # Put the buffer info into frame_queue
                     item = (buffer_name, frame.shape, frame.dtype.str, self.source['id'], self.frame_idx)
                     self.frame_queue.put(item)
@@ -568,9 +566,26 @@ class SourceProcess(multiprocessing.Process):
                     self.frame_idx += 1
                 else:
                     break
+            logging.info(f"SourceProcess {self.source['id']} is terminating.")
+            with self.active_source_processes.get_lock():
+                self.active_source_processes.value -= 1
         except Exception as e:
             logging.error(f"Error in SourceProcess: {e}")
             self.stopped = True
+            with self.active_source_processes.get_lock():
+                self.active_source_processes.value -= 1
+
+    def parse_frame_ranges(self, frame_ranges):
+        if self.source['type'] != 'webcam':
+            if len(frame_ranges) == 2 and all(isinstance(x, int) for x in frame_ranges):
+                start_frame, end_frame = frame_ranges
+                return set(range(start_frame, end_frame + 1))
+            elif len(frame_ranges) == 0:
+                return None
+            else:
+                return set(frame_ranges)
+        else:
+            return None
 
     def shared_counts_lock(self):
         return multiprocessing.Lock()
@@ -821,7 +836,10 @@ def track_people(keypoints, scores, multi_person, tracking_mode, prev_keypoints,
     else:
         if prev_keypoints is None:
             prev_keypoints = keypoints
-        prev_keypoints, keypoints, scores = sort_people_hungarian(prev_keypoints, keypoints, scores, return_first_only)
+        if tracking_mode == 'hungarian':
+            prev_keypoints, keypoints, scores = sort_people_hungarian(prev_keypoints, keypoints, scores, return_first_only)
+        else:
+            prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores, return_first_only)
 
     return keypoints, scores, prev_keypoints
 
@@ -911,3 +929,130 @@ def sort_people_hungarian(keyptpre, keypt, scores, return_first_only=False):
         sorted_scores = np.array([sorted_scores[0]])
 
     return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+
+
+def sort_people_sports2d(keyptpre, keypt, scores, return_first_only=False):
+    '''
+    Associate persons across frames (Pose2Sim method)
+    Persons' indices are sometimes swapped when changing frame
+    A person is associated to another in the next frame when they are at a small distance
+    
+    N.B.: Requires min_with_single_indices and euclidian_distance function (see common.py)
+
+    INPUTS:
+    - keyptpre: array of shape K, L, M with K the number of detected persons,
+    L the number of detected keypoints, M their 2D coordinates
+    - keypt: idem keyptpre, for current frame
+    - score: array of shape K, L with K the number of detected persons,
+    L the confidence of detected keypoints
+    
+    OUTPUTS:
+    - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
+    - sorted_keypoints: array with reordered persons
+    - sorted_scores: array with reordered scores
+    '''
+    
+    # Generate possible person correspondences across frames
+    if len(keyptpre) < len(keypt):
+        keyptpre = np.concatenate((keyptpre, np.full((len(keypt)-len(keyptpre), keypt.shape[1], 2), np.nan)))
+    if len(keypt) < len(keyptpre):
+        keypt = np.concatenate((keypt, np.full((len(keyptpre)-len(keypt), keypt.shape[1], 2), np.nan)))
+        scores = np.concatenate((scores, np.full((len(keyptpre)-len(scores), scores.shape[1]), np.nan)))
+    personsIDs_comb = sorted(list(it.product(range(len(keyptpre)), range(len(keypt)))))
+    
+    # Compute distance between persons from one frame to another
+    frame_by_frame_dist = []
+    for comb in personsIDs_comb:
+        frame_by_frame_dist += [euclidean_distance(keyptpre[comb[0]],keypt[comb[1]])]
+    # frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
+    
+    # Sort correspondences by distance
+    _, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
+    
+    # Associate points to same index across frames, nan if no correspondence
+    sorted_keypoints, sorted_scores = [], []
+    for i in range(len(keyptpre)):
+        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+        if len(id_in_old) > 0:
+            sorted_keypoints += [keypt[id_in_old[0]]]
+            sorted_scores += [scores[id_in_old[0]]]
+        else:
+            sorted_keypoints += [keypt[i]]
+            sorted_scores += [scores[i]]
+    sorted_keypoints, sorted_scores = np.array(sorted_keypoints), np.array(sorted_scores)
+
+    # Keep track of previous values even when missing for more than one frame
+    sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints) & ~np.isnan(keyptpre), keyptpre, sorted_keypoints)
+
+    if return_first_only and sorted_keypoints.shape[0] > 0:
+        sorted_keypoints = np.array([sorted_keypoints[0]])
+        sorted_scores = np.array([sorted_scores[0]])
+    
+    return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+
+
+def euclidean_distance(q1, q2):
+    '''
+    Euclidean distance between 2 points (N-dim).
+
+    INPUTS:
+    - q1: list of N_dimensional coordinates of point
+    - q2: idem
+
+    OUTPUTS:
+    - euc_dist: float. Euclidian distance between q1 and q2
+    '''
+
+    q1 = np.array(q1)
+    q2 = np.array(q2)
+    dist = q2 - q1
+
+    euc_dist = np.sqrt(np.sum( [d**2 for d in dist]))
+
+    return euc_dist
+
+
+def min_with_single_indices(L, T):
+    '''
+    Let L be a list (size s) with T associated tuple indices (size s).
+    Select the smallest values of L, considering that 
+    the next smallest value cannot have the same numbers 
+    in the associated tuple as any of the previous ones.
+
+    Example:
+    L = [  20,   27,  51,    33,   43,   23,   37,   24,   4,   68,   84,    3  ]
+    T = list(it.product(range(2),range(3)))
+      = [(0,0),(0,1),(0,2),(0,3),(1,0),(1,1),(1,2),(1,3),(2,0),(2,1),(2,2),(2,3)]
+
+    - 1st smallest value: 3 with tuple (2,3), index 11
+    - 2nd smallest value when excluding indices (2,.) and (.,3), i.e. [(0,0),(0,1),(0,2),X,(1,0),(1,1),(1,2),X,X,X,X,X]:
+    20 with tuple (0,0), index 0
+    - 3rd smallest value when excluding [X,X,X,X,X,(1,1),(1,2),X,X,X,X,X]:
+    23 with tuple (1,1), index 5
+    
+    INPUTS:
+    - L: list (size s)
+    - T: T associated tuple indices (size s)
+
+    OUTPUTS: 
+    - minL: list of smallest values of L, considering constraints on tuple indices
+    - argminL: list of indices of smallest values of L (indices of best combinations)
+    - T_minL: list of tuples associated with smallest values of L
+    '''
+
+    minL = [np.nanmin(L)]
+    argminL = [np.nanargmin(L)]
+    T_minL = [T[argminL[0]]]
+    
+    mask_tokeep = np.array([True for t in T])
+    i=0
+    while mask_tokeep.any()==True:
+        mask_tokeep = mask_tokeep & np.array([t[0]!=T_minL[i][0] and t[1]!=T_minL[i][1] for t in T])
+        if mask_tokeep.any()==True:
+            indicesL_tokeep = np.where(mask_tokeep)[0]
+            minL += [np.nanmin(np.array(L)[indicesL_tokeep]) if not np.isnan(np.array(L)[indicesL_tokeep]).all() else np.nan]
+            argminL += [indicesL_tokeep[np.nanargmin(np.array(L)[indicesL_tokeep])] if not np.isnan(minL[-1]) else indicesL_tokeep[0]]
+            T_minL += (T[argminL[i+1]],)
+            i+=1
+    
+    return np.array(minL), np.array(argminL), np.array(T_minL)
