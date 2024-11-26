@@ -334,8 +334,8 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
             # bbox = [min_x, min_y, max_x, max_y]
             bbox = [min_x, min_y, bbox_width, bbox_height] # coco format
             # add padding
-            bbox = [min(0, min_x-bbox_width*padding),
-                    min(0, min_y-bbox_height*padding),
+            bbox = [max(0, min_x-bbox_width*padding),
+                    max(0, min_y-bbox_height*padding),
                     bbox_width*(1+padding*2) if max_x+bbox_width*padding < w else bbox_width*(1+padding),
                     bbox_height*(1+padding*2) if max_y+bbox_height*padding < h else bbox_height*(1+padding)]
 
