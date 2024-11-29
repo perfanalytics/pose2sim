@@ -251,7 +251,7 @@ def get_IK_Setup(model_name, osim_setup_dir):
     elif model_name == 'COCO_17':
         ik_setup_file = 'IK_Setup_Pose2Sim_Coco17.xml'
     elif model_name == 'LSTM':
-        ik_setup_file = 'IK_Setup_Pose2Sim_withHands_LSTM.xml.xml'
+        ik_setup_file = 'IK_Setup_Pose2Sim_withHands_LSTM.xml'
     else:
         raise ValueError(f"Pose model '{model_name}' not found.")
 
