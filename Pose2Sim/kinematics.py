@@ -501,7 +501,7 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
     '''
 
     fastest_frames_to_remove_percent = 0.1 # fasters frames may be outliers
-    large_hip_knee_angles = 30 # imprecise coordinates when person is crouching
+    large_hip_knee_angles = 45 # imprecise coordinates when person is crouching
     trimmed_extrema_percent = 0.2 # proportion of the most extreme segment values to remove before calculating their mean
 
     try:
@@ -529,7 +529,7 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
         min_speed_indices = Q_diff.abs().nsmallest(int(len(Q_diff) * (1-fastest_frames_to_remove_percent))).index
         Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
 
-        # Only keep frames with hip and knee flexion angles below 30% 
+        # Only keep frames with hip and knee flexion angles below 45% 
         # (if more than 50 of them, else take 50 smallest values)
         ang_mean = mean_angles(Q_coords_low_speeds, markers, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
