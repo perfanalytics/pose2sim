@@ -544,6 +544,58 @@ def convert_to_c3d(trc_path):
     return c3d_path
 
 
+def points_to_angles(points_list):
+    '''
+    If len(points_list)==2, computes clockwise angle of ab vector w.r.t. horizontal (e.g. RBigToe, RHeel) 
+    If len(points_list)==3, computes clockwise angle from a to c around b (e.g. Neck, Hip, Knee) 
+    If len(points_list)==4, computes clockwise angle between vectors ab and cd (e.g. Neck Hip, RKnee RHip)
+    
+    Points can be 2D or 3D.
+    If parameters are float, returns a float between 0.0 and 360.0
+    If parameters are arrays, returns an array of floats between 0.0 and 360.0
+
+    INPUTS:
+    '''
+
+    if len(points_list) < 2: # if not enough points, return None
+        return np.nan
+    
+    points_array = np.array(points_list)
+    dimensions = points_array.shape[-1]
+
+    if len(points_list) == 2:
+        vector_u = points_array[0] - points_array[1]
+        if len(points_array.shape)==2:
+            vector_v = np.array([1, 0, 0]) # Here vector X, could be any horizontal vector
+        else:
+            vector_v = np.array([[1, 0, 0],] * points_array.shape[1]) 
+
+    elif len(points_list) == 3:
+        vector_u = points_array[0] - points_array[1]
+        vector_v = points_array[2] - points_array[1]
+
+    elif len(points_list) == 4:
+        vector_u = points_array[1] - points_array[0]
+        vector_v = points_array[3] - points_array[2]
+
+    else:
+        return np.nan
+
+    if dimensions == 2: 
+        vector_u = vector_u[:2]
+        vector_v = vector_v[:2]
+        ang = np.arctan2(vector_u[1], vector_u[0]) - np.arctan2(vector_v[1], vector_v[0])
+    else:
+        cross_product = np.cross(vector_u, vector_v)
+        dot_product = np.einsum('ij,ij->i', vector_u, vector_v) # np.dot(vector_u, vector_v) # does not work with time series
+        ang = np.arctan2(np.linalg.norm(cross_product,axis=1), dot_product)
+
+    ang_deg = np.degrees(ang)
+    # ang_deg = np.array(np.degrees(np.unwrap(ang*2)/2))
+    
+    return ang_deg
+
+
 ## CLASSES
 class plotWindow():
     '''

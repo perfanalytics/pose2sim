@@ -44,9 +44,8 @@ from anytree import PreOrderIter
 
 import opensim
 
-from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean
+from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean, points_to_angles
 from Pose2Sim.skeletons import *
-
 
 
 ## AUTHORSHIP INFORMATION
@@ -58,6 +57,44 @@ __version__ = "0.10.0"
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
+
+
+## CONSTANTS
+angle_dict = { # lowercase!
+    # joint angles
+    'right ankle': [['RKnee', 'RAnkle', 'RBigToe', 'RHeel'], 'dorsiflexion', 90, 1],
+    'left ankle': [['LKnee', 'LAnkle', 'LBigToe', 'LHeel'], 'dorsiflexion', 90, 1],
+    'right knee': [['RAnkle', 'RKnee', 'RHip'], 'flexion', -180, 1],
+    'left knee': [['LAnkle', 'LKnee', 'LHip'], 'flexion', -180, 1],
+    'right hip': [['RKnee', 'RHip', 'Hip', 'Neck'], 'flexion', 0, -1],
+    'left hip': [['LKnee', 'LHip', 'Hip', 'Neck'], 'flexion', 0, -1],
+    # 'lumbar': [['Neck', 'Hip', 'RHip', 'LHip'], 'flexion', -180, -1],
+    # 'neck': [['Head', 'Neck', 'RShoulder', 'LShoulder'], 'flexion', -180, -1],
+    'right shoulder': [['RElbow', 'RShoulder', 'Hip', 'Neck'], 'flexion', 0, -1],
+    'left shoulder': [['LElbow', 'LShoulder', 'Hip', 'Neck'], 'flexion', 0, -1],
+    'right elbow': [['RWrist', 'RElbow', 'RShoulder'], 'flexion', 180, -1],
+    'left elbow': [['LWrist', 'LElbow', 'LShoulder'], 'flexion', 180, -1],
+    'right wrist': [['RElbow', 'RWrist', 'RIndex'], 'flexion', -180, 1],
+    'left wrist': [['LElbow', 'LIndex', 'LWrist'], 'flexion', -180, 1],
+
+    # segment angles
+    'right foot': [['RBigToe', 'RHeel'], 'horizontal', 0, -1],
+    'left foot': [['LBigToe', 'LHeel'], 'horizontal', 0, -1],
+    'right shank': [['RAnkle', 'RKnee'], 'horizontal', 0, -1],
+    'left shank': [['LAnkle', 'LKnee'], 'horizontal', 0, -1],
+    'right thigh': [['RKnee', 'RHip'], 'horizontal', 0, -1],
+    'left thigh': [['LKnee', 'LHip'], 'horizontal', 0, -1],
+    'pelvis': [['LHip', 'RHip'], 'horizontal', 0, -1],
+    'trunk': [['Neck', 'Hip'], 'horizontal', 0, -1],
+    'shoulders': [['LShoulder', 'RShoulder'], 'horizontal', 0, -1],
+    'head': [['Head', 'Neck'], 'horizontal', 0, -1],
+    'right arm': [['RElbow', 'RShoulder'], 'horizontal', 0, -1],
+    'left arm': [['LElbow', 'LShoulder'], 'horizontal', 0, -1],
+    'right forearm': [['RWrist', 'RElbow'], 'horizontal', 0, -1],
+    'left forearm': [['LWrist', 'LElbow'], 'horizontal', 0, -1],
+    'right hand': [['RIndex', 'RWrist'], 'horizontal', 0, -1],
+    'left hand': [['LIndex', 'LWrist'], 'horizontal', 0, -1]
+    }
 
 
 ## FUNCTIONS
@@ -262,6 +299,42 @@ def get_kpt_pairs_from_scaling(scaling_root):
     return pairs
 
 
+def mean_angles(Q_coords, markers, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']):
+    '''
+    Compute the mean angle time series from 3D points for a given list of angles.
+
+    INPUTS:
+    - Q_coords (DataFrame): The triangulated coordinates of the markers.
+    - markers (list): The list of marker names.
+    - ang_to_consider (list): The list of angles to consider (requires angle_dict).
+
+    OUTPUTS:
+    - ang_mean: The mean angle time series.
+    '''
+
+    ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']
+
+    angs = []
+    for ang_name in ang_to_consider:
+        ang_params = angle_dict[ang_name]
+        ang_mk = ang_params[0]
+        
+        pts_for_angles = []
+        for pt in ang_mk:
+            pts_for_angles.append(Q_coords.iloc[:,markers.index(pt)*3:markers.index(pt)*3+3])
+        ang = points_to_angles(pts_for_angles)
+
+        ang += ang_params[2]
+        ang *= ang_params[3]
+        ang = np.abs(ang)
+
+        angs.append(ang)
+
+    ang_mean = np.mean(angs, axis=0)
+
+    return ang_mean
+
+
 def dict_segment_marker_pairs(scaling_root, right_left_symmetry=True):
     '''
     Get a dictionary of segment names and their corresponding marker pairs.
@@ -427,8 +500,9 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
     - A scaled OpenSim model file.
     '''
 
-    fastest_frames_to_remove_percent = 0.1
-    trimmed_extrema_percent = 0.4 # proportion of the most extreme segment values to remove before calculating their mean
+    fastest_frames_to_remove_percent = 0.1 # fasters frames may be outliers
+    large_hip_knee_angles = 30 # imprecise coordinates when person is crouching
+    trimmed_extrema_percent = 0.2 # proportion of the most extreme segment values to remove before calculating their mean
 
     try:
         # Load model
@@ -449,14 +523,21 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
         # Read trc file
         Q_coords, _, _, markers, _ = read_trc(trc_file)
 
-        # Using 80% slowest frames for scaling, removing frames when person is out of frame
+        # Using 80% slowest frames for scaling and removing frames when person is out of frame
         Q_diff = Q_coords.diff(axis=0).sum(axis=1)
         Q_diff = Q_diff[Q_diff != 0] # remove when speed is 0 (person out of frame)
         min_speed_indices = Q_diff.abs().nsmallest(int(len(Q_diff) * (1-fastest_frames_to_remove_percent))).index
-        Q_coords_scaling = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
+        Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
 
-        # Get manual scale values (scale on trimmed mean of measured segments rather than on raw keypoints)
-        segment_ratio_dict = dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, 
+        # Only keep frames with hip and knee flexion angles below 30% 
+        # (if more than 50 of them, else take 50 smallest values)
+        ang_mean = mean_angles(Q_coords_low_speeds, markers, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
+        Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
+        if len(Q_coords_low_speeds_low_angles) < 50:
+            Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
+
+        # Get manual scale values (mean from remaining frames after trimming the 20% most extreme values)
+        segment_ratio_dict = dict_segment_ratio(scaling_root, unscaled_model, Q_coords_low_speeds_low_angles, markers, 
                                                 trimmed_extrema_percent=trimmed_extrema_percent, right_left_symmetry=right_left_symmetry)
 
         # Update scaling setup file
