@@ -335,6 +335,42 @@ def mean_angles(Q_coords, markers, ang_to_consider = ['right knee', 'left knee',
     return ang_mean
 
 
+def best_coords_for_measurements(trc_data, fastest_frames_to_remove_percent=0.1, large_hip_knee_angles=45):
+    '''
+    Compute the best coordinates for measurements, after removing:
+    - 20% slowest frames (fastest frames may be outliers)
+    - frames when person is out of frame (imprecise coordinates when person is crouching)
+    - frames when hip and knee angle below 45° (proportion of the most extreme segment values to remove before calculating their mean)
+    
+    INPUTS:
+    - trc_data: pd.DataFrame. The trc data
+    - fastest_frames_to_remove_percent: float
+    - large_hip_knee_angles: int
+    - trimmed_extrema_percent
+
+    OUTPUT:
+    - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
+    '''
+
+    markers = trc_data.columns[1::3]
+    n_markers = len(markers)
+
+    # Using 80% slowest frames
+    sum_speeds = pd.Series(np.nansum([np.linalg.norm(trc_data.iloc[:,kpt+1:kpt+4].diff(), axis=1) for kpt in range(n_markers)], axis=0))
+    sum_speeds = sum_speeds[sum_speeds!=0] # Removing when speeds are zero (probable outliers)
+    min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
+    Q_coords_low_speeds = trc_data.iloc[min_speed_indices].reset_index(drop=True)    
+    
+    # Only keep frames with hip and knee flexion angles below 45% 
+    # (if more than 50 of them, else take 50 smallest values)
+    ang_mean = mean_angles(Q_coords_low_speeds, markers, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
+    Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
+    if len(Q_coords_low_speeds_low_angles) < 50:
+        Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
+
+    return Q_coords_low_speeds_low_angles
+
+
 def dict_segment_marker_pairs(scaling_root, right_left_symmetry=True):
     '''
     Get a dictionary of segment names and their corresponding marker pairs.
@@ -520,21 +556,9 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
         scaling_root = scaling_tree.getroot()
         scaling_path_temp = str(kinematics_dir / (trc_file.stem + '_scaling_setup.xml'))
         
-        # Read trc file
+        # Remove fastest frames, frames with null speed, and frames with large hip and knee angles
         Q_coords, _, _, markers, _ = read_trc(trc_file)
-
-        # Using 80% slowest frames for scaling and removing frames when person is out of frame
-        Q_diff = Q_coords.diff(axis=0).sum(axis=1)
-        Q_diff = Q_diff[Q_diff != 0] # remove when speed is 0 (person out of frame)
-        min_speed_indices = Q_diff.abs().nsmallest(int(len(Q_diff) * (1-fastest_frames_to_remove_percent))).index
-        Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
-
-        # Only keep frames with hip and knee flexion angles below 45% 
-        # (if more than 50 of them, else take 50 smallest values)
-        ang_mean = mean_angles(Q_coords_low_speeds, markers, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
-        Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
-        if len(Q_coords_low_speeds_low_angles) < 50:
-            Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
+        Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles)
 
         # Get manual scale values (mean from remaining frames after trimming the 20% most extreme values)
         segment_ratio_dict = dict_segment_ratio(scaling_root, unscaled_model, Q_coords_low_speeds_low_angles, markers, 
