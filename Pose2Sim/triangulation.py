@@ -51,8 +51,8 @@ from anytree.importer import DictImporter
 import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
-    reprojection, euclidean_distance, sort_stringlist_by_last_number, \
-    min_with_single_indices, zup2yup, convert_to_c3d
+    reprojection, euclidean_distance, sort_people_sports2d, \
+    sort_stringlist_by_last_number, min_with_single_indices, zup2yup, convert_to_c3d
 from Pose2Sim.skeletons import *
 
 
@@ -119,53 +119,6 @@ def count_persons_in_json(file_path):
         data = json.load(file)
         return len(data.get('people', []))
     
-
-def sort_people(Q_kpt_old, Q_kpt):
-    '''
-    Associate persons across frames
-    Persons' indices are sometimes swapped when changing frame
-    A person is associated to another in the next frame when they are at a small distance
-    
-    INPUTS:
-    - Q_kpt_old: list of arrays of 3D coordinates [X, Y, Z, 1.] for the previous frame
-    - Q_kpt: idem Q_kpt_old, for current frame
-    
-    OUTPUT:
-    - Q_kpt_new: array with reordered persons
-    - personsIDs_sorted: index of reordered persons
-    '''
-    
-    # Generate possible person correspondences across frames
-    if len(Q_kpt_old) < len(Q_kpt):
-        Q_kpt_old = np.concatenate((Q_kpt_old, [[0., 0., 0., 1.]]*(len(Q_kpt)-len(Q_kpt_old))))
-    if len(Q_kpt) < len(Q_kpt_old):
-        Q_kpt = np.concatenate((Q_kpt, [[0., 0., 0., 1.]]*(len(Q_kpt_old)-len(Q_kpt))))
-    personsIDs_comb = sorted(list(it.product(range(len(Q_kpt_old)),range(len(Q_kpt)))))
-    
-    # Compute distance between persons from one frame to another
-    frame_by_frame_dist = []
-    for comb in personsIDs_comb:
-        frame_by_frame_dist += [euclidean_distance(Q_kpt_old[comb[0]],Q_kpt[comb[1]])]
-    frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
-        
-    # sort correspondences by distance
-    minL, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
-    # print('Distances :', minL)
-    
-    # associate 3D points to same index across frames, nan if no correspondence
-    Q_kpt_new, personsIDs_sorted = [], []
-    for i in range(len(Q_kpt_old)):
-        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
-        # print('id_in_old ', i, id_in_old)
-        if len(id_in_old) > 0:
-            personsIDs_sorted += id_in_old
-            Q_kpt_new += [Q_kpt[id_in_old[0]]]
-        else:
-            personsIDs_sorted += [-1]
-            Q_kpt_new += [Q_kpt_old[i]]
-    
-    return Q_kpt_new, personsIDs_sorted, associated_tuples
-
 
 def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
     '''
@@ -840,19 +793,20 @@ def triangulate_all(config_dict):
             # reID persons across frames by checking the distance from one frame to another
             # print('Q before ordering ', np.array(Q)[:,:2])
             if f !=0:
-                Q, personsIDs_sorted, associated_tuples = sort_people(Q_old, Q)
+                Q, associated_tuples = sort_people_sports2d(Q_old, Q)
+                # Q, personsIDs_sorted, associated_tuples = sort_people(Q_old, Q)
                 # print('Q after ordering ', personsIDs_sorted, associated_tuples, np.array(Q)[:,:2])
                 
                 error_sorted, nb_cams_excluded_sorted, id_excluded_cams_sorted = [], [], []
                 for i in range(len(Q)):
                     id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
                     if len(id_in_old) > 0:
-                        personsIDs_sorted += id_in_old
+                        # personsIDs_sorted += id_in_old
                         error_sorted += [error[id_in_old[0]]]
                         nb_cams_excluded_sorted += [nb_cams_excluded[id_in_old[0]]]
                         id_excluded_cams_sorted += [id_excluded_cams[id_in_old[0]]]
                     else:
-                        personsIDs_sorted += [-1]
+                        # personsIDs_sorted += [-1]
                         error_sorted += [error[i]]
                         nb_cams_excluded_sorted += [nb_cams_excluded[i]]
                         id_excluded_cams_sorted += [id_excluded_cams[i]]

@@ -18,6 +18,7 @@ import re
 import cv2
 import c3d
 import sys
+import itertools as it
 
 import matplotlib as mpl
 mpl.use('qt5agg')
@@ -289,6 +290,87 @@ def euclidean_distance(q1, q2):
         euc_dist = np.sqrt(np.nansum( [d**2 for d in dist], axis=1))
     
     return euc_dist
+
+
+def pad_shape(arr, target_len, fill_value=np.nan):
+    '''
+    Pads an array to the target length with specified fill values
+    
+    INPUTS:
+    - arr: Input array to be padded.
+    - target_len: The target length of the first dimension after padding.
+    - fill_value: The value to use for padding (default: np.nan).
+    
+    OUTPUTS:
+    - Padded array with shape (target_len, ...) matching the input dimensions.
+    '''
+
+    if len(arr) < target_len:
+        pad_shape = (target_len - len(arr),) + arr.shape[1:]
+        padding = np.full(pad_shape, fill_value)
+        return np.concatenate((arr, padding))
+    
+    return arr
+
+
+def sort_people_sports2d(keyptpre, keypt, scores=None):
+    '''
+    Associate persons across frames (Sports2D method)
+    Persons' indices are sometimes swapped when changing frame
+    A person is associated to another in the next frame when they are at a small distance
+    
+    N.B.: Requires min_with_single_indices and euclidian_distance function (see common.py)
+
+    INPUTS:
+    - keyptpre: (K, L, M) array of 2D coordinates for K persons in the previous frame, L keypoints, M 2D coordinates
+    - keypt: idem keyptpre, for current frame
+    - score: (K, L) array of confidence scores for K persons, L keypoints (optional) 
+    
+    OUTPUTS:
+    - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
+    - sorted_keypoints: array with reordered persons --> if scores is not None
+    - sorted_scores: array with reordered scores     --> if scores is not None
+    - associated_tuples: list of tuples with correspondences between persons across frames --> if scores is None (for Pose2Sim.triangulation())
+    '''
+    
+    # Generate possible person correspondences across frames
+    max_len = max(len(keyptpre), len(keypt))
+    keyptpre = pad_shape(keyptpre, max_len, fill_value=np.nan)
+    keypt = pad_shape(keypt, max_len, fill_value=np.nan)
+    if scores is not None:
+        scores = pad_shape(scores, max_len, fill_value=np.nan)
+    
+    # Compute distance between persons from one frame to another
+    personsIDs_comb = sorted(list(it.product(range(len(keyptpre)), range(len(keypt)))))
+    frame_by_frame_dist = [euclidean_distance(keyptpre[comb[0]],keypt[comb[1]]) for comb in personsIDs_comb]
+    frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
+    
+    # Sort correspondences by distance
+    _, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
+    
+    # Associate points to same index across frames, nan if no correspondence
+    sorted_keypoints = []
+    for i in range(len(keyptpre)):
+        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+        if len(id_in_old) > 0:      sorted_keypoints += [keypt[id_in_old[0]]]
+        else:                       sorted_keypoints += [keypt[i]]
+    sorted_keypoints = np.array(sorted_keypoints)
+
+    if scores is not None:
+        sorted_scores = []
+        for i in range(len(keyptpre)):
+            id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+            if len(id_in_old) > 0:  sorted_scores += [scores[id_in_old[0]]]
+            else:                   sorted_scores += [scores[i]]
+        sorted_scores = np.array(sorted_scores)
+
+    # Keep track of previous values even when missing for more than one frame
+    sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints) & ~np.isnan(keyptpre), keyptpre, sorted_keypoints)
+    
+    if scores is not None:
+        return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+    else: # For Pose2Sim.triangulation()
+        return sorted_keypoints, associated_tuples
 
 
 def trimmed_mean(arr, trimmed_extrema_percent=0.5):
