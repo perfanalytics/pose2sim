@@ -335,11 +335,11 @@ def mean_angles(Q_coords, markers, ang_to_consider = ['right knee', 'left knee',
     return ang_mean
 
 
-def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, large_hip_knee_angles=45):
+def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, large_hip_knee_angles=45, close_to_zero_speed=0.2):
     '''
     Compute the best coordinates for measurements, after removing:
     - 20% fastest frames (may be outliers)
-    - frames when speed is zero (person is out of frame)
+    - frames when speed is close to zero (person is out of frame)
     - frames when hip and knee angle below 45° (imprecise coordinates when person is crouching)
     
     INPUTS:
@@ -347,6 +347,7 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     - keypoints_names: list. The list of marker names
     - fastest_frames_to_remove_percent: float
     - large_hip_knee_angles: int
+    - close_to_zero_speed: float (sum for all keypoints: about 50 px/frame or 0.2 m/frame)
     - trimmed_extrema_percent
 
     OUTPUT:
@@ -357,7 +358,7 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
 
     # Using 80% slowest frames
     sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords.iloc[:,kpt:kpt+3].diff(), axis=1) for kpt in range(n_markers)], axis=0))
-    sum_speeds = sum_speeds[sum_speeds>50] # Removing when speeds close to zero (out of frame)
+    sum_speeds = sum_speeds[sum_speeds>close_to_zero_speed] # Removing when speeds close to zero (out of frame)
     min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
     Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)    
     
@@ -558,7 +559,7 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
         
         # Remove fastest frames, frames with null speed, and frames with large hip and knee angles
         Q_coords, _, _, markers, _ = read_trc(trc_file)
-        Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles)
+        Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, close_to_zero_speed=0.2)
 
         # Get manual scale values (mean from remaining frames after trimming the 20% most extreme values)
         segment_ratio_dict = dict_segment_ratio(scaling_root, unscaled_model, Q_coords_low_speeds_low_angles, markers, 
