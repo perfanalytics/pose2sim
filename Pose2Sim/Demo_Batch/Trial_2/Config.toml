@@ -183,9 +183,13 @@ keypoints_to_consider = 'all' # 'all' if all points should be considered, for ex
 # [kinematics]
 # use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
 # right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)
+
 # remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
 # remove_individual_IK_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
-
+# fastest_frames_to_remove_percent = 0.1 # Frames with high speed are considered as outliers
+# close_to_zero_speed_m = 0.2 # Sum for all keypoints: about 50 px/frame or 0.2 m/frame
+# large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
+# trimmed_extrema_percent = 0.5 # Proportion of the most extreme segment values to remove before calculating their mean)
 
 
 # # CUSTOM skeleton, if you trained your own model from DeepLabCut or MMPose for example. 
