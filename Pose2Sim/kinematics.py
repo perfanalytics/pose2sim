@@ -335,16 +335,16 @@ def mean_angles(Q_coords, markers, ang_to_consider = ['right knee', 'left knee',
     return ang_mean
 
 
-def best_coords_for_measurements(Q_coords, markers, fastest_frames_to_remove_percent=0.2, large_hip_knee_angles=45):
+def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, large_hip_knee_angles=45):
     '''
     Compute the best coordinates for measurements, after removing:
-    - 20% slowest frames (fastest frames may be outliers)
-    - frames when person is out of frame (imprecise coordinates when person is crouching)
-    - frames when hip and knee angle below 45° (proportion of the most extreme segment values to remove before calculating their mean)
+    - 20% fastest frames (may be outliers)
+    - frames when speed is zero (person is out of frame)
+    - frames when hip and knee angle below 45° (imprecise coordinates when person is crouching)
     
     INPUTS:
     - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
-    - markers: list. The list of marker names
+    - keypoints_names: list. The list of marker names
     - fastest_frames_to_remove_percent: float
     - large_hip_knee_angles: int
     - trimmed_extrema_percent
@@ -353,17 +353,17 @@ def best_coords_for_measurements(Q_coords, markers, fastest_frames_to_remove_per
     - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
     '''
 
-    n_markers = len(markers)
+    n_markers = len(keypoints_names)
 
     # Using 80% slowest frames
     sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords.iloc[:,kpt:kpt+3].diff(), axis=1) for kpt in range(n_markers)], axis=0))
-    sum_speeds = sum_speeds[sum_speeds!=0] # Removing when speeds are zero (probable outliers)
+    sum_speeds = sum_speeds[sum_speeds>50] # Removing when speeds close to zero (out of frame)
     min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
     Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)    
     
     # Only keep frames with hip and knee flexion angles below 45% 
     # (if more than 50 of them, else take 50 smallest values)
-    ang_mean = mean_angles(Q_coords_low_speeds, markers, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
+    ang_mean = mean_angles(Q_coords_low_speeds, keypoints_names, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
     Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
     if len(Q_coords_low_speeds_low_angles) < 50:
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
@@ -638,7 +638,7 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_s
         raise
 
 
-def kinematics(config_dict):
+def kinematics_all(config_dict):
     '''
     Runs OpenSim scaling and inverse kinematics
     

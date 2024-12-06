@@ -475,7 +475,7 @@ def kinematics(config=None):
     or the function can be called without an argument, in which case it the config directory is the current one.
     '''
 
-    from Pose2Sim.kinematics import kinematics
+    from Pose2Sim.kinematics import kinematics_all
     level, config_dicts = read_config_files(config)
 
     if type(config) == dict:
@@ -502,7 +502,7 @@ def kinematics(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        kinematics(config_dict)
+        kinematics_all(config_dict)
         
         end = time.time()
         elapsed = end - start
