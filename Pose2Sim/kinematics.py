@@ -354,6 +354,14 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
     '''
 
+    if 'Hip' not in keypoints_names:
+        # Middle  of the RHip and LHip
+        MidHip_data =(Q_coords.iloc[:,keypoints_names.index('RHip')*3:keypoints_names.index('RHip')*3+3] + Q_coords.iloc[:,keypoints_names.index('LHip')*3:keypoints_names.index('LHip')*3+3]) / 2
+        Q_coords['Hip_X'] = MidHip_data.iloc[:,0]
+        Q_coords['Hip_Y'] = MidHip_data.iloc[:,1]
+        Q_coords['Hip_Z'] = MidHip_data.iloc[:,2]
+        keypoints_names.append('Hip')
+        
     n_markers = len(keypoints_names)
 
     # Using 80% slowest frames
@@ -372,7 +380,7 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     return Q_coords_low_speeds_low_angles
 
 
-def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Compute the height of the person from the trc data.
 
