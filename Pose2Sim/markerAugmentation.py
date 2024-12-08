@@ -31,6 +31,7 @@ import logging
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.MarkerAugmenter.utils import TRC2numpy
 from Pose2Sim.common import convert_to_c3d, natural_sort_key
+from Pose2Sim.kinematics import compute_height, read_trc
 
 
 ## AUTHORSHIP INFORMATION
@@ -84,7 +85,7 @@ def augmentTRC(config_dict):
     pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     pathOutputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     make_c3d = config_dict.get('markerAugmentation').get('make_c3d')
-    subject_height = config_dict.get('project').get('participant_height')
+    # subject_height = config_dict.get('project').get('participant_height')
     subject_mass = config_dict.get('project').get('participant_mass')
     
     augmenterDir = os.path.dirname(utilsDataman.__file__)
@@ -106,16 +107,37 @@ def augmentTRC(config_dict):
         trc_files = trc_no_filtering
     sorted(trc_files, key=natural_sort_key)
 
-    # Get subject heights and masses
-    if subject_height is None or subject_height == 0:
-        subject_height = [1.75] * len(trc_files)
-        logging.warning("No subject height found in Config.toml. Using default height of 1.75m.")
-    elif not type(subject_height) == list: # int or float
-        subject_height = [subject_height]
-    elif len(subject_height) < len(trc_files):
-        logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to 1.75m.")
-        subject_height += [1.75] * (len(trc_files) - len(subject_height))
+    # calculate subject heights
+    subject_height = []
+    for trc_file in trc_files:
+        try:
+            Q_coords, _, _, markers, _ = read_trc(trc_file)
+            # Define required markers for proper matching
+            required_markers = ['RHeel', 'RAnkle', 'RKnee', 'RHip', 'RShoulder',
+                              'LHeel', 'LAnkle', 'LKnee', 'LHip', 'LShoulder',
+                              'Head', 'Nose', 'Neck', 'Hip']  
+            
+            filtered_indices = []
+            filtered_markers = []
+            for marker in required_markers:
+                if marker in markers:
+                    filtered_indices.append(markers.index(marker))
+                    filtered_markers.append(marker)
+            
+            # Filter Q_coords columns based on filtered markers
+            Q_coords_filtered = Q_coords.iloc[:, [i*3+j for i in filtered_indices for j in range(3)]]
+            # Set column names to match marker names
+            Q_coords_filtered.columns = np.array([[m]*3 for m in filtered_markers]).flatten()
+            
+            # Compute height using filtered data
+            height = compute_height(Q_coords_filtered, filtered_markers)
+            print(f"Computed height for {os.path.basename(trc_file)}: {height} m")
+            subject_height.append(height)
+        except Exception as e:
+            subject_height.append(1.75)
+            logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Error: {str(e)}. Using default height of 1.75m.")
 
+    # Get subject masses
     if subject_mass is None or subject_mass == 0:
         subject_mass = [70] * len(trc_files)
         logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
