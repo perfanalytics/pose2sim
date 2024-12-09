@@ -397,8 +397,10 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     '''
     
     # Retrieve most reliable coordinates
+    print(f"before cleaning: {Q_coords.shape}")
     Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, keypoints_names, 
                                                                   fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, close_to_zero_speed=close_to_zero_speed, large_hip_knee_angles=large_hip_knee_angles)
+    print(f"after cleaning: {Q_coords_low_speeds_low_angles.shape}")
     Q_coords_low_speeds_low_angles.columns = np.array([[m]*3 for m in keypoints_names]).flatten()
 
     # Add MidShoulder column
