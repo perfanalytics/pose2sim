@@ -26,12 +26,11 @@ import copy
 import tensorflow as tf
 import glob
 import logging
-import pandas as pd
 
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.MarkerAugmenter.utils import TRC2numpy
 from Pose2Sim.common import convert_to_c3d, natural_sort_key
-from Pose2Sim.kinematics import compute_height, read_trc, mean_angles
+from Pose2Sim.kinematics import compute_height, read_trc
 
 
 ## AUTHORSHIP INFORMATION
