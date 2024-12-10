@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
 '''
 ###########################################################################
 ## AUGMENT MARKER DATA                                                   ##
@@ -27,11 +26,12 @@ import copy
 import tensorflow as tf
 import glob
 import logging
+import pandas as pd
 
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.MarkerAugmenter.utils import TRC2numpy
 from Pose2Sim.common import convert_to_c3d, natural_sort_key
-from Pose2Sim.kinematics import compute_height, read_trc
+from Pose2Sim.kinematics import compute_height, read_trc, mean_angles
 
 
 ## AUTHORSHIP INFORMATION
@@ -89,7 +89,7 @@ def augmentTRC(config_dict):
     subject_mass = config_dict.get('project').get('participant_mass')
     
     fastest_frames_to_remove_percent = config_dict.get('markerAugmentation').get('fastest_frames_to_remove_percent')
-    close_to_zero_speed = config_dict.get('markerAugmentation').get('close_to_zero_speed')
+    close_to_zero_speed = config_dict.get('markerAugmentation').get('close_to_zero_speed_m')
     large_hip_knee_angles = config_dict.get('markerAugmentation').get('large_hip_knee_angles')
     trimmed_extrema_percent = config_dict.get('markerAugmentation').get('trimmed_extrema_percent')
 
@@ -121,40 +121,19 @@ def augmentTRC(config_dict):
         for trc_file in trc_files:
             try:
                 Q_coords, _, _, markers, _ = read_trc(trc_file)
-                # # Define required markers for proper matching
-                # required_markers = ['RHeel', 'RAnkle', 'RKnee', 'RHip', 'RShoulder',
-                #                 'LHeel', 'LAnkle', 'LKnee', 'LHip', 'LShoulder',
-                #                 'Head', 'Nose', 'Neck', 'Hip']  
-                
-                # filtered_indices = []
-                # filtered_markers = []
-                # for marker in required_markers:
-                #     if marker in markers:
-                #         filtered_indices.append(markers.index(marker))
-                #         filtered_markers.append(marker)
-                
-                # # Filter Q_coords columns based on filtered markers
-                # Q_coords_filtered = Q_coords.iloc[:, [i*3+j for i in filtered_indices for j in range(3)]]
-                # # Set column names to match marker names
-                # Q_coords_filtered.columns = np.array([[m]*3 for m in filtered_markers]).flatten()
-                
-                # TODO: Finding reasong of error
-                # before cleaning: (100, 67)
-                # after cleaning: (0, 67)
-                # Could not compute height from Demo_SinglePerson_0-100_filt_butterworth.trc. Error: Length mismatch:
-                # Expected axis has 67 elements, new values have 69 elements. Using default height of 1.75m.
+                Q_coords = Q_coords.loc[:, ~Q_coords.columns.str.startswith('Unnamed')] # remove unnamed columns
+                markers = [m.strip() for m in markers if m.strip()] # remove last \n character
 
-                # Compute height using filtered data
+                # Compute height
                 height = compute_height(
-                    Q_coords, 
-                    markers, 
-                    fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, 
-                    close_to_zero_speed=close_to_zero_speed, 
-                    large_hip_knee_angles=large_hip_knee_angles, 
+                    Q_coords,
+                    markers,
+                    fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
+                    close_to_zero_speed=close_to_zero_speed,
+                    large_hip_knee_angles=large_hip_knee_angles,
                     trimmed_extrema_percent=trimmed_extrema_percent
                 )
-
-                print(f"Computed height for {os.path.basename(trc_file)}: {height} m")
+                print(f"Subject height for {os.path.basename(trc_file)}: {height} m")
                 subject_height.append(height)
             except Exception as e:
                 subject_height.append(1.75)
