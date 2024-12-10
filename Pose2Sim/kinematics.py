@@ -358,8 +358,9 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     n_markers_init = len(keypoints_names)
     if 'Hip' not in keypoints_names:
         RHip_df = Q_coords.iloc[:,keypoints_names.index('RHip')*3:keypoints_names.index('RHip')*3+3]
-        LHip_df = Q_coords.iloc[:,keypoints_names.index('LHip')*3:keypoints_names.index('RHip')*3+3]
-        Hip_df = RHip_df.add(LHip_df, fill_value=0) /2
+        LHip_df = Q_coords.iloc[:,keypoints_names.index('LHip')*3:keypoints_names.index('LHip')*3+3]
+        #Hip_df = RHip_df.add(LHip_df, fill_value=0) /2 # .add function would make 6 columns due to RHip and LHip have different name of columns
+        Hip_df = pd.DataFrame((RHip_df.values + LHip_df.values) / 2, columns=['X','Y','Z']) 
         Hip_df.columns = [col+ str(int(Q_coords.columns[-1][1:])+1) for col in ['X','Y','Z']]
         keypoints_names += ['Hip']
         Q_coords = pd.concat([Q_coords, Hip_df], axis=1)
@@ -380,11 +381,12 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
 
     if n_markers_init < n_markers:
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
+        keypoints_names.remove('Hip') # prevent length mismatch
 
     return Q_coords_low_speeds_low_angles
 
 
-def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Compute the height of the person from the trc data.
 
@@ -738,12 +740,14 @@ def kinematics_all(config_dict):
     subject_height = config_dict.get('project').get('participant_height')
     subject_mass = config_dict.get('project').get('participant_mass')
 
+    fastest_frames_to_remove_percent = config_dict.get('markerAugmentation').get('fastest_frames_to_remove_percent')
+    large_hip_knee_angles = config_dict.get('markerAugmentation').get('large_hip_knee_angles')
+    trimmed_extrema_percent = config_dict.get('markerAugmentation').get('trimmed_extrema_percent')
+    close_to_zero_speed_m = config_dict.get('markerAugmentation').get('close_to_zero_speed_m')
+
     remove_scaling_setup = config_dict.get('kinematics').get('remove_individual_scaling_setup')
     remove_IK_setup = config_dict.get('kinematics').get('remove_individual_IK_setup')
-    fastest_frames_to_remove_percent = config_dict.get('kinematics').get('fastest_frames_to_remove_percent')
-    large_hip_knee_angles = config_dict.get('kinematics').get('large_hip_knee_angles')
-    trimmed_extrema_percent = config_dict.get('kinematics').get('trimmed_extrema_percent')
-    close_to_zero_speed_m = config_dict.get('kinematics').get('close_to_zero_speed_m')
+
 
     pose3d_dir = Path(project_dir) / 'pose-3d'
     kinematics_dir = Path(project_dir) / 'kinematics'
