@@ -738,12 +738,14 @@ def kinematics_all(config_dict):
     subject_height = config_dict.get('project').get('participant_height')
     subject_mass = config_dict.get('project').get('participant_mass')
 
+    fastest_frames_to_remove_percent = config_dict.get('markerAugmentation').get('fastest_frames_to_remove_percent')
+    large_hip_knee_angles = config_dict.get('markerAugmentation').get('large_hip_knee_angles')
+    trimmed_extrema_percent = config_dict.get('markerAugmentation').get('trimmed_extrema_percent')
+    close_to_zero_speed_m = config_dict.get('markerAugmentation').get('close_to_zero_speed_m')
+
     remove_scaling_setup = config_dict.get('kinematics').get('remove_individual_scaling_setup')
     remove_IK_setup = config_dict.get('kinematics').get('remove_individual_IK_setup')
-    fastest_frames_to_remove_percent = config_dict.get('kinematics').get('fastest_frames_to_remove_percent')
-    large_hip_knee_angles = config_dict.get('kinematics').get('large_hip_knee_angles')
-    trimmed_extrema_percent = config_dict.get('kinematics').get('trimmed_extrema_percent')
-    close_to_zero_speed_m = config_dict.get('kinematics').get('close_to_zero_speed_m')
+
 
     pose3d_dir = Path(project_dir) / 'pose-3d'
     kinematics_dir = Path(project_dir) / 'kinematics'
