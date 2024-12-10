@@ -85,9 +85,14 @@ def augmentTRC(config_dict):
     pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     pathOutputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     make_c3d = config_dict.get('markerAugmentation').get('make_c3d')
-    # subject_height = config_dict.get('project').get('participant_height')
+    subject_height = config_dict.get('project').get('participant_height')
     subject_mass = config_dict.get('project').get('participant_mass')
     
+    fastest_frames_to_remove_percent = config_dict.get('markerAugmentation').get('fastest_frames_to_remove_percent')
+    close_to_zero_speed = config_dict.get('markerAugmentation').get('close_to_zero_speed')
+    large_hip_knee_angles = config_dict.get('markerAugmentation').get('large_hip_knee_angles')
+    trimmed_extrema_percent = config_dict.get('markerAugmentation').get('trimmed_extrema_percent')
+
     augmenterDir = os.path.dirname(utilsDataman.__file__)
     augmenterModelName = 'LSTM'
     augmenter_model = 'v0.3'
@@ -108,34 +113,57 @@ def augmentTRC(config_dict):
     sorted(trc_files, key=natural_sort_key)
 
     # calculate subject heights
-    subject_height = []
-    for trc_file in trc_files:
-        try:
-            Q_coords, _, _, markers, _ = read_trc(trc_file)
-            # Define required markers for proper matching
-            required_markers = ['RHeel', 'RAnkle', 'RKnee', 'RHip', 'RShoulder',
-                              'LHeel', 'LAnkle', 'LKnee', 'LHip', 'LShoulder',
-                              'Head', 'Nose', 'Neck', 'Hip']  
-            
-            filtered_indices = []
-            filtered_markers = []
-            for marker in required_markers:
-                if marker in markers:
-                    filtered_indices.append(markers.index(marker))
-                    filtered_markers.append(marker)
-            
-            # Filter Q_coords columns based on filtered markers
-            Q_coords_filtered = Q_coords.iloc[:, [i*3+j for i in filtered_indices for j in range(3)]]
-            # Set column names to match marker names
-            Q_coords_filtered.columns = np.array([[m]*3 for m in filtered_markers]).flatten()
-            
-            # Compute height using filtered data
-            height = compute_height(Q_coords_filtered, filtered_markers)
-            print(f"Computed height for {os.path.basename(trc_file)}: {height} m")
-            subject_height.append(height)
-        except Exception as e:
-            subject_height.append(1.75)
-            logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Error: {str(e)}. Using default height of 1.75m.")
+    if subject_height is None or subject_height == 0:
+        subject_height = [1.75] * len(trc_files)
+        logging.warning("No subject height found in Config.toml. Using default height of 1.75m.")
+    elif subject_height == 'auto'.lower():
+        subject_height = []
+        for trc_file in trc_files:
+            try:
+                Q_coords, _, _, markers, _ = read_trc(trc_file)
+                # # Define required markers for proper matching
+                # required_markers = ['RHeel', 'RAnkle', 'RKnee', 'RHip', 'RShoulder',
+                #                 'LHeel', 'LAnkle', 'LKnee', 'LHip', 'LShoulder',
+                #                 'Head', 'Nose', 'Neck', 'Hip']  
+                
+                # filtered_indices = []
+                # filtered_markers = []
+                # for marker in required_markers:
+                #     if marker in markers:
+                #         filtered_indices.append(markers.index(marker))
+                #         filtered_markers.append(marker)
+                
+                # # Filter Q_coords columns based on filtered markers
+                # Q_coords_filtered = Q_coords.iloc[:, [i*3+j for i in filtered_indices for j in range(3)]]
+                # # Set column names to match marker names
+                # Q_coords_filtered.columns = np.array([[m]*3 for m in filtered_markers]).flatten()
+                
+                # TODO: Finding reasong of error
+                # before cleaning: (100, 67)
+                # after cleaning: (0, 67)
+                # Could not compute height from Demo_SinglePerson_0-100_filt_butterworth.trc. Error: Length mismatch:
+                # Expected axis has 67 elements, new values have 69 elements. Using default height of 1.75m.
+
+                # Compute height using filtered data
+                height = compute_height(
+                    Q_coords, 
+                    markers, 
+                    fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, 
+                    close_to_zero_speed=close_to_zero_speed, 
+                    large_hip_knee_angles=large_hip_knee_angles, 
+                    trimmed_extrema_percent=trimmed_extrema_percent
+                )
+
+                print(f"Computed height for {os.path.basename(trc_file)}: {height} m")
+                subject_height.append(height)
+            except Exception as e:
+                subject_height.append(1.75)
+                logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Error: {str(e)}. Using default height of 1.75m.")
+    elif not type(subject_height) == list: # int or float
+        subject_height = [subject_height]
+    elif len(subject_height) < len(trc_files):
+        logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to 1.75m.")
+        subject_height += [1.75] * (len(trc_files) - len(subject_height))
 
     # Get subject masses
     if subject_mass is None or subject_mass == 0:
@@ -312,4 +340,3 @@ def augmentTRC(config_dict):
             logging.info(f'Augmented trc files have been converted to c3d.')
             
     return min_y_pos
-

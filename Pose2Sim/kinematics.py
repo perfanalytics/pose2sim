@@ -354,14 +354,15 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
     '''
 
+    # Add Hip column if not present
+    n_markers_init = len(keypoints_names)
     if 'Hip' not in keypoints_names:
-        # Middle  of the RHip and LHip
-        MidHip_data =(Q_coords.iloc[:,keypoints_names.index('RHip')*3:keypoints_names.index('RHip')*3+3] + Q_coords.iloc[:,keypoints_names.index('LHip')*3:keypoints_names.index('LHip')*3+3]) / 2
-        Q_coords['Hip_X'] = MidHip_data.iloc[:,0]
-        Q_coords['Hip_Y'] = MidHip_data.iloc[:,1]
-        Q_coords['Hip_Z'] = MidHip_data.iloc[:,2]
-        keypoints_names.append('Hip')
-        
+        RHip_df = Q_coords.iloc[:,keypoints_names.index('RHip')*3:keypoints_names.index('RHip')*3+3]
+        LHip_df = Q_coords.iloc[:,keypoints_names.index('LHip')*3:keypoints_names.index('RHip')*3+3]
+        Hip_df = RHip_df.add(LHip_df, fill_value=0) /2
+        Hip_df.columns = [col+ str(int(Q_coords.columns[-1][1:])+1) for col in ['X','Y','Z']]
+        keypoints_names += ['Hip']
+        Q_coords = pd.concat([Q_coords, Hip_df], axis=1)
     n_markers = len(keypoints_names)
 
     # Using 80% slowest frames
@@ -376,6 +377,9 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
     if len(Q_coords_low_speeds_low_angles) < 50:
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
+
+    if n_markers_init < n_markers:
+        Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
 
     return Q_coords_low_speeds_low_angles
 
