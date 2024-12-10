@@ -359,7 +359,8 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     if 'Hip' not in keypoints_names:
         RHip_df = Q_coords.iloc[:,keypoints_names.index('RHip')*3:keypoints_names.index('RHip')*3+3]
         LHip_df = Q_coords.iloc[:,keypoints_names.index('LHip')*3:keypoints_names.index('LHip')*3+3]
-        Hip_df = RHip_df.add(LHip_df, fill_value=0) /2
+        #Hip_df = RHip_df.add(LHip_df, fill_value=0) /2 # .add function would make 6 columns due to RHip and LHip have different name of columns
+        Hip_df = pd.DataFrame((RHip_df.values + LHip_df.values) / 2, columns=['X','Y','Z']) 
         Hip_df.columns = [col+ str(int(Q_coords.columns[-1][1:])+1) for col in ['X','Y','Z']]
         keypoints_names += ['Hip']
         Q_coords = pd.concat([Q_coords, Hip_df], axis=1)
