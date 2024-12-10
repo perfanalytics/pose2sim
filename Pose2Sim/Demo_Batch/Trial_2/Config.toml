@@ -17,10 +17,10 @@
 
 
 
-[project]
-multi_person = true # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
-participant_height = [1.72, 1.40] # m # float if single person, list of float if multi-person (same order as the Static trials) # Only used for marker augmentation
-participant_mass = [70.0, 63.5] # kg # Only used for marker augmentation and scaling
+# [project]
+# multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
+# participant_height = 'auto' # m # Set it to 'auto' for automatic compute mode # float if single person, list of float if multi-person (same order as the Static trials) # Only used for marker augmentation
+# participant_mass = 70.0 # kg # Only used for marker augmentation and scaling
 
 # frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
 # frame_range = [] # For example [10,300], or [] for all frames. 
@@ -44,15 +44,15 @@ participant_mass = [70.0, 63.5] # kg # Only used for marker augmentation and sca
 # mode = 'balanced' # 'lightweight', 'balanced', 'performance'
 # det_frequency = 100 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
                   # # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
-# # overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
+# # overwrite_pose = true # set to false if you don't want to recalculate pose estimation when it has already been done
 # display_detection = true
 # save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 # output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 
-[synchronization]
+# [synchronization]
 # display_sync_plots = true # true or false (lowercase)
-keypoints_to_consider = 'all' # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
+# keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
 # approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
                            # # [10.0, 2.0, 8.0, 11.0] list of times (seconds) if you want to specify the approximate time of a clear vertical event for each camera
@@ -143,17 +143,17 @@ keypoints_to_consider = 'all' # 'all' if all points should be considered, for ex
 # interpolation = 'linear' #linear, slinear, quadratic, cubic, or none
                         # # 'none' if you don't want to interpolate missing points
 # interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
-# fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
 # show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
+# fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
 # handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
 # undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
-# make_c3d = false # save triangulated data in c3d format in addition to trc
+# make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
 # [filtering]
 # type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
 # display_figures = false # true or false (lowercase) 
-# make_c3d = false # also save triangulated data in c3d format
+# make_c3d = true # also save triangulated data in c3d format
 
    # [filtering.butterworth]
    # order = 4 
@@ -178,7 +178,10 @@ keypoints_to_consider = 'all' # 'all' if all points should be considered, for ex
 # ##        "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
 # ##        "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
 # make_c3d = false # save triangulated data in c3d format in addition to trc
-
+# fastest_frames_to_remove_percent = 0.1 # Frames with high speed are considered as outliers
+# close_to_zero_speed_m = 0.2 # Sum for all keypoints: about 50 px/frame or 0.2 m/frame
+# large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
+# trimmed_extrema_percent = 0.5 # Proportion of the most extreme segment values to remove before calculating their mean)
 
 # [kinematics]
 # use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
@@ -186,10 +189,7 @@ keypoints_to_consider = 'all' # 'all' if all points should be considered, for ex
 
 # remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
 # remove_individual_IK_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
-# fastest_frames_to_remove_percent = 0.1 # Frames with high speed are considered as outliers
-# close_to_zero_speed_m = 0.2 # Sum for all keypoints: about 50 px/frame or 0.2 m/frame
-# large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
-# trimmed_extrema_percent = 0.5 # Proportion of the most extreme segment values to remove before calculating their mean)
+
 
 
 # # CUSTOM skeleton, if you trained your own model from DeepLabCut or MMPose for example. 

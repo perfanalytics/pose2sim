@@ -29,8 +29,7 @@ import logging
 
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.MarkerAugmenter.utils import TRC2numpy
-from Pose2Sim.common import convert_to_c3d, natural_sort_key
-from Pose2Sim.kinematics import compute_height, read_trc
+from Pose2Sim.common import convert_to_c3d, natural_sort_key, read_trc, compute_height
 
 
 ## AUTHORSHIP INFORMATION
@@ -132,7 +131,7 @@ def augmentTRC(config_dict):
                     large_hip_knee_angles=large_hip_knee_angles,
                     trimmed_extrema_percent=trimmed_extrema_percent
                 )
-                print(f"Subject height for {os.path.basename(trc_file)}: {height} m")
+                logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {height} m")
                 subject_height.append(height)
             except Exception as e:
                 subject_height.append(1.75)
