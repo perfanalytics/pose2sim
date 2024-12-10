@@ -55,6 +55,48 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def setup_backend_device():
+    '''
+    Set up the backend and device for the pose tracker based on the availability of hardware acceleration.
+    TensorRT is not supported by RTMLib yet: https://github.com/Tau-J/rtmlib/issues/12
+
+    Selects the best option in the following order of priority:
+    1. GPU with CUDA and ONNXRuntime backend (if CUDAExecutionProvider is available)
+    2. GPU with ROCm and ONNXRuntime backend (if ROCMExecutionProvider is available, for AMD GPUs)
+    3. GPU with MPS or CoreML and ONNXRuntime backend (for macOS systems)
+    4. CPU with OpenVINO backend (default fallback)
+    '''
+
+    try:
+        import torch
+        import onnxruntime as ort
+        if torch.cuda.is_available() == True and 'CUDAExecutionProvider' in ort.get_available_providers():
+            device = 'cuda'
+            backend = 'onnxruntime'
+            logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
+        elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
+            device = 'rocm'
+            backend = 'onnxruntime'
+            logging.info(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
+        else:
+            raise 
+    except:
+        try:
+            import onnxruntime as ort
+            if 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
+                device = 'mps'
+                backend = 'onnxruntime'
+                logging.info(f"\nValid MPS installation found: using ONNXRuntime backend with GPU.")
+            else:
+                raise
+        except:
+            device = 'cpu'
+            backend = 'openvino'
+            logging.info(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
+    
+    return backend, device
+
+
 def save_to_openpose(json_file_path, keypoints, scores):
     '''
     Save the keypoints and scores to a JSON file in the OpenPose format
@@ -342,34 +384,10 @@ def rtm_estimator(config_dict):
         except:
             frame_rate = 30
 
-    # If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
-    try:
-        import torch
-        import onnxruntime as ort
-        if torch.cuda.is_available() and 'CUDAExecutionProvider' in ort.get_available_providers():
-            device = 'cuda'
-            backend = 'onnxruntime'
-            logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
-        elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
-            device = 'rocm'
-            backend = 'onnxruntime'
-            logging.info(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
-        else:
-            raise 
-    except:
-        try:
-            import onnxruntime as ort
-            if 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
-                device = 'mps'
-                backend = 'onnxruntime'
-                logging.info(f"\nValid MPS installation found: using ONNXRuntime backend with GPU.")
-            else:
-                raise
-        except:
-            device = 'cpu'
-            backend = 'openvino'
-            logging.info(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
+    # Select device and backend
+    backend, device = setup_backend_device()
 
+    # Set detection frequency
     if det_frequency>1:
         logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points.')
     elif det_frequency==1:
