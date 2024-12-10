@@ -655,6 +655,28 @@ def kinematics_all(config_dict):
     if subject_height is None or subject_height == 0:
         subject_height = [1.75] * len(trc_files)
         logging.warning("No subject height found in Config.toml. Using default height of 1.75m.")
+    elif subject_height == 'auto'.lower():
+        subject_height = []
+        for trc_file in trc_files:
+            try:
+                Q_coords, _, _, markers, _ = read_trc(trc_file)
+                Q_coords = Q_coords.loc[:, ~Q_coords.columns.str.startswith('Unnamed')] # remove unnamed columns
+                markers = [m.strip() for m in markers if m.strip()] # remove last \n character
+
+                # Compute height
+                height = compute_height(
+                    Q_coords,
+                    markers,
+                    fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
+                    close_to_zero_speed=close_to_zero_speed,
+                    large_hip_knee_angles=large_hip_knee_angles,
+                    trimmed_extrema_percent=trimmed_extrema_percent
+                )
+                logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {height} m")
+                subject_height.append(height)
+            except Exception as e:
+                subject_height.append(1.75)
+                logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Error: {str(e)}. Using default height of 1.75m.")
     elif not type(subject_height) == list: # int or float
         subject_height = [subject_height]
     elif len(subject_height) < len(trc_files):
