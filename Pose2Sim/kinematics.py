@@ -381,6 +381,7 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
 
     if n_markers_init < n_markers:
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
+        keypoints_names.remove('Hip') # prevent length mismatch
 
     return Q_coords_low_speeds_low_angles
 
