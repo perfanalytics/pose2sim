@@ -275,7 +275,7 @@ def gait_events_fwd_coords(trc_path, gait_direction, markers=['RHeel', 'RBigToe'
     return (t_Ron, t_Lon, t_Roff, t_Loff), (frame_Ron, frame_Lon, frame_Roff, frame_Loff)
 
 
-def gait_events_height_coords(trc_path, up_direction, height_threshold=6, filter_fs=10, markers=['RBigToe', 'LBigToe'], plot=True):
+def gait_events_height_coords(trc_path, up_direction, height_threshold=6, cut_off_frequency=10, markers=['RBigToe', 'LBigToe'], plot=True):
     '''
     Determine gait on and off with "height_coordinates" method
     
@@ -292,7 +292,7 @@ def gait_events_height_coords(trc_path, up_direction, height_threshold=6, filter
     - trc_path: path to the trc file
     - up_direction: tuple (sign, direction) with sign in {-1, 1} and direction in {'X', 'Y', 'Z'}
     - height_threshold: height below which the foot is considered to have touched the ground (cm)
-    - filter_fs: butterworth filter cutoff frequency (Hz)
+    - cut_off_frequency: butterworth filter cutoff frequency (Hz)
     - markers: list of marker names in the following order: [right_toe_marker, left_toe_marker]
     - plot: plot results or not (boolean)
 
@@ -319,7 +319,7 @@ def gait_events_height_coords(trc_path, up_direction, height_threshold=6, filter
     Rfoot_height, Lfoot_height = (Y_height[m] for m in markers)
 
     dt = time_col.diff().mean()
-    b, a = signal.butter(4/2, filter_fs*dt*2, 'low', analog=False)
+    b, a = signal.butter(4/2, cut_off_frequency*dt*2, 'low', analog=False)
     Rfoot_height_filtered = pd.Series(signal.filtfilt(b, a, Rfoot_height[1:]), name=Rfoot_height.name)
     Lfoot_height_filtered = pd.Series(signal.filtfilt(b, a, Lfoot_height[1:]), name=Lfoot_height.name)
 
@@ -368,7 +368,7 @@ def gait_events_height_coords(trc_path, up_direction, height_threshold=6, filter
     return (t_Ron, t_Lon, t_Roff, t_Loff), (frame_Ron, frame_Lon, frame_Roff, frame_Loff)
 
 
-def gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=1, filter_fs=10, markers=['RBigToe', 'LBigToe'], plot=True):
+def gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=1, cut_off_frequency=10, markers=['RBigToe', 'LBigToe'], plot=True):
     '''
     Determine gait on and off with "forward_velocity" method
     
@@ -383,7 +383,7 @@ def gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=1, 
     - trc_path: path to the trc file
     - gait_direction: tuple (sign, direction) with sign in {-1, 1} and direction in {'X', 'Y', 'Z'}
     - forward_velocity_threshold: forward velocity below which the foot is considered to have touched the ground (m/s)
-    - filter_fs: butterworth filter cutoff frequency (Hz)
+    - cut_off_frequency: butterworth filter cutoff frequency (Hz)
     - markers: list of marker names in the following order: [right_toe_marker, left_toe_marker]
     - plot: plot results or not (boolean)
 
@@ -407,7 +407,7 @@ def gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=1, 
 
     # Calculate speed
     dt = time_col.diff().mean()
-    b, a = signal.butter(4/2, filter_fs*dt*2, 'low', analog=False)
+    b, a = signal.butter(4/2, cut_off_frequency*dt*2, 'low', analog=False)
     X_speed = Q_coords.iloc[:,axis::3].diff()/dt
     X_speed.columns = trc_markers
     Rfoot_speed, Lfoot_speed = (X_speed[m] for m in markers)
@@ -526,11 +526,10 @@ def trc_gaitevents_func(**args):
     right_toe_marker = args.get('right_toe_marker')
     left_heel_marker = args.get('left_heel_marker')
     left_toe_marker = args.get('left_toe_marker')
+    cut_off_frequency = args.get('cut_off_frequency')
     plot = args.get('plot')
     save_output = args.get('save_output')
     output_file = args.get('output_file')
-
-    filter_fs = 6
 
     # If invoked via a function
     if gait_direction == None: gait_direction = '+X'
@@ -543,6 +542,7 @@ def trc_gaitevents_func(**args):
     if right_toe_marker == None: right_toe_marker = 'RBigToe'
     if left_heel_marker == None: left_heel_marker = 'LHeel'
     if left_toe_marker == None: left_toe_marker = 'LBigToe'
+    if cut_off_frequency == None: cut_off_frequency = 10
     if plot == None: plot = True
     if save_output == None: save_output = True
     if output_file == None: output_file = 'gaitevents.txt'
@@ -570,12 +570,12 @@ def trc_gaitevents_func(**args):
         print(f'Method: height_coordinates. Height threshold: {height_threshold} cm')
         markers = [right_toe_marker, left_toe_marker]
         (t_Ron, t_Lon, t_Roff, t_Loff), (frame_Ron, frame_Lon, frame_Roff, frame_Loff) \
-                                = gait_events_height_coords(trc_path, up_direction, height_threshold=height_threshold, filter_fs=filter_fs, markers=markers, plot=plot)
+                                = gait_events_height_coords(trc_path, up_direction, height_threshold=height_threshold, cut_off_frequency=cut_off_frequency, markers=markers, plot=plot)
     elif method == 'forward_velocity':
         print(f'Method: forward_velocity. Forward velocity threshold: {forward_velocity_threshold} m/s')
         markers = [right_toe_marker, left_toe_marker]
         (t_Ron, t_Lon, t_Roff, t_Loff), (frame_Ron, frame_Lon, frame_Roff, frame_Loff) \
-                                = gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=forward_velocity_threshold, filter_fs=filter_fs, markers=markers, plot=plot)
+                                = gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=forward_velocity_threshold, cut_off_frequency=cut_off_frequency, markers=markers, plot=plot)
 
     if save_output or save_output==None:
         trc_dir = os.path.dirname(trc_path)
@@ -614,6 +614,7 @@ if __name__ == '__main__':
     parser.add_argument('--right_toe_marker', default = 'RBigToe', required = False, help='Right toe marker name. Default: "RBigToe"')
     parser.add_argument('--left_heel_marker', default = 'LHeel', required = False, help='Left heel marker name. Default: "LHeel"')
     parser.add_argument('--left_toe_marker', default = 'LBigToe', required = False, help='Left toe marker name. Default: "LBigToe"')
+    parser.add_argument('-f', '--cut_off_frequency', default = 10, type=float, required = False, help='Butterworth filter cutoff frequency (Hz). Default: 10')
     parser.add_argument('-p', '--plot', default = True, required = False, help='Plot results. Default: True')
     parser.add_argument('-s', '--save_output', default = True, required = False, help='Save output in csv file. Default: True')
     parser.add_argument('-o', '--output_file', default = 'gaitevents.txt', required = False, help='Output file name. Default: "gaitevents.txt"')
