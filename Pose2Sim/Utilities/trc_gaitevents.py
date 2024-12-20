@@ -8,7 +8,15 @@
     ##################################################
     
     Determine gait on and off from a TRC file of point coordinates.
+
+    Events are cleaned to make sure that each contact phases has a start and an end.
+    Optionally and in case of noisy data, you can constrain the right and left steps to alternate (gait), 
+    or the right and left steps to alternate with a flight phase inbetween (sprint), 
+    or not constrain at all in case of hops on one foot (eg triple jump).
+
+    Contacts and curves can be plotted to check the results.
     
+
     N.B.: Could implement the methods listed there in the future:
           https://www.tandfonline.com/doi/full/10.1080/19424280903133938 
           Please feel free to make a pull-request or keep me informed if you do so!
@@ -47,14 +55,14 @@
         python -m trc_gaitevents -h
 
         import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>')
-        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_coordinates', gait_direction='-X', plot=True, save_output=True, output_file='gaitevents.txt')
-        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='height_coordinates', up_direction='Y', height_threshold=6, right_toe_marker='RBigToe', left_toe_marker='LBigToe')
-        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_velocity', gait_direction='-Z', forward_velocity_threshold=1, right_toe_marker='RBigToe', left_toe_marker='LBigToe')
+        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_coordinates', gait_direction='-X', motion_type='gait', plot=True, save_output=True, output_file='gaitevents.txt')
+        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='height_coordinates', up_direction='Y', height_threshold=6, motion_type='gait', right_toe_marker='RBigToe', left_toe_marker='LBigToe')
+        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_velocity', gait_direction='-Z', forward_velocity_threshold=1, motion_type='gait', right_toe_marker='RBigToe', left_toe_marker='LBigToe')
         
         python -m trc_gaitevents -i input_trc_file
-        OR python -m trc_gaitevents -i input_trc_file --method forward_coordinates --gait_direction=-X --plot True --save_output True --output_file gaitevents.txt
-        OR python -m trc_gaitevents -i input_trc_file --method height_coordinates --up_direction=Y --height_threshold 6 --right_toe_marker RBigToe --left_toe_marker LBigToe
-        OR python -m trc_gaitevents -i input_trc_file --method forward_velocity --gait_direction=-Z --forward_velocity_threshold 1 --right_toe_marker RBigToe --left_toe_marker LBigToe
+        OR python -m trc_gaitevents -i input_trc_file --method forward_coordinates --gait_direction=-X --motion_type gait --plot True --save_output True --output_file gaitevents.txt
+        OR python -m trc_gaitevents -i input_trc_file --method height_coordinates --up_direction=Y --height_threshold 6 --motion_type gait --right_toe_marker RBigToe --left_toe_marker LBigToe
+        OR python -m trc_gaitevents -i input_trc_file --method forward_velocity --gait_direction=-Z --forward_velocity_threshold 1 --motion_type gait --right_toe_marker RBigToe --left_toe_marker LBigToe
 '''
 
 
@@ -146,12 +154,77 @@ def first_step_side(Ron, Lon):
     return first_side
 
 
-def clean_gait_events(gait_events):
+def alternate_lists(*lists, strategy='last'):
     '''
-    Clean gait events to only keep right-left alternating and full contact pairs
+    Alternates values from multiple sorted lists while preserving their order.
+    Two strategies are available: 'first' to take the first non-alternating value, 'last' to take the last.
+
+    For example, with 
+    lists = [[1, 4, 7, 10], 
+             [2, 3, 5, 6, 8, 9]]
+    and strategy 'first', the output would be:
+            [[1, 4, 7, 10], 
+             [2, 5, 8]]
+    while with strategy 'last', it would be:
+            [[1, 4, 7, 10], 
+             [3, 6, 9]]
+    
+    INPUTS:
+    - lists: list of lists of values
+    - strategy: 'first' to take the first non-alternating value, 'last' to take the last
+
+    OUTPUTS:
+    - lists: list of lists of values
+    '''
+
+    # Combine all lists into a list of tuples with list index and value, and sort them by value
+    combined = [(i, value) for i, lst in enumerate(lists) for value in lst]
+    combined.sort(key=lambda x: x[1])
+
+    # Make sure we start with an item from the first list
+    while combined and combined[0][0] != 0: 
+        combined.pop(0)
+
+    # Alternate values between lists
+    result = {i: [] for i in range(len(lists))}
+    new_index, last_value = 0, 0
+    while combined:
+        # print(f'{combined}')
+        index, value = combined[0]
+        if index == new_index and value >= last_value:
+            result[index].append(value)
+            last_index = new_index
+            new_index = new_index+1
+        # print(index, value)
+        # print(new_index, last_value, last_index)
+        if strategy == 'last' and index == last_index and value > last_value:
+            result[last_index][-1] = value
+        last_value = value
+        if new_index>=len(lists): new_index=0
+        combined.pop(0)
+        # print(f'{result}')
+        # input()
+
+    lists = [result[i] for i in range(len(lists))]
+
+    # Extract final lists in the original order
+    return lists
+
+
+def clean_gait_events(gait_events, motion_type='gait'):
+    '''
+
+    Events are cleaned to make sure that each contact phases has a start and an end.
+    
+    Optionally and in case of noisy data, you can constrain the right and left steps to alternate (gait), 
+    or the right and left steps to alternate with a flight phase inbetween (sprint), 
+    or not constrain at all in case of hops on one foot (eg triple jump).
 
     INPUTS:
     - gait_events: tuple of lists (Ron, Lon, Roff, Loff)
+    - motion_type: 'gait' for walking (right-left alternation),
+                   'sprint' for sprinting (right-left alternation with flight phase inbetween), 
+                   '' if there is no specific alternation
 
     OUTPUTS:
     - Ron, Lon, Roff, Loff = cleaned gait events
@@ -159,6 +232,28 @@ def clean_gait_events(gait_events):
 
     Ron, Lon, Roff, Loff = gait_events
 
+    # Make right and left contacts alternate. Take the first strike and the last take off detection (some outliers may be detected in the middle)
+    if motion_type=='gait':
+        first_side = first_step_side(Ron, Lon)
+        if first_side == 'R':
+            Ron, Lon = alternate_lists(Ron, Lon, strategy='first')
+            Roff, Loff = alternate_lists(Roff, Loff, strategy='last')
+        else:
+            Lon, Ron = alternate_lists(Lon, Ron, strategy='first')
+            Loff, Roff = alternate_lists(Loff, Roff, strategy='last')
+
+    # Make sure that left on, left off, right on, right off events alternate (or the other way around). 
+    if motion_type=='sprint':
+        first_side = first_step_side(Ron, Lon)
+        if first_side == 'R':
+            Ron, Roff, Lon, Loff = alternate_lists(Ron, Roff, Lon, Loff, strategy='last')
+        else:
+            Lon, Loff, Ron, Roff = alternate_lists(Lon, Loff, Ron, Roff, strategy='last')
+
+    # Don't fix it if hopping on one foot (eg triple jump). Beware that noisy data may lead to wrong results
+    else: 
+        pass
+    
     # Remove incomplete pairs at the start and end
     if Ron[0]>Roff[0]: Roff.pop(0)
     if Lon[0]>Loff[0]: Loff.pop(0)
@@ -166,24 +261,10 @@ def clean_gait_events(gait_events):
     if Ron[-1]>Roff[-1]: Ron.pop(-1)
     if Lon[-1]>Loff[-1]: Lon.pop(-1)
 
-    # Remove lonely pairs that are not alternating with the other side at the beginning or the end
-    if Ron[0]<Lon[0]: # Right first
-        while Ron[1]<Lon[0]: Ron.pop(0)
-        while Lon[-2]>Ron[-1]: Lon.pop(-1)
-        while Roff[1]<Loff[0]: Roff.pop(0)
-        while Loff[-2]>Roff[-1]: Loff.pop(-1)
-        
-    else: # Left first
-        while Lon[1]<Ron[0]: Lon.pop(0)
-        while Ron[-2]>Lon[-1]: Ron.pop(-1)
-        while Loff[1]<Roff[0]: Loff.pop(0)
-        while Roff[-2]>Loff[-1]: Roff.pop(-1)
-        
-
     return Ron, Lon, Roff, Loff
 
 
-def gait_events_fwd_coords(trc_path, gait_direction, markers=['RHeel', 'RBigToe', 'LHeel', 'LBigToe', 'Hip'], plot=True):
+def gait_events_fwd_coords(trc_path, gait_direction, motion_type='gait', markers=['RHeel', 'RBigToe', 'LHeel', 'LBigToe', 'Hip'], plot=True):
     '''
     Determine gait on and off with "forward_coordinates" method
     
@@ -238,8 +319,8 @@ def gait_events_fwd_coords(trc_path, gait_direction, markers=['RHeel', 'RBigToe'
     t_Loff = time_col[frame_Loff].tolist()
 
     # Clean gait events
-    frame_Ron, frame_Lon, frame_Roff, frame_Loff = clean_gait_events((frame_Ron, frame_Lon, frame_Roff, frame_Loff))
-    t_Ron, t_Lon, t_Roff, t_Loff = clean_gait_events((t_Ron, t_Lon, t_Roff, t_Loff))
+    frame_Ron, frame_Lon, frame_Roff, frame_Loff = clean_gait_events((frame_Ron, frame_Lon, frame_Roff, frame_Loff), motion_type=motion_type)
+    t_Ron, t_Lon, t_Roff, t_Loff = clean_gait_events((t_Ron, t_Lon, t_Roff, t_Loff), motion_type=motion_type)
 
     # Plot
     if plot:
@@ -275,7 +356,7 @@ def gait_events_fwd_coords(trc_path, gait_direction, markers=['RHeel', 'RBigToe'
     return (t_Ron, t_Lon, t_Roff, t_Loff), (frame_Ron, frame_Lon, frame_Roff, frame_Loff)
 
 
-def gait_events_height_coords(trc_path, up_direction, height_threshold=6, cut_off_frequency=10, markers=['RBigToe', 'LBigToe'], plot=True):
+def gait_events_height_coords(trc_path, up_direction, height_threshold=6, motion_type='gait', cut_off_frequency=10, markers=['RBigToe', 'LBigToe'], plot=True):
     '''
     Determine gait on and off with "height_coordinates" method
     
@@ -335,8 +416,8 @@ def gait_events_height_coords(trc_path, up_direction, height_threshold=6, cut_of
     t_Lon, t_Loff = time_col[frame_Lon].tolist(), time_col[frame_Loff].tolist()
 
     # Clean gait events
-    frame_Ron, frame_Lon, frame_Roff, frame_Loff = clean_gait_events((frame_Ron, frame_Lon, frame_Roff, frame_Loff))
-    t_Ron, t_Lon, t_Roff, t_Loff = clean_gait_events((t_Ron, t_Lon, t_Roff, t_Loff))
+    frame_Ron, frame_Lon, frame_Roff, frame_Loff = clean_gait_events((frame_Ron, frame_Lon, frame_Roff, frame_Loff), motion_type=motion_type)
+    t_Ron, t_Lon, t_Roff, t_Loff = clean_gait_events((t_Ron, t_Lon, t_Roff, t_Loff), motion_type=motion_type)
 
     # Plot
     if plot:
@@ -368,7 +449,7 @@ def gait_events_height_coords(trc_path, up_direction, height_threshold=6, cut_of
     return (t_Ron, t_Lon, t_Roff, t_Loff), (frame_Ron, frame_Lon, frame_Roff, frame_Loff)
 
 
-def gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=1, cut_off_frequency=10, markers=['RBigToe', 'LBigToe'], plot=True):
+def gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=1, motion_type='gait', cut_off_frequency=10, markers=['RBigToe', 'LBigToe'], plot=True):
     '''
     Determine gait on and off with "forward_velocity" method
     
@@ -434,8 +515,8 @@ def gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=1, 
     t_Lon, t_Loff = time_col[frame_Lon].tolist(), time_col[frame_Loff].tolist()
 
     # Clean gait events
-    frame_Ron, frame_Lon, frame_Roff, frame_Loff = clean_gait_events((frame_Ron, frame_Lon, frame_Roff, frame_Loff))
-    t_Ron, t_Lon, t_Roff, t_Loff = clean_gait_events((t_Ron, t_Lon, t_Roff, t_Loff))
+    frame_Ron, frame_Lon, frame_Roff, frame_Loff = clean_gait_events((frame_Ron, frame_Lon, frame_Roff, frame_Loff), motion_type=motion_type)
+    t_Ron, t_Lon, t_Roff, t_Loff = clean_gait_events((t_Ron, t_Lon, t_Roff, t_Loff), motion_type=motion_type)
 
     # Plot
     if plot:
@@ -470,6 +551,19 @@ def gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=1, 
 def trc_gaitevents_func(**args):
     '''
     Determine gait on and off from a TRC file of point coordinates.
+
+    Events are cleaned to make sure that each contact phases has a start and an end.
+    Optionally and in case of noisy data, you can constrain the right and left steps to alternate (gait), 
+    or the right and left steps to alternate with a flight phase inbetween (sprint), 
+    or not constrain at all in case of hops on one foot (eg triple jump).
+
+    Contacts and curves can be plotted to check the results.
+    
+
+    N.B.: Could implement the methods listed there in the future:
+          https://www.tandfonline.com/doi/full/10.1080/19424280903133938 
+          Please feel free to make a pull-request or keep me informed if you do so!
+
     Three available methods, each of them with their own pros and cons: 
 
     - "forward_coordinates": 
@@ -504,23 +598,24 @@ def trc_gaitevents_func(**args):
         python -m trc_gaitevents -h
 
         import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>')
-        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_coordinates', gait_direction='-X', plot=True, save_output=True, output_file='gaitevents.txt')
-        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='height_coordinates', up_direction='Y', height_threshold=6, right_toe_marker='RBigToe', left_toe_marker='LBigToe')
-        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_velocity', gait_direction='-Z', forward_velocity_threshold=1, right_toe_marker='RBigToe', left_toe_marker='LBigToe')
+        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_coordinates', gait_direction='-X', motion_type='gait', plot=True, save_output=True, output_file='gaitevents.txt')
+        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='height_coordinates', up_direction='Y', height_threshold=6, motion_type='gait', right_toe_marker='RBigToe', left_toe_marker='LBigToe')
+        OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_velocity', gait_direction='-Z', forward_velocity_threshold=1, motion_type='gait', right_toe_marker='RBigToe', left_toe_marker='LBigToe')
         
         python -m trc_gaitevents -i input_trc_file
-        OR python -m trc_gaitevents -i input_trc_file --method forward_coordinates --gait_direction=-X --plot True --save_output True --output_file gaitevents.txt
-        OR python -m trc_gaitevents -i input_trc_file --method height_coordinates --up_direction=Y --height_threshold 6 --right_toe_marker RBigToe --left_toe_marker LBigToe
-        OR python -m trc_gaitevents -i input_trc_file --method forward_velocity --gait_direction=-Z --forward_velocity_threshold 1 --right_toe_marker RBigToe --left_toe_marker LBigToe
+        OR python -m trc_gaitevents -i input_trc_file --method forward_coordinates --gait_direction=-X --motion_type gait --plot True --save_output True --output_file gaitevents.txt
+        OR python -m trc_gaitevents -i input_trc_file --method height_coordinates --up_direction=Y --height_threshold 6 --motion_type gait --right_toe_marker RBigToe --left_toe_marker LBigToe
+        OR python -m trc_gaitevents -i input_trc_file --method forward_velocity --gait_direction=-Z --forward_velocity_threshold 1 --motion_type gait --right_toe_marker RBigToe --left_toe_marker LBigToe
     '''
 
     # Retrieve arguments
     trc_path = args.get('trc_path')
+    method = args.get('method')
     gait_direction = args.get('gait_direction')
     up_direction = args.get('up_direction')
-    method = args.get('method')
     forward_velocity_threshold = args.get('forward_velocity_threshold')
     height_threshold = args.get('height_threshold')
+    motion_type = args.get('motion_type')
     sacrum_marker = args.get('sacrum_marker')
     right_heel_marker = args.get('right_heel_marker')
     right_toe_marker = args.get('right_toe_marker')
@@ -532,11 +627,12 @@ def trc_gaitevents_func(**args):
     output_file = args.get('output_file')
 
     # If invoked via a function
+    if method == None: method = 'height_coordinates'
     if gait_direction == None: gait_direction = '+X'
     if up_direction == None: up_direction = '+Y'
-    if method == None: method = 'height_coordinates'
     if forward_velocity_threshold == None: forward_velocity_threshold = 1
     if height_threshold == None: height_threshold = 6
+    if motion_type == None: motion_type = 'gait'
     if sacrum_marker == None: sacrum_marker = 'Hip'
     if right_heel_marker == None: right_heel_marker = 'RHeel'
     if right_toe_marker == None: right_toe_marker = 'RBigToe'
@@ -563,19 +659,22 @@ def trc_gaitevents_func(**args):
     # Retrieve gait events
     if method == 'forward_coordinates':
         print('Method: forward_coordinates')
+        print(f'Motion type: {motion_type}')
         markers = [right_heel_marker, right_toe_marker, left_heel_marker, left_toe_marker, sacrum_marker]
         (t_Ron, t_Lon, t_Roff, t_Loff), (frame_Ron, frame_Lon, frame_Roff, frame_Loff) \
-                                = gait_events_fwd_coords(trc_path, gait_direction, markers=markers, plot=plot)
+                                = gait_events_fwd_coords(trc_path, gait_direction, motion_type=motion_type, markers=markers, plot=plot)
     elif method == 'height_coordinates':
         print(f'Method: height_coordinates. Height threshold: {height_threshold} cm')
+        print(f'Motion type: {motion_type}')
         markers = [right_toe_marker, left_toe_marker]
         (t_Ron, t_Lon, t_Roff, t_Loff), (frame_Ron, frame_Lon, frame_Roff, frame_Loff) \
-                                = gait_events_height_coords(trc_path, up_direction, height_threshold=height_threshold, cut_off_frequency=cut_off_frequency, markers=markers, plot=plot)
+                                = gait_events_height_coords(trc_path, up_direction, height_threshold=height_threshold, motion_type=motion_type, cut_off_frequency=cut_off_frequency, markers=markers, plot=plot)
     elif method == 'forward_velocity':
         print(f'Method: forward_velocity. Forward velocity threshold: {forward_velocity_threshold} m/s')
+        print(f'Motion type: {motion_type}')
         markers = [right_toe_marker, left_toe_marker]
         (t_Ron, t_Lon, t_Roff, t_Loff), (frame_Ron, frame_Lon, frame_Roff, frame_Loff) \
-                                = gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=forward_velocity_threshold, cut_off_frequency=cut_off_frequency, markers=markers, plot=plot)
+                                = gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=forward_velocity_threshold, motion_type=motion_type, cut_off_frequency=cut_off_frequency, markers=markers, plot=plot)
 
     if save_output or save_output==None:
         trc_dir = os.path.dirname(trc_path)
@@ -584,7 +683,8 @@ def trc_gaitevents_func(**args):
         with open(os.path.join(trc_dir, output_file), 'a') as gaitevents:
             L = trc_name + '\n'
             L += f'Method: {method}. '
-            L+= f'Height threshold: {height_threshold}\n' if method=='height_coordinates' else f'Forward velovity threshold: {forward_velocity_threshold}\n' if method == 'forward_velocity' else '\n'
+            L += f'Height threshold: {height_threshold}\n' if method=='height_coordinates' else f'Forward velovity threshold: {forward_velocity_threshold}\n' if method == 'forward_velocity' else '\n'
+            L += f'Motion type: {motion_type}\n'
             L += 'Times:\n'
             L += '\tRight on: ' + str(t_Ron) + '\n'
             L += '\tLeft on: ' + str(t_Lon) + '\n'
@@ -609,6 +709,7 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--method', default = 'height_coordinates', required = False, help='Method to determine gait events. "forward_coordinates", "height_coordinates", or "forward_velocity". Default:"height_coordinates"')
     parser.add_argument('-V', '--forward_velocity_threshold', default = 1, type=float, required = False, help='Forward velocity below which the foot is considered to have touched the ground (m/s). Used if method is forward_velocity. Default: 1.5')
     parser.add_argument('-H', '--height_threshold', default = 6, type=float, required = False, help='Height below which the foot is considered to have touched the ground (cm). Used if method is height_coordinates. Default: 6')
+    parser.add_argument('-t', '--motion_type', default = 'gait', required = False, help='Motion type. "gait" for walking, "sprint" for sprinting, "" if there is no specific alternation. Default: "gait"')
     parser.add_argument('--sacrum_marker', default = 'Hip', required = False, help='Hip marker name. Default: "Hip"')
     parser.add_argument('--right_heel_marker', default = 'RHeel', required = False, help='Right heel marker name. Default: "RHeel"')
     parser.add_argument('--right_toe_marker', default = 'RBigToe', required = False, help='Right toe marker name. Default: "RBigToe"')
