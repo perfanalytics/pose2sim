@@ -614,7 +614,7 @@ def synchronize_cams_all(config_dict):
             cap.read()
             if cap.read()[0] == False:
                 raise
-            fps = int(cap.get(cv2.CAP_PROP_FPS))
+            fps = round(cap.get(cv2.CAP_PROP_FPS))
         except:
             fps = 60  
     lag_range = time_range_around_maxspeed*fps # frames

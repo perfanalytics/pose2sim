@@ -154,7 +154,7 @@ def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
             cap.read()
             if cap.read()[0] == False:
                 raise
-            frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
+            frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
             frame_rate = 60
 

@@ -176,7 +176,7 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
     
     if save_video: # Set up video writer
         fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
-        fps = cap.get(cv2.CAP_PROP_FPS) # Get the frame rate from the raw video
+        fps = round(cap.get(cv2.CAP_PROP_FPS)) # Get the frame rate from the raw video
         W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) # Get the width and height from the raw video
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
         
@@ -377,7 +377,7 @@ def rtm_estimator(config_dict):
             cap = cv2.VideoCapture(video_files[0])
             if not cap.isOpened():
                 raise FileNotFoundError(f'Error: Could not open {video_files[0]}. Check that the file exists.')
-            frame_rate = cap.get(cv2.CAP_PROP_FPS)
+            frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
             if frame_rate == 0:
                 frame_rate = 30
                 logging.warning(f'Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps.')
