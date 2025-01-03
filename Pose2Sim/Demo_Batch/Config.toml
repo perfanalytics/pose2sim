@@ -18,7 +18,7 @@
 
 
 [project]
-multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
+multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (runs faster).  
 participant_height = 1.72 # m # float if single person, list of float if multi-person (same order as the Static trials) # Only used for marker augmentation
 participant_mass = 70.0 # kg # Only used for marker augmentation and scaling
 
