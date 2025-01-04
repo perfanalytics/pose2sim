@@ -734,8 +734,16 @@ def kinematics_all(config_dict):
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     use_augmentation = config_dict.get('kinematics').get('use_augmentation')
-    if use_augmentation: model_name = 'LSTM'
-    else: model_name = config_dict.get('pose').get('pose_model').upper()
+    if use_augmentation: 
+        model_name = 'LSTM'
+    else: 
+        model_name = config_dict.get('pose').get('pose_model').upper()
+        if model_name.upper() == 'BODY_WITH_FEET': model_name = 'HALPE_26'
+        elif model_name.upper() == 'WHOLE_BODY': model_name = 'COCO_133'
+        elif model_name.upper() == 'BODY': model_name = 'COCO_17'
+        else:
+            raise ValueError(f"Invalid model_type: {model_name}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
+
     right_left_symmetry = config_dict.get('kinematics').get('right_left_symmetry')
     subject_height = config_dict.get('project').get('participant_height')
     subject_mass = config_dict.get('project').get('participant_mass')
@@ -796,13 +804,13 @@ def kinematics_all(config_dict):
     for p, trc_file in enumerate(trc_files):
         logging.info(f"Processing TRC file: {trc_file.resolve()}")
 
-        logging.info("Scaling...")
+        logging.info("\nScaling...")
         perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], 
                         remove_scaling_setup=remove_scaling_setup, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, trimmed_extrema_percent=trimmed_extrema_percent,close_to_zero_speed_m=close_to_zero_speed_m)
         logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
         logging.info(f"\tScaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
         
-        logging.info("Inverse Kinematics...")
+        logging.info("\nInverse Kinematics...")
         perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_setup=remove_IK_setup)
         logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
         logging.info(f"\tJoint angle data saved to {(kinematics_dir / (trc_file.stem + '.mot')).resolve()}\n")

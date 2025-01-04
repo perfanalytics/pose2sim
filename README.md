@@ -61,8 +61,8 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 - [x] **v0.9** *(07/2024)*: Integration of pose estimation in the pipeline
 - [x] **v0.10 *(09/2024)*: Integration of OpenSim in the pipeline**
 - [ ] v0.11: Integration of Sports2D, and documentation on new website
-- [ ] v0.13: Graphical User Interface
-- [ ] v0.12: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
+- [ ] v0.12: Graphical User Interface
+- [ ] v0.13: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
 - [ ] v1.0: First full release
 
 ***N.B.:*** As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
@@ -251,7 +251,7 @@ Type `ipython`, and try the following code:
 from Pose2Sim import Pose2Sim
 Pose2Sim.calibration()
 Pose2Sim.poseEstimation()
-# Pose2Sim.synchronization()
+Pose2Sim.synchronization()
 Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
 Pose2Sim.filtering()
@@ -263,7 +263,7 @@ or equivalently:
 
 ``` python
 from Pose2Sim import Pose2Sim
-Pose2Sim.runAll(do_synchronization=False) # Synchronization possible, but tricky with multiple persons
+Pose2Sim.runAll() 
 ```
 
 One .trc file per participant will be generated and stored in the `pose-3d` directory.\
@@ -925,6 +925,8 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Pose:** Define custom model in config.toml rather than in skeletons.py.
 &#10004; **Pose:** Integrate pose estimation within Pose2Sim (via RTMlib).
 &#9634; **Pose:** Support [MMPose](https://github.com/open-mmlab/mmpose), [SLEAP](https://sleap.ai/), etc.
+&#9634; **Pose:** Optionally let user select the person of interest in single_person mode:
+&nbsp; multiperson = true # true, or 'single_auto', or 'single_click'. 'single_auto' selects the person with lowest reprojection error, and 'single_click' lets the user manually select the person of interest.
 &#9634; **Pose:** Implement [RTMPoseW3D](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose3d) and monocular 3D kinematics
 &#9634; **Pose:** Directly reading from DeepLabCut .csv or .h5 files instead of converting to .json (triangulation, person association, calibration, synchronization...) 
 &#9634; **Pose:** GUI help for DeepLabCut model creation.
