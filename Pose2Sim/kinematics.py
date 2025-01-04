@@ -742,7 +742,7 @@ def kinematics_all(config_dict):
         elif model_name.upper() == 'WHOLE_BODY': model_name = 'COCO_133'
         elif model_name.upper() == 'BODY': model_name = 'COCO_17'
         else:
-            raise ValueError(f"Invalid model_type: {model_name}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
+            raise ValueError(f"Invalid model_type: {model_name}. Must be 'BODY_WITH_FEET', 'WHOLE_BODY', 'BODY', 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
 
     right_left_symmetry = config_dict.get('kinematics').get('right_left_symmetry')
     subject_height = config_dict.get('project').get('participant_height')
