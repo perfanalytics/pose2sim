@@ -351,16 +351,18 @@ Pose2Sim.poseEstimation()
 
 </br>
 
-*N.B.:* Pose estimation can be run in `lightweight`, `balanced`, or `performance` mode.
+*N.B.:* To speed up the process:
+- Disable `display_detection` and `save_video` 
+- Increase the value of `det_frequency`. In that case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames)
+- Use your GPU (See [Installation](#installation)). Slightly more involved, but often worth it
+- Run pose estimation in `lightweight` mode instead of `balanced` or `performance`. However, this will reduce the quality of results 
 
-*N.B.:* Pose estimation can be dramatically sped up by increasing the value of `det_frequency`. In that case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames).
+*N.B.:* The default model is '**Body_with_feet**', but for wrist motion, the '**Whole_body**' `pose_model` is required. Note that it is much slower and slightly less accurate on body keypoints.\
+Alternatively, it is possible to manually select **any .onnx or .zip model** for person, animal, or object detection, and for pose estimation. 
 
 *N.B.:* You can manually select the desired device _(CPU, CUDA, MPS for macOS, ROCM for AMD GPUs)_ and backend _(OpenVINO, ONNXRuntime, OpenCV)_. Otherwise, the best ones for your configuration will be automatically selected.
 
-*N.B.:* The default model is 'Body_with_feet', but you can also choose 'Whole_body' (with hands) or 'Body'.\
-Alternatively, it is possible to manually select your favorite model for person or animal detection and for pose estimation. 
-
-*N.B.:* For wrist motion, the 'Whole_body' `pose_model` is required, but it is much slower and slightly less accurate on body keypoints.
+*N.B.:* 
 
 <img src="Content/Pose2D.png" width="760">
 
