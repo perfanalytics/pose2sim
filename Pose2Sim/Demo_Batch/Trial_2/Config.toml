@@ -56,7 +56,7 @@ participant_mass = [70.0, 63.5] # kg # Only used for marker augmentation and sca
 
 [synchronization]
 # display_sync_plots = true # true or false (lowercase)
-keypoints_to_consider = 'all' # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
+keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
 # approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
                            # # [10.0, 2.0, 8.0, 11.0] list of times (seconds) if you want to specify the approximate time of a clear vertical event for each camera

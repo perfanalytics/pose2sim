@@ -57,7 +57,7 @@
 
 # [synchronization]
 # display_sync_plots = true # true or false (lowercase)
-# keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
+# keypoints_to_consider = 'all' # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
 # approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
                            # # [10.0, 2.0, 8.0, 11.0] list of times (seconds) if you want to specify the approximate time of a clear vertical event for each camera
@@ -148,8 +148,8 @@
 # interpolation = 'linear' #linear, slinear, quadratic, cubic, or none
                         # # 'none' if you don't want to interpolate missing points
 # interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
-# show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 # fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
+# show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 # handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
 # undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
 # make_c3d = true # save triangulated data in c3d format in addition to trc

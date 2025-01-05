@@ -594,14 +594,13 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
     - subject_height (float): The height of the subject.
     - subject_mass (float): The mass of the subject.
     - remove_scaling_setup (bool): Whether to remove the scaling setup file after scaling.
+    - fastest_frames_to_remove_percent (float): Fasters frames may be outliers
+    - large_hip_knee_angles (float): Imprecise coordinates when person is crouching
+    - trimmed_extrema_percent (float): Proportion of the most extreme segment values to remove before calculating their mean
     
     OUTPUTS:
     - A scaled OpenSim model file.
     '''
-
-    fastest_frames_to_remove_percent = 0.1 # fasters frames may be outliers
-    large_hip_knee_angles = 45 # imprecise coordinates when person is crouching
-    trimmed_extrema_percent = 0.2 # proportion of the most extreme segment values to remove before calculating their mean
 
     try:
         # Load model
@@ -622,6 +621,11 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
         # Remove fastest frames, frames with null speed, and frames with large hip and knee angles
         Q_coords, _, _, markers, _ = read_trc(trc_file)
         Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, close_to_zero_speed=close_to_zero_speed_m)
+
+        if Q_coords_low_speeds_low_angles.size == 0:
+            logging.warning(f"\nNo frames left after removing fastest frames, frames with null speed, and frames with large hip and knee angles for {trc_file}. The person may be static, or crouched, or incorrectly detected.")
+            logging.warning(f"Running with fastest_frames_to_remove_percent=0, close_to_zero_speed_m=0, large_hip_knee_angles=0, trimmed_extrema_percent=0. You can edit these parameters in your Config.toml file.\n")
+            Q_coords_low_speeds_low_angles = Q_coords
 
         # Get manual scale values (mean from remaining frames after trimming the 20% most extreme values)
         segment_ratio_dict = dict_segment_ratio(scaling_root, unscaled_model, Q_coords_low_speeds_low_angles, markers, 
@@ -648,7 +652,7 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
             Path(scaling_path_temp).unlink()
 
     except Exception as e:
-        logging.error(f"Error during scaling for {trc_file}: {e}")
+        logging.error(f"Error during scaling for {trc_file}: {e}\.")
         raise
 
 
@@ -726,6 +730,9 @@ def kinematics_all(config_dict):
     - Optionally, OpenSim scaling and IK setup files saved to the kinematics directory
     - Pose2Sim and OpenSim logs saved to files
     '''
+
+    print(config_dict, '\n\n\n\n\n')
+
 
     # Read config_dict
     project_dir = config_dict.get('project').get('project_dir')
