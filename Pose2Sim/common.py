@@ -20,6 +20,7 @@ import cv2
 import c3d
 import sys
 import itertools as it
+import logging
 
 import matplotlib as mpl
 mpl.use('qt5agg')
@@ -42,19 +43,99 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
+## CONSTANTS
+angle_dict = { # lowercase!
+    # joint angles
+    'right ankle': [['RKnee', 'RAnkle', 'RBigToe', 'RHeel'], 'dorsiflexion', 90, 1],
+    'left ankle': [['LKnee', 'LAnkle', 'LBigToe', 'LHeel'], 'dorsiflexion', 90, 1],
+    'right knee': [['RAnkle', 'RKnee', 'RHip'], 'flexion', -180, 1],
+    'left knee': [['LAnkle', 'LKnee', 'LHip'], 'flexion', -180, 1],
+    'right hip': [['RKnee', 'RHip', 'Hip', 'Neck'], 'flexion', 0, -1],
+    'left hip': [['LKnee', 'LHip', 'Hip', 'Neck'], 'flexion', 0, -1],
+    # 'lumbar': [['Neck', 'Hip', 'RHip', 'LHip'], 'flexion', -180, -1],
+    # 'neck': [['Head', 'Neck', 'RShoulder', 'LShoulder'], 'flexion', -180, -1],
+    'right shoulder': [['RElbow', 'RShoulder', 'Hip', 'Neck'], 'flexion', 0, -1],
+    'left shoulder': [['LElbow', 'LShoulder', 'Hip', 'Neck'], 'flexion', 0, -1],
+    'right elbow': [['RWrist', 'RElbow', 'RShoulder'], 'flexion', 180, -1],
+    'left elbow': [['LWrist', 'LElbow', 'LShoulder'], 'flexion', 180, -1],
+    'right wrist': [['RElbow', 'RWrist', 'RIndex'], 'flexion', -180, 1],
+    'left wrist': [['LElbow', 'LIndex', 'LWrist'], 'flexion', -180, 1],
+
+    # segment angles
+    'right foot': [['RBigToe', 'RHeel'], 'horizontal', 0, -1],
+    'left foot': [['LBigToe', 'LHeel'], 'horizontal', 0, -1],
+    'right shank': [['RAnkle', 'RKnee'], 'horizontal', 0, -1],
+    'left shank': [['LAnkle', 'LKnee'], 'horizontal', 0, -1],
+    'right thigh': [['RKnee', 'RHip'], 'horizontal', 0, -1],
+    'left thigh': [['LKnee', 'LHip'], 'horizontal', 0, -1],
+    'pelvis': [['LHip', 'RHip'], 'horizontal', 0, -1],
+    'trunk': [['Neck', 'Hip'], 'horizontal', 0, -1],
+    'shoulders': [['LShoulder', 'RShoulder'], 'horizontal', 0, -1],
+    'head': [['Head', 'Neck'], 'horizontal', 0, -1],
+    'right arm': [['RElbow', 'RShoulder'], 'horizontal', 0, -1],
+    'left arm': [['LElbow', 'LShoulder'], 'horizontal', 0, -1],
+    'right forearm': [['RWrist', 'RElbow'], 'horizontal', 0, -1],
+    'left forearm': [['LWrist', 'LElbow'], 'horizontal', 0, -1],
+    'right hand': [['RIndex', 'RWrist'], 'horizontal', 0, -1],
+    'left hand': [['LIndex', 'LWrist'], 'horizontal', 0, -1]
+    }
+
+
+## CLASSES
+class plotWindow():
+    '''
+    Display several figures in tabs
+    Taken from https://github.com/superjax/plotWindow/blob/master/plotWindow.py
+
+    USAGE:
+    pw = plotWindow()
+    f = plt.figure()
+    plt.plot(x1, y1)
+    pw.addPlot("1", f)
+    f = plt.figure()
+    plt.plot(x2, y2)
+    pw.addPlot("2", f)
+    '''
+
+    def __init__(self, parent=None):
+        self.app = QApplication.instance()
+        if not self.app:
+            self.app = QApplication(sys.argv)
+        self.MainWindow = QMainWindow()
+        self.MainWindow.setWindowTitle("Multitabs figure")
+        self.canvases = []
+        self.figure_handles = []
+        self.toolbar_handles = []
+        self.tab_handles = []
+        self.current_window = -1
+        self.tabs = QTabWidget()
+        self.MainWindow.setCentralWidget(self.tabs)
+        self.MainWindow.resize(1280, 720)
+        self.MainWindow.show()
+
+    def addPlot(self, title, figure):
+        new_tab = QWidget()
+        layout = QVBoxLayout()
+        new_tab.setLayout(layout)
+
+        figure.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.91, wspace=0.2, hspace=0.2)
+        new_canvas = FigureCanvas(figure)
+        new_toolbar = NavigationToolbar(new_canvas, new_tab)
+
+        layout.addWidget(new_canvas)
+        layout.addWidget(new_toolbar)
+        self.tabs.addTab(new_tab, title)
+
+        self.toolbar_handles.append(new_toolbar)
+        self.canvases.append(new_canvas)
+        self.figure_handles.append(figure)
+        self.tab_handles.append(new_tab)
+
+    def show(self):
+        self.app.exec_() 
+
+
 ## FUNCTIONS
-def common_items_in_list(list1, list2):
-    '''
-    Do two lists have any items in common at the same index?
-    Returns True or False
-    '''
-    
-    for i, j in enumerate(list1):
-        if j == list2[i]:
-            return True
-    return False
-
-
 def read_trc(trc_path):
     '''
     Read a TRC file and extract its contents.
@@ -70,15 +151,29 @@ def read_trc(trc_path):
         with open(trc_path, 'r') as trc_file:
             header = [next(trc_file) for _ in range(5)]
         markers = header[3].split('\t')[2::3]
-        
+        markers = [m.strip() for m in markers if m.strip()] # remove last \n character
+       
         trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4, encoding='utf-8')
         frames_col, time_col = trc_df.iloc[:, 0], trc_df.iloc[:, 1]
         Q_coords = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
+        Q_coords = Q_coords.loc[:, ~Q_coords.columns.str.startswith('Unnamed')] # remove unnamed columns
 
         return Q_coords, frames_col, time_col, markers, header
     
     except Exception as e:
         raise ValueError(f"Error reading TRC file at {trc_path}: {e}")
+
+
+def common_items_in_list(list1, list2):
+    '''
+    Do two lists have any items in common at the same index?
+    Returns True or False
+    '''
+    
+    for i, j in enumerate(list1):
+        if j == list2[i]:
+            return True
+    return False
 
 
 def bounding_boxes(js_file, margin_percent=0.1, around='extremities'):
@@ -705,6 +800,42 @@ def points_to_angles(points_list):
     return ang_deg
 
 
+def mean_angles(Q_coords, markers, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']):
+    '''
+    Compute the mean angle time series from 3D points for a given list of angles.
+
+    INPUTS:
+    - Q_coords (DataFrame): The triangulated coordinates of the markers.
+    - markers (list): The list of marker names.
+    - ang_to_consider (list): The list of angles to consider (requires angle_dict).
+
+    OUTPUTS:
+    - ang_mean: The mean angle time series.
+    '''
+
+    ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']
+
+    angs = []
+    for ang_name in ang_to_consider:
+        ang_params = angle_dict[ang_name]
+        ang_mk = ang_params[0]
+        
+        pts_for_angles = []
+        for pt in ang_mk:
+            pts_for_angles.append(Q_coords.iloc[:,markers.index(pt)*3:markers.index(pt)*3+3])
+        ang = points_to_angles(pts_for_angles)
+
+        ang += ang_params[2]
+        ang *= ang_params[3]
+        ang = np.abs(ang)
+
+        angs.append(ang)
+
+    ang_mean = np.mean(angs, axis=0)
+
+    return ang_mean
+
+
 def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, close_to_zero_speed=0.2, large_hip_knee_angles=45):
     '''
     Compute the best coordinates for measurements, after removing:
@@ -723,17 +854,13 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     OUTPUT:
     - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
     '''
-    
-    # Import here to avoid circular import error (kinematics <-> common)
-    from Pose2Sim.kinematics import mean_angles
 
     # Add Hip column if not present
     n_markers_init = len(keypoints_names)
     if 'Hip' not in keypoints_names:
         RHip_df = Q_coords.iloc[:,keypoints_names.index('RHip')*3:keypoints_names.index('RHip')*3+3]
         LHip_df = Q_coords.iloc[:,keypoints_names.index('LHip')*3:keypoints_names.index('LHip')*3+3]
-        #Hip_df = RHip_df.add(LHip_df, fill_value=0) /2 # .add function would make 6 columns due to RHip and LHip have different name of columns
-        Hip_df = pd.DataFrame((RHip_df.values + LHip_df.values) / 2, columns=['X','Y','Z']) 
+        Hip_df = RHip_df.add(LHip_df, fill_value=0) /2
         Hip_df.columns = [col+ str(int(Q_coords.columns[-1][1:])+1) for col in ['X','Y','Z']]
         keypoints_names += ['Hip']
         Q_coords = pd.concat([Q_coords, Hip_df], axis=1)
@@ -742,8 +869,10 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     # Using 80% slowest frames
     sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords.iloc[:,kpt:kpt+3].diff(), axis=1) for kpt in range(n_markers)], axis=0))
     sum_speeds = sum_speeds[sum_speeds>close_to_zero_speed] # Removing when speeds close to zero (out of frame)
+    if len(sum_speeds)==0:
+        raise ValueError('All frames have speed close to zero. Make sure the person is moving and correctly detected, or change close_to_zero_speed to a lower value.')
     min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
-    Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)    
+    Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)  
     
     # Only keep frames with hip and knee flexion angles below 45% 
     # (if more than 50 of them, else take 50 smallest values)
@@ -754,12 +883,11 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
 
     if n_markers_init < n_markers:
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
-        keypoints_names.remove('Hip') # prevent length mismatch
 
     return Q_coords_low_speeds_low_angles
 
 
-def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Compute the height of the person from the trc data.
 
@@ -805,56 +933,3 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
 
     return height
 
-
-## CLASSES
-class plotWindow():
-    '''
-    Display several figures in tabs
-    Taken from https://github.com/superjax/plotWindow/blob/master/plotWindow.py
-
-    USAGE:
-    pw = plotWindow()
-    f = plt.figure()
-    plt.plot(x1, y1)
-    pw.addPlot("1", f)
-    f = plt.figure()
-    plt.plot(x2, y2)
-    pw.addPlot("2", f)
-    '''
-
-    def __init__(self, parent=None):
-        self.app = QApplication.instance()
-        if not self.app:
-            self.app = QApplication(sys.argv)
-        self.MainWindow = QMainWindow()
-        self.MainWindow.setWindowTitle("Multitabs figure")
-        self.canvases = []
-        self.figure_handles = []
-        self.toolbar_handles = []
-        self.tab_handles = []
-        self.current_window = -1
-        self.tabs = QTabWidget()
-        self.MainWindow.setCentralWidget(self.tabs)
-        self.MainWindow.resize(1280, 720)
-        self.MainWindow.show()
-
-    def addPlot(self, title, figure):
-        new_tab = QWidget()
-        layout = QVBoxLayout()
-        new_tab.setLayout(layout)
-
-        figure.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.91, wspace=0.2, hspace=0.2)
-        new_canvas = FigureCanvas(figure)
-        new_toolbar = NavigationToolbar(new_canvas, new_tab)
-
-        layout.addWidget(new_canvas)
-        layout.addWidget(new_toolbar)
-        self.tabs.addTab(new_tab, title)
-
-        self.toolbar_handles.append(new_toolbar)
-        self.canvases.append(new_canvas)
-        self.figure_handles.append(figure)
-        self.tab_handles.append(new_tab)
-
-    def show(self):
-        self.app.exec_() 

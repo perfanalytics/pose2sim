@@ -86,10 +86,11 @@ def augmentTRC(config_dict):
     subject_height = config_dict.get('project').get('participant_height')
     subject_mass = config_dict.get('project').get('participant_mass')
     
-    fastest_frames_to_remove_percent = config_dict.get('markerAugmentation').get('fastest_frames_to_remove_percent')
-    close_to_zero_speed = config_dict.get('markerAugmentation').get('close_to_zero_speed_m')
-    large_hip_knee_angles = config_dict.get('markerAugmentation').get('large_hip_knee_angles')
-    trimmed_extrema_percent = config_dict.get('markerAugmentation').get('trimmed_extrema_percent')
+    fastest_frames_to_remove_percent = config_dict.get('kinematics').get('fastest_frames_to_remove_percent')
+    close_to_zero_speed = config_dict.get('kinematics').get('close_to_zero_speed_m')
+    large_hip_knee_angles = config_dict.get('kinematics').get('large_hip_knee_angles')
+    trimmed_extrema_percent = config_dict.get('kinematics').get('trimmed_extrema_percent')
+    default_height = config_dict.get('kinematics').get('default_height')
 
     augmenterDir = os.path.dirname(utilsDataman.__file__)
     augmenterModelName = 'LSTM'
@@ -110,19 +111,15 @@ def augmentTRC(config_dict):
         trc_files = trc_no_filtering
     sorted(trc_files, key=natural_sort_key)
 
-    # calculate subject heights
+    # Calculate subject heights
     if subject_height is None or subject_height == 0:
-        subject_height = [1.75] * len(trc_files)
-        logging.warning("No subject height found in Config.toml. Using default height of 1.75m.")
-    elif subject_height == 'auto'.lower():
+        subject_height = [default_height] * len(trc_files)
+        logging.warning(f"No subject height found in Config.toml. Using default height of {default_height}m.")
+    elif subject_height.lower() == 'auto':
         subject_height = []
         for trc_file in trc_files:
             try:
                 Q_coords, _, _, markers, _ = read_trc(trc_file)
-                Q_coords = Q_coords.loc[:, ~Q_coords.columns.str.startswith('Unnamed')] # remove unnamed columns
-                markers = [m.strip() for m in markers if m.strip()] # remove last \n character
-
-                # Compute height
                 height = compute_height(
                     Q_coords,
                     markers,
@@ -131,16 +128,22 @@ def augmentTRC(config_dict):
                     large_hip_knee_angles=large_hip_knee_angles,
                     trimmed_extrema_percent=trimmed_extrema_percent
                 )
-                logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {height} m")
-                subject_height.append(height)
+                if not np.isnan(height):
+                    logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m\n")
+                else:
+                    logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
+                    logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, close_to_zero_speed_m, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
+                    height = default_height
             except Exception as e:
-                subject_height.append(1.75)
-                logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Error: {str(e)}. Using default height of 1.75m.")
+                logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
+                logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, close_to_zero_speed_m, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
+                height = default_height
+            subject_height.append(height)
     elif not type(subject_height) == list: # int or float
         subject_height = [subject_height]
     elif len(subject_height) < len(trc_files):
-        logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to 1.75m.")
-        subject_height += [1.75] * (len(trc_files) - len(subject_height))
+        logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to {default_height}m.")
+        subject_height += [default_height] * (len(trc_files) - len(subject_height))
 
     # Get subject masses
     if subject_mass is None or subject_mass == 0:

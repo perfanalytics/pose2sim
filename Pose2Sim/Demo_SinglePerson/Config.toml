@@ -183,10 +183,7 @@ make_c3d = true # also save triangulated data in c3d format
 ##        "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
 ##        "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
 make_c3d = true # save triangulated data in c3d format in addition to trc
-fastest_frames_to_remove_percent = 0.1 # Frames with high speed are considered as outliers
-close_to_zero_speed_m = 0.2 # Sum for all keypoints: about 50 px/frame or 0.2 m/frame
-large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
-trimmed_extrema_percent = 0.5 # Proportion of the most extreme segment values to remove before calculating their mean)
+
 
 [kinematics]
 use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
@@ -195,6 +192,11 @@ right_left_symmetry = true # true or false (lowercase) # Set to false only if yo
 remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
 remove_individual_IK_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
 
+fastest_frames_to_remove_percent = 0.1 # Frames with high speed are considered as outliers
+close_to_zero_speed_m = 0.1 # Sum for all keypoints: about 0.1 m/frame
+large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
+trimmed_extrema_percent = 0.25 # Proportion of the most extreme segment values to remove before calculating their mean)
+default_height = 1.75 # m # If no frames left after removing fastest frames, frames with zero speed, frames with large hip and knee angles, and frames with extreme values.
 
 
 # CUSTOM skeleton, if you trained your own model from DeepLabCut or MMPose for example. 
