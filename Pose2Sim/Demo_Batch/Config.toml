@@ -18,9 +18,9 @@
 
 
 [project]
-multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
-participant_height = 'auto' # m # Set it to 'auto' for automatic compute mode # float if single person, list of float if multi-person (same order as the Static trials) # Only used for marker augmentation
-participant_mass = 70.0 # kg # Only used for marker augmentation and scaling
+multi_person = false # true for trials with multiple participants. If false, only the person with lowest reprojection error is analyzed.
+participant_height = 'auto' # 'auto', float (eg 1.72), or list of floats (eg [1.72, 1.40])  # meters  # Only used for marker augmentation 
+participant_mass = 70.0             # float (eg 70.0), or list of floats (eg [70.0, 63.5])  # kg      # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces rather than only kinematics 
 
 frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
 frame_range = [] # For example [10,300], or [] for all frames. 
@@ -32,9 +32,11 @@ frame_range = [] # For example [10,300], or [] for all frames.
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
+
 [pose]
 vid_img_extension = 'mp4' # any video or image extension
-pose_model = 'HALPE_26'  #With RTMLib: HALPE_26 (body and feet, default), COCO_133 (body, feet, hands), COCO_17 (body)
+
+pose_model = 'Body_with_feet'  #With RTMLib: Body_with_feet (default HALPE_26 model), Whole_body (COCO_133: body + feet + hands), Body (COCO_17)
                          # /!\ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the output files if needed
                          #With MMPose: HALPE_26, COCO_133, COCO_17, CUSTOM. See CUSTOM example at the end of the file
                          #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
@@ -42,8 +44,11 @@ pose_model = 'HALPE_26'  #With RTMLib: HALPE_26 (body and feet, default), COCO_1
                          #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133
                          #With deeplabcut: CUSTOM. See example at the end of the file
 mode = 'balanced' # 'lightweight', 'balanced', 'performance'
-det_frequency = 100 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
+det_frequency = 1 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
                   # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
+device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
+backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
+
 display_detection = false
 overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
 save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
@@ -52,7 +57,7 @@ output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a lis
 
 [synchronization]
 display_sync_plots = false # true or false (lowercase)
-keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
+keypoints_to_consider = 'all' # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
                            # [10.0, 2.0, 8.0, 11.0] list of times (seconds) if you want to specify the approximate time of a clear vertical event for each camera
@@ -143,8 +148,8 @@ min_cameras_for_triangulation = 2
 interpolation = 'linear' #linear, slinear, quadratic, cubic, or none
                         # 'none' if you don't want to interpolate missing points
 interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
-show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
+show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
 undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
 make_c3d = true # save triangulated data in c3d format in addition to trc

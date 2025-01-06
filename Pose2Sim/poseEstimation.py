@@ -55,45 +55,53 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def setup_backend_device():
+def setup_backend_device(backend='auto', device='auto'):
     '''
     Set up the backend and device for the pose tracker based on the availability of hardware acceleration.
     TensorRT is not supported by RTMLib yet: https://github.com/Tau-J/rtmlib/issues/12
 
-    Selects the best option in the following order of priority:
+    If device and backend are not specified, they are automatically set up in the following order of priority:
     1. GPU with CUDA and ONNXRuntime backend (if CUDAExecutionProvider is available)
     2. GPU with ROCm and ONNXRuntime backend (if ROCMExecutionProvider is available, for AMD GPUs)
     3. GPU with MPS or CoreML and ONNXRuntime backend (for macOS systems)
     4. CPU with OpenVINO backend (default fallback)
     '''
 
-    try:
-        import torch
-        import onnxruntime as ort
-        if torch.cuda.is_available() == True and 'CUDAExecutionProvider' in ort.get_available_providers():
-            device = 'cuda'
-            backend = 'onnxruntime'
-            logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
-        elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
-            device = 'rocm'
-            backend = 'onnxruntime'
-            logging.info(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
-        else:
-            raise 
-    except:
+    if device!='auto' and backend!='auto':
+        device = device.lower()
+        backend = backend.lower()
+
+    if device=='auto' or backend=='auto':
+        if device=='auto' and backend!='auto' or device!='auto' and backend=='auto':
+            logging.warning(f"If you set device or backend to 'auto', you must set the other to 'auto' as well. Both device and backend will be determined automatically.")
+
         try:
+            import torch
             import onnxruntime as ort
-            if 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
-                device = 'mps'
+            if torch.cuda.is_available() == True and 'CUDAExecutionProvider' in ort.get_available_providers():
+                device = 'cuda'
                 backend = 'onnxruntime'
-                logging.info(f"\nValid MPS installation found: using ONNXRuntime backend with GPU.")
+                logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
+            elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
+                device = 'rocm'
+                backend = 'onnxruntime'
+                logging.info(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
             else:
-                raise
+                raise 
         except:
-            device = 'cpu'
-            backend = 'openvino'
-            logging.info(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
-    
+            try:
+                import onnxruntime as ort
+                if 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
+                    device = 'mps'
+                    backend = 'onnxruntime'
+                    logging.info(f"\nValid MPS installation found: using ONNXRuntime backend with GPU.")
+                else:
+                    raise
+            except:
+                device = 'cpu'
+                backend = 'openvino'
+                logging.info(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
+        
     return backend, device
 
 
@@ -176,7 +184,7 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
     
     if save_video: # Set up video writer
         fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
-        fps = cap.get(cv2.CAP_PROP_FPS) # Get the frame rate from the raw video
+        fps = round(cap.get(cv2.CAP_PROP_FPS)) # Get the frame rate from the raw video
         W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) # Get the width and height from the raw video
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
         
@@ -368,6 +376,8 @@ def rtm_estimator(config_dict):
     display_detection = config_dict['pose']['display_detection']
     overwrite_pose = config_dict['pose']['overwrite_pose']
     det_frequency = config_dict['pose']['det_frequency']
+    backend = config_dict['pose']['backend']
+    device = config_dict['pose']['device']
 
     # Determine frame rate
     video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
@@ -377,15 +387,12 @@ def rtm_estimator(config_dict):
             cap = cv2.VideoCapture(video_files[0])
             if not cap.isOpened():
                 raise FileNotFoundError(f'Error: Could not open {video_files[0]}. Check that the file exists.')
-            frame_rate = cap.get(cv2.CAP_PROP_FPS)
+            frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
             if frame_rate == 0:
                 frame_rate = 30
                 logging.warning(f'Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps.')
         except:
             frame_rate = 30
-
-    # Select device and backend
-    backend, device = setup_backend_device()
 
     # Set detection frequency
     if det_frequency>1:
@@ -395,20 +402,22 @@ def rtm_estimator(config_dict):
     else:
         raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
 
+    # Select device and backend
+    backend, device = setup_backend_device(backend=backend, device=device)
+
     # Select the appropriate model based on the model_type
-    if pose_model.upper() == 'HALPE_26':
-        ModelClass = BodyWithFeet
+    if pose_model.upper() == 'HALPE_26' or 'BODY_WITH_FEET':
+        ModelClass = BodyWithFeet # 26 keypoints(halpe26)
         logging.info(f"Using HALPE_26 model (body and feet) for pose estimation.")
-    elif pose_model.upper() == 'COCO_133':
+    elif pose_model.upper() == 'COCO_133' or 'WHOLE_BODY':
         ModelClass = Wholebody
         logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation.")
-    elif pose_model.upper() == 'COCO_17':
-        ModelClass = Body # 26 keypoints(halpe26)
+    elif pose_model.upper() == 'COCO_17' or 'BODY':
+        ModelClass = Body
         logging.info(f"Using COCO_17 model (body) for pose estimation.")
     else:
         raise ValueError(f"Invalid model_type: {pose_model}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
     logging.info(f'Mode: {mode}.\n')
-
 
     # Initialize the pose tracker
     pose_tracker = PoseTracker(

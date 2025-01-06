@@ -98,6 +98,11 @@ class TestWorkflow(unittest.TestCase):
             - opensim scaling and inverse kinematics
             - run all
 
+        Display of images and plots deactivated for testing purposes. Synchronization deactivated in multi_person mode.
+        Testing overwritting pose or not.
+        Testing cpu with openvino, and automatic device and backend selection.
+        Testing lightweight and automatic (balanced) modes.
+        
         N.B.: Calibration from scene dimensions is not tested, as it requires the 
         user to click points on the image. 
         Not all possible configuration parameters are extensively tested.
@@ -115,13 +120,17 @@ class TestWorkflow(unittest.TestCase):
         project_dir = '../Demo_SinglePerson'
         config_dict = toml.load(os.path.join(project_dir, 'Config.toml'))
 
+        # lightweight, openvino, cpu
         os.chdir(project_dir)
         config_dict.get("project").update({"project_dir":project_dir})
         config_dict.get("pose").update({"mode":'lightweight'})
         config_dict.get("pose").update({"display_detection":False})
+        config_dict.get("pose").update({"backend":'openvino'})
+        config_dict.get("pose").update({"device":'cpu'})
         config_dict.get("synchronization").update({"display_sync_plots":False})
         config_dict['filtering']['display_figures'] = False
 
+        # Step by step
         Pose2Sim.calibration(config_dict)
         Pose2Sim.poseEstimation(config_dict)
         Pose2Sim.synchronization(config_dict)
@@ -131,6 +140,7 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.markerAugmentation(config_dict)
         Pose2Sim.kinematics(config_dict)
 
+        # Run all, pose not overwritten
         config_dict.get("pose").update({"overwrite_pose":False})
         Pose2Sim.runAll(config_dict)
         
@@ -142,6 +152,7 @@ class TestWorkflow(unittest.TestCase):
         project_dir = '../Demo_MultiPerson'
         config_dict = toml.load(os.path.join(project_dir, 'Config.toml'))
         
+        # lightweight, openvino, cpu
         os.chdir(project_dir)
         config_dict.get("project").update({"project_dir":project_dir})
         config_dict.get("pose").update({"mode":'lightweight'})
@@ -159,9 +170,9 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.markerAugmentation(config_dict)
         Pose2Sim.kinematics(config_dict)
 
-        # Run all
+        # Run all, without marker augmentation
         config_dict.get("pose").update({"overwrite_pose":False})
-        Pose2Sim.runAll(config_dict, do_synchronization=False)
+        Pose2Sim.runAll(config_dict, do_synchronization=False, do_markerAugmentation=False)
 
 
         ####################

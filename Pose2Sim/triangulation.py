@@ -154,7 +154,7 @@ def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
             cap.read()
             if cap.read()[0] == False:
                 raise
-            frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
+            frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
             frame_rate = 60
 
@@ -673,7 +673,14 @@ def triangulate_all(config_dict):
         
     # Retrieve keypoints from model
     try: # from skeletons.py
+        if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
+        elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
+        else:
+            raise ValueError(f"Invalid model_type: {pose_model}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
+   
         model = eval(pose_model)
+        
     except:
         try: # from Config.toml
             model = DictImporter().import_(config_dict.get('pose').get(pose_model))

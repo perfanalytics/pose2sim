@@ -464,7 +464,7 @@ def filter_all(config_dict):
             cap.read()
             if cap.read()[0] == False:
                 raise
-            frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
+            frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
             frame_rate = 60
     

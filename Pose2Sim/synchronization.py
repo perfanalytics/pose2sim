@@ -614,14 +614,21 @@ def synchronize_cams_all(config_dict):
             cap.read()
             if cap.read()[0] == False:
                 raise
-            fps = int(cap.get(cv2.CAP_PROP_FPS))
+            fps = round(cap.get(cv2.CAP_PROP_FPS))
         except:
             fps = 60  
     lag_range = time_range_around_maxspeed*fps # frames
 
     # Retrieve keypoints from model
     try: # from skeletons.py
+        if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
+        elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
+        else:
+            raise ValueError(f"Invalid model_type: {pose_model}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
+   
         model = eval(pose_model)
+   
     except:
         try: # from Config.toml
             model = DictImporter().import_(config_dict.get('pose').get(pose_model))

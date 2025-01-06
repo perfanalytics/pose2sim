@@ -17,10 +17,10 @@
 
 
 
-# [project]
-# multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
-# participant_height = 'auto' # m # Set it to 'auto' for automatic compute mode # float if single person, list of float if multi-person (same order as the Static trials) # Only used for marker augmentation
-# participant_mass = 70.0 # kg # Only used for marker augmentation and scaling
+[project]
+multi_person = true # true for trials with multiple participants. If false, only the person with lowest reprojection error is analyzed.
+participant_height = 'auto' # 'auto', float (eg 1.72), or list of floats (eg [1.72, 1.40])  # meters  # Only used for marker augmentation 
+participant_mass = [70.0, 63.5]     # float (eg 70.0), or list of floats (eg [70.0, 63.5])  # kg      # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces rather than only kinematics 
 
 # frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
 # frame_range = [] # For example [10,300], or [] for all frames. 
@@ -34,8 +34,9 @@
 
 # [pose]
 # vid_img_extension = 'mp4' # any video or image extension
-# pose_model = 'HALPE_26'  #With RTMLib: HALPE_26 (body and feet, default), COCO_133 (body, feet, hands), COCO_17 (body)
-                         # #/!\ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the output files if needed
+
+# pose_model = 'Body_with_feet'  #With RTMLib: Body_with_feet (default HALPE_26 model), Whole_body (COCO_133: body + feet + hands), Body (COCO_17)
+                         # # /!\ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the output files if needed
                          # #With MMPose: HALPE_26, COCO_133, COCO_17, CUSTOM. See CUSTOM example at the end of the file
                          # #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
                          # #With mediapipe: BLAZEPOSE
@@ -44,15 +45,19 @@
 # mode = 'balanced' # 'lightweight', 'balanced', 'performance'
 # det_frequency = 100 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
                   # # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
-# # overwrite_pose = true # set to false if you don't want to recalculate pose estimation when it has already been done
+# device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
+# backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
+
 # display_detection = true
+# overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
 # save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 # output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 
-# [synchronization]
+[synchronization]
 # display_sync_plots = true # true or false (lowercase)
-# keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
+
+keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
 # approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
                            # # [10.0, 2.0, 8.0, 11.0] list of times (seconds) if you want to specify the approximate time of a clear vertical event for each camera

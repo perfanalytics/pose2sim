@@ -61,8 +61,8 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 - [x] **v0.9** *(07/2024)*: Integration of pose estimation in the pipeline
 - [x] **v0.10 *(09/2024)*: Integration of OpenSim in the pipeline**
 - [ ] v0.11: Integration of Sports2D, and documentation on new website
-- [ ] v0.13: Graphical User Interface
-- [ ] v0.12: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
+- [ ] v0.12: Graphical User Interface
+- [ ] v0.13: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
 - [ ] v1.0: First full release
 
 ***N.B.:*** As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
@@ -251,7 +251,7 @@ Type `ipython`, and try the following code:
 from Pose2Sim import Pose2Sim
 Pose2Sim.calibration()
 Pose2Sim.poseEstimation()
-# Pose2Sim.synchronization()
+Pose2Sim.synchronization()
 Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
 Pose2Sim.filtering()
@@ -263,7 +263,7 @@ or equivalently:
 
 ``` python
 from Pose2Sim import Pose2Sim
-Pose2Sim.runAll(do_synchronization=False) # Synchronization possible, but tricky with multiple persons
+Pose2Sim.runAll() 
 ```
 
 One .trc file per participant will be generated and stored in the `pose-3d` directory.\
@@ -351,10 +351,18 @@ Pose2Sim.poseEstimation()
 
 </br>
 
-*N.B.:* Pose estimation can be run in `lightweight`, `balanced`, or `performance` mode.\
-*N.B.:* The `pose_model` with body, feet, hands, and face is required for wrist motion but is much slower and slightly less accurate on body keypoints.\
-*N.B.:* The `GPU` will be used with ONNX backend if a valid CUDA installation is found (or ROCM with AMD GPUS, or MPS with MacOS), otherwise the `CPU` will be used with OpenVINO backend.\
-*N.B.:* Pose estimation can be dramatically sped up by increasing the value of `det_frequency`. In that case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames).
+*N.B.:* To speed up the process:
+- Disable `display_detection` and `save_video` 
+- Increase the value of `det_frequency`. In that case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames)
+- Use your GPU (See [Installation](#installation)). Slightly more involved, but often worth it
+- Run pose estimation in `lightweight` mode instead of `balanced` or `performance`. However, this will reduce the quality of results 
+
+*N.B.:* The default model is '**Body_with_feet**', but for wrist motion, the '**Whole_body**' `pose_model` is required. Note that it is much slower and slightly less accurate on body keypoints.\
+Alternatively, it is possible to manually select **any .onnx or .zip model** for person, animal, or object detection, and for pose estimation. 
+
+*N.B.:* You can manually select the desired device _(CPU, CUDA, MPS for macOS, ROCM for AMD GPUs)_ and backend _(OpenVINO, ONNXRuntime, OpenCV)_. Otherwise, the best ones for your configuration will be automatically selected.
+
+*N.B.:* 
 
 <img src="Content/Pose2D.png" width="760">
 
@@ -925,6 +933,8 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Pose:** Define custom model in config.toml rather than in skeletons.py.
 &#10004; **Pose:** Integrate pose estimation within Pose2Sim (via RTMlib).
 &#9634; **Pose:** Support [MMPose](https://github.com/open-mmlab/mmpose), [SLEAP](https://sleap.ai/), etc.
+&#9634; **Pose:** Optionally let user select the person of interest in single_person mode:
+&nbsp; multiperson = true # true, or 'single_auto', or 'single_click'. 'single_auto' selects the person with lowest reprojection error, and 'single_click' lets the user manually select the person of interest.
 &#9634; **Pose:** Implement [RTMPoseW3D](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose3d) and monocular 3D kinematics
 &#9634; **Pose:** Directly reading from DeepLabCut .csv or .h5 files instead of converting to .json (triangulation, person association, calibration, synchronization...) 
 &#9634; **Pose:** GUI help for DeepLabCut model creation.
