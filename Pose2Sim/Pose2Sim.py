@@ -220,7 +220,7 @@ def poseEstimation(config=None):
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    use_custom_logging = config_dicts[0].get('logging').get('use_custom_logging')
     if not use_custom_logging:
         setup_logging(session_dir)
     currentDateAndTime = datetime.now()
@@ -270,7 +270,7 @@ def synchronization(config=None):
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    use_custom_logging = config_dicts[0].get('logging').get('use_custom_logging')
     if not use_custom_logging:
         setup_logging(session_dir)
     currentDateAndTime = datetime.now()
@@ -317,7 +317,7 @@ def personAssociation(config=None):
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    use_custom_logging = config_dicts[0].get('logging').get('use_custom_logging')
     if not use_custom_logging:
         setup_logging(session_dir)
     currentDateAndTime = datetime.now()
@@ -366,7 +366,7 @@ def triangulation(config=None):
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    use_custom_logging = config_dicts[0].get('logging').get('use_custom_logging')
     if not use_custom_logging:
         setup_logging(session_dir)
     currentDateAndTime = datetime.now()
@@ -415,7 +415,7 @@ def filtering(config=None):
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    use_custom_logging = config_dicts[0].get('logging').get('use_custom_logging')
     if not use_custom_logging:
         setup_logging(session_dir)
     currentDateAndTime = datetime.now()
@@ -459,7 +459,7 @@ def markerAugmentation(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    use_custom_logging = config_dicts[0].get('logging').get('use_custom_logging')
     if not use_custom_logging:
         setup_logging(session_dir)
     currentDateAndTime = datetime.now()
@@ -505,7 +505,7 @@ def kinematics(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    use_custom_logging = config_dicts[0].get('logging').get('use_custom_logging')
     if not use_custom_logging:
         setup_logging(session_dir)
     currentDateAndTime = datetime.now()
