@@ -199,9 +199,15 @@ keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, f
 # default_height = 1.75 # m # If no frames left after removing fastest frames, frames with zero speed, frames with large hip and knee angles, and frames with extreme values.
 
 
+# [logging]
+# use_custom_logging = false # if integrated in an API that already has logging
 
-# # CUSTOM skeleton, if you trained your own model from DeepLabCut or MMPose for example. 
-# # Make sure the node ids correspond to the column numbers of the 2D pose file, starting from zero.
+
+
+# # CUSTOM skeleton
+# # If you use a model with different keypoints and/or different ordering
+# # Useful if you trained your own model, from DeepLabCut or MMPose for example. 
+# # Make sure the ids are set in the right order and start from zero.
 # # 
 # # If you want to perform inverse kinematics, you will also need to create an OpenSim model
 # # and add to its markerset the location where you expect the triangulated keypoints to be detected.
@@ -213,67 +219,67 @@ keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, f
 # #                                      print(f'{pre}{node.name} id={node.id}')
 # [pose.CUSTOM]
 # name = "Hip"
-# id = "19"
-  # [[pose.CUSTOM.children]]
-  # name = "RHip"
-  # id = 12
-     # [[pose.CUSTOM.children.children]]
-     # name = "RKnee"
-     # id = 14
-        # [[pose.CUSTOM.children.children.children]]
-        # name = "RAnkle"
-        # id = 16
-           # [[pose.CUSTOM.children.children.children.children]]
-           # name = "RBigToe"
-           # id = 21
-              # [[pose.CUSTOM.children.children.children.children.children]]
-              # name = "RSmallToe"
-              # id = 23
-           # [[pose.CUSTOM.children.children.children.children]]
-           # name = "RHeel"
-           # id = 25
-  # [[pose.CUSTOM.children]]
-  # name = "LHip"
-  # id = 11
-     # [[pose.CUSTOM.children.children]]
-     # name = "LKnee"
-     # id = 13
-        # [[pose.CUSTOM.children.children.children]]
-        # name = "LAnkle"
-        # id = 15
-           # [[pose.CUSTOM.children.children.children.children]]
-           # name = "LBigToe"
-           # id = 20
-              # [[pose.CUSTOM.children.children.children.children.children]]
-              # name = "LSmallToe"
-              # id = 22
-           # [[pose.CUSTOM.children.children.children.children]]
-           # name = "LHeel"
-           # id = 24
-  # [[pose.CUSTOM.children]]
-  # name = "Neck"
-  # id = 18
-     # [[pose.CUSTOM.children.children]]
-     # name = "Head"
-     # id = 17
-        # [[pose.CUSTOM.children.children.children]]
-        # name = "Nose"
-        # id = 0
-     # [[pose.CUSTOM.children.children]]
-     # name = "RShoulder"
-     # id = 6
-        # [[pose.CUSTOM.children.children.children]]
-        # name = "RElbow"
-        # id = 8
-           # [[pose.CUSTOM.children.children.children.children]]
-           # name = "RWrist"
-           # id = 10
-     # [[pose.CUSTOM.children.children]]
-     # name = "LShoulder"
-     # id = 5
-        # [[pose.CUSTOM.children.children.children]]
-        # name = "LElbow"
-        # id = 7
-           # [[pose.CUSTOM.children.children.children.children]]
-           # name = "LWrist"
-           # id = 9
+# id = 19
+#   [[pose.CUSTOM.children]]
+#   name = "RHip"
+#   id = 12
+#      [[pose.CUSTOM.children.children]]
+#      name = "RKnee"
+#      id = 14
+#         [[pose.CUSTOM.children.children.children]]
+#         name = "RAnkle"
+#         id = 16
+#            [[pose.CUSTOM.children.children.children.children]]
+#            name = "RBigToe"
+#            id = 21
+#               [[pose.CUSTOM.children.children.children.children.children]]
+#               name = "RSmallToe"
+#               id = 23
+#            [[pose.CUSTOM.children.children.children.children]]
+#            name = "RHeel"
+#            id = 25
+#   [[pose.CUSTOM.children]]
+#   name = "LHip"
+#   id = 11
+#      [[pose.CUSTOM.children.children]]
+#      name = "LKnee"
+#      id = 13
+#         [[pose.CUSTOM.children.children.children]]
+#         name = "LAnkle"
+#         id = 15
+#            [[pose.CUSTOM.children.children.children.children]]
+#            name = "LBigToe"
+#            id = 20
+#               [[pose.CUSTOM.children.children.children.children.children]]
+#               name = "LSmallToe"
+#               id = 22
+#            [[pose.CUSTOM.children.children.children.children]]
+#            name = "LHeel"
+#            id = 24
+#   [[pose.CUSTOM.children]]
+#   name = "Neck"
+#   id = 18
+#      [[pose.CUSTOM.children.children]]
+#      name = "Head"
+#      id = 17
+#         [[pose.CUSTOM.children.children.children]]
+#         name = "Nose"
+#         id = 0
+#      [[pose.CUSTOM.children.children]]
+#      name = "RShoulder"
+#      id = 6
+#         [[pose.CUSTOM.children.children.children]]
+#         name = "RElbow"
+#         id = 8
+#            [[pose.CUSTOM.children.children.children.children]]
+#            name = "RWrist"
+#            id = 10
+#      [[pose.CUSTOM.children.children]]
+#      name = "LShoulder"
+#      id = 5
+#         [[pose.CUSTOM.children.children.children]]
+#         name = "LElbow"
+#         id = 7
+#            [[pose.CUSTOM.children.children.children.children]]
+#            name = "LWrist"
+#            id = 9
