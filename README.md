@@ -245,6 +245,7 @@ All of them are clearly documented: feel free to play with them!
 > _**Another person, hidden all along, will appear when multi-person analysis is activated!**_
 
 Go to the Multi-participant Demo folder: `cd <path>\Pose2Sim\Demo_MultiPerson`. \
+Make sure that `multi_person = true` is set in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_MultiPerson/Config.toml) file.\
 Type `ipython`, and try the following code:
 
 ``` python
@@ -274,7 +275,6 @@ You can visualize your results with Blender as explained in [Demonstration Part-
 <br>
 
 ***N.B.:***
-- In [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), set `project` > `multi_person = true` for each trial that contains multiple persons.
 - Make sure that the order of `markerAugmentation` > `participant_height` and `participant_mass` matches the person's IDs.
 
 <br/>

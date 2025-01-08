@@ -179,7 +179,9 @@ def calibration(config=None):
     config_dict.get("project").update({"project_dir":session_dir})
 
     # Set up logging
-    setup_logging(session_dir)
+    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    if not use_custom_logging:
+        setup_logging(session_dir)
     currentDateAndTime = datetime.now()
 
     # Run calibration
@@ -218,7 +220,10 @@ def poseEstimation(config=None):
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    setup_logging(session_dir)
+    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    if not use_custom_logging:
+        setup_logging(session_dir)
+    currentDateAndTime = datetime.now()
 
     # Batch process all trials
     for config_dict in config_dicts:
@@ -265,7 +270,10 @@ def synchronization(config=None):
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    setup_logging(session_dir)
+    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    if not use_custom_logging:
+        setup_logging(session_dir)
+    currentDateAndTime = datetime.now()
 
     # Batch process all trials
     for config_dict in config_dicts:
@@ -309,7 +317,10 @@ def personAssociation(config=None):
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    setup_logging(session_dir)
+    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    if not use_custom_logging:
+        setup_logging(session_dir)
+    currentDateAndTime = datetime.now()
 
     # Batch process all trials
     for config_dict in config_dicts:
@@ -355,7 +366,10 @@ def triangulation(config=None):
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    setup_logging(session_dir)
+    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    if not use_custom_logging:
+        setup_logging(session_dir)
+    currentDateAndTime = datetime.now()
 
     # Batch process all trials
     for config_dict in config_dicts:
@@ -401,7 +415,10 @@ def filtering(config=None):
 
     # Set up logging
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    setup_logging(session_dir)
+    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    if not use_custom_logging:
+        setup_logging(session_dir)
+    currentDateAndTime = datetime.now()
 
     # Batch process all trials
     for config_dict in config_dicts:
@@ -442,7 +459,10 @@ def markerAugmentation(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    setup_logging(session_dir)
+    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    if not use_custom_logging:
+        setup_logging(session_dir)
+    currentDateAndTime = datetime.now()
 
     for config_dict in config_dicts:
         start = time.time()
@@ -485,7 +505,10 @@ def kinematics(config=None):
                              config_dict.get("project").update({"project_dir":"<YOUR_TRIAL_DIRECTORY>"})')
 
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    setup_logging(session_dir)
+    use_custom_logging = config_dict.get('logging').get('use_custom_logging')
+    if not use_custom_logging:
+        setup_logging(session_dir)
+    currentDateAndTime = datetime.now()
 
     # Process each configuration dictionary
     for config_dict in config_dicts:
@@ -519,7 +542,10 @@ def runAll(config=None, do_calibration=True, do_poseEstimation=True, do_synchron
     # Set up logging
     level, config_dicts = read_config_files(config)
     session_dir = os.path.realpath(os.path.join(config_dicts[0].get('project').get('project_dir'), '.'))
-    setup_logging(session_dir)
+    use_custom_logging = config_dicts[0].get('logging').get('use_custom_logging')
+    if not use_custom_logging:
+        setup_logging(session_dir)
+    currentDateAndTime = datetime.now()
 
     currentDateAndTime = datetime.now()
     start = time.time()
