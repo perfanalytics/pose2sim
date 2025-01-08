@@ -19,8 +19,8 @@
 
 [project]
 multi_person = false # true for trials with multiple participants. If false, only the person with lowest reprojection error is analyzed.
-participant_height = 1.72 # m # float if single person, list of float if multi-person (same order as the Static trials) # Only used for marker augmentation
-participant_mass = 70.0 # kg # Only used for marker augmentation and scaling
+participant_height = 'auto' # 'auto', float (eg 1.72), or list of floats (eg [1.72, 1.40])  # meters  # Only used for marker augmentation 
+participant_mass = 70.0             # float (eg 70.0), or list of floats (eg [70.0, 63.5])  # kg      # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces rather than only kinematics 
 
 frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
 frame_range = [] # For example [10,300], or [] for all frames. 

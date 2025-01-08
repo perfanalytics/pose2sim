@@ -115,7 +115,7 @@ def augmentTRC(config_dict):
     if subject_height is None or subject_height == 0:
         subject_height = [default_height] * len(trc_files)
         logging.warning(f"No subject height found in Config.toml. Using default height of {default_height}m.")
-    elif subject_height.lower() == 'auto':
+    elif isinstance(subject_height, str) and subject_height.lower() == 'auto':
         subject_height = []
         for trc_file in trc_files:
             try:
