@@ -287,7 +287,7 @@ def update_play(cap, image, slider, frame_to_json, pose_dir, json_dir_name, rect
     fig.canvas.draw_idle()
 
 
-def manual_person_selection(vid_or_img_files, cam_names, json_files_names_range, search_around_frames, pose_dir, json_dirs_names):
+def select_person(vid_or_img_files, cam_names, json_files_names_range, search_around_frames, pose_dir, json_dirs_names):
     '''
     Allows the user to select a person from each camera by clicking on their bounding box in the video frames.
 
@@ -689,7 +689,7 @@ def synchronize_cams_all(config_dict):
     
     # Handle manual selection if multi person is True
     if not multi_person:
-        selected_id_list = manual_person_selection(multi_person, vid_or_img_files, cam_names, cam_nb, json_files_names_range, search_around_frames, pose_dir, json_dirs_names)
+        selected_id_list = select_person(vid_or_img_files, cam_names, json_files_names_range, search_around_frames, pose_dir, json_dirs_names)
     else:
         selected_id_list = [None] * cam_nb
 
