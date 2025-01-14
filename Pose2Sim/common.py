@@ -14,10 +14,13 @@ Functions shared between modules, and other utilities
 import toml
 import json
 import numpy as np
+import pandas as pd
 import re
 import cv2
 import c3d
 import sys
+import itertools as it
+import logging
 
 import matplotlib as mpl
 mpl.use('qt5agg')
@@ -40,7 +43,127 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
+## CONSTANTS
+angle_dict = { # lowercase!
+    # joint angles
+    'right ankle': [['RKnee', 'RAnkle', 'RBigToe', 'RHeel'], 'dorsiflexion', 90, 1],
+    'left ankle': [['LKnee', 'LAnkle', 'LBigToe', 'LHeel'], 'dorsiflexion', 90, 1],
+    'right knee': [['RAnkle', 'RKnee', 'RHip'], 'flexion', -180, 1],
+    'left knee': [['LAnkle', 'LKnee', 'LHip'], 'flexion', -180, 1],
+    'right hip': [['RKnee', 'RHip', 'Hip', 'Neck'], 'flexion', 0, -1],
+    'left hip': [['LKnee', 'LHip', 'Hip', 'Neck'], 'flexion', 0, -1],
+    # 'lumbar': [['Neck', 'Hip', 'RHip', 'LHip'], 'flexion', -180, -1],
+    # 'neck': [['Head', 'Neck', 'RShoulder', 'LShoulder'], 'flexion', -180, -1],
+    'right shoulder': [['RElbow', 'RShoulder', 'Hip', 'Neck'], 'flexion', 0, -1],
+    'left shoulder': [['LElbow', 'LShoulder', 'Hip', 'Neck'], 'flexion', 0, -1],
+    'right elbow': [['RWrist', 'RElbow', 'RShoulder'], 'flexion', 180, -1],
+    'left elbow': [['LWrist', 'LElbow', 'LShoulder'], 'flexion', 180, -1],
+    'right wrist': [['RElbow', 'RWrist', 'RIndex'], 'flexion', -180, 1],
+    'left wrist': [['LElbow', 'LIndex', 'LWrist'], 'flexion', -180, 1],
+
+    # segment angles
+    'right foot': [['RBigToe', 'RHeel'], 'horizontal', 0, -1],
+    'left foot': [['LBigToe', 'LHeel'], 'horizontal', 0, -1],
+    'right shank': [['RAnkle', 'RKnee'], 'horizontal', 0, -1],
+    'left shank': [['LAnkle', 'LKnee'], 'horizontal', 0, -1],
+    'right thigh': [['RKnee', 'RHip'], 'horizontal', 0, -1],
+    'left thigh': [['LKnee', 'LHip'], 'horizontal', 0, -1],
+    'pelvis': [['LHip', 'RHip'], 'horizontal', 0, -1],
+    'trunk': [['Neck', 'Hip'], 'horizontal', 0, -1],
+    'shoulders': [['LShoulder', 'RShoulder'], 'horizontal', 0, -1],
+    'head': [['Head', 'Neck'], 'horizontal', 0, -1],
+    'right arm': [['RElbow', 'RShoulder'], 'horizontal', 0, -1],
+    'left arm': [['LElbow', 'LShoulder'], 'horizontal', 0, -1],
+    'right forearm': [['RWrist', 'RElbow'], 'horizontal', 0, -1],
+    'left forearm': [['LWrist', 'LElbow'], 'horizontal', 0, -1],
+    'right hand': [['RIndex', 'RWrist'], 'horizontal', 0, -1],
+    'left hand': [['LIndex', 'LWrist'], 'horizontal', 0, -1]
+    }
+
+
+## CLASSES
+class plotWindow():
+    '''
+    Display several figures in tabs
+    Taken from https://github.com/superjax/plotWindow/blob/master/plotWindow.py
+
+    USAGE:
+    pw = plotWindow()
+    f = plt.figure()
+    plt.plot(x1, y1)
+    pw.addPlot("1", f)
+    f = plt.figure()
+    plt.plot(x2, y2)
+    pw.addPlot("2", f)
+    '''
+
+    def __init__(self, parent=None):
+        self.app = QApplication.instance()
+        if not self.app:
+            self.app = QApplication(sys.argv)
+        self.MainWindow = QMainWindow()
+        self.MainWindow.setWindowTitle("Multitabs figure")
+        self.canvases = []
+        self.figure_handles = []
+        self.toolbar_handles = []
+        self.tab_handles = []
+        self.current_window = -1
+        self.tabs = QTabWidget()
+        self.MainWindow.setCentralWidget(self.tabs)
+        self.MainWindow.resize(1280, 720)
+        self.MainWindow.show()
+
+    def addPlot(self, title, figure):
+        new_tab = QWidget()
+        layout = QVBoxLayout()
+        new_tab.setLayout(layout)
+
+        figure.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.91, wspace=0.2, hspace=0.2)
+        new_canvas = FigureCanvas(figure)
+        new_toolbar = NavigationToolbar(new_canvas, new_tab)
+
+        layout.addWidget(new_canvas)
+        layout.addWidget(new_toolbar)
+        self.tabs.addTab(new_tab, title)
+
+        self.toolbar_handles.append(new_toolbar)
+        self.canvases.append(new_canvas)
+        self.figure_handles.append(figure)
+        self.tab_handles.append(new_tab)
+
+    def show(self):
+        self.app.exec_() 
+
+
 ## FUNCTIONS
+def read_trc(trc_path):
+    '''
+    Read a TRC file and extract its contents.
+
+    INPUTS:
+    - trc_path (str): The path to the TRC file.
+
+    OUTPUTS:
+    - tuple: A tuple containing the Q coordinates, frames column, time column, marker names, and header.
+    '''
+
+    try:
+        with open(trc_path, 'r') as trc_file:
+            header = [next(trc_file) for _ in range(5)]
+        markers = header[3].split('\t')[2::3]
+        markers = [m.strip() for m in markers if m.strip()] # remove last \n character
+       
+        trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4, encoding='utf-8')
+        frames_col, time_col = trc_df.iloc[:, 0], trc_df.iloc[:, 1]
+        Q_coords = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
+        Q_coords = Q_coords.loc[:, ~Q_coords.columns.str.startswith('Unnamed')] # remove unnamed columns
+
+        return Q_coords, frames_col, time_col, markers, header
+    
+    except Exception as e:
+        raise ValueError(f"Error reading TRC file at {trc_path}: {e}")
+
+
 def common_items_in_list(list1, list2):
     '''
     Do two lists have any items in common at the same index?
@@ -289,6 +412,87 @@ def euclidean_distance(q1, q2):
         euc_dist = np.sqrt(np.nansum( [d**2 for d in dist], axis=1))
     
     return euc_dist
+
+
+def pad_shape(arr, target_len, fill_value=np.nan):
+    '''
+    Pads an array to the target length with specified fill values
+    
+    INPUTS:
+    - arr: Input array to be padded.
+    - target_len: The target length of the first dimension after padding.
+    - fill_value: The value to use for padding (default: np.nan).
+    
+    OUTPUTS:
+    - Padded array with shape (target_len, ...) matching the input dimensions.
+    '''
+
+    if len(arr) < target_len:
+        pad_shape = (target_len - len(arr),) + arr.shape[1:]
+        padding = np.full(pad_shape, fill_value)
+        return np.concatenate((arr, padding))
+    
+    return arr
+
+
+def sort_people_sports2d(keyptpre, keypt, scores=None):
+    '''
+    Associate persons across frames (Sports2D method)
+    Persons' indices are sometimes swapped when changing frame
+    A person is associated to another in the next frame when they are at a small distance
+    
+    N.B.: Requires min_with_single_indices and euclidian_distance function (see common.py)
+
+    INPUTS:
+    - keyptpre: (K, L, M) array of 2D coordinates for K persons in the previous frame, L keypoints, M 2D coordinates
+    - keypt: idem keyptpre, for current frame
+    - score: (K, L) array of confidence scores for K persons, L keypoints (optional) 
+    
+    OUTPUTS:
+    - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
+    - sorted_keypoints: array with reordered persons --> if scores is not None
+    - sorted_scores: array with reordered scores     --> if scores is not None
+    - associated_tuples: list of tuples with correspondences between persons across frames --> if scores is None (for Pose2Sim.triangulation())
+    '''
+    
+    # Generate possible person correspondences across frames
+    max_len = max(len(keyptpre), len(keypt))
+    keyptpre = pad_shape(keyptpre, max_len, fill_value=np.nan)
+    keypt = pad_shape(keypt, max_len, fill_value=np.nan)
+    if scores is not None:
+        scores = pad_shape(scores, max_len, fill_value=np.nan)
+    
+    # Compute distance between persons from one frame to another
+    personsIDs_comb = sorted(list(it.product(range(len(keyptpre)), range(len(keypt)))))
+    frame_by_frame_dist = [euclidean_distance(keyptpre[comb[0]],keypt[comb[1]]) for comb in personsIDs_comb]
+    frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
+    
+    # Sort correspondences by distance
+    _, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
+    
+    # Associate points to same index across frames, nan if no correspondence
+    sorted_keypoints = []
+    for i in range(len(keyptpre)):
+        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+        if len(id_in_old) > 0:      sorted_keypoints += [keypt[id_in_old[0]]]
+        else:                       sorted_keypoints += [keypt[i]]
+    sorted_keypoints = np.array(sorted_keypoints)
+
+    if scores is not None:
+        sorted_scores = []
+        for i in range(len(keyptpre)):
+            id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+            if len(id_in_old) > 0:  sorted_scores += [scores[id_in_old[0]]]
+            else:                   sorted_scores += [scores[i]]
+        sorted_scores = np.array(sorted_scores)
+
+    # Keep track of previous values even when missing for more than one frame
+    sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints) & ~np.isnan(keyptpre), keyptpre, sorted_keypoints)
+    
+    if scores is not None:
+        return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+    else: # For Pose2Sim.triangulation()
+        return sorted_keypoints, associated_tuples
 
 
 def trimmed_mean(arr, trimmed_extrema_percent=0.5):
@@ -544,55 +748,188 @@ def convert_to_c3d(trc_path):
     return c3d_path
 
 
-## CLASSES
-class plotWindow():
+def points_to_angles(points_list):
     '''
-    Display several figures in tabs
-    Taken from https://github.com/superjax/plotWindow/blob/master/plotWindow.py
+    If len(points_list)==2, computes clockwise angle of ab vector w.r.t. horizontal (e.g. RBigToe, RHeel) 
+    If len(points_list)==3, computes clockwise angle from a to c around b (e.g. Neck, Hip, Knee) 
+    If len(points_list)==4, computes clockwise angle between vectors ab and cd (e.g. Neck Hip, RKnee RHip)
+    
+    Points can be 2D or 3D.
+    If parameters are float, returns a float between 0.0 and 360.0
+    If parameters are arrays, returns an array of floats between 0.0 and 360.0
 
-    USAGE:
-    pw = plotWindow()
-    f = plt.figure()
-    plt.plot(x1, y1)
-    pw.addPlot("1", f)
-    f = plt.figure()
-    plt.plot(x2, y2)
-    pw.addPlot("2", f)
+    INPUTS:
     '''
 
-    def __init__(self, parent=None):
-        self.app = QApplication.instance()
-        if not self.app:
-            self.app = QApplication(sys.argv)
-        self.MainWindow = QMainWindow()
-        self.MainWindow.setWindowTitle("Multitabs figure")
-        self.canvases = []
-        self.figure_handles = []
-        self.toolbar_handles = []
-        self.tab_handles = []
-        self.current_window = -1
-        self.tabs = QTabWidget()
-        self.MainWindow.setCentralWidget(self.tabs)
-        self.MainWindow.resize(1280, 720)
-        self.MainWindow.show()
+    if len(points_list) < 2: # if not enough points, return None
+        return np.nan
+    
+    points_array = np.array(points_list)
+    dimensions = points_array.shape[-1]
 
-    def addPlot(self, title, figure):
-        new_tab = QWidget()
-        layout = QVBoxLayout()
-        new_tab.setLayout(layout)
+    if len(points_list) == 2:
+        vector_u = points_array[0] - points_array[1]
+        if len(points_array.shape)==2:
+            vector_v = np.array([1, 0, 0]) # Here vector X, could be any horizontal vector
+        else:
+            vector_v = np.array([[1, 0, 0],] * points_array.shape[1]) 
 
-        figure.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.91, wspace=0.2, hspace=0.2)
-        new_canvas = FigureCanvas(figure)
-        new_toolbar = NavigationToolbar(new_canvas, new_tab)
+    elif len(points_list) == 3:
+        vector_u = points_array[0] - points_array[1]
+        vector_v = points_array[2] - points_array[1]
 
-        layout.addWidget(new_canvas)
-        layout.addWidget(new_toolbar)
-        self.tabs.addTab(new_tab, title)
+    elif len(points_list) == 4:
+        vector_u = points_array[1] - points_array[0]
+        vector_v = points_array[3] - points_array[2]
 
-        self.toolbar_handles.append(new_toolbar)
-        self.canvases.append(new_canvas)
-        self.figure_handles.append(figure)
-        self.tab_handles.append(new_tab)
+    else:
+        return np.nan
 
-    def show(self):
-        self.app.exec_() 
+    if dimensions == 2: 
+        vector_u = vector_u[:2]
+        vector_v = vector_v[:2]
+        ang = np.arctan2(vector_u[1], vector_u[0]) - np.arctan2(vector_v[1], vector_v[0])
+    else:
+        cross_product = np.cross(vector_u, vector_v)
+        dot_product = np.einsum('ij,ij->i', vector_u, vector_v) # np.dot(vector_u, vector_v) # does not work with time series
+        ang = np.arctan2(np.linalg.norm(cross_product,axis=1), dot_product)
+
+    ang_deg = np.degrees(ang)
+    # ang_deg = np.array(np.degrees(np.unwrap(ang*2)/2))
+    
+    return ang_deg
+
+
+def mean_angles(Q_coords, markers, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']):
+    '''
+    Compute the mean angle time series from 3D points for a given list of angles.
+
+    INPUTS:
+    - Q_coords (DataFrame): The triangulated coordinates of the markers.
+    - markers (list): The list of marker names.
+    - ang_to_consider (list): The list of angles to consider (requires angle_dict).
+
+    OUTPUTS:
+    - ang_mean: The mean angle time series.
+    '''
+
+    ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']
+
+    angs = []
+    for ang_name in ang_to_consider:
+        ang_params = angle_dict[ang_name]
+        ang_mk = ang_params[0]
+        
+        pts_for_angles = []
+        for pt in ang_mk:
+            pts_for_angles.append(Q_coords.iloc[:,markers.index(pt)*3:markers.index(pt)*3+3])
+        ang = points_to_angles(pts_for_angles)
+
+        ang += ang_params[2]
+        ang *= ang_params[3]
+        ang = np.abs(ang)
+
+        angs.append(ang)
+
+    ang_mean = np.mean(angs, axis=0)
+
+    return ang_mean
+
+
+def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, close_to_zero_speed=0.2, large_hip_knee_angles=45):
+    '''
+    Compute the best coordinates for measurements, after removing:
+    - 20% fastest frames (may be outliers)
+    - frames when speed is close to zero (person is out of frame): 0.2 m/frame, or 50 px/frame
+    - frames when hip and knee angle below 45° (imprecise coordinates when person is crouching)
+    
+    INPUTS:
+    - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
+    - keypoints_names: list. The list of marker names
+    - fastest_frames_to_remove_percent: float
+    - close_to_zero_speed: float (sum for all keypoints: about 50 px/frame or 0.2 m/frame)
+    - large_hip_knee_angles: int
+    - trimmed_extrema_percent
+
+    OUTPUT:
+    - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
+    '''
+
+    # Add Hip column if not present
+    n_markers_init = len(keypoints_names)
+    if 'Hip' not in keypoints_names:
+        RHip_df = Q_coords.iloc[:,keypoints_names.index('RHip')*3:keypoints_names.index('RHip')*3+3]
+        LHip_df = Q_coords.iloc[:,keypoints_names.index('LHip')*3:keypoints_names.index('LHip')*3+3]
+        Hip_df = RHip_df.add(LHip_df, fill_value=0) /2
+        Hip_df.columns = [col+ str(int(Q_coords.columns[-1][1:])+1) for col in ['X','Y','Z']]
+        keypoints_names += ['Hip']
+        Q_coords = pd.concat([Q_coords, Hip_df], axis=1)
+    n_markers = len(keypoints_names)
+
+    # Using 80% slowest frames
+    sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords.iloc[:,kpt:kpt+3].diff(), axis=1) for kpt in range(n_markers)], axis=0))
+    sum_speeds = sum_speeds[sum_speeds>close_to_zero_speed] # Removing when speeds close to zero (out of frame)
+    if len(sum_speeds)==0:
+        raise ValueError('All frames have speed close to zero. Make sure the person is moving and correctly detected, or change close_to_zero_speed to a lower value.')
+    min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
+    Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)  
+    
+    # Only keep frames with hip and knee flexion angles below 45% 
+    # (if more than 50 of them, else take 50 smallest values)
+    ang_mean = mean_angles(Q_coords_low_speeds, keypoints_names, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
+    Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
+    if len(Q_coords_low_speeds_low_angles) < 50:
+        Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
+
+    if n_markers_init < n_markers:
+        Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
+
+    return Q_coords_low_speeds_low_angles
+
+
+def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+    '''
+    Compute the height of the person from the trc data.
+
+    INPUTS:
+    - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
+    - keypoints_names: list. The list of marker names
+    - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
+    - close_to_zero_speed: float. Sum for all keypoints: about 50 px/frame or 0.2 m/frame
+    - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
+    - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
+    
+    OUTPUT:
+    - height: float. The estimated height of the person
+    '''
+    
+    # Retrieve most reliable coordinates
+    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, keypoints_names, 
+                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, close_to_zero_speed=close_to_zero_speed, large_hip_knee_angles=large_hip_knee_angles)
+    Q_coords_low_speeds_low_angles.columns = np.array([[m]*3 for m in keypoints_names]).flatten()
+
+    # Add MidShoulder column
+    df_MidShoulder = pd.DataFrame((Q_coords_low_speeds_low_angles['RShoulder'].values + Q_coords_low_speeds_low_angles['LShoulder'].values) /2)
+    df_MidShoulder.columns = ['MidShoulder']*3
+    Q_coords_low_speeds_low_angles = pd.concat((Q_coords_low_speeds_low_angles.reset_index(drop=True), df_MidShoulder), axis=1)
+
+    # Automatically compute the height of the person
+    pairs_up_to_shoulders = [['RHeel', 'RAnkle'], ['RAnkle', 'RKnee'], ['RKnee', 'RHip'], ['RHip', 'RShoulder'],
+                            ['LHeel', 'LAnkle'], ['LAnkle', 'LKnee'], ['LKnee', 'LHip'], ['LHip', 'LShoulder']]
+    try:
+        rfoot, rshank, rfemur, rback, lfoot, lshank, lfemur, lback = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in pairs_up_to_shoulders]
+    except:
+        raise ValueError('At least one of the following markers is missing for computing the height of the person:\
+                         RHeel, RAnkle, RKnee, RHip, RShoulder, LHeel, LAnkle, LKnee, LHip, LShoulder.\
+                         Make sure that the person is entirely visible, or use a calibration file instead, or set "to_meters=false".')
+    if 'Head' in keypoints_names:
+        head = euclidean_distance(Q_coords_low_speeds_low_angles['MidShoulder'], Q_coords_low_speeds_low_angles['Head'])
+    else:
+        head = euclidean_distance(Q_coords_low_speeds_low_angles['MidShoulder'], Q_coords_low_speeds_low_angles['Nose'])*1.33
+    heights = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2 + (rback + lback)/2 + head
+    
+    # Remove the 20% most extreme values
+    height = trimmed_mean(heights, trimmed_extrema_percent=trimmed_extrema_percent)
+
+    return height
+

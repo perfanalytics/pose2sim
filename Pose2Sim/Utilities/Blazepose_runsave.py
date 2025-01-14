@@ -165,7 +165,7 @@ def blazepose_detec_func(**args):
     # Run Blazepose
     cap = cv2.VideoCapture(video_input)
     W, H = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-    fps = cap.get(cv2.CAP_PROP_FPS)
+    fps = round(cap.get(cv2.CAP_PROP_FPS))
     count = 0
     kpt_list = []
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5, model_complexity=model_complexity) as pose:

@@ -36,14 +36,18 @@ import os
 import glob
 import json
 import logging
+from tqdm import tqdm
 import cv2
 import time
 import queue
 import multiprocessing
 import psutil
 
+
 import numpy as np
 import itertools as it
+
+from Pose2Sim.common import natural_sort_key, sort_people_sports2d
 
 from multiprocessing import shared_memory
 from datetime import datetime
@@ -715,44 +719,54 @@ def setup_capture_directories(source_path, output_dir, save_images):
 
     return output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path
 
-def save_to_openpose(json_file_path, keypoints, scores):
+def setup_backend_device(backend='auto', device='auto'):
     '''
-    Save the keypoints and scores to a JSON file in the OpenPose format
+    Set up the backend and device for the pose tracker based on the availability of hardware acceleration.
+    TensorRT is not supported by RTMLib yet: https://github.com/Tau-J/rtmlib/issues/12
 
-    INPUTS:
-    - json_file_path: Path to save the JSON file
-    - keypoints: Detected keypoints
-    - scores: Confidence scores for each keypoint
-
-    OUTPUTS:
-    - JSON file with the detected keypoints and confidence scores in the OpenPose format
+    If device and backend are not specified, they are automatically set up in the following order of priority:
+    1. GPU with CUDA and ONNXRuntime backend (if CUDAExecutionProvider is available)
+    2. GPU with ROCm and ONNXRuntime backend (if ROCMExecutionProvider is available, for AMD GPUs)
+    3. GPU with MPS or CoreML and ONNXRuntime backend (for macOS systems)
+    4. CPU with OpenVINO backend (default fallback)
     '''
 
-    # Prepare keypoints with confidence scores for JSON output
-    keypoints_with_confidence = np.concatenate([keypoints, scores[:, :, np.newaxis]], axis=2)
-    keypoints_with_confidence_flat = keypoints_with_confidence.reshape((keypoints.shape[0], -1))
+    if device!='auto' and backend!='auto':
+        device = device.lower()
+        backend = backend.lower()
 
-    detections = [
-        {
-            "person_id": [-1],
-            "pose_keypoints_2d": person_keypoints.tolist(),
-            "face_keypoints_2d": [],
-            "hand_left_keypoints_2d": [],
-            "hand_right_keypoints_2d": [],
-            "pose_keypoints_3d": [],
-            "face_keypoints_3d": [],
-            "hand_left_keypoints_3d": [],
-            "hand_right_keypoints_3d": []
-        }
-        for person_keypoints in keypoints_with_confidence_flat
-    ]
+    if device=='auto' or backend=='auto':
+        if device=='auto' and backend!='auto' or device!='auto' and backend=='auto':
+            logging.warning(f"If you set device or backend to 'auto', you must set the other to 'auto' as well. Both device and backend will be determined automatically.")
 
-    # Create JSON output structure
-    json_output = {"version": 1.3, "people": detections}
-
-    # Save JSON output for each frame
-    with open(json_file_path, 'w') as json_file:
-        json.dump(json_output, json_file)
+        try:
+            import torch
+            import onnxruntime as ort
+            if torch.cuda.is_available() == True and 'CUDAExecutionProvider' in ort.get_available_providers():
+                device = 'cuda'
+                backend = 'onnxruntime'
+                logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
+            elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
+                device = 'rocm'
+                backend = 'onnxruntime'
+                logging.info(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
+            else:
+                raise 
+        except:
+            try:
+                import onnxruntime as ort
+                if 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
+                    device = 'mps'
+                    backend = 'onnxruntime'
+                    logging.info(f"\nValid MPS installation found: using ONNXRuntime backend with GPU.")
+                else:
+                    raise
+            except:
+                device = 'cpu'
+                backend = 'openvino'
+                logging.info(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
+        
+    return backend, device
 
 
 def determine_tracker_settings(config_dict):
@@ -991,6 +1005,7 @@ def sort_people_sports2d(keyptpre, keypt, scores, return_first_only=False):
         sorted_scores = np.array([sorted_scores[0]])
     
     return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+
 
 
 def euclidean_distance(q1, q2):

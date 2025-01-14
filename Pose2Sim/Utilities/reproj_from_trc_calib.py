@@ -56,7 +56,7 @@ biocvplus_markers = ['ACROM_R', 'ACROM_L', 'C7', 'T10', 'CLAV', 'XIP_PROC', 'UA_
 
 
 ## FUNCTIONS
-def str_to_id(string, length=8):
+def str_to_id(string, length=12):
     '''
     Convert a string to an integer id
     '''
@@ -285,12 +285,6 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
     - labels2d_json: saved json file
     '''
 
-    # transform first name in integer, and append other numbers from persons
-    persons = list(set(['_'.join(item.split('_')[:5]) for item in coords_df.columns.levels[1]]))
-    person_ids = [int(str(str_to_id(p.split('_')[1])) + ''.join(p.split('_')[3:])) if len(p.split('_'))>=3 
-                  else str_to_id(p.split('_')[0]) 
-                  for p in persons]
-    
     labels2d_json_data = {}
     labels2d_json_data['info'] = {'description': f'Bedlam Pose {markerset}', 
                                     'url': 'https://github.com/davidpagnon/bedlam_pose', 
@@ -303,14 +297,14 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
     labels2d_json_data['images'] = []
     labels2d_json_data['annotations'] = []
     labels2d_json_data['categories'] = [{'id': 1, 'name': 'person'}]
+    padding = 0.05
 
     # for each image
+    persons = list(set(['_'.join(item.split('_')[:5]) for item in coords_df.columns.levels[1]]))
     for i in range(len(coords_df)):
-        file_name = coords_df.index[i]
-        w, h = img_size
-        # id from concatenation of numbers from path
-        # file_id = int(''.join(re.findall(r'\d+', str(file_name))))
-        file_id = int(hashlib.md5(file_name.encode()).hexdigest(), 16) % (10**12)  # Keep only 12 digits
+        file_name = coords_df.index[i][0]
+        w, h = int(img_size[0]), int(img_size[1])
+        file_id = str_to_id(file_name, length=12)
 
         labels2d_json_data['images'] += [{'file_name': file_name, 
                                             'height': h, 
@@ -319,7 +313,8 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
                                             'license': 1}]
         
         # for each person
-        for p, person in enumerate(persons):
+        for person in persons:
+
             # store 2D keypoints and respect model keypoint order
             coords = coords_df.iloc[i, coords_df.columns.get_level_values(1)==person]
             coords_list = []
@@ -338,8 +333,13 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
             bbox_height = np.round(max_y - min_y, decimals=1)
             # bbox = [min_x, min_y, max_x, max_y]
             bbox = [min_x, min_y, bbox_width, bbox_height] # coco format
+            # add padding
+            bbox = [max(0, min_x-bbox_width*padding),
+                    max(0, min_y-bbox_height*padding),
+                    bbox_width*(1+padding*2) if max_x+bbox_width*padding < w else bbox_width*(1+padding),
+                    bbox_height*(1+padding*2) if max_y+bbox_height*padding < h else bbox_height*(1+padding)]
 
-            person_id = person_ids[p]
+            ann_id = str_to_id(person+file_name) 
             category_id = 1
             segmentation = [[min_x, min_y, min_x, max_y, max_x, max_y, max_x, min_y]] # no segmentation
             area = np.round(bbox_width * bbox_height, decimals=1)
@@ -349,7 +349,7 @@ def dataset_to_mmpose2d(coords_df, mmpose_json_file, img_size, markerset='custom
                 labels2d_json_data['annotations'] += [{ 'keypoints': coords_list, 
                                                         'num_keypoints': num_keypoints, 
                                                         'bbox': bbox, 
-                                                        'id': person_id, 
+                                                        'id': ann_id, 
                                                         'image_id': file_id, 
                                                         'category_id': category_id,
                                                         'segmentation': segmentation,
