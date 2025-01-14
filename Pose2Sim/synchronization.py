@@ -617,20 +617,21 @@ def synchronize_cams_all(config_dict):
     # Retrieve keypoints from model
     try: # from skeletons.py
         if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
         elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
         elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
-        else:
-            raise ValueError(f"Invalid model_type: {pose_model}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
-   
+        elif pose_model.upper() == 'HAND': pose_model = 'HAND_21'
+        elif pose_model.upper() == 'FACE': pose_model = 'FACE_106'
+        elif pose_model.upper() == 'ANIMAL': pose_model = 'ANIMAL2D_17'
+        else: pass
         model = eval(pose_model)
-   
     except:
         try: # from Config.toml
             model = DictImporter().import_(config_dict.get('pose').get(pose_model))
             if model.id == 'None':
                 model.id = None
         except:
-            raise NameError('Model not found in skeletons.py nor in Config.toml')
+            raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
     keypoints_ids = [node.id for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
 

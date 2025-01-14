@@ -119,9 +119,9 @@ def augmentTRC(config_dict):
         subject_height = []
         for trc_file in trc_files:
             try:
-                Q_coords, _, _, markers, _ = read_trc(trc_file)
+                trc_data, _, _, markers, _ = read_trc(trc_file)
                 height = compute_height(
-                    Q_coords,
+                    trc_data,
                     markers,
                     fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
                     close_to_zero_speed=close_to_zero_speed,

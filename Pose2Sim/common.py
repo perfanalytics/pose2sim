@@ -157,13 +157,14 @@ def read_trc(trc_path):
         frames_col, time_col = trc_df.iloc[:, 0], trc_df.iloc[:, 1]
         Q_coords = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
         Q_coords = Q_coords.loc[:, ~Q_coords.columns.str.startswith('Unnamed')] # remove unnamed columns
+        Q_coords.columns = np.array([[m,m,m] for m in markers]).ravel().tolist()
 
         return Q_coords, frames_col, time_col, markers, header
     
     except Exception as e:
         raise ValueError(f"Error reading TRC file at {trc_path}: {e}")
-
-
+    
+    
 def common_items_in_list(list1, list2):
     '''
     Do two lists have any items in common at the same index?
@@ -759,6 +760,10 @@ def points_to_angles(points_list):
     If parameters are arrays, returns an array of floats between 0.0 and 360.0
 
     INPUTS:
+    - points_list: list of arrays of points
+
+    OUTPUTS:
+    - ang_deg: float or array of floats. The angle(s) in degrees.
     '''
 
     if len(points_list) < 2: # if not enough points, return None
@@ -800,13 +805,38 @@ def points_to_angles(points_list):
     return ang_deg
 
 
-def mean_angles(Q_coords, markers, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']):
+def fixed_angles(points_list, ang_name):
+    '''
+    Add offset and multiplying factor to angles
+
+    INPUTS:
+    - points_list: list of arrays of points
+    - ang_name: str. The name of the angle to consider.
+
+    OUTPUTS:
+    - ang: float. The angle in degrees.
+    '''
+
+    ang_params = angle_dict[ang_name]
+    ang = points_to_angles(points_list)
+    ang += ang_params[2]
+    ang *= ang_params[3]
+    if ang_name in ['pelvis', 'shoulders']:
+        ang = np.where(ang>90, ang-180, ang)
+        ang = np.where(ang<-90, ang+180, ang)
+    else:
+        ang = np.where(ang>180, ang-360, ang)
+        ang = np.where(ang<-180, ang+360, ang)
+
+    return ang
+
+
+def mean_angles(Q_coords, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']):
     '''
     Compute the mean angle time series from 3D points for a given list of angles.
 
     INPUTS:
     - Q_coords (DataFrame): The triangulated coordinates of the markers.
-    - markers (list): The list of marker names.
     - ang_to_consider (list): The list of angles to consider (requires angle_dict).
 
     OUTPUTS:
@@ -819,21 +849,61 @@ def mean_angles(Q_coords, markers, ang_to_consider = ['right knee', 'left knee',
     for ang_name in ang_to_consider:
         ang_params = angle_dict[ang_name]
         ang_mk = ang_params[0]
-        
+        if 'Neck' not in Q_coords.columns:
+            df_MidShoulder = pd.DataFrame((Q_coords['RShoulder'].values + Q_coords['LShoulder'].values) /2)
+            df_MidShoulder.columns = ['Neck']*3
+            Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_MidShoulder), axis=1)
+
         pts_for_angles = []
         for pt in ang_mk:
-            pts_for_angles.append(Q_coords.iloc[:,markers.index(pt)*3:markers.index(pt)*3+3])
-        ang = points_to_angles(pts_for_angles)
+            # pts_for_angles.append(Q_coords.iloc[:,markers.index(pt)*3:markers.index(pt)*3+3])
+            pts_for_angles.append(Q_coords[pt])
 
-        ang += ang_params[2]
-        ang *= ang_params[3]
+        ang = fixed_angles(pts_for_angles, ang_name)
         ang = np.abs(ang)
-
         angs.append(ang)
 
     ang_mean = np.mean(angs, axis=0)
 
     return ang_mean
+
+
+def add_neck_hip_coords(kpt_name, p_X, p_Y, p_scores, kpt_ids, kpt_names):
+    '''
+    Add neck (midshoulder) and hip (midhip) coordinates if neck and hip are not available
+    
+    INPUTS:
+    - kpt_name: name of the keypoint to add (neck, hip)
+    - p_X: list of x coordinates after flipping if needed
+    - p_Y: list of y coordinates
+    - p_scores: list of confidence scores
+    - kpt_ids: list of keypoint ids (see skeletons.py)
+    - kpt_names: list of keypoint names (see skeletons.py)
+    
+    OUTPUTS:
+    - p_X: list of x coordinates with added missing coordinate
+    - p_Y: list of y coordinates with added missing coordinate
+    - p_scores: list of confidence scores with added missing score
+    '''
+
+    names, ids = kpt_names.copy(), kpt_ids.copy()
+    names.append(kpt_name)
+    ids.append(len(p_X))
+    if kpt_name == 'Neck':
+        mid_X = (np.abs(p_X[ids[names.index('LShoulder')]]) + np.abs(p_X[ids[names.index('RShoulder')]])) /2
+        mid_Y = (p_Y[ids[names.index('LShoulder')]] + p_Y[ids[names.index('RShoulder')]])/2
+        mid_score = (p_scores[ids[names.index('LShoulder')]] + p_scores[ids[names.index('RShoulder')]])/2
+    elif kpt_name == 'Hip':
+        mid_X = (np.abs(p_X[ids[names.index('LHip')]]) + np.abs(p_X[ids[names.index('RHip')]]) ) /2
+        mid_Y = (p_Y[ids[names.index('LHip')]] + p_Y[ids[names.index('RHip')]])/2
+        mid_score = (p_scores[ids[names.index('LHip')]] + p_scores[ids[names.index('RHip')]])/2
+    else:
+        raise ValueError("kpt_name must be 'Neck' or 'Hip'")
+    p_X = np.append(p_X, mid_X)
+    p_Y = np.append(p_Y, mid_Y)
+    p_scores = np.append(p_scores, mid_score)
+
+    return p_X, p_Y, p_scores
 
 
 def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, close_to_zero_speed=0.2, large_hip_knee_angles=45):
@@ -855,15 +925,17 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
     '''
 
+    # Add MidShoulder column
+    df_MidShoulder = pd.DataFrame((Q_coords['RShoulder'].values + Q_coords['LShoulder'].values) /2)
+    df_MidShoulder.columns = ['MidShoulder']*3
+    Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_MidShoulder), axis=1)
+
     # Add Hip column if not present
     n_markers_init = len(keypoints_names)
     if 'Hip' not in keypoints_names:
-        RHip_df = Q_coords.iloc[:,keypoints_names.index('RHip')*3:keypoints_names.index('RHip')*3+3]
-        LHip_df = Q_coords.iloc[:,keypoints_names.index('LHip')*3:keypoints_names.index('LHip')*3+3]
-        Hip_df = RHip_df.add(LHip_df, fill_value=0) /2
-        Hip_df.columns = [col+ str(int(Q_coords.columns[-1][1:])+1) for col in ['X','Y','Z']]
-        keypoints_names += ['Hip']
-        Q_coords = pd.concat([Q_coords, Hip_df], axis=1)
+        df_Hip = pd.DataFrame((Q_coords['RHip'].values + Q_coords['LHip'].values) /2)
+        df_Hip.columns = ['Hip']*3
+        Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_Hip), axis=1)
     n_markers = len(keypoints_names)
 
     # Using 80% slowest frames
@@ -872,14 +944,17 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     if len(sum_speeds)==0:
         raise ValueError('All frames have speed close to zero. Make sure the person is moving and correctly detected, or change close_to_zero_speed to a lower value.')
     min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
-    Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)  
+    Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
     
     # Only keep frames with hip and knee flexion angles below 45% 
     # (if more than 50 of them, else take 50 smallest values)
-    ang_mean = mean_angles(Q_coords_low_speeds, keypoints_names, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
-    Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
-    if len(Q_coords_low_speeds_low_angles) < 50:
-        Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
+    try:
+        ang_mean = mean_angles(Q_coords_low_speeds, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
+        Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
+        if len(Q_coords_low_speeds_low_angles) < 50:
+            Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
+    except:
+        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these agles to be below {large_hip_knee_angles}°.")
 
     if n_markers_init < n_markers:
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
@@ -903,33 +978,42 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     - height: float. The estimated height of the person
     '''
     
-    # Retrieve most reliable coordinates
+    # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
     Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, keypoints_names, 
                                                                   fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, close_to_zero_speed=close_to_zero_speed, large_hip_knee_angles=large_hip_knee_angles)
-    Q_coords_low_speeds_low_angles.columns = np.array([[m]*3 for m in keypoints_names]).flatten()
-
-    # Add MidShoulder column
-    df_MidShoulder = pd.DataFrame((Q_coords_low_speeds_low_angles['RShoulder'].values + Q_coords_low_speeds_low_angles['LShoulder'].values) /2)
-    df_MidShoulder.columns = ['MidShoulder']*3
-    Q_coords_low_speeds_low_angles = pd.concat((Q_coords_low_speeds_low_angles.reset_index(drop=True), df_MidShoulder), axis=1)
 
     # Automatically compute the height of the person
-    pairs_up_to_shoulders = [['RHeel', 'RAnkle'], ['RAnkle', 'RKnee'], ['RKnee', 'RHip'], ['RHip', 'RShoulder'],
-                            ['LHeel', 'LAnkle'], ['LAnkle', 'LKnee'], ['LKnee', 'LHip'], ['LHip', 'LShoulder']]
+    feet_pairs = [['RHeel', 'RAnkle'], ['LHeel', 'LAnkle']]
     try:
-        rfoot, rshank, rfemur, rback, lfoot, lshank, lfemur, lback = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in pairs_up_to_shoulders]
+        rfoot, lfoot = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in feet_pairs]
     except:
+        rfoot, lfoot = 10, 10
+        logging.warning('The Heel marker is missing from your model. Considering Foot to Heel size as 10 cm.')
+
+    ankle_to_shoulder_pairs =  [['RAnkle', 'RKnee'], ['RKnee', 'RHip'], ['RHip', 'RShoulder'],
+                                ['LAnkle', 'LKnee'], ['LKnee', 'LHip'], ['LHip', 'LShoulder']]
+    try:
+        rshank, rfemur, rback, lshank, lfemur, lback = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in ankle_to_shoulder_pairs]
+    except:
+        logging.error('At least one of the following markers is missing for computing the height of the person:\
+                            RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder.\n\
+                            Make sure that the person is entirely visible, or use a calibration file instead, or set "to_meters=false".')
         raise ValueError('At least one of the following markers is missing for computing the height of the person:\
-                         RHeel, RAnkle, RKnee, RHip, RShoulder, LHeel, LAnkle, LKnee, LHip, LShoulder.\
+                         RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder.\
                          Make sure that the person is entirely visible, or use a calibration file instead, or set "to_meters=false".')
-    if 'Head' in keypoints_names:
-        head = euclidean_distance(Q_coords_low_speeds_low_angles['MidShoulder'], Q_coords_low_speeds_low_angles['Head'])
-    else:
-        head = euclidean_distance(Q_coords_low_speeds_low_angles['MidShoulder'], Q_coords_low_speeds_low_angles['Nose'])*1.33
+
+    try:
+        head_pair = [['MidShoulder', 'Head']]
+        head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]
+    except:
+        head_pair = [['MidShoulder', 'Nose']]
+        head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]\
+                *1.33
+        logging.warning('The Head marker is missing from your model. Considering Neck to Head size as 1.33 times Neck to MidShoulder size.')
+    
     heights = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2 + (rback + lback)/2 + head
     
     # Remove the 20% most extreme values
     height = trimmed_mean(heights, trimmed_extrema_percent=trimmed_extrema_percent)
 
     return height
-

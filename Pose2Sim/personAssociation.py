@@ -41,7 +41,7 @@ import itertools as it
 import toml
 from tqdm import tqdm
 import cv2
-from anytree import RenderTree
+from anytree import RenderTree, PreOrderIter
 from anytree.importer import DictImporter
 import logging
 
@@ -665,22 +665,28 @@ def associate_all(config_dict):
     # selection of tracked keypoint id
     try: # from skeletons.py
         if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
         elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
         elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
-        else:
-            raise ValueError(f"Invalid model_type: {pose_model}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
-   
+        elif pose_model.upper() == 'HAND': pose_model = 'HAND_21'
+        elif pose_model.upper() == 'FACE': pose_model = 'FACE_106'
+        elif pose_model.upper() == 'ANIMAL': pose_model = 'ANIMAL2D_17'
+        else: pass
         model = eval(pose_model)
-        
     except:
         try: # from Config.toml
             model = DictImporter().import_(config_dict.get('pose').get(pose_model))
             if model.id == 'None':
                 model.id = None
         except:
-            raise NameError('Model not found in skeletons.py nor in Config.toml')
-    tracked_keypoint_id = [node.id for _, _, node in RenderTree(model) if node.name==tracked_keypoint][0]
-    
+            raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
+    try:
+        tracked_keypoint_id = [node.id for _, _, node in RenderTree(model) if node.name==tracked_keypoint][0]
+    except:
+        tracked_keypoint_id = 0
+        tracked_keypoint_name = next((node for node in PreOrderIter(model) if getattr(node, 'id', None) == 0), None).name
+        logging.warning(f'{tracked_keypoint} not found in {pose_model}, consider editing tracked_keypoint in Config.toml. Tracking {tracked_keypoint_name} instead.')
+
     # 2d-pose files selection
     pose_listdirs_names = next(os.walk(pose_dir))[1]
     try:

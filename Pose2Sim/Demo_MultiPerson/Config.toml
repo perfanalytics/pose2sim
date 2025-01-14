@@ -36,14 +36,44 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 [pose]
 vid_img_extension = 'mp4' # any video or image extension
 
-pose_model = 'Body_with_feet'  #With RTMLib: Body_with_feet (default HALPE_26 model), Whole_body (COCO_133: body + feet + hands), Body (COCO_17)
+pose_model = 'Body_with_feet'  #With RTMLib: 
+                         # - Body_with_feet (default HALPE_26 model), 
+                         # - Whole_body_wrist (COCO_133: body + feet + 2 hand_points), 
+                         # - Whole_body (COCO_133: body + feet + hands), 
+                         # - Body (COCO_17), 
+                         # - Hand (HAND_21, only lightweight mode. Potentially better results with Whole_body), 
+                         # - Face (FACE_106), 
+                         # - Animal (ANIMAL2D_17)
                          # /!\ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the output files if needed
+                         # /!\ For Face and Animal, use mode="""{dictionary}""", and find the corresponding .onnx model there https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose
+                         
                          #With MMPose: HALPE_26, COCO_133, COCO_17, CUSTOM. See CUSTOM example at the end of the file
                          #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
                          #With mediapipe: BLAZEPOSE
                          #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133
                          #With deeplabcut: CUSTOM. See example at the end of the file
-mode = 'balanced' # 'lightweight', 'balanced', 'performance'
+
+mode = 'balanced' # 'lightweight', 'balanced', 'performance', 
+                  # or """{dictionary}""" (see below)
+# A dictionary (WITHIN THREE DOUBLE QUOTES) allows you to manually select the person detection (if top_down approach) and/or pose estimation models (see https://github.com/Tau-J/rtmlib). 
+# Make sure the input_sizes are within triple quotes, and that they are in the opposite order from the one in the model path (for example, it would be [192,256] for rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip). 
+# If your pose_model is not provided in skeletons.py, you may have to create your own one (see example at the end of the file).
+# Example, equivalent to mode='balanced':
+# mode = """{'det_class':'YOLOX',
+#          'det_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/yolox_m_8xb8-300e_humanart-c2c7a14a.zip',
+#          'det_input_size':[640, 640],
+#          'pose_class':'RTMPose',
+#          'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip',
+#          'pose_input_size':[192,256]}"""
+# Example with one-stage RTMO model (Requires pose_model = 'Body'):
+# mode = """{'pose_class':'RTMO', 
+#          'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.zip', 
+#          'pose_input_size':[640, 640]}"""
+# Example with animal pose estimation:
+# mode = """{'pose_class':'RTMPose',
+#          'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.zip',
+#          'pose_input_size':[256,256]}"""
+
 det_frequency = 1 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
                   # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
 device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
@@ -188,6 +218,7 @@ make_c3d = true # save triangulated data in c3d format in addition to trc
 [kinematics]
 use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
 right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)
+default_height = 1.7 # meters # If automatic height calculation did not work, this value is used to scale the model
 
 remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
 remove_individual_IK_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
@@ -196,7 +227,6 @@ fastest_frames_to_remove_percent = 0.2 # Frames with high speed are considered a
 close_to_zero_speed_m = 0.1 # Sum for all keypoints: about 0.1 m/frame
 large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
 trimmed_extrema_percent = 0.25 # Proportion of the most extreme segment values to remove before calculating their mean)
-default_height = 1.75 # m # If no frames left after removing fastest frames, frames with zero speed, frames with large hip and knee angles, and frames with extreme values.
 
 
 [logging]
@@ -215,9 +245,10 @@ use_custom_logging = false # if integrated in an API that already has logging
 # In this example, CUSTOM reproduces the HALPE_26 skeleton (default skeletons are stored in skeletons.py).
 # You can create as many custom skeletons as you want, just add them further down and rename them.
 # 
-# Check your model hierarchy with:  for pre, _, node in RenderTree(model): 
-#                                      print(f'{pre}{node.name} id={node.id}')
-[pose.CUSTOM]
+# Check your model hierarchy with:  
+# from anytree import Node, RenderTree
+# for pre, _, node in RenderTree(model): 
+#     print(f'{pre}{node.name} id={node.id}')[pose.CUSTOM]
 name = "Hip"
 id = 19
   [[pose.CUSTOM.children]]

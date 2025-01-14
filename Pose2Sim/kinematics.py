@@ -44,7 +44,8 @@ from anytree import PreOrderIter
 
 import opensim
 
-from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean, read_trc, best_coords_for_measurements, compute_height
+from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean, read_trc, \
+                            best_coords_for_measurements, compute_height
 from Pose2Sim.skeletons import *
 
 
@@ -76,120 +77,120 @@ def get_opensim_setup_dir():
     return setup_dir
 
 
-def get_model_path(model_name, osim_setup_dir):
+def get_model_path(pose_model, osim_setup_dir):
     '''
     Retrieve the path of the OpenSim model file.
 
     INPUTS:
-    - model_name (str): Name of the model
+    - pose_model (str): Name of the model
     - osim_setup_dir (Path): Path to the OpenSim setup directory.
 
     OUTPUTS:
     - pose_model_path: (Path) Path to the OpenSim model file.
     '''
 
-    if model_name == 'BODY_25B':
+    if pose_model == 'BODY_25B':
         pose_model_file = 'Model_Setup_Pose2Sim_Body25b.osim'
-    elif model_name == 'BODY_25':
+    elif pose_model == 'BODY_25':
         pose_model_file = 'Model_Pose2Sim_Body25.osim'
-    elif model_name == 'BODY_135':
+    elif pose_model == 'BODY_135':
         pose_model_file = 'Model_Pose2Sim_Body135.osim'
-    elif model_name == 'BLAZEPOSE':
+    elif pose_model == 'BLAZEPOSE':
         pose_model_file = 'Model_Pose2Sim_Blazepose.osim'
-    elif model_name == 'HALPE_26':
+    elif pose_model == 'HALPE_26':
         pose_model_file = 'Model_Pose2Sim_Halpe26.osim'
-    elif model_name == 'HALPE_68' or model_name == 'HALPE_136':
+    elif pose_model == 'HALPE_68' or pose_model == 'HALPE_136':
         pose_model_file = 'Model_Pose2Sim_Halpe68_136.osim'
-    elif model_name == 'COCO_133':
+    elif pose_model == 'COCO_133' or pose_model == 'COCO_133_WRIST':
         pose_model_file = 'Model_Pose2Sim_Coco133.osim'
-    # elif model_name == 'COCO' or model_name == 'MPII':
+    # elif pose_model == 'COCO' or pose_model == 'MPII':
     #     pose_model_file = 'Model_Pose2Sim_Coco.osim'
-    elif model_name == 'COCO_17':
+    elif pose_model == 'COCO_17':
         pose_model_file = 'Model_Pose2Sim_Coco17.osim'
-    elif model_name == 'LSTM':
+    elif pose_model == 'LSTM':
         pose_model_file = 'Model_Pose2Sim_LSTM.osim'
     else:
-        raise ValueError(f"Pose model '{model_name}' not found.")
+        raise ValueError(f"Pose model '{pose_model}' not supported yet.")
 
     unscaled_model_path = osim_setup_dir / pose_model_file
 
     return unscaled_model_path
 
 
-def get_scaling_setup(model_name, osim_setup_dir):
+def get_scaling_setup(pose_model, osim_setup_dir):
     '''
     Retrieve the path of the OpenSim scaling setup file.
 
     INPUTS:
-    - model_name (str): Name of the model
+    - pose_model (str): Name of the model
     - osim_setup_dir (Path): Path to the OpenSim setup directory.
 
     OUTPUTS:
     - scaling_setup_path: (Path) Path to the OpenSim scaling setup file.
     '''
 
-    if model_name == 'BODY_25B':
+    if pose_model == 'BODY_25B':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Body25b.xml'
-    elif model_name == 'BODY_25':
+    elif pose_model == 'BODY_25':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Body25.xml'
-    elif model_name == 'BODY_135':
+    elif pose_model == 'BODY_135':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Body135.xml'
-    elif model_name == 'BLAZEPOSE':
+    elif pose_model == 'BLAZEPOSE':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Blazepose.xml'
-    elif model_name == 'HALPE_26':
+    elif pose_model == 'HALPE_26':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Halpe26.xml'
-    elif model_name == 'HALPE_68' or model_name == 'HALPE_136':
+    elif pose_model == 'HALPE_68' or pose_model == 'HALPE_136':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Halpe68_136.xml'
-    elif model_name == 'COCO_133':
+    elif pose_model == 'COCO_133' or pose_model == 'COCO_133_WRIST':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco133.xml'
-    # elif model_name == 'COCO' or model_name == 'MPII':
+    # elif pose_model == 'COCO' or pose_model == 'MPII':
     #     scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco.xml'
-    elif model_name == 'COCO_17':
+    elif pose_model == 'COCO_17':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco17.xml'
-    elif model_name == 'LSTM':
+    elif pose_model == 'LSTM':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_LSTM.xml'
     else:
-        raise ValueError(f"Pose model '{model_name}' not found.")
+        raise ValueError(f"Pose model '{pose_model}' not supported yet.")
 
     scaling_setup_path = osim_setup_dir / scaling_setup_file
 
     return scaling_setup_path
 
 
-def get_IK_Setup(model_name, osim_setup_dir):
+def get_IK_Setup(pose_model, osim_setup_dir):
     '''
     Retrieve the path of the OpenSim inverse kinematics setup file.
 
     INPUTS:
-    - model_name (str): Name of the model
+    - pose_model (str): Name of the model
     - osim_setup_dir (Path): Path to the OpenSim setup directory.
 
     OUTPUTS:
     - ik_setup_path: (Path) Path to the OpenSim IK setup file.
     '''
     
-    if model_name == 'BODY_25B':
+    if pose_model == 'BODY_25B':
         ik_setup_file = 'IK_Setup_Pose2Sim_Body25b.xml'
-    elif model_name == 'BODY_25':
+    elif pose_model == 'BODY_25':
         ik_setup_file = 'IK_Setup_Pose2Sim_Body25.xml'
-    elif model_name == 'BODY_135':
+    elif pose_model == 'BODY_135':
         ik_setup_file = 'IK_Setup_Pose2Sim_Body135.xml'
-    elif model_name == 'BLAZEPOSE':
+    elif pose_model == 'BLAZEPOSE':
         ik_setup_file = 'IK_Setup_Pose2Sim_Blazepose.xml'
-    elif model_name == 'HALPE_26':
+    elif pose_model == 'HALPE_26':
         ik_setup_file = 'IK_Setup_Pose2Sim_Halpe26.xml'
-    elif model_name == 'HALPE_68' or model_name == 'HALPE_136':
+    elif pose_model == 'HALPE_68' or pose_model == 'HALPE_136':
         ik_setup_file = 'IK_Setup_Pose2Sim_Halpe68_136.xml'
-    elif model_name == 'COCO_133':
+    elif pose_model == 'COCO_133' or pose_model == 'COCO_133_WRIST':
         ik_setup_file = 'IK_Setup_Pose2Sim_Coco133.xml'
-    # elif model_name == 'COCO' or model_name == 'MPII':
+    # elif pose_model == 'COCO' or pose_model == 'MPII':
     #     ik_setup_file = 'IK_Setup_Pose2Sim_Coco.xml'
-    elif model_name == 'COCO_17':
+    elif pose_model == 'COCO_17':
         ik_setup_file = 'IK_Setup_Pose2Sim_Coco17.xml'
-    elif model_name == 'LSTM':
+    elif pose_model == 'LSTM':
         ik_setup_file = 'IK_Setup_Pose2Sim_withHands_LSTM.xml'
     else:
-        raise ValueError(f"Pose model '{model_name}' not found.")
+        raise ValueError(f"Pose model '{pose_model}' not supported yet.")
 
     ik_setup_path = osim_setup_dir / ik_setup_file
     return ik_setup_path
@@ -290,7 +291,7 @@ def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, 
     - segment_ratio_dict: A dictionary of segment names and their corresponding X, Y, and Z ratios.
     '''
 
-    # segment_pairs = get_kpt_pairs_from_tree(eval(model_name))
+    # segment_pairs = get_kpt_pairs_from_tree(eval(pose_model))
     segment_pairs = get_kpt_pairs_from_scaling(scaling_root)
 
     # Get median segment lengths from Q_coords_scaling. Trimmed mean works better than mean or median
@@ -378,7 +379,7 @@ def update_scale_values(scaling_root, segment_ratio_dict):
         scale_set.append(new_scale)
         
 
-def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_left_symmetry=True, subject_height=1.75, subject_mass=70, 
+def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, pose_model, right_left_symmetry=True, subject_height=1.75, subject_mass=70, 
                     remove_scaling_setup=True, fastest_frames_to_remove_percent=0.1,close_to_zero_speed_m=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Perform model scaling based on the (not necessarily static) TRC file:
@@ -391,7 +392,7 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
     - trc_file (Path): The path to the TRC file.
     - kinematics_dir (Path): The directory where the kinematics files are saved.
     - osim_setup_dir (Path): The directory where the OpenSim setup and model files are stored.
-    - model_name (str): The name of the model.
+    - pose_model (str): The name of the model.
     - right_left_symmetry (bool): Whether to consider right and left side of equal size.
     - subject_height (float): The height of the subject.
     - subject_mass (float): The mass of the subject.
@@ -407,7 +408,7 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
     try:
         # Load model
         opensim.ModelVisualizer.addDirToGeometrySearchPaths(str(osim_setup_dir / 'Geometry'))
-        unscaled_model_path = get_model_path(model_name, osim_setup_dir)
+        unscaled_model_path = get_model_path(pose_model, osim_setup_dir)
         if not unscaled_model_path:
             raise ValueError(f"Unscaled OpenSim model not found at: {unscaled_model_path}")
         unscaled_model = opensim.Model(str(unscaled_model_path))
@@ -415,7 +416,7 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
         scaled_model_path = (kinematics_dir / (trc_file.stem + '.osim')).resolve()
 
         # Load scaling setup
-        scaling_path = get_scaling_setup(model_name, osim_setup_dir)
+        scaling_path = get_scaling_setup(pose_model, osim_setup_dir)
         scaling_tree = etree.parse(scaling_path)
         scaling_root = scaling_tree.getroot()
         scaling_path_temp = str(kinematics_dir / (trc_file.stem + '_scaling_setup.xml'))
@@ -458,7 +459,7 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
         raise
 
 
-def perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_setup=True):
+def perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_setup=True):
     '''
     Perform inverse kinematics based on a TRC file and a scaled OpenSim model:
     - Model markers follow the triangulated markers while respecting the model kinematic constraints
@@ -468,7 +469,7 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_s
     - trc_file (Path): The path to the TRC file.
     - kinematics_dir (Path): The directory where the kinematics files are saved.
     - osim_setup_dir (Path): The directory where the OpenSim setup and model files are stored.
-    - model_name (str): The name of the model.
+    - pose_model (str): The name of the model.
     - remove_IK_setup (bool): Whether to remove the IK setup file after running IK.
 
     OUTPUTS:
@@ -477,7 +478,7 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_s
 
     try:
         # Retrieve data
-        ik_path = get_IK_Setup(model_name, osim_setup_dir)
+        ik_path = get_IK_Setup(pose_model, osim_setup_dir)
         ik_path_temp =  str(kinematics_dir / (trc_file.stem + '_ik_setup.xml'))
         scaled_model_path = (kinematics_dir / (trc_file.stem + '.osim')).resolve()
         output_motion_file = Path(kinematics_dir, trc_file.stem + '.mot').resolve()
@@ -541,14 +542,18 @@ def kinematics_all(config_dict):
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     use_augmentation = config_dict.get('kinematics').get('use_augmentation')
     if use_augmentation: 
-        model_name = 'LSTM'
+        pose_model = 'LSTM'
     else: 
-        model_name = config_dict.get('pose').get('pose_model').upper()
-        if model_name.upper() == 'BODY_WITH_FEET': model_name = 'HALPE_26'
-        elif model_name.upper() == 'WHOLE_BODY': model_name = 'COCO_133'
-        elif model_name.upper() == 'BODY': model_name = 'COCO_17'
+        pose_model = config_dict.get('pose').get('pose_model').upper()
+        if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
+        elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
+        elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
+        elif pose_model.upper() == 'HAND': pose_model = 'HAND_21'
+        elif pose_model.upper() == 'FACE': pose_model = 'FACE_106'
+        elif pose_model.upper() == 'ANIMAL': pose_model = 'ANIMAL2D_17'
         else:
-            raise ValueError(f"Invalid model_type: {model_name}. Must be 'BODY_WITH_FEET', 'WHOLE_BODY', 'BODY', 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
+            raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
 
     right_left_symmetry = config_dict.get('kinematics').get('right_left_symmetry')
     subject_height = config_dict.get('project').get('participant_height')
@@ -579,7 +584,7 @@ def kinematics_all(config_dict):
     if use_augmentation:
         trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' in f.name]
         if len(trc_files) == 0:
-            model_name = config_dict.get('pose').get('pose_model').upper()
+            pose_model = config_dict.get('pose').get('pose_model').upper()
             logging.warning("No LSTM trc files found. Using non augmented trc files instead.")
     if len(trc_files) == 0: # filtered files by default
         trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' not in f.name and '_filt' in f.name and '_scaling' not in f.name]
@@ -597,9 +602,9 @@ def kinematics_all(config_dict):
         subject_height = []
         for trc_file in trc_files:
             try:
-                Q_coords, _, _, markers, _ = read_trc(trc_file)
+                trc_data, _, _, markers, _ = read_trc(trc_file)
                 height = compute_height(
-                    Q_coords,
+                    trc_data,
                     markers,
                     fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
                     close_to_zero_speed=close_to_zero_speed,
@@ -638,12 +643,12 @@ def kinematics_all(config_dict):
         logging.info(f"Processing TRC file: {trc_file.resolve()}")
 
         logging.info("\nScaling...")
-        perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], 
+        perform_scaling(trc_file, kinematics_dir, osim_setup_dir, pose_model, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], 
                         remove_scaling_setup=remove_scaling_setup, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, trimmed_extrema_percent=trimmed_extrema_percent,close_to_zero_speed_m=close_to_zero_speed)
         logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
         logging.info(f"\tScaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
         
         logging.info("\nInverse Kinematics...")
-        perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_setup=remove_IK_setup)
+        perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_setup=remove_IK_setup)
         logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
         logging.info(f"\tJoint angle data saved to {(kinematics_dir / (trc_file.stem + '.mot')).resolve()}\n")

@@ -35,12 +35,16 @@
 import os
 import glob
 import json
+import re
 import logging
+import ast
+from functools import partial
 from tqdm import tqdm
 import cv2
 
-from rtmlib import PoseTracker, Body, Wholebody, BodyWithFeet, draw_skeleton
+from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d
+from Pose2Sim.skeletons import *
 
 
 ## AUTHORSHIP INFORMATION
@@ -55,6 +59,38 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def setup_pose_tracker(ModelClass, det_frequency, mode, tracking, backend, device):
+    '''
+    Set up the RTMLib pose tracker with the appropriate model and backend.
+    If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
+
+    INPUTS:
+    - ModelClass: class. The RTMlib model class to use for pose detection (Body, BodyWithFeet, Wholebody)
+    - det_frequency: int. The frequency of pose detection (every N frames)
+    - mode: str. The mode of the pose tracker ('lightweight', 'balanced', 'performance')
+    - tracking: bool. Whether to track persons across frames with RTMlib tracker
+    - backend: str. The backend to use for pose detection (onnxruntime, openvino, opencv)
+    - device: str. The device to use for pose detection (cpu, cuda, rocm, mps)
+
+    OUTPUTS:
+    - pose_tracker: PoseTracker. The initialized pose tracker object    
+    '''
+
+    backend, device = setup_backend_device(backend=backend, device=device)
+
+    # Initialize the pose tracker with Halpe26 model
+    pose_tracker = PoseTracker(
+        ModelClass,
+        det_frequency=det_frequency,
+        mode=mode,
+        backend=backend,
+        device=device,
+        tracking=tracking,
+        to_openpose=False)
+        
+    return pose_tracker
+
+
 def setup_backend_device(backend='auto', device='auto'):
     '''
     Set up the backend and device for the pose tracker based on the availability of hardware acceleration.
@@ -402,35 +438,69 @@ def rtm_estimator(config_dict):
     else:
         raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
 
+    # Select the appropriate model based on the model_type
+    logging.info('\nEstimating pose...')
+    if pose_model.upper() in ('HALPE_26', 'BODY_WITH_FEET'):
+        model_name = 'HALPE_26'
+        ModelClass = BodyWithFeet # 26 keypoints(halpe26)
+        logging.info(f"Using HALPE_26 model (body and feet) for pose estimation.")
+    elif pose_model.upper() in ('COCO_133', 'WHOLE_BODY', 'WHOLE_BODY_WRIST'):
+        model_name = 'COCO_133'
+        ModelClass = Wholebody
+        logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation.")
+    elif pose_model.upper() in ('COCO_17', 'BODY'):
+        model_name = 'COCO_17'
+        ModelClass = Body
+        logging.info(f"Using COCO_17 model (body) for pose estimation.")
+    elif pose_model.upper() =='HAND':
+        model_name = 'HAND_21'
+        ModelClass = Hand
+        logging.info(f"Using HAND_21 model for pose estimation.")
+    elif pose_model.upper() =='FACE':
+        model_name = 'FACE_106'
+        logging.info(f"Using FACE_106 model for pose estimation.")
+    elif pose_model.upper() =='ANIMAL':
+        model_name = 'ANIMAL2D_17'
+        logging.info(f"Using ANIMAL2D_17 model for pose estimation.")
+    else:
+        model_name = pose_model.upper()
+        logging.info(f"Using model {model_name} for pose estimation.")
+    pose_model_name = pose_model
+    try:
+        pose_model = eval(model_name)
+    except:
+        raise ValueError(f"Pose model '{model_name}' not supported yet.")
+
     # Select device and backend
     backend, device = setup_backend_device(backend=backend, device=device)
 
-    # Select the appropriate model based on the model_type
-    if pose_model.upper() == 'HALPE_26' or 'BODY_WITH_FEET':
-        ModelClass = BodyWithFeet # 26 keypoints(halpe26)
-        logging.info(f"Using HALPE_26 model (body and feet) for pose estimation.")
-    elif pose_model.upper() == 'COCO_133' or 'WHOLE_BODY':
-        ModelClass = Wholebody
-        logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation.")
-    elif pose_model.upper() == 'COCO_17' or 'BODY':
-        ModelClass = Body
-        logging.info(f"Using COCO_17 model (body) for pose estimation.")
-    else:
-        raise ValueError(f"Invalid model_type: {pose_model}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
-    logging.info(f'Mode: {mode}.\n')
+    # Manually select the models if mode is a dictionary rather than 'lightweight', 'balanced', or 'performance'
+    if not mode in ['lightweight', 'balanced', 'performance'] or 'ModelClass' not in locals():
+        try:
+            try:
+                mode = ast.literal_eval(mode)
+            except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+                mode = mode.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/',':/').replace('":"\\',':\\')
+                mode = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', mode) # changes "[640", "640]" to [640,640]
+                mode = json.loads(mode)
+            det_class = mode.get('det_class')
+            det = mode.get('det_model')
+            det_input_size = mode.get('det_input_size')
+            pose_class = mode.get('pose_class')
+            pose = mode.get('pose_model')
+            pose_input_size = mode.get('pose_input_size')
 
-    # Initialize the pose tracker
-    pose_tracker = PoseTracker(
-        ModelClass,
-        det_frequency=det_frequency,
-        mode=mode,
-        backend=backend,
-        device=device,
-        tracking=False,
-        to_openpose=False)
+            ModelClass = partial(Custom,
+                        det_class=det_class, det=det, det_input_size=det_input_size,
+                        pose_class=pose_class, pose=pose, pose_input_size=pose_input_size,
+                        backend=backend, device=device)
+            
+        except (json.JSONDecodeError, TypeError):
+            logging.warning("\nInvalid mode. Must be 'lightweight', 'balanced', 'performance', or '''{dictionary}''' of parameters within triple quotes. Make sure input_sizes are within square brackets.")
+            logging.warning('Using the default "balanced" mode.')
+            mode = 'balanced'
 
-
-    logging.info('\nEstimating pose...')
+    # Estimate pose
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
         os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
@@ -441,6 +511,15 @@ def rtm_estimator(config_dict):
             raise
             
     except:
+        # Set up pose tracker
+        try:
+            pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+        except:
+            logging.error('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
+            raise ValueError('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
+        logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
+        logging.info(f'Mode: {mode}.\n')
+
         video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
         if not len(video_files) == 0: 
             # Process video files
