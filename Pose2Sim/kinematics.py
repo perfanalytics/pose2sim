@@ -541,19 +541,6 @@ def kinematics_all(config_dict):
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     use_augmentation = config_dict.get('kinematics').get('use_augmentation')
-    if use_augmentation: 
-        pose_model = 'LSTM'
-    else: 
-        pose_model = config_dict.get('pose').get('pose_model').upper()
-        if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
-        elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
-        elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
-        elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
-        elif pose_model.upper() == 'HAND': pose_model = 'HAND_21'
-        elif pose_model.upper() == 'FACE': pose_model = 'FACE_106'
-        elif pose_model.upper() == 'ANIMAL': pose_model = 'ANIMAL2D_17'
-        else:
-            raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
 
     right_left_symmetry = config_dict.get('kinematics').get('right_left_symmetry')
     subject_height = config_dict.get('project').get('participant_height')
@@ -585,6 +572,7 @@ def kinematics_all(config_dict):
         trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' in f.name]
         if len(trc_files) == 0:
             pose_model = config_dict.get('pose').get('pose_model').upper()
+            use_augmentation = False
             logging.warning("No LSTM trc files found. Using non augmented trc files instead.")
     if len(trc_files) == 0: # filtered files by default
         trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' not in f.name and '_filt' in f.name and '_scaling' not in f.name]
@@ -593,6 +581,21 @@ def kinematics_all(config_dict):
     if len(trc_files) == 0:
         raise ValueError(f'No trc files found in {pose3d_dir}.')
     sorted(trc_files, key=natural_sort_key)
+
+    if use_augmentation: 
+        pose_model = 'LSTM'
+    else: 
+        pose_model = config_dict.get('pose').get('pose_model').upper()
+        if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
+        elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
+        elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
+        elif pose_model.upper() == 'HAND': pose_model = 'HAND_21'
+        elif pose_model.upper() == 'FACE': pose_model = 'FACE_106'
+        elif pose_model.upper() == 'ANIMAL': pose_model = 'ANIMAL2D_17'
+        else:
+            raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
+
 
     # Calculate subject heights
     if subject_height is None or subject_height == 0:

@@ -404,7 +404,7 @@ def euclidean_distance(q1, q2):
     q2 = np.array(q2)
     dist = q2 - q1
     if np.isnan(dist).all():
-        dist =  np.empty_like(dist)
+        dist = np.empty_like(dist)
         dist[...] = np.inf
     
     if len(dist.shape)==1:
@@ -942,9 +942,11 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords.iloc[:,kpt:kpt+3].diff(), axis=1) for kpt in range(n_markers)], axis=0))
     sum_speeds = sum_speeds[sum_speeds>close_to_zero_speed] # Removing when speeds close to zero (out of frame)
     if len(sum_speeds)==0:
-        raise ValueError('All frames have speed close to zero. Make sure the person is moving and correctly detected, or change close_to_zero_speed to a lower value.')
-    min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
-    Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
+        logging.warning('All frames have speed close to zero. Make sure the person is moving and correctly detected, or change close_to_zero_speed to a lower value. Not restricting the speeds to be above any threshold.')
+        Q_coords_low_speeds = Q_coords
+    else:
+        min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
+        Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
     
     # Only keep frames with hip and knee flexion angles below 45% 
     # (if more than 50 of them, else take 50 smallest values)
@@ -954,7 +956,7 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
         if len(Q_coords_low_speeds_low_angles) < 50:
             Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
     except:
-        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these agles to be below {large_hip_knee_angles}°.")
+        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}°.")
 
     if n_markers_init < n_markers:
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
@@ -987,7 +989,7 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     try:
         rfoot, lfoot = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in feet_pairs]
     except:
-        rfoot, lfoot = 10, 10
+        rfoot, lfoot = 0.10, 0.10
         logging.warning('The Heel marker is missing from your model. Considering Foot to Heel size as 10 cm.')
 
     ankle_to_shoulder_pairs =  [['RAnkle', 'RKnee'], ['RKnee', 'RHip'], ['RHip', 'RShoulder'],

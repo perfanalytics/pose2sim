@@ -583,7 +583,6 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
     calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
     
     if not multi_person:
-        logging.info('\nSingle-person analysis selected.')
         # Error
         mean_error_px = np.around(np.nanmean(error), decimals=1)
         
@@ -604,7 +603,6 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
         logging.info(f'--> In average, {mean_cam_off_count} cameras had to be excluded to reach the demanded {error_threshold_tracking} px error threshold after excluding points with likelihood below {likelihood_threshold_association}.')
     
     else:
-        logging.info('\nMulti-person analysis selected.')
         logging.info(f'\n--> A person was reconstructed if the lines from cameras to their keypoints intersected within {reconstruction_error_threshold} m and if the calculated affinity stayed below {min_affinity} after excluding points with likelihood below {likelihood_threshold_association}.')
         logging.info(f'--> Beware that people were sorted across cameras, but not across frames. This will be done in the triangulation stage.')
 
@@ -680,12 +678,6 @@ def associate_all(config_dict):
                 model.id = None
         except:
             raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
-    try:
-        tracked_keypoint_id = [node.id for _, _, node in RenderTree(model) if node.name==tracked_keypoint][0]
-    except:
-        tracked_keypoint_id = 0
-        tracked_keypoint_name = next((node for node in PreOrderIter(model) if getattr(node, 'id', None) == 0), None).name
-        logging.warning(f'{tracked_keypoint} not found in {pose_model}, consider editing tracked_keypoint in Config.toml. Tracking {tracked_keypoint_name} instead.')
 
     # 2d-pose files selection
     pose_listdirs_names = next(os.walk(pose_dir))[1]
@@ -718,7 +710,20 @@ def associate_all(config_dict):
         raise Exception(f'Error: The number of cameras is not consistent:\
                     Found {len(P_all)} cameras in the calibration file,\
                     and {n_cams} cameras based on the number of pose folders.')
-    
+
+    if not multi_person:
+        logging.info('\nSingle-person analysis selected.')
+        try:
+            tracked_keypoint_id = [node.id for _, _, node in RenderTree(model) if node.name==tracked_keypoint][0]
+            assert tracked_keypoint_id # Fails if tracked_keypoint_id is None
+        except:
+            tracked_keypoint_id = 0
+            tracked_keypoint_name = next((node for node in PreOrderIter(model) if getattr(node, 'id', None) == 0), None).name
+            logging.warning(f'{tracked_keypoint} not found in {pose_model}, consider editing tracked_keypoint in Config.toml. Tracking {tracked_keypoint_name} instead.')
+    else:
+        logging.info('\nMulti-person analysis selected.')
+
+
     for f in tqdm(range(*f_range)):
         # print(f'\nFrame {f}:')
         json_files_names_f = [[j for j in json_files_names[c] if int(re.split(r'(\d+)',j)[-2])==f] for c in range(n_cams)]
