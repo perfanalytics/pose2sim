@@ -156,11 +156,11 @@ class TestWorkflow(unittest.TestCase):
         # Step by step
         Pose2Sim.calibration(config_dict)
         Pose2Sim.poseEstimation(config_dict)
-        # Pose2Sim.synchronization(config_dict) # No synchronization for multi-person for now
+        # Pose2Sim.synchronization(config_dict) # No test for synchronization for multi-person
         Pose2Sim.personAssociation(config_dict)
         Pose2Sim.triangulation(config_dict)
         Pose2Sim.filtering(config_dict)
-        Pose2Sim.markerAugmentation(config_dict)
+        # Pose2Sim.markerAugmentation(config_dict) # Marker augmentation requires markers that are not provided by RTMO: ['RHeel', 'RBigToe', 'RSmallToe', 'LSmallToe', 'LHeel', 'LBigToe']
         Pose2Sim.kinematics(config_dict)
 
         # Run all
