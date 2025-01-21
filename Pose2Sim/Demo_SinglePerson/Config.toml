@@ -34,7 +34,11 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 
 [pose]
-vid_img_extension = 'mp4' # any video or image extension
+vid_img_extension = 'mp4' # any video or image extension or 'webcam'
+webcam_ids = 0 # your webcam id 0, or [0, 1, ...] (0 is default)
+
+input_size = [] # [W, H]. Lower resolution will be faster but less precise.
+capture_mode = 'continuous' #'continuous' or 'alternating'
 
 pose_model = 'Body_with_feet'  #With RTMLib: 
                          # - Body_with_feet (default HALPE_26 model), 
@@ -82,7 +86,7 @@ backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
 
 display_detection = true
 overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
-save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
+save_video = ['to_video', 'to_images'] # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 
