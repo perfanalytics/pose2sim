@@ -84,14 +84,14 @@ det_frequency = 1 # Run person detection only every N frames, and inbetween trac
 device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
 
-display_detection = true
+display_detection = false
 overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
-save_video = ['to_video', 'to_images'] # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
+save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 
 [synchronization]
-display_sync_plots = true # true or false (lowercase)
+display_sync_plots = false # true or false (lowercase)
 keypoints_to_consider = 'all' # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)

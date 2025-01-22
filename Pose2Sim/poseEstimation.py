@@ -69,6 +69,12 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def get_formatted_timestamp():
+    dt = datetime.now()
+    ms = dt.microsecond // 1000
+    return dt.strftime("%Y%m%d_%H%M%S_") + f"{ms:03d}"
+
+
 def init_pose_tracker(pose_tracker_settings):
     '''
     Set up the RTMLib pose tracker with the appropriate model and backend.
@@ -180,139 +186,6 @@ def save_keypoints_to_openpose(json_file_path, all_keypoints, all_scores):
         json.dump(json_output, outfile)
 
 
-def process_frame(vid_img_extension, frame, source_id, frame_idx, output_dirs, pose_tracker,
-                  multi_person, save_video, save_images, display_detection,
-                  output_format, video_writer, previous_keypoints, timestamp=None):
-    '''
-    Processes a single frame from a source.
-
-    Args:
-        config_dict (dict): Configuration dictionary.
-        frame (ndarray): Frame image.
-        source_id (int): Source ID.
-        frame_idx (int): Frame index.
-        output_dirs (tuple): Output directories.
-        pose_tracker: Pose tracker object.
-        multi_person (bool): Whether to track multiple persons.
-        output_format (str): Output format.
-        save_video (bool): Whether to save the output video.
-        save_images (bool): Whether to save output images.
-        display_detection (bool): Whether to display results in real time.
-        out_vid (cv2.VideoWriter): Video writer object.
-
-    Returns:
-        tuple: (source_id, img_show)
-    '''
-    output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path = output_dirs
-
-    # Pose estimation
-    keypoints, scores = pose_tracker(frame)
-
-    # Sort persons consistently if multiple persons
-    if multi_person:
-        if previous_keypoints is None:
-            previous_keypoints = keypoints
-        previous_keypoints, keypoints, scores = sort_people_sports2d(previous_keypoints, keypoints, scores=scores)
-
-    if vid_img_extension == 'webcam':
-        file_name = f"{output_dir_name}_{timestamp}"
-    else:
-        file_name = f"{output_dir_name}_{frame_idx:06d}"
-
-    if 'openpose' in output_format.lower():
-        json_path = os.path.join(json_output_dir, f"{file_name}.json")
-        save_keypoints_to_openpose(json_path, keypoints, scores)
-
-    # Draw skeleton if needed
-    annotated_frame = None
-    if display_detection or save_video or save_images:
-        annotated_frame = draw_skeleton(frame, keypoints, scores, kpt_thr=0.1)
-
-    if save_video and video_writer:
-        video_writer.write(annotated_frame)
-
-    if save_images:
-        cv2.imwrite(os.path.join(img_output_dir, f"{file_name}.jpg"), annotated_frame)
-
-    return (source_id, annotated_frame), keypoints
-
-
-class FrameSynchronizer(multiprocessing.Process):
-    '''
-    Class to display frames from multiple sources in a synchronized grid.
-    '''
-
-    def __init__(self, sources, display_queue):
-        super().__init__(daemon=True)
-        self.num_sources = len(sources)
-        self.display_queue = display_queue
-        self.stopped = False
-        self.frame_data = {}
-
-    def run(self):
-        while not self.stopped:
-            try:
-                source_id, frame_idx, final_frame = self.display_queue.get(timeout=0.1)
-                if final_frame is None:
-                    continue
-
-                if frame_idx not in self.frame_data:
-                    self.frame_data[frame_idx] = {}
-                self.frame_data[frame_idx][source_id] = final_frame
-
-                # Once we have frames from all sources for this frame_idx, display them
-                if len(self.frame_data[frame_idx]) == self.num_sources:
-                    self.show_synchronized(frame_idx)
-                    del self.frame_data[frame_idx]
-            except queue.Empty:
-                pass
-
-    def show_synchronized(self, frame_idx):
-        frames_dict = self.frame_data.get(frame_idx, {})
-        if not frames_dict:
-            return
-
-        # Sort frames by source id
-        frames_list = [frames_dict[sid] for sid in sorted(frames_dict.keys())]
-        n_sources = len(frames_list)
-        if n_sources == 0:
-            return
-
-        # Arrange frames in a grid (square-ish)
-        cols = int(math.ceil(math.sqrt(n_sources)))
-        rows = int(math.ceil(n_sources / cols))
-
-        # Window size
-        window_width, window_height = 1280, 720
-        frame_width = window_width // cols
-        frame_height = window_height // rows
-
-        combined_image = np.zeros((window_height, window_width, 3), dtype=np.uint8)
-        idx = 0
-        for r in range(rows):
-            for c in range(cols):
-                if idx >= n_sources:
-                    break
-                frame = frames_list[idx]
-                frame_resized = cv2.resize(frame, (frame_width, frame_height))
-                y1, x1 = r * frame_height, c * frame_width
-                combined_image[y1:y1+frame_height, x1:x1+frame_width] = frame_resized
-                idx += 1
-
-        cv2.imshow("Synchronized Display", combined_image)
-        key = cv2.waitKey(1)
-        if key in [ord('q'), 27]:
-            logging.info("User closed display.")
-            self.stopped = True
-            cv2.destroyWindow("Synchronized Display")
-
-    def stop(self):
-        self.stopped = True
-
-    def __del__(self):
-        cv2.destroyAllWindows()
-
-
 class PoseEstimatorWorker(multiprocessing.Process):
     '''
     Worker process that pulls frames from the frame_queue, runs pose estimation,
@@ -329,14 +202,9 @@ class PoseEstimatorWorker(multiprocessing.Process):
         source_outputs,
         active_sources,
         multi_person,
-        save_video,
-        save_images,
-        display_detection,
+        display_queue,
         output_format,
-        vid_img_extension,
-        fps,
-        size,
-        display_queue=None
+        vid_img_extension
     ):
         super().__init__()
         self.frame_queue = frame_queue
@@ -347,14 +215,10 @@ class PoseEstimatorWorker(multiprocessing.Process):
         self.source_outputs = source_outputs
         self.active_sources = active_sources
         self.display_queue = display_queue
+
         self.multi_person = multi_person
-        self.save_video = save_video
-        self.save_images = save_images
-        self.display_detection = display_detection
         self.output_format = output_format
         self.vid_img_extension = vid_img_extension
-        self.fps = fps
-        self.W, self.H = size
 
         self.prev_keypoints_map = {}
         self.stopped = False
@@ -363,9 +227,6 @@ class PoseEstimatorWorker(multiprocessing.Process):
         try:
             # Initialize pose tracker
             pose_tracker = init_pose_tracker(self.pose_tracker_settings)
-
-            # Local storage for each source's video writer
-            local_video_writers = {}
 
             while True:
                 # If no new frames and no active sources remain, stop
@@ -386,37 +247,33 @@ class PoseEstimatorWorker(multiprocessing.Process):
                     shm = self.shared_buffers[buffer_name]
                     frame_np = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype_str), buffer=shm.buf)
 
-                    # Prepare the video writer if needed
-                    if self.save_video and sid not in local_video_writers:
-                        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                        output_video_path = self.source_outputs[sid][4]
-                        local_video_writers[sid] = cv2.VideoWriter(output_video_path, fourcc, self.fps, (self.W, self.H))
+                    # Pose estimation
+                    keypoints, scores = pose_tracker(frame_np)
 
-                    video_writer = local_video_writers.get(sid)
-                    prev_kpts = self.prev_keypoints_map.get(sid)
+                    # Tri multi-person
+                    previous_keypoints = self.prev_keypoints_map.get(sid)
+                    if self.multi_person:
+                        if previous_keypoints is None:
+                            previous_keypoints = keypoints
+                        previous_keypoints, keypoints, scores = sort_people_sports2d(previous_keypoints, keypoints, scores=scores)
+                        self.prev_keypoints_map[sid] = previous_keypoints
 
-                    # Process frame
-                    (sid, final_frame), curr_kpts = process_frame(
-                        self.vid_img_extension,
-                        frame_np,
-                        sid,
-                        frame_idx,
-                        self.source_outputs[sid],
-                        pose_tracker,
-                        self.multi_person,
-                        self.save_video,
-                        self.save_images,
-                        self.display_detection,
-                        self.output_format,
-                        video_writer,
-                        prev_kpts,
-                        timestamp
-                    )
-                    self.prev_keypoints_map[sid] = curr_kpts
+                    # Sauvegarde JSON si besoin
+                    out_dirs = self.source_outputs[sid]
+                    (output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path) = out_dirs
 
-                    # Send frames for display if needed
-                    if self.display_queue and self.display_detection and final_frame is not None:
-                        self.display_queue.put((sid, frame_idx, final_frame))
+                    if 'openpose' in self.output_format.lower():
+                        if self.vid_img_extension == 'webcam':
+                            file_name = f"{output_dir_name}_{timestamp}.json"
+                        else:
+                            file_name = f"{output_dir_name}_{frame_idx:06d}.json"
+                        json_path = os.path.join(json_output_dir, file_name)
+                        save_keypoints_to_openpose(json_path, keypoints, scores)
+
+                    # Draw skeleton if needed
+                    if self.display_queue:
+                        annotated_frame = draw_skeleton(frame_np, keypoints, scores, kpt_thr=0.1)
+                        self.display_queue.put((sid, frame_idx, annotated_frame))
 
                     # Increase count and return buffer
                     with self.shared_counts[sid]['processed'].get_lock():
@@ -426,13 +283,132 @@ class PoseEstimatorWorker(multiprocessing.Process):
                 except queue.Empty:
                     pass
 
-            # Release any local video writers
-            for vw in local_video_writers.values():
-                vw.release()
-
         except Exception as err:
             logging.error(f"PoseEstimatorWorker error: {err}")
             self.stopped = True
+
+
+class FrameSynchronizer(multiprocessing.Process):
+    '''
+    Class to display frames from multiple sources in a synchronized grid.
+    '''
+
+    def __init__(self, 
+                 sources,
+                 display_queue,
+                 save_images=False,
+                 save_video=False,
+                 output_dirs_map=None,
+                 frame_width=1280,
+                 frame_height=720,
+                 fps=30):
+        super().__init__(daemon=True)
+        self.sources = sources
+        self.display_queue = display_queue
+        self.save_images = save_images
+        self.save_video = save_video
+        self.output_dirs_map = output_dirs_map
+
+        self.num_sources = len(sources)
+        self.stopped = False
+        self.frame_data = {}
+
+        self.video_writers = {}
+        self.fps = fps
+        self.frame_width = frame_width
+        self.frame_height = frame_height
+
+    def run(self):
+        if self.save_video and self.output_dirs_map:
+            for s in self.sources:
+                sid = s['id']
+                out_dirs = self.output_dirs_map[sid]
+                (_, output_dir_name, _, _, output_video_path) = out_dirs
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                self.video_writers[sid] = cv2.VideoWriter(
+                    output_video_path,
+                    fourcc,
+                    self.fps,
+                    (self.frame_width, self.frame_height)
+                )
+
+        while not self.stopped:
+            try:
+                source_id, frame_idx, final_frame = self.display_queue.get(timeout=0.1)
+                if final_frame is None:
+                    continue
+
+                h, w = final_frame.shape[:2]
+                if (w, h) != (self.frame_width, self.frame_height):
+                    final_frame = cv2.resize(final_frame, (self.frame_width, self.frame_height))
+
+                if frame_idx not in self.frame_data:
+                    self.frame_data[frame_idx] = {}
+                self.frame_data[frame_idx][source_id] = final_frame
+
+                if self.save_images and self.output_dirs_map:
+                    out_dirs = self.output_dirs_map[source_id]
+                    (output_dir, output_dir_name, img_output_dir, _, _) = out_dirs
+                    file_name = f"{output_dir_name}_{frame_idx:06d}.jpg"
+                    cv2.imwrite(os.path.join(img_output_dir, file_name), final_frame)
+
+                if self.save_video and source_id in self.video_writers:
+                    self.video_writers[source_id].write(final_frame)
+
+                # Once we have frames from all sources for this frame_idx, display them
+                if len(self.frame_data[frame_idx]) == self.num_sources:
+                    self.show_synchronized(frame_idx)
+                    del self.frame_data[frame_idx]
+
+            except queue.Empty:
+                pass
+
+        for vw in self.video_writers.values():
+            vw.release()
+        cv2.destroyAllWindows()
+
+    def show_synchronized(self, frame_idx):
+        frames_dict = self.frame_data.get(frame_idx, {})
+        if not frames_dict:
+            return
+
+        # Sort frames by source id
+        frames_list = [frames_dict[sid] for sid in sorted(frames_dict.keys())]
+        n_sources = len(frames_list)
+        if n_sources == 0:
+            return
+
+        # Arrange frames in a grid
+        window_width, window_height = 1280, 720
+
+        cols = int(math.ceil(math.sqrt(n_sources)))
+        rows = int(math.ceil(n_sources / cols))
+
+        frame_width = window_width // cols
+        frame_height = window_height // rows
+
+        combined_image = np.zeros((window_height, window_width, 3), dtype=np.uint8)
+
+        idx = 0
+        for r in range(rows):
+            for c in range(cols):
+                if idx >= n_sources:
+                    break
+                frame = frames_list[idx]
+                frame_resized = cv2.resize(frame, (frame_width, frame_height))
+                y1, x1 = r * frame_height, c * frame_width
+                combined_image[y1:y1+frame_height, x1:x1+frame_width] = frame_resized
+                idx += 1
+
+        cv2.imshow("Synchronized Display", combined_image)
+        key = cv2.waitKey(1)
+        if key in [ord('q'), 27]:
+            logging.info("User closed display.")
+            self.stopped = True
+
+    def stop(self):
+        self.stopped = True
+
 
 
 class CaptureCoordinator(multiprocessing.Process):
@@ -607,24 +583,29 @@ class MediaSource(multiprocessing.Process):
                 if cmd is None:
                     break
 
-                if isinstance(cmd, tuple) and cmd[0] == "CAPTURE_FRAME":
-                    buf_name = cmd[1]
-                    # Stop if we've reached total frames for video/images
+                if isinstance(cmd, tuple):
+                    if cmd[0] == "CAPTURE_FRAME":
+                        buf_name = cmd[1]
+                        # Stop if we've reached total frames for video/images
 
-                    if self.source['type'] in ('video', 'images'):
-                        if self.frame_idx >= self.total_frames:
+                        if self.source['type'] in ('video', 'images'):
+                            if self.frame_idx >= self.total_frames:
+                                self.stop_source()
+                                break
+
+                        # Read frame and send it
+                        frame = self.read_frame()
+                        if frame is None:
                             self.stop_source()
                             break
 
-                    # Read frame and send it
-                    frame = self.read_frame()
-                    if frame is None:
+                        self.send_frame(frame, buf_name)
+                    elif cmd[0] == "STOP_CAPTURE":
                         self.stop_source()
+                        self.stopped = True
                         break
-
-                    self.send_frame(frame, buf_name)
-                else:
-                    pass
+                    else:
+                        pass
 
             logging.info(f"MediaSource {self.source['id']} ended.")
 
@@ -660,7 +641,7 @@ class MediaSource(multiprocessing.Process):
             self.stopped = True
 
     def load_images(self):
-        pattern = os.path.join(self.source['path'], f"*{self.extension}")
+        pattern = os.path.join(self.source['path'], f"*{self.vid_img_extension}")
         self.image_files = sorted(glob.glob(pattern), key=natural_sort_key)
         self.total_frames = len(self.image_files)
 
@@ -711,7 +692,8 @@ class MediaSource(multiprocessing.Process):
         np_frame = np.ndarray(frame.shape, dtype=frame.dtype, buffer=shm.buf)
         np_frame[:] = frame
 
-        timestamp = f"{time.time():.5f}"
+        timestamp = get_formatted_timestamp()
+
         item = (buffer_name, frame.shape, frame.dtype.str, self.source['id'], self.frame_idx, timestamp)
         self.frame_queue.put(item)
 
@@ -770,7 +752,9 @@ def rtm_estimator(config_dict):
     vid_img_extension = config_dict['pose']['vid_img_extension']
     webcam_ids = config_dict['pose'].get('webcam_ids', [])
     capture_mode = config_dict['pose'].get('capture_mode', 'continuous')
-    save_images = 'to_images' in config_dict['project'].get('save_video', [])
+    save_files = config_dict['pose'].get('save_video', [])
+    save_images = ('to_images' in save_files)
+    save_video = ('to_video' in save_files)
 
     # Gather sources
     sources = []
@@ -859,34 +843,20 @@ def rtm_estimator(config_dict):
             'total': multiprocessing.Value('i', 0)
         }
 
-    # Real-time display
-    display_queue = None
-    sync_process = None
-    if display_detection:
-        display_queue = multiprocessing.Queue()
-
-    if display_detection or vid_img_extension == 'webcam':
-        sync_process = FrameSynchronizer(sources, display_queue)
-        sync_process.start()
-
     active_sources = multiprocessing.Value('i', len(sources))
     manager = multiprocessing.Manager()
     webcam_ready = manager.dict()
-    for s in sources:
-        if s['type'] == 'webcam':
-            webcam_ready[s['id']] = False
-
     source_ended = manager.dict()
-    for s in sources:
-        source_ended[s['id']] = False
+    command_queues = {}
 
-    command_queues = {s['id']: manager.Queue() for s in sources}
-
-    # Create media sources
     media_sources = []
     for s in sources:
+        source_ended[s['id']] = False
+        command_queues[s['id']] = manager.Queue()
         out_dirs = create_output_folders(s['path'], pose_dir, save_images)
         source_outputs[s['id']] = out_dirs
+        if s['type'] == 'webcam':
+            webcam_ready[s['id']] = False
 
         ms = MediaSource(
             source=s,
@@ -904,52 +874,49 @@ def rtm_estimator(config_dict):
         ms.start()
         media_sources.append(ms)
 
-    # Wait for webcams
-    if vid_img_extension == 'webcam' and webcam_ids:
-        while True:
-            if all(webcam_ready[w] for w in webcam_ready.keys()):
-                break
-            time.sleep(0.1)
-        logging.info("All webcams ready.")
-
     # Decide how many workers to start initially
     cpu_count = multiprocessing.cpu_count()
-    
-    if display_detection or vid_img_extension == 'webcam':
+
+    # Real-time display
+    display_queue = None
+    sync_process = None
+    if display_detection or vid_img_extension == 'webcam' or save_video or save_images:
+        display_queue = multiprocessing.Queue()
+        sync_process = FrameSynchronizer(
+            sources=sources,
+            display_queue=display_queue,
+            save_images=save_images,
+            save_video=save_video,
+            output_dirs_map=source_outputs,
+            frame_width=fw,
+            frame_height=fh,
+            fps=frame_rate
+        )
+        sync_process.start()
         initial_workers = max(1, cpu_count - len(sources) - 2)
     else:
         initial_workers = max(1, cpu_count - len(sources) - 1)
-
-    if initial_workers < 1:
-        initial_workers = 1
 
     logging.info(f"Starting {initial_workers} workers.")
 
     def spawn_new_worker():
         w = PoseEstimatorWorker(
-            frame_queue,
-            available_buffers,
-            shared_buffers,
-            shared_counts,
-            pose_tracker_settings,
-            source_outputs,
-            active_sources,
-            config_dict['project'].get('multi_person', False),
-            ('to_video' in config_dict['project'].get('save_video', [])),
-            save_images,
-            display_detection,
-            config_dict['project'].get('output_format', 'openpose'),
-            vid_img_extension,
-            frame_rate,
-            (fw, fh),
-            display_queue
+            frame_queue=frame_queue,
+            available_buffers=available_buffers,
+            shared_buffers=shared_buffers,
+            shared_counts=shared_counts,
+            pose_tracker_settings=pose_tracker_settings,
+            source_outputs=source_outputs,
+            active_sources=active_sources,
+            multi_person=config_dict['project'].get('multi_person', False),
+            display_queue=display_queue,
+            output_format=config_dict['project'].get('output_format','openpose'),
+            vid_img_extension=vid_img_extension
         )
         w.start()
         return w
 
-    workers = []
-    for _ in range(initial_workers):
-        workers.append(spawn_new_worker())
+    workers = [spawn_new_worker() for _ in range(initial_workers)]
 
     # Start capture coordinator
     capture_coordinator = CaptureCoordinator(
@@ -968,9 +935,25 @@ def rtm_estimator(config_dict):
     bar_ended_state = {}
     bar_pos = 0
 
+    # On retient le type pour chaque source pour mise à jour
+    source_type_map = {s['id']: s['type'] for s in sources}
+
+    if vid_img_extension == 'webcam':
+        cv2.namedWindow("StopWindow", cv2.WINDOW_NORMAL)
+
     for s in sources:
         sid = s['id']
-        if s['type'] != 'webcam':
+        if s['type'] == 'webcam':
+            pb = tqdm(
+                total=0,
+                desc=f"\033[32mWebcam {sid} (0/0)\033[0m",
+                position=bar_pos,
+                leave=True,
+                bar_format="{desc}"
+            )
+            progress_bars[sid] = pb
+            bar_ended_state[sid] = False
+        else:
             pb = tqdm(
                 total=0,
                 desc=f"\033[32mSource {sid}\033[0m",
@@ -979,7 +962,8 @@ def rtm_estimator(config_dict):
             )
             progress_bars[sid] = pb
             bar_ended_state[sid] = False
-            bar_pos += 1
+
+        bar_pos += 1
 
     buffer_bar = tqdm(
         total=n_buffers,
@@ -1004,18 +988,38 @@ def rtm_estimator(config_dict):
         while True:
             # Update progress bars
             for sid, pb in progress_bars.items():
+                s_type = source_type_map[sid]
                 cnts = shared_counts[sid]
-                tval = cnts['total'].value
                 pval = cnts['processed'].value
-                if tval > 0:
-                    pb.total = tval
-                    pb.n = pval
-                    pb.refresh()
+                qval = cnts['queued'].value
+                tval = cnts['total'].value
 
-                if source_ended[sid] and not bar_ended_state[sid]:
-                    bar_ended_state[sid] = True
-                    pb.set_description_str(f"\033[31mSource {sid} (Ended)\033[0m")
+                if s_type == 'webcam':
+                    pb.set_description_str(
+                        f"\033[32mWebcam {sid}\033[0m : {pval}/{qval} frames processed/read"
+                    )
                     pb.refresh()
+                    if source_ended[sid] and not bar_ended_state[sid]:
+                        bar_ended_state[sid] = True
+                        pb.set_description_str(
+                            f"\033[31mWebcam {sid} (Ended)\033[0m : {pval}/{qval} frames"
+                        )
+                        pb.refresh()
+
+                    if check_stop_window_open():
+                        stop_all_cameras_immediately(sources, command_queues)
+                        break
+
+                else:
+                    if tval > 0:
+                        pb.total = tval
+                        pb.n = pval
+                        pb.refresh()
+
+                    if source_ended[sid] and not bar_ended_state[sid]:
+                        bar_ended_state[sid] = True
+                        pb.set_description_str(f"\033[31mSource {sid} (Ended)\033[0m")
+                        pb.refresh()
 
             buffer_bar.n = available_buffers.qsize()
             buffer_bar.refresh()
@@ -1129,7 +1133,7 @@ def create_output_folders(source_path, output_dir, save_images):
         os.makedirs(img_output_dir, exist_ok=True)
     os.makedirs(json_output_dir, exist_ok=True)
 
-    output_video_path = os.path.join(output_dir, f"{output_dir_name}_pose.mp4")
+    output_video_path = os.path.join(output_dir, f"{output_dir_name}_pose.avi")
     return output_dir, output_dir_name, img_output_dir, json_output_dir, output_video_path
 
 
@@ -1212,34 +1216,36 @@ def find_largest_frame_size(sources, vid_img_extension):
     If input_size is not specified, find the maximum (width, height) 
     among all sources (videos, images, webcams).
     '''
+
     max_w, max_h = 0, 0
+
     for s in sources:
         # Handle each source type
         if s['type'] == 'webcam':
-            cap = cv2.VideoCapture(int(s['id']))
-            if cap.isOpened():
-                ret, frame = cap.read()
-                if ret and frame is not None:
-                    h, w = frame.shape[:2]
+            cap_test = cv2.VideoCapture(int(s['id']), cv2.CAP_DSHOW)
+            if cap_test.isOpened():
+                cap_test.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+                cap_test.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+                time.sleep(0.2)
+                ret, frame_test = cap_test.read()
+                if ret and frame_test is not None:
+                    h, w = frame_test.shape[:2]
                     max_w = max(max_w, w)
                     max_h = max(max_h, h)
-            cap.release()
+            cap_test.release()
 
         elif s['type'] == 'video':
-            cap = cv2.VideoCapture(s['path'])
-            if cap.isOpened():
-                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                max_w = max(max_w, width)
-                max_h = max(max_h, height)
-            cap.release()
+            cap_test = cv2.VideoCapture(s['path'])
+            if cap_test.isOpened():
+                w = int(cap_test.get(cv2.CAP_PROP_FRAME_WIDTH))
+                h = int(cap_test.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                max_w = max(max_w, w)
+                max_h = max(max_h, h)
+            cap_test.release()
 
         elif s['type'] == 'images':
-            all_exts = ("*.jpg", "*.png", "*.jpeg", "*.bmp")
-            found = []
-            for ext in all_exts:
-                found.extend(glob.glob(os.path.join(s['path'], ext)))
-            found = sorted(found, key=natural_sort_key)
+            pattern = os.path.join(sources['path'], f"*{vid_img_extension}")
+            found = sorted(glob.glob(pattern), key=natural_sort_key)
             if found:
                 # Just read the first image for dimension
                 im = cv2.imread(found[0])
@@ -1254,23 +1260,68 @@ def find_largest_frame_size(sources, vid_img_extension):
     return max_w, max_h
 
 
+def measure_webcam_fps(cam_index, warmup_frames=20, measure_frames=50):
+    cap = cv2.VideoCapture(cam_index, cv2.CAP_DSHOW)
+    if not cap.isOpened():
+        return 30
+    
+    for _ in range(warmup_frames):
+        ret, _ = cap.read()
+        if not ret:
+            cap.release()
+            return 30
+    
+    import time
+    start = time.time()
+    count = 0
+    for _ in range(measure_frames):
+        ret, _ = cap.read()
+        if not ret:
+            break
+        count += 1
+    
+    end = time.time()
+    cap.release()
+    if count < 1:
+        return 30
+
+    fps_measured = count / (end - start)
+    return fps_measured
+
+
 def find_largest_fps(sources):
     '''
     Auto-detect the largest FPS among all video/webcam sources.
     If none found or invalid, default to 30.
     '''
+
     max_fps = 0
+
     for s in sources:
-        if s['type'] in ('video', 'webcam'):
-            if s['type'] == 'webcam':
-                cap = cv2.VideoCapture(int(s['id']))
-            else:
-                cap = cv2.VideoCapture(s['path'])
+        if s['type'] == 'video':
+            cap = cv2.VideoCapture(s['path'])
             if cap.isOpened():
                 fps = cap.get(cv2.CAP_PROP_FPS)
-                # Some webcams give 0 or -1
                 if fps <= 0 or math.isnan(fps):
                     fps = 30
                 max_fps = max(max_fps, fps)
             cap.release()
+
+        elif s['type'] == 'webcam':
+            fps = measure_webcam_fps(int(s['id']))
+            max_fps = max(max_fps, fps)
+    
     return int(math.ceil(max_fps)) if max_fps > 0 else 30
+
+def check_stop_window_open():
+    if cv2.getWindowProperty("StopWindow", cv2.WND_PROP_VISIBLE) < 1:
+        return True
+    key = cv2.waitKey(1)
+    if key == 27:
+        return True
+    return False
+
+def stop_all_cameras_immediately(sources, command_queues):
+    for s in sources:
+        if s['type'] == 'webcam':
+            command_queues[s['id']].put(("STOP_CAPTURE", None))
