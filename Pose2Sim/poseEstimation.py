@@ -366,7 +366,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
         cv2.destroyAllWindows()
 
 
-def rtm_estimator(config_dict):
+def estimate_pose_all(config_dict):
     '''
     Estimate pose from a video file or a folder of images and 
     write the results to JSON files, videos, and/or images.
@@ -523,14 +523,14 @@ def rtm_estimator(config_dict):
         video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
         if not len(video_files) == 0: 
             # Process video files
-            logging.info(f'Found video files with extension {vid_img_extension}.')
+            logging.info(f'Found video files with {vid_img_extension} extension.')
             for video_path in video_files:
                 pose_tracker.reset()
                 process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person)
 
         else:
             # Process image folders
-            logging.info(f'Found image folders with extension {vid_img_extension}.')
+            logging.info(f'Found image folders with {vid_img_extension} extension.')
             image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
             for image_folder in image_folders:
                 pose_tracker.reset()

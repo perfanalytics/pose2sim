@@ -392,8 +392,6 @@ Pose2Sim.poseEstimation()
   # Same approach for hand or face pose estimation, check the RTMLib documentation for more information.
   ```
 
-
-
 <img src="Content/Pose2D.png" width="760">
 
 </br>
@@ -687,7 +685,7 @@ _**Note that inverse kinematic results are not necessarily better after marker a
 **Make sure that `participant_height` is correct in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.** `participant_mass` is mostly optional for IK.\
 Only works with models estimating at least the following keypoints (e.g., not COCO):
 ``` python
- ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
+ ["RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
  "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
  "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
 ```
