@@ -60,7 +60,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 - [x] **v0.8** *(04/2024)*: New synchronization tool
 - [x] **v0.9** *(07/2024)*: Integration of pose estimation in the pipeline
 - [x] **v0.10 *(09/2024)*: Integration of OpenSim in the pipeline**
-- [ ] v0.11: Integration of Sports2D, and documentation on new website
+- [ ] v0.11: Integration of Sports2D, monocular 3D pose estimation, and documentation on new website
 - [ ] v0.12: Graphical User Interface
 - [ ] v0.13: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
 - [ ] v1.0: First full release
