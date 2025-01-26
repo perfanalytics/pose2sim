@@ -21,10 +21,12 @@ import c3d
 import sys
 import itertools as it
 import logging
+from anytree import PreOrderIter
 
 import matplotlib as mpl
 mpl.use('qt5agg')
 mpl.rc('figure', max_open_warning=0)
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
@@ -79,6 +81,12 @@ angle_dict = { # lowercase!
     'right hand': [['RIndex', 'RWrist'], 'horizontal', 0, -1],
     'left hand': [['LIndex', 'LWrist'], 'horizontal', 0, -1]
     }
+
+colors = [(255, 0, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255), (0, 0, 0), (255, 255, 255),
+            (125, 0, 0), (0, 125, 0), (0, 0, 125), (125, 125, 0), (125, 0, 125), (0, 125, 125), 
+            (255, 125, 125), (125, 255, 125), (125, 125, 255), (255, 255, 125), (255, 125, 255), (125, 255, 255), (125, 125, 125),
+            (255, 0, 125), (255, 125, 0), (0, 125, 255), (0, 255, 125), (125, 0, 255), (125, 255, 0), (0, 255, 0)]
+thickness = 1
 
 
 ## CLASSES
@@ -1019,3 +1027,106 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     height = trimmed_mean(heights, trimmed_extrema_percent=trimmed_extrema_percent)
 
     return height
+
+
+def draw_bounding_box(img, X, Y, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)], fontSize=0.3, thickness=1):
+    '''
+    Draw bounding boxes and person ID around list of lists of X and Y coordinates.
+    Bounding boxes have a different color for each person.
+    
+    INPUTS:
+    - img: opencv image
+    - X: list of list of x coordinates
+    - Y: list of list of y coordinates
+    - colors: list of colors to cycle through
+    
+    OUTPUT:
+    - img: image with rectangles and person IDs
+    '''
+   
+    color_cycle = it.cycle(colors)
+
+    for i,(x,y) in enumerate(zip(X,Y)):
+        color = next(color_cycle)
+        if not np.isnan(x).all():
+            x_min, y_min = np.nanmin(x).astype(int), np.nanmin(y).astype(int)
+            x_max, y_max = np.nanmax(x).astype(int), np.nanmax(y).astype(int)
+            if x_min < 0: x_min = 0
+            if x_max > img.shape[1]: x_max = img.shape[1]
+            if y_min < 0: y_min = 0
+            if y_max > img.shape[0]: y_max = img.shape[0]
+
+            # Draw rectangles
+            cv2.rectangle(img, (x_min-25, y_min-25), (x_max+25, y_max+25), color, thickness) 
+        
+            # Write person ID
+            cv2.putText(img, str(i), (x_min-30, y_min-30), cv2.FONT_HERSHEY_SIMPLEX, fontSize+1, color, 2, cv2.LINE_AA) 
+    
+    return img
+
+
+def draw_skel(img, X, Y, model, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)]):
+    '''
+    Draws keypoints and skeleton for each person.
+    Skeletons have a different color for each person.
+
+    INPUTS:
+    - img: opencv image
+    - X: list of list of x coordinates
+    - Y: list of list of y coordinates
+    - model: skeleton model (from skeletons.py)
+    - colors: list of colors to cycle through
+    
+    OUTPUT:
+    - img: image with keypoints and skeleton
+    '''
+    
+    # Get (unique) pairs between which to draw a line
+    node_pairs = []
+    for data_i in PreOrderIter(model.root, filter_=lambda node: node.is_leaf):
+        node_branches = [node_i.id for node_i in data_i.path]
+        node_pairs += [[node_branches[i],node_branches[i+1]] for i in range(len(node_branches)-1)]
+    node_pairs = [list(x) for x in set(tuple(x) for x in node_pairs)]
+    
+    # Draw lines
+    color_cycle = it.cycle(colors)
+    for (x,y) in zip(X,Y):
+        c = next(color_cycle)
+        if not np.isnan(x).all():
+            [cv2.line(img,
+                (int(x[n[0]]), int(y[n[0]])), (int(x[n[1]]), int(y[n[1]])), c, thickness)
+                for n in node_pairs
+                if not None in n and not (np.isnan(x[n[0]]) or np.isnan(y[n[0]]) or np.isnan(x[n[1]]) or np.isnan(y[n[1]]))] # IF NOT NONE
+
+    return img
+
+
+def draw_keypts(img, X, Y, scores, cmap_str='RdYlGn'):
+    '''
+    Draws keypoints and skeleton for each person.
+    Keypoints' colors depend on their score.
+
+    INPUTS:
+    - img: opencv image
+    - X: list of list of x coordinates
+    - Y: list of list of y coordinates
+    - scores: list of list of scores
+    - cmap_str: colormap name
+    
+    OUTPUT:
+    - img: image with keypoints and skeleton
+    '''
+    
+    scores = np.where(np.isnan(scores), 0, scores)
+    # scores = (scores - 0.4) / (1-0.4) # to get a red color for scores lower than 0.4
+    scores = np.where(scores>0.99, 0.99, scores)
+    scores = np.where(scores<0, 0, scores)
+    
+    cmap = plt.get_cmap(cmap_str)
+    for (x,y,s) in zip(X,Y,scores):
+        c_k = np.array(cmap(s))[:,:-1]*255
+        [cv2.circle(img, (int(x[i]), int(y[i])), thickness+4, c_k[i][::-1], -1)
+            for i in range(len(x))
+            if not (np.isnan(x[i]) or np.isnan(y[i]))]
+
+    return img

@@ -38,12 +38,15 @@ import json
 import re
 import logging
 import ast
+import numpy as np
 from functools import partial
 from tqdm import tqdm
+from anytree.importer import DictImporter
 import cv2
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
-from Pose2Sim.common import natural_sort_key, sort_people_sports2d
+from Pose2Sim.common import natural_sort_key, sort_people_sports2d, \
+                        colors, thickness, draw_bounding_box, draw_keypts, draw_skel
 from Pose2Sim.skeletons import *
 
 
@@ -184,13 +187,14 @@ def save_to_openpose(json_file_path, keypoints, scores):
         json.dump(json_output, json_file)
 
 
-def process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person):
+def process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person):
     '''
     Estimate pose from a video file
     
     INPUTS:
     - video_path: str. Path to the input video file
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
+    - pose_model: str. The pose model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
@@ -254,8 +258,22 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
 
                 # Draw skeleton on the frame
                 if display_detection or save_video or save_images:
-                    img_show = frame.copy()
-                    img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+                    try:
+                        # MMPose skeleton
+                        img_show = frame.copy()
+                        img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+                    except:
+                        # Sports2D skeleton
+                        valid_X, valid_Y, valid_scores = [], [], []
+                        for person_keypoints, person_scores in zip(keypoints, scores):
+                            person_X, person_Y = person_keypoints[:, 0], person_keypoints[:, 1]
+                            valid_X.append(person_X)
+                            valid_Y.append(person_Y)
+                            valid_scores.append(person_scores)
+                        img_show = frame.copy()
+                        img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
+                        img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
+                        img_show = draw_skel(img_show, valid_X, valid_Y, pose_model, colors=colors)
                 
                 if display_detection:
                     cv2.imshow(f"Pose Estimation {os.path.basename(video_path)}", img_show)
@@ -282,7 +300,7 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
         cv2.destroyAllWindows()
 
 
-def process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, fps, save_video, save_images, display_detection, frame_range, multi_person):
+def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, multi_person):
     '''
     Estimate pose estimation from a folder of images
     
@@ -290,6 +308,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
     - image_folder_path: str. Path to the input image folder
     - vid_img_extension: str. Extension of the image files
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
+    - pose_model: str. The pose model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
@@ -343,8 +362,22 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
 
             # Draw skeleton on the image
             if display_detection or save_video or save_images:
-                img_show = frame.copy()
-                img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+                try:
+                    # MMPose skeleton
+                    img_show = frame.copy()
+                    img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+                except:
+                    # Sports2D skeleton
+                    valid_X, valid_Y, valid_scores = [], [], []
+                    for person_keypoints, person_scores in zip(keypoints, scores):
+                        person_X, person_Y = person_keypoints[:, 0], person_keypoints[:, 1]
+                        valid_X.append(person_X)
+                        valid_Y.append(person_Y)
+                        valid_scores.append(person_scores)
+                    img_show = frame.copy()
+                    img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
+                    img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
+                    img_show = draw_skel(img_show, valid_X, valid_Y, pose_model, colors=colors)
 
             if display_detection:
                 cv2.imshow(f"Pose Estimation {os.path.basename(image_folder_path)}", img_show)
@@ -469,7 +502,12 @@ def estimate_pose_all(config_dict):
     try:
         pose_model = eval(model_name)
     except:
-        raise ValueError(f"Pose model '{model_name}' not supported yet.")
+        try: # from Config.toml
+            pose_model = DictImporter().import_(config_dict.get('pose').get(pose_model))
+            if pose_model.id == 'None':
+                pose_model.id = None
+        except:
+            raise NameError(f'{pose_model} not found in skeletons.py nor in Config.toml')
 
     # Select device and backend
     backend, device = setup_backend_device(backend=backend, device=device)
@@ -526,7 +564,7 @@ def estimate_pose_all(config_dict):
             logging.info(f'Found video files with {vid_img_extension} extension.')
             for video_path in video_files:
                 pose_tracker.reset()
-                process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person)
+                process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person)
 
         else:
             # Process image folders
@@ -535,4 +573,4 @@ def estimate_pose_all(config_dict):
             for image_folder in image_folders:
                 pose_tracker.reset()
                 image_folder_path = os.path.join(video_dir, image_folder)
-                process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person)
+                process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person)
