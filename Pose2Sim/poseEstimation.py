@@ -558,7 +558,7 @@ def estimate_pose_all(config_dict):
         logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
         logging.info(f'Mode: {mode}.\n')
 
-        video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+        video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
         if not len(video_files) == 0: 
             # Process video files
             logging.info(f'Found video files with {vid_img_extension} extension.')
@@ -569,7 +569,7 @@ def estimate_pose_all(config_dict):
         else:
             # Process image folders
             logging.info(f'Found image folders with {vid_img_extension} extension.')
-            image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
+            image_folders = sorted([f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
             for image_folder in image_folders:
                 pose_tracker.reset()
                 image_folder_path = os.path.join(video_dir, image_folder)
