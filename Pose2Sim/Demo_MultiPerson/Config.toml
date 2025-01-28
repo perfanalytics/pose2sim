@@ -34,6 +34,7 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 
 [pose]
+orientation = 'landscape' #'landscape' or 'portrait'
 vid_img_extension = 'mp4' # any video or image extension or 'webcam'
 webcam_ids = 0 # your webcam id 0, or [0, 1, ...] (0 is default)
 
