@@ -247,9 +247,8 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                 keypoints, scores = pose_tracker(frame)
 
                 # Tracking people IDs across frames
-                if multi_person:
-                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+                if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
            
                 # Save to json
                 if 'openpose' in output_format:
@@ -258,11 +257,11 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
 
                 # Draw skeleton on the frame
                 if display_detection or save_video or save_images:
-                    try:
-                        # MMPose skeleton
-                        img_show = frame.copy()
-                        img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
-                    except:
+                    # try:
+                    #     # MMPose skeleton
+                    #     img_show = frame.copy()
+                    #     img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+                    # except:
                         # Sports2D skeleton
                         valid_X, valid_Y, valid_scores = [], [], []
                         for person_keypoints, person_scores in zip(keypoints, scores):
@@ -273,7 +272,7 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                         img_show = frame.copy()
                         img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                         img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
-                        img_show = draw_skel(img_show, valid_X, valid_Y, pose_model, colors=colors)
+                        img_show = draw_skel(img_show, valid_X, valid_Y, pose_model)
                 
                 if display_detection:
                     cv2.imshow(f"Pose Estimation {os.path.basename(video_path)}", img_show)
@@ -377,7 +376,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
                     img_show = frame.copy()
                     img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                     img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
-                    img_show = draw_skel(img_show, valid_X, valid_Y, pose_model, colors=colors)
+                    img_show = draw_skel(img_show, valid_X, valid_Y, pose_model)
 
             if display_detection:
                 cv2.imshow(f"Pose Estimation {os.path.basename(image_folder_path)}", img_show)

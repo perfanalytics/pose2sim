@@ -86,7 +86,7 @@ colors = [(255, 0, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255),
             (125, 0, 0), (0, 125, 0), (0, 0, 125), (125, 125, 0), (125, 0, 125), (0, 125, 125), 
             (255, 125, 125), (125, 255, 125), (125, 125, 255), (255, 255, 125), (255, 125, 255), (125, 255, 255), (125, 125, 125),
             (255, 0, 125), (255, 125, 0), (0, 125, 255), (0, 255, 125), (125, 0, 255), (125, 255, 0), (0, 255, 0)]
-thickness = 1
+thickness = 2
 
 
 ## CLASSES
@@ -1060,12 +1060,12 @@ def draw_bounding_box(img, X, Y, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)],
             cv2.rectangle(img, (x_min-25, y_min-25), (x_max+25, y_max+25), color, thickness) 
         
             # Write person ID
-            cv2.putText(img, str(i), (x_min-30, y_min-30), cv2.FONT_HERSHEY_SIMPLEX, fontSize+1, color, 2, cv2.LINE_AA) 
+            cv2.putText(img, str(i), (x_min-30, y_min-30), cv2.FONT_HERSHEY_SIMPLEX, fontSize, color, 2, cv2.LINE_AA) 
     
     return img
 
 
-def draw_skel(img, X, Y, model, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)]):
+def draw_skel(img, X, Y, model):
     '''
     Draws keypoints and skeleton for each person.
     Skeletons have a different color for each person.
@@ -1082,21 +1082,27 @@ def draw_skel(img, X, Y, model, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)]):
     '''
     
     # Get (unique) pairs between which to draw a line
-    node_pairs = []
+    id_pairs, name_pairs = [], []
     for data_i in PreOrderIter(model.root, filter_=lambda node: node.is_leaf):
-        node_branches = [node_i.id for node_i in data_i.path]
-        node_pairs += [[node_branches[i],node_branches[i+1]] for i in range(len(node_branches)-1)]
-    node_pairs = [list(x) for x in set(tuple(x) for x in node_pairs)]
+        node_branch_ids = [node_i.id for node_i in data_i.path]
+        node_branch_names = [node_i.name for node_i in data_i.path]
+        id_pairs += [[node_branch_ids[i],node_branch_ids[i+1]] for i in range(len(node_branch_ids)-1)]
+        name_pairs += [[node_branch_names[i],node_branch_names[i+1]] for i in range(len(node_branch_names)-1)]
+    node_pairs = {tuple(name_pair): id_pair for (name_pair,id_pair) in zip(name_pairs,id_pairs)}
+
     
     # Draw lines
-    color_cycle = it.cycle(colors)
     for (x,y) in zip(X,Y):
-        c = next(color_cycle)
         if not np.isnan(x).all():
-            [cv2.line(img,
-                (int(x[n[0]]), int(y[n[0]])), (int(x[n[1]]), int(y[n[1]])), c, thickness)
-                for n in node_pairs
-                if not None in n and not (np.isnan(x[n[0]]) or np.isnan(y[n[0]]) or np.isnan(x[n[1]]) or np.isnan(y[n[1]]))] # IF NOT NONE
+            for names, ids in node_pairs.items():
+                if not None in ids and not (np.isnan(x[ids[0]]) or np.isnan(y[ids[0]]) or np.isnan(x[ids[1]]) or np.isnan(y[ids[1]])):
+                    if any(n.startswith('R') for n in names) and not any(n.startswith('L') for n in names):
+                        c = (255,128,0)
+                    elif any(n.startswith('L') for n in names) and not any(n.startswith('R') for n in names):
+                        c = (0,255,0)
+                    else:
+                        c = (51, 153, 255)
+                    cv2.line(img, (int(x[ids[0]]), int(y[ids[0]])), (int(x[ids[1]]), int(y[ids[1]])), c, thickness)
 
     return img
 
