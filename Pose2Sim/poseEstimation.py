@@ -247,8 +247,9 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                 keypoints, scores = pose_tracker(frame)
 
                 # Tracking people IDs across frames
-                if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+                if multi_person:
+                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
            
                 # Save to json
                 if 'openpose' in output_format:
@@ -270,7 +271,7 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                             valid_Y.append(person_Y)
                             valid_scores.append(person_scores)
                         img_show = frame.copy()
-                        img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
+                        if multi_person: img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                         img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
                         img_show = draw_skel(img_show, valid_X, valid_Y, pose_model)
                 
