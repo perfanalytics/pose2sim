@@ -74,6 +74,15 @@ def get_formatted_timestamp():
     return dt.strftime("%Y%m%d_%H%M%S_") + f"{ms:03d}"
 
 
+def safe_resize(frame, target_w, target_h):
+    h, w = frame.shape[:2]
+    if w <= target_w and h <= target_h:
+        return frame
+    ratio = min(target_w / float(w), target_h / float(h))
+    new_w, new_h = int(w * ratio), int(h * ratio)
+    return cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+
 def init_pose_tracker(pose_tracker_settings):
     '''
     Set up the RTMLib pose tracker with the appropriate model and backend.
@@ -185,159 +194,92 @@ def save_keypoints_to_openpose(json_file_path, all_keypoints, all_scores):
 
 
 class PoseEstimatorWorker(multiprocessing.Process):
-    '''
-    Worker process that pulls frames from the frame_queue, runs pose estimation,
-    and returns results.
-    '''
-
-    def __init__(
-        self,
-        frame_queue,
-        available_buffers,
-        shared_buffers,
-        shared_counts,
-        pose_tracker_settings,
-        source_outputs,
-        active_sources,
-        multi_person,
-        display_queue,
-        output_format,
-        save_images,
-        vid_img_extension
-    ):
+    def __init__(self, **kwargs):
         super().__init__()
-        self.frame_queue = frame_queue
-        self.available_buffers = available_buffers
-        self.shared_buffers = shared_buffers
-        self.shared_counts = shared_counts
-        self.pose_tracker_settings = pose_tracker_settings
-        self.source_outputs = source_outputs
-        self.active_sources = active_sources
-        self.display_queue = display_queue
-
-        self.multi_person = multi_person
-        self.output_format = output_format
-        self.save_images = save_images
-        self.vid_img_extension = vid_img_extension
-
-        self.prev_keypoints_map = {}
+        self.__dict__.update(kwargs)
+        self.pose_tracker = None
         self.stopped = False
 
     def run(self):
-        try:
-            # Initialize pose tracker
-            pose_tracker = init_pose_tracker(self.pose_tracker_settings)
+        # Initialize pose tracker
+        self.pose_tracker = init_pose_tracker(self.pose_tracker_settings)
+        while not self.stopped:
+            # If no new frames and no active sources remain, stop
+            if self.queue.empty() and self.active_sources.value == 0:
+                logging.info("Stopping worker as no active sources or items are in the queue.")
+                self.stop()
+                break
 
-            while True:
-                # If no new frames and no active sources remain, stop
-                if self.frame_queue.empty() and self.active_sources.value == 0:
-                    logging.info(f"PoseEstimatorWorker {self.pid} stopping.")
-                    break
+            item = self.queue.get(timeout=0.1)
+            if item:
+                self.process_frame(item)
 
-                try:
-                    item = self.frame_queue.get(timeout=0.1)
-                    if item is None:
-                        break
+    def process_frame(self, item):
+        # Unpack frame info
+        buffer_name, idx, frame_shape, frame_dtype, *others = item
+    
+        # Convert shared memory to numpy
+        frame = np.ndarray(frame_shape, dtype=frame_dtype, buffer=self.buffers[buffer_name].buf)
+        
+        if not others[1]:
+            keypoints, scores = self.pose_tracker(frame)
+            result = (buffer_name, idx, frame_shape, frame_dtype, None, others[1], keypoints, scores, others[0]) if self.combined_frames else (buffer_name, idx, frame_shape, frame_dtype, others[0], others[1], keypoints, scores)
+            self.result_queue.put(result)
+        else:
+            self.result_queue.put((buffer_name, idx, frame_shape, frame_dtype, others[0], others[1], None, None))
+        
+        # Return buffer
+        self.available_buffers.put(buffer_name)
 
-                    # Unpack frame info
-                    buffer_name, frame_shape, frame_dtype_str, sid, frame_idx, is_placeholder, timestamp = item
-
-                    # Convert shared memory to numpy
-                    shm = self.shared_buffers[buffer_name]
-                    frame_np = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype_str), buffer=shm.buf)
-
-                    if is_placeholder:
-                        if self.display_queue:
-                            self.display_queue.put((sid, frame_idx, frame_np, True))
-                        self.available_buffers.put(buffer_name)
-                        continue
-
-                    # Pose
-                    keypoints, scores = pose_tracker(frame_np)
-
-                    # Tri multi-person
-                    previous_keypoints = self.prev_keypoints_map.get(sid)
-                    if self.multi_person:
-                        if previous_keypoints is None:
-                            previous_keypoints = keypoints
-                        previous_keypoints, keypoints, scores = sort_people_sports2d(previous_keypoints, keypoints, scores=scores)
-                        self.prev_keypoints_map[sid] = previous_keypoints
-
-                    out_dirs = self.source_outputs[sid]
-                    (output_dir_name, img_output_dir, json_output_dir, _ ) = out_dirs
-                    if self.vid_img_extension == 'webcam':
-                        file_name = f"{output_dir_name}_{timestamp}"
-                    else:
-                        file_name = f"{output_dir_name}_{frame_idx:06d}"
-
-                    if 'openpose' in self.output_format:
-                        json_file_name = f"{file_name}.json"
-                        json_path = os.path.join(json_output_dir, json_file_name)
-                        save_keypoints_to_openpose(json_path, keypoints, scores)
-
-                    if self.save_images:
-                        img_file_name = f"{file_name}.jpg"
-                        cv2.imwrite(os.path.join(img_output_dir, img_file_name), frame_np)
-
-                    # Draw skeleton if needed
-                    if self.display_queue:
-                        annotated_frame = draw_skeleton(frame_np, keypoints, scores, kpt_thr=0.1)
-                        self.display_queue.put((sid, frame_idx, annotated_frame, False))
-
-                    # Increase count and return buffer
-                    with self.shared_counts[sid]['processed'].get_lock():
-                        self.shared_counts[sid]['processed'].value += 1
-                    self.available_buffers.put(buffer_name)
-
-                except queue.Empty:
-                    pass
-
-        except Exception as err:
-            logging.error(f"PoseEstimatorWorker error: {err}")
-            self.stopped = True
+    def stop(self):
+        self.stopped = True
 
 
-class FrameSynchronizer(multiprocessing.Process):
-    '''
-    Affichage unifié, deux modes possibles :
-      - mode webcams  => live (placeholder "Not connected")
-      - mode vidéos/images => synchro par frame_idx
-    Jamais un mélange des deux en même temps.
-
-    On enregistre la vidéo si besoin (self.save_video).
-    '''
-
+class BaseSynchronizer:
     def __init__(self,
                  sources,
-                 display_queue,
+                 frame_buffers,
+                 pose_buffers,
+                 available_frame_buffers,
+                 available_pose_buffers,
                  vid_img_extension,
-                 save_video=False,
-                 source_outputs=None,
-                 frame_width=1280,
-                 frame_height=720,
-                 fps=30,
-                 orientation='landscape'):
-        super().__init__(daemon=True)
+                 source_outputs,
+                 shared_counts,
+                 save_images,
+                 save_video,
+                 frame_size,
+                 frame_rate,
+                 orientation,
+                 combined_frames,
+                 multi_person,
+                 output_format,
+                 display_detection):
         self.sources = sources
-        self.display_queue = display_queue
-        self.vid_img_extension = vid_img_extension
-        self.save_video = save_video
-        self.source_outputs = source_outputs
+        self.frame_buffers = frame_buffers
+        self.pose_buffers = pose_buffers
+        self.available_frame_buffers = available_frame_buffers
+        self.available_pose_buffers = available_pose_buffers
 
-        self.last_frames   = {}
-        self.placeholder_map = {}
+        self.vid_img_extension = vid_img_extension
+        self.source_outputs = source_outputs
+        self.shared_counts = shared_counts
+        self.save_images = save_images
+        self.save_video = save_video
+        self.frame_size = frame_size
+        self.frame_rate = frame_rate
+        self.orientation = orientation
+        self.combined_frames = combined_frames
+        self.multi_person = multi_person
+        self.output_format = output_format
+        self.display_detection = display_detection
 
         self.sync_data = {}
-
-        self.stopped = False
-        self.fps = fps
-        self.frame_width = frame_width
-        self.frame_height = frame_height
-        self.orientation = orientation
+        self.placeholder_map = {}
 
         self.video_writers = {}
+        self.stopped = False
 
-    def run(self):
+    def init_video_writers(self):
         if self.save_video and self.source_outputs:
             for s in self.sources:
                 sid = s['id']
@@ -347,161 +289,235 @@ class FrameSynchronizer(multiprocessing.Process):
                 self.video_writers[sid] = cv2.VideoWriter(
                     output_video_path,
                     fourcc,
-                    self.fps,
-                    (self.frame_width, self.frame_height)
+                    self.frame_rate,
+                    (self.frame_size[0], self.frame_size[1])
                 )
 
-        while not self.stopped:
-            try:
-                sid, frame_idx, frame, is_placeholder = self.display_queue.get(timeout=0.1)
-                if frame is None:
-                    continue
-
-                if self.vid_img_extension == 'webcam':
-                    self.last_frames[sid] = frame
-                    self.placeholder_map[sid] = is_placeholder
-                else:
-                    if frame_idx not in self.sync_data:
-                        self.sync_data[frame_idx] = {}
-                    self.sync_data[frame_idx][sid] = frame
-
-                if not is_placeholder and sid in self.video_writers:
-                    frm_resized = self.safe_resize(frame, self.frame_width, self.frame_height)
-                    self.video_writers[sid].write(frm_resized)
-
-                self.show_unified()
-
-            except queue.Empty:
-                pass
-
-        for vw in self.video_writers.values():
-            vw.release()
-        cv2.destroyAllWindows()
-
-    def safe_resize(self, frame, target_w, target_h):
-        h, w = frame.shape[:2]
-        if w <= target_w and h <= target_h:
-            return frame
-        ratio = min(target_w / w, target_h / h)
-        new_w, new_h = int(w*ratio), int(h*ratio)
-        return cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
-
-    def show_unified(self):
-        frames_list = self.get_frames_list()
-
-        if not frames_list:
-            return
-
-        mosaic = self.build_mosaic(frames_list)
-
+    def show_mosaic(self, mosaic):
         cv2.imshow("Display", mosaic)
         key = cv2.waitKey(1)
         if key in [ord('q'), 27]:
             logging.info("User closed display.")
-            self.stopped = True
+            self.stop()
 
     def get_frames_list(self):
-        if self.vid_img_extension == 'webcam':
-            frames_list = []
-            for s in self.sources:
-                sid = s['id']
-                frm = self.last_frames.get(sid, None)
-                if frm is None:
-                    black = np.zeros((self.frame_height, self.frame_width, 3), dtype=np.uint8)
-                    cv2.putText(black, "No frames yet", (50, 50),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255,255,255), 2)
-                    frames_list.append(black)
-                else:
-                    if self.placeholder_map.get(sid, False):
-                        frm_small = self.safe_resize(frm, self.frame_width, self.frame_height)
-                        cv2.putText(frm_small, "Not connected", (50, 50),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0,0,255), 2)
-                        frames_list.append(frm_small)
-                    else:
-                        frames_list.append(frm)
-            return frames_list
-        else:
-            complete_idxs = []
-            for f_idx, frames_dict in self.sync_data.items():
-                if len(frames_dict) == len(self.sources):
-                    complete_idxs.append(f_idx)
-            if not complete_idxs:
-                return []
+        frames_list = []
+        for source in self.sources:
+            sid = source['id']
+            if sid in self.sync_data:
+                buffer_name, frame_shape, frame_dtype, keypoints, scores = self.sync_data.pop(sid)
+                frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype), buffer=self.frame_buffers[buffer_name].buf)
+                orig_w, orig_h = frame_shape[1], frame_shape[0]
 
-            min_idx = min(complete_idxs)
-            frames_dict = self.sync_data[min_idx]
-            del self.sync_data[min_idx]
+                is_placeholder = self.placeholder_map.pop(sid, False)
+                if is_placeholder:
+                    frame = safe_resize(frame, self.frame_size[0], self.frame_size[1])
+                    cv2.putText(frame, "Not connected", (50, 50),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 2)
 
-            frames_list = []
-            for s in self.sources:
-                sid = s['id']
-                frames_list.append(frames_dict[sid])
-            return frames_list
+                frames_list.append((frame, sid, orig_w, orig_h, keypoints, scores))
+                self.available_frame_buffers.put(buffer_name)
+            else:
+                frame = np.zeros((self.frame_size[1], self.frame_size[0], 3), dtype=np.uint8)
+                cv2.putText(frame, "No frames yet", (50, 50),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
+                orig_w, orig_h = self.frame_size[0], self.frame_size[1]
+                frames_list.append((frame, sid, orig_w, orig_h, None, None))
+        return frames_list
 
     def build_mosaic(self, frames_list):
+        target_w, target_h = self.frame_size
+        if not frames_list:
+            return np.zeros((target_h, target_w, 3), dtype=np.uint8), {}
         n = len(frames_list)
-        if n == 0:
-            return np.zeros((self.frame_height, self.frame_width, 3), dtype=np.uint8)
-
-        if self.orientation == 'portrait':
-            window_w, window_h = 720, 1280
-        else:
-            window_w, window_h = 1280, 720
-
         cols = int(math.ceil(math.sqrt(n)))
         rows = int(math.ceil(n / cols))
-        sub_w = window_w // cols
-        sub_h = window_h // rows
-
-        mosaic = np.zeros((window_h, window_w, 3), dtype=np.uint8)
-
+        mosaic_h = rows * target_h
+        mosaic_w = cols * target_w
+        mosaic = np.zeros((mosaic_h, mosaic_w, 3), dtype=np.uint8)
+        subinfo = {}
         idx = 0
         for r in range(rows):
             for c in range(cols):
                 if idx >= n:
                     break
-                frm = frames_list[idx]
-                frm_small = self.safe_resize(frm, sub_w, sub_h)
-
-                h2, w2 = frm_small.shape[:2]
-                if w2 != sub_w or h2 != sub_h:
-                    frm_small = cv2.resize(frm_small, (sub_w, sub_h))
-
-                y1, x1 = r*sub_h, c*sub_w
-                mosaic[y1:y1+sub_h, x1:x1+sub_w] = frm_small
+                frame, *others = frames_list[idx]
+                frame_resized = cv2.resize(frame, (target_w, target_h))
+                x_off = c * target_w
+                y_off = r * target_h
+                mosaic[y_off:y_off+target_h, x_off:x_off+target_w] = frame_resized
+                if others is not None:
+                    subinfo[others[0]] = {
+                        "x_offset": x_off,
+                        "y_offset": y_off,
+                        "scaled_w": target_w,
+                        "scaled_h": target_h,
+                        "orig_w": others[1],
+                        "orig_h": others[2]
+                    }
                 idx += 1
+        return mosaic, subinfo
 
-        return mosaic
+    def read_mosaic(self, mosaic_np, subinfo, keypoints, scores):
+        annotated_frames = {}
+        recovered_keypoints = {}
+        recovered_scores = {}
+        for s in self.sources:
+            sid = s['id']
+            if sid not in subinfo:
+                continue
+            info = subinfo[sid]
+            x_off = info["x_offset"]
+            y_off = info["y_offset"]
+            sc_w  = info["scaled_w"]
+            sc_h  = info["scaled_h"]
+            orig_w = info["orig_w"]
+            orig_h = info["orig_h"]
+
+            frame_region = mosaic_np[y_off:y_off+sc_h, x_off:x_off+sc_w].copy()
+            annotated_frames[sid] = frame_region
+
+            rec_kpts = []
+            rec_scores = []
+            for p in range(len(keypoints)):
+                kp_person = []
+                sc_person = []
+                for (xk, yk), scv in zip(keypoints[p], scores[p]):
+                    x_local = (xk - x_off) * (orig_w / float(sc_w))
+                    y_local = (yk - y_off) * (orig_h / float(sc_h))
+                    kp_person.append([x_local, y_local])
+                    sc_person.append(scv)
+                rec_kpts.append(np.array(kp_person))
+                rec_scores.append(np.array(sc_person))
+            recovered_keypoints[sid] = rec_kpts
+            recovered_scores[sid] = rec_scores
+        return annotated_frames, recovered_keypoints, recovered_scores
 
     def stop(self):
         self.stopped = True
 
 
-class CaptureCoordinator(multiprocessing.Process):
-    '''
-    Orchestrates reading frames from multiple media sources in a certain mode
-    ('continuous' or 'alternating'), controlling the pace of capture.
-    '''
+class FrameQueueProcessor(multiprocessing.Process, BaseSynchronizer):
+    def __init__(self, frame_queue, pose_queue, **kwargs):
+        multiprocessing.Process.__init__(self)
+        BaseSynchronizer.__init__(self, **kwargs)
+        self.frame_queue = frame_queue
+        self.pose_queue = pose_queue
 
+    def run(self):
+        while not self.stopped:
+            try:
+                buffer_name, idx, frame_shape, frame_dtype, sid, is_placeholder = self.frame_queue.get_nowait()
+                self.sync_data[sid] = (buffer_name, frame_shape, frame_dtype, None, None)
+                self.placeholder_map[sid] = is_placeholder
+
+                if frames_list := self.get_frames_list():
+                    mosaic, subinfo = self.build_mosaic(frames_list)
+                    pose_buf_name = self.available_pose_buffers.get_nowait()
+                    np.ndarray(mosaic.shape, dtype=mosaic.dtype, buffer=self.pose_buffers[pose_buf_name].buf)[:] = mosaic
+                    self.pose_queue.put((pose_buf_name, idx, mosaic.shape, mosaic.dtype.str, subinfo, False))
+            except queue.Empty:
+                time.sleep(0.005)
+
+
+class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
+    def __init__(self, result_queue, **kwargs):
+        multiprocessing.Process.__init__(self)
+        BaseSynchronizer.__init__(self, **kwargs)
+        self.result_queue = result_queue
+
+    def run(self):
+        self.init_video_writers()
+
+        while not self.stopped:
+            try:
+                result_item = self.result_queue.get_nowait()
+                self.process_result_item(result_item)
+            except queue.Empty:
+                time.sleep(0.005)
+
+        for vw in self.video_writers.values():
+            vw.release()
+        cv2.destroyAllWindows()
+
+    def process_result_item(self, result_item):
+        buffer_name, idx, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, *others = result_item
+        if self.combined_frames:
+            shm = self.pose_buffers[buffer_name]
+            mosaic_np = np.ndarray(frame_shape, dtype=frame_dtype, buffer=shm.buf)
+            self.handle_combined_frames(mosaic_np, keypoints, scores, others, idx)
+        else:
+            self.handle_individual_frames(buffer_name, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, idx)
+
+    def handle_combined_frames(self, mosaic_np, keypoints, scores, subinfo, idx):
+        if self.save_images or self.save_video or self.display_detection:
+            mosaic_np = draw_skeleton(mosaic_np, keypoints, scores, kpt_thr=0.1)
+            if self.display_detection:
+                desired_w, desired_h = 1280, 720
+                display_frame = cv2.resize(mosaic_np, (desired_w, desired_h))
+                self.show_mosaic(display_frame)
+        frame, recovered_keypoints, recovered_scores = self.read_mosaic(mosaic_np, subinfo, keypoints, scores)
+        for (sid, frame, keypoints, scores) in (frame, recovered_keypoints, recovered_scores):
+            self.handle_output(sid, frame, keypoints, scores, idx)
+
+    def handle_individual_frames(self, buffer_name, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, idx):
+        self.sync_data[sid] = (buffer_name, frame_shape, frame_dtype, keypoints, scores)
+        self.placeholder_map[sid] = is_placeholder
+        frames_list = self.get_frames_list()
+        if frames_list:
+            self.process_frames(frames_list, idx)
+
+    def process_frames(self, frames_list, idx):
+        annotated_frames = []
+        for (sid, frame, orig_w, orig_h, *others) in frames_list:
+            if others[0] is not None:
+                if self.save_images or self.save_video or self.display_detection:
+                    frame = draw_skeleton(frame, others[0], others[1], kpt_thr=0.1)
+                annotated_frames.append((frame, sid, orig_w, orig_h))
+                self.handle_output(sid, frame, others[0], others[1], idx)
+            
+        if self.display_detection:
+            mosaic, _ = self.build_mosaic(annotated_frames)
+            desired_w, desired_h = 1280, 720
+            mosaic = cv2.resize(mosaic, (desired_w, desired_h))
+            self.show_mosaic(mosaic)
+
+    def handle_output(self, sid, frame, keypoints, scores, idx):
+        out_dirs = self.source_outputs[sid]
+        file_name = f"{out_dirs[0]}_{idx}"
+        if 'openpose' in self.output_format:
+            json_file_name = f"{file_name}.json"
+            json_path = os.path.join(out_dirs[2], json_file_name)
+            save_keypoints_to_openpose(json_path, keypoints, scores)
+        if self.save_images:
+            img_file_name = f"{file_name}.jpg"
+            cv2.imwrite(os.path.join(out_dirs[1], img_file_name), frame)
+        if self.save_video:
+            frm_resized = safe_resize(frame, self.frame_size[0], self.frame_size[1])
+            if sid in self.video_writers:
+                self.video_writers[sid].write(frm_resized)
+
+
+class CaptureCoordinator(multiprocessing.Process):
     def __init__(self,
                  sources,
                  command_queues,
-                 available_buffers,
+                 available_frame_buffers,
                  shared_counts,
                  source_ended,
                  webcam_ready,
-                 frame_limit=10,
-                 mode='continuous'):
+                 frame_rate,
+                 mode):
         super().__init__(daemon=True)
         self.sources = sources
         self.command_queues = command_queues
-        self.available_buffers = available_buffers
+        self.available_frame_buffers = available_frame_buffers
         self.shared_counts = shared_counts
         self.source_ended = source_ended
         self.webcam_ready = webcam_ready
         self.mode = mode
 
-        self.min_interval = 1.0 / frame_limit if frame_limit > 0 else 0.0
+        self.min_interval = 1.0 / frame_rate if frame_rate > 0 else 0.0
         self.stopped = multiprocessing.Value('b', False)
 
     def run(self):
@@ -526,8 +542,8 @@ class CaptureCoordinator(multiprocessing.Process):
             ready_srcs = [s for s in self.sources if is_ready_source(s)]
 
             if self.mode == 'continuous':
-                if self.available_buffers.qsize() >= len(ready_srcs):
-                    buffs = [self.available_buffers.get() for _ in ready_srcs]
+                if self.available_frame_buffers.qsize() >= len(ready_srcs):
+                    buffs = [self.available_frame_buffers.get() for _ in ready_srcs]
                     for i, src in enumerate(ready_srcs):
                         sid = src['id']
                         self.command_queues[sid].put(("CAPTURE_FRAME", buffs[i]))
@@ -536,7 +552,7 @@ class CaptureCoordinator(multiprocessing.Process):
                     time.sleep(0.005)
 
             elif self.mode == 'alternating':
-                chunk = self.available_buffers.qsize()
+                chunk = self.available_frame_buffers.qsize()
                 if chunk <= 0:
                     time.sleep(0.005)
                     continue
@@ -551,7 +567,7 @@ class CaptureCoordinator(multiprocessing.Process):
                         break
                     src = ready_srcs[src_index]
                     sid = src['id']
-                    buf_name = self.available_buffers.get()
+                    buf_name = self.available_frame_buffers.get()
                     self.command_queues[sid].put(("CAPTURE_FRAME", buf_name))
                     sources_requested.append(sid)
                     frames_sent += 1
@@ -594,16 +610,11 @@ class CaptureCoordinator(multiprocessing.Process):
 
 
 class MediaSource(multiprocessing.Process):
-    '''
-    Reads frames from a single source: webcam, video file, or image directory.
-    Sends frames to the frame queue when commanded by the CaptureCoordinator.
-    '''
-
     def __init__(
         self,
         source,
         frame_queue,
-        shared_buffers,
+        frame_buffers,
         shared_counts,
         frame_size,
         active_sources,
@@ -617,7 +628,7 @@ class MediaSource(multiprocessing.Process):
         super().__init__()
         self.source = source
         self.frame_queue = frame_queue
-        self.shared_buffers = shared_buffers
+        self.frame_buffers = frame_buffers
         self.shared_counts = shared_counts
         self.frame_size = frame_size
         self.active_sources = active_sources
@@ -632,7 +643,6 @@ class MediaSource(multiprocessing.Process):
         self.total_frames = 0
         self.cap = None
         self.image_files = []
-        self.img_idx = 0
         self.stopped = False
 
     def run(self):
@@ -667,24 +677,31 @@ class MediaSource(multiprocessing.Process):
 
                 if isinstance(cmd, tuple):
                     if cmd[0] == "CAPTURE_FRAME":
-                        buf_name = cmd[1]
+                        buffer_name = cmd[1]
                         # Stop if we've reached total frames for video/images
                         if self.source['type'] in ('video', 'images'):
                             if self.frame_idx >= self.total_frames:
-                                self.stop_source()
+                                self.stop()
                                 break
 
                         # Read frame and send it
                         frame, is_placeholder = self.read_frame()
                         if frame is None:
-                            self.stop_source()
+                            self.stop()
                             break
 
-                        self.send_frame(frame, buf_name, is_placeholder)
+                        with self.shared_counts[self.source['id']]['processed'].get_lock():
+                            self.shared_counts[self.source['id']]['processed'].value += 1
+
+                        if self.orientation == 'portrait':
+                            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+
+                        frame = safe_resize(frame, self.frame_size[0], self.frame_size[1])
+
+                        self.send_frame(frame, buffer_name, is_placeholder)
 
                     elif cmd[0] == "STOP_CAPTURE":
-                        self.stop_source()
-                        self.stopped = True
+                        self.stop()
                         break
                     else:
                         pass
@@ -697,9 +714,9 @@ class MediaSource(multiprocessing.Process):
             if self.source_ended is not None:
                 self.source_ended[self.source['id']] = True
 
-        except Exception as err:
-            logging.error(f"MediaSource {self.source['id']} error: {err}")
-            self.stopped = True
+        except Exception as e:
+            logging.error(f"MediaSource {self.source['id']} error: {e}")
+            self.stop()
             with self.active_sources.get_lock():
                 self.active_sources.value -= 1
             if self.source_ended is not None:
@@ -721,7 +738,7 @@ class MediaSource(multiprocessing.Process):
         self.cap = cv2.VideoCapture(self.source['path'])
         if not self.cap.isOpened():
             logging.error(f"Cannot open video file: {self.source['path']}")
-            self.stopped = True
+            self.stop()
 
     def load_images(self):
         pattern = os.path.join(self.source['path'], f"*{self.vid_img_extension}")
@@ -739,29 +756,21 @@ class MediaSource(multiprocessing.Process):
             ret, frame = self.cap.read()
             if not ret or frame is None:
                 logging.info(f"Video finished: {self.source['path']}")
-                self.stopped = True
+                self.stop()
                 return None, False
 
-            if self.orientation == 'portrait':
-                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
-
-            frame = cv2.resize(frame, self.frame_size, interpolation=cv2.INTER_AREA)
             return frame, False
 
         elif self.source['type'] == 'images':
-            if self.img_idx < len(self.image_files):
-                frame = cv2.imread(self.image_files[self.img_idx])
+            if self.frame_idx < len(self.image_files):
+                frame = cv2.imread(self.image_files[self.frame_idx])
                 if frame is None:
                     return None, False
 
-                if self.orientation == 'portrait':
-                    frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
-
-                frame = cv2.resize(frame, self.frame_size, interpolation=cv2.INTER_AREA)
-                self.img_idx += 1
+                self.frame_idx += 1
                 return frame, False
             else:
-                self.stopped = True
+                self.stop()
                 return None, False
 
         elif self.source['type'] == 'webcam':
@@ -775,8 +784,8 @@ class MediaSource(multiprocessing.Process):
                     placeholder_frame = np.zeros((self.frame_size[1], self.frame_size[0], 3), dtype=np.uint8)
                     return placeholder_frame, True
 
-            ret, frm = self.cap.read()
-            if not ret or frm is None:
+            ret, frame = self.cap.read()
+            if not ret or frame is None:
                 logging.warning(f"Failed to read from webcam {self.source['id']}. Reconnecting loop.")
                 self.cap.release()
                 self.cap = None
@@ -786,22 +795,23 @@ class MediaSource(multiprocessing.Process):
             if self.webcam_ready is not None:
                 self.webcam_ready[self.source['id']] = True
 
-            if self.orientation == 'portrait':
-                frm = cv2.rotate(frm, cv2.ROTATE_90_CLOCKWISE)
-
-            frm = cv2.resize(frm, self.frame_size, interpolation=cv2.INTER_AREA)
-            return frm, False
+            return frame, False
 
         return None, False
 
     def send_frame(self, frame, buffer_name, is_placeholder):
-        shm = self.shared_buffers[buffer_name]
+        shm = self.frame_buffers[buffer_name]
         np_frame = np.ndarray(frame.shape, dtype=frame.dtype, buffer=shm.buf)
         np_frame[:] = frame
 
-        timestamp = get_formatted_timestamp()
-
-        item = (buffer_name, frame.shape, frame.dtype.str, self.source['id'], self.frame_idx, is_placeholder, timestamp)
+        item = (
+            buffer_name,
+            self.frame_idx if not self.source['type'] == 'webcam' else get_formatted_timestamp(),
+            frame.shape,
+            frame.dtype.str,
+            self.source['id'],
+            is_placeholder
+        )
         self.frame_queue.put(item)
 
         if not is_placeholder:
@@ -809,13 +819,10 @@ class MediaSource(multiprocessing.Process):
                 self.shared_counts[self.source['id']]['queued'].value += 1
             self.frame_idx += 1
 
-    def stop_source(self):
+    def stop(self):
         self.stopped = True
         if self.cap:
             self.cap.release()
-
-    def stop(self):
-        self.stop_source()
 
 
 def rtm_estimator(config_dict):
@@ -863,6 +870,10 @@ def rtm_estimator(config_dict):
     save_images = ('to_images' in save_files)
     save_video = ('to_video' in save_files)
     orientation = config_dict['pose'].get('orientation', 'landscape')
+    combined_frames = config_dict['pose'].get('combined_frames', False)
+    multi_workers = config_dict['pose'].get('multi_workers', False)
+    multi_person = config_dict['project'].get('multi_person', False)
+    output_format = config_dict['project'].get('output_format', 'openpose')
 
     # Gather sources
     sources = []
@@ -926,20 +937,51 @@ def rtm_estimator(config_dict):
         logging.info(f"Using user-defined frame rate: {frame_rate} fps")
 
     # Prepare shared memory
+    num_sources = len(sources)
     available_memory = psutil.virtual_memory().available
     frame_bytes = fw * fh * 3
-    n_buffers = int((available_memory / 2) / frame_bytes)
-    logging.info(f"Allocating {n_buffers} shared frame buffers...")
+    n_buffers_total = int((available_memory / 2) / (frame_bytes * (num_sources / (num_sources + 1))))
 
-    frame_queue = multiprocessing.Queue(maxsize=n_buffers)
-    shared_buffers = {}
-    available_buffers = multiprocessing.Queue()
+    frame_buffer_count = 0
 
-    for i in range(n_buffers):
-        unique_name = f"frame_buffer_{i}"
-        shm = shared_memory.SharedMemory(name=unique_name, create=True, size=frame_bytes)
-        shared_buffers[unique_name] = shm
-        available_buffers.put(unique_name)
+    if not combined_frames:
+        frame_buffer_count = n_buffers_total
+
+        logging.info(f"Allocating {frame_buffer_count} buffers.")
+    else:
+        pose_buffer_count = math.ceil(n_buffers_total / (num_sources + 1))
+
+        logging.info(f"Allocating {pose_buffer_count} pose buffers.")
+
+        frame_buffer_count = n_buffers_total - pose_buffer_count
+
+        logging.info(f"Allocating {frame_buffer_count} frame buffers.")
+
+    frame_queue = multiprocessing.Queue(maxsize=frame_buffer_count)
+    pose_queue = multiprocessing.Queue()
+    if combined_frames:
+        pose_queue = multiprocessing.Queue(maxsize=pose_buffer_count)
+    result_queue = multiprocessing.Queue()
+
+    frame_buffers = {}
+    available_frame_buffers = multiprocessing.Queue()
+
+    for i in range(frame_buffer_count):
+        buf_name = f"frame_{i}"
+        shm = shared_memory.SharedMemory(name=buf_name, create=True, size=frame_bytes)
+        frame_buffers[buf_name] = shm
+        available_frame_buffers.put(buf_name)
+
+    pose_buffers = {}
+    available_pose_buffers = {}
+
+    if combined_frames:
+        available_pose_buffers = multiprocessing.Queue()
+        for i in range(pose_buffer_count):
+            buf_name = f"pose_buffer_{i}"
+            shm = shared_memory.SharedMemory(name=buf_name, create=True, size=frame_bytes * num_sources)
+            pose_buffers[buf_name] = shm
+            available_pose_buffers.put(buf_name)
 
     # Prepare per-source counters
     source_outputs = {}
@@ -968,65 +1010,94 @@ def rtm_estimator(config_dict):
             webcam_ready[s['id']] = False
 
         ms = MediaSource(
-            source=s,
-            frame_queue=frame_queue,
-            shared_buffers=shared_buffers,
-            shared_counts=shared_counts,
-            frame_size=(fw, fh),
-            active_sources=active_sources,
-            command_queue=command_queues[s['id']],
-            vid_img_extension=vid_img_extension,
-            frame_ranges=frame_range,
-            webcam_ready=webcam_ready,
-            source_ended=source_ended,
-            orientation=orientation
+            source = s,
+            frame_queue = frame_queue,
+            frame_buffers = frame_buffers,
+            shared_counts = shared_counts,
+            frame_size = (fw, fh),
+            active_sources = active_sources,
+            command_queue = command_queues[s['id']],
+            vid_img_extension = vid_img_extension,
+            frame_ranges = frame_range,
+            webcam_ready = webcam_ready,
+            source_ended = source_ended,
+            orientation = orientation
         )
         ms.start()
         media_sources.append(ms)
 
+    result_processor = ResultQueueProcessor(
+        result_queue = result_queue,
+        sources = sources,
+        frame_buffers = frame_buffers, 
+        pose_buffers = pose_buffers,
+        available_frame_buffers = available_frame_buffers,
+        available_pose_buffers = available_pose_buffers,
+        vid_img_extension= vid_img_extension,
+        source_outputs = source_outputs,
+        shared_counts = shared_counts,
+        save_images = save_images,
+        save_video = save_video,
+        frame_size = (fw, fh),
+        frame_rate = frame_rate,
+        orientation = orientation,
+        combined_frames = combined_frames,
+        multi_person = multi_person,
+        output_format = output_format,
+        display_detection= display_detection
+    )
+    result_processor.start()
+
     # Decide how many workers to start
     cpu_count = multiprocessing.cpu_count()
 
-    # Real-time display
-    display_queue = None
-    sync_process = None
-    if display_detection or vid_img_extension == 'webcam' or save_video:
-        display_queue = multiprocessing.Queue()
-        sync_process = FrameSynchronizer(
-            sources=sources,
-            display_queue=display_queue,
-            vid_img_extension=vid_img_extension,
-            save_video=save_video,
-            source_outputs=source_outputs,
-            frame_width=fw,
-            frame_height=fh,
-            fps=frame_rate,
-            orientation=orientation
+    if combined_frames:
+        frame_processor = FrameQueueProcessor(
+            frame_queue = frame_queue,
+            pose_queue = pose_queue,
+            sources = sources,
+            frame_buffers = frame_buffers,
+            pose_buffers = pose_buffers,
+            available_frame_buffers = available_frame_buffers, 
+            available_pose_buffers = available_pose_buffers,
+            vid_img_extension = vid_img_extension,
+            source_outputs = source_outputs,
+            shared_counts = shared_counts,
+            save_images = save_images, 
+            save_video = save_video, 
+            frame_size = (fw, fh), 
+            frame_rate = frame_rate,
+            orientation = orientation,
+            combined_frames = combined_frames,
+            multi_person = multi_person, 
+            output_format = output_format, 
+            display_detection = display_detection
         )
-        sync_process.start()
-        initial_workers = max(1, cpu_count - len(sources) - 2)
+        frame_processor.start()
+
+        initial_workers = max(1, cpu_count - len(sources) - 3)
     else:
-        initial_workers = max(1, cpu_count - len(sources) - 1)
+        initial_workers = max(1, cpu_count - len(sources) - 2)
+
+    if not multi_workers:
+        initial_workers = 1
 
     logging.info(f"Starting {initial_workers} workers.")
 
     def spawn_new_worker():
-        w = PoseEstimatorWorker(
-            frame_queue=frame_queue,
-            available_buffers=available_buffers,
-            shared_buffers=shared_buffers,
+        worker = PoseEstimatorWorker(
+            queue=pose_queue if combined_frames else frame_queue,
+            result_queue=result_queue,
             shared_counts=shared_counts,
             pose_tracker_settings=pose_tracker_settings,
-            source_outputs=source_outputs,
+            buffers=pose_buffers if combined_frames else frame_buffers,
+            available_buffers=available_pose_buffers if combined_frames else available_frame_buffers,
             active_sources=active_sources,
-            multi_person=config_dict['project'].get('multi_person', False),
-            display_queue=display_queue,
-            output_format=config_dict['project'].get('output_format', 'openpose'),
-            save_images=save_images,
-            vid_img_extension=vid_img_extension
+            combined_frames=combined_frames
         )
-        w.start()
-        return w
+        worker.start()
+        return worker
+
 
     workers = [spawn_new_worker() for _ in range(initial_workers)]
 
@@ -1034,11 +1105,11 @@ def rtm_estimator(config_dict):
     capture_coordinator = CaptureCoordinator(
         sources=sources,
         command_queues=command_queues,
-        available_buffers=available_buffers,
+        available_frame_buffers=available_frame_buffers,
         shared_counts=shared_counts,
         source_ended=source_ended,
         webcam_ready=webcam_ready,
-        frame_limit=frame_rate if vid_img_extension == 'webcam' else 0,
+        frame_rate=frame_rate if vid_img_extension == 'webcam' else 0,
         mode=capture_mode
     )
     capture_coordinator.start()
@@ -1077,23 +1148,34 @@ def rtm_estimator(config_dict):
 
         bar_pos += 1
 
-    buffer_bar = tqdm(
-        total=n_buffers,
-        desc='Buffers Free',
+    frame_buffer_bar = tqdm(
+        total=frame_buffer_count,
+        desc='Frame Buffers Free',
         position=bar_pos,
         leave=True,
         colour='blue'
     )
     bar_pos += 1
 
-    worker_bar = tqdm(
-        total=len(workers),
-        desc='Active Workers',
-        position=bar_pos,
-        leave=True,
-        colour='blue'
-    )
-    bar_pos += 1
+    if combined_frames:
+        pose_buffer_bar = tqdm(
+            total=pose_buffer_count,
+            desc='Pose Buffers Free',
+            position=bar_pos,
+            leave=True,
+            colour='blue'
+        )
+        bar_pos += 1
+
+    if multi_workers:
+        worker_bar = tqdm(
+            total=len(workers),
+            desc='Active Workers',
+            position=bar_pos,
+            leave=True,
+            colour='blue'
+        )
+        bar_pos += 1
 
     previous_ended_count = 0
     try:
@@ -1140,36 +1222,42 @@ def rtm_estimator(config_dict):
                         pb.set_description_str(f"\033[31mSource {sid} (Ended)\033[0m")
                         pb.refresh()
 
-            buffer_bar.n = available_buffers.qsize()
-            buffer_bar.refresh()
+            frame_buffer_bar.n = available_frame_buffers.qsize()
+            frame_buffer_bar.refresh()
 
-            alive_workers = sum(w.is_alive() for w in workers)
-            worker_bar.n = alive_workers
-            worker_bar.refresh()
+            if combined_frames:
+                pose_buffer_bar.n = available_pose_buffers.qsize()
+                pose_buffer_bar.refresh()
 
             # Check if user closed the display
-            if sync_process and sync_process.stopped:
+            if result_processor and result_processor.stopped:
                 logging.info("\nUser closed display. Stopping all streams.")
                 capture_coordinator.stop()
                 for ms_proc in media_sources:
-                    ms_proc.stop_source()
+                    ms_proc.stop()
                 break
 
-            # Possibly spawn new worker(s) if new sources ended
-            current_ended_count = sum(1 for s in sources if source_ended[s['id']])
-            ended_delta = current_ended_count - previous_ended_count
-            if ended_delta > 0:
-                for _ in range(ended_delta):
-                    logging.info("Spawning a new PoseEstimatorWorker.")
-                    new_w = spawn_new_worker()
-                    workers.append(new_w)
-                    worker_bar.total = len(workers)
-                previous_ended_count = current_ended_count
+            alive_workers = sum(w.is_alive() for w in workers)
+
+            if multi_workers:
+                worker_bar.n = alive_workers
+                worker_bar.refresh()
+
+                # Possibly spawn new worker(s) if new sources ended
+                current_ended_count = sum(1 for s in sources if source_ended[s['id']])
+                ended_delta = current_ended_count - previous_ended_count
+                if ended_delta > 0:
+                    for _ in range(ended_delta):
+                        logging.info("Spawning a new PoseEstimatorWorker.")
+                        new_w = spawn_new_worker()
+                        workers.append(new_w)
+                        worker_bar.total = len(workers)
+                    previous_ended_count = current_ended_count
 
             # If all sources ended, queue empty, and no alive workers => done
             all_ended = all(source_ended[s['id']] for s in sources)
-            if all_ended and frame_queue.empty() and alive_workers == 0:
-                logging.info("All sources ended, queue empty, and workers finished. Exiting loop.")
+            if all_ended and frame_queue.empty() and pose_queue.empty() and alive_workers == 0:
+                logging.info("All sources ended, queues empty, and worker finished. Exiting loop.")
                 break
 
             time.sleep(0.05)
@@ -1178,22 +1266,23 @@ def rtm_estimator(config_dict):
         logging.info("User interrupted pose estimation.")
         capture_coordinator.stop()
         for ms_proc in media_sources:
-            ms_proc.stop_source()
+            ms_proc.stop()
 
     finally:
         # Stop capture coordinator
         capture_coordinator.stop()
-        capture_coordinator.join(timeout=2)
+        capture_coordinator.join()
         if capture_coordinator.is_alive():
             capture_coordinator.terminate()
 
         # Stop media sources
         for s in sources:
             command_queues[s['id']].put(None)
-        for rp in media_sources:
-            rp.join(timeout=2)
-            if rp.is_alive():
-                rp.terminate()
+
+        for ms in media_sources:
+            ms.join(timeout=2)
+            if ms.is_alive():
+                ms.terminate()
 
         # Stop workers
         for w in workers:
@@ -1203,25 +1292,38 @@ def rtm_estimator(config_dict):
                 w.terminate()
 
         # Free shared memory
-        for shm in shared_buffers.values():
+        for shm in frame_buffers.values():
+            shm.close()
+            shm.unlink()
+        for shm in pose_buffers.values():
             shm.close()
             shm.unlink()
 
-        # Stop sync display
-        if sync_process:
-            sync_process.stop()
-            sync_process.join(timeout=2)
-            if sync_process.is_alive():
-                sync_process.terminate()
+        if combined_frames:
+            frame_processor.stop()
+            frame_processor.join(timeout=2)
+            if frame_processor.is_alive():
+                frame_processor.terminate()
+
+        result_processor.stop()
+        result_processor.join(timeout=2)
+        if result_processor.is_alive():
+            result_processor.terminate()
 
         # Final bar updates
-        buffer_bar.n = available_buffers.qsize()
-        buffer_bar.refresh()
+        frame_buffer_bar.n = available_frame_buffers.qsize()
+        frame_buffer_bar.refresh()
+        if combined_frames:
+            pose_buffer_bar.n = available_pose_buffers.qsize()
+            pose_buffer_bar.refresh()
 
         for sid, pb in progress_bars.items():
             pb.close()
-        buffer_bar.close()
-        worker_bar.close()
+        frame_buffer_bar.close()
+        if combined_frames:
+            pose_buffer_bar.close()
+        if multi_workers:
+            worker_bar.close()
 
         logging.info("Pose estimation done. Exiting now.")
         logging.shutdown()
@@ -1245,12 +1347,12 @@ def create_output_folders(source_path, output_dir, save_images):
         output_dir_name = os.path.basename(os.path.splitext(str(source_path))[0])
 
     os.makedirs(output_dir, exist_ok=True)
-    img_output_dir = os.path.join(output_dir, f"{output_dir_name}_img")
     json_output_dir = os.path.join(output_dir, f"{output_dir_name}_json")
+    os.makedirs(json_output_dir, exist_ok=True)
 
     if save_images:
+        img_output_dir = os.path.join(output_dir, f"{output_dir_name}_img")
         os.makedirs(img_output_dir, exist_ok=True)
-    os.makedirs(json_output_dir, exist_ok=True)
 
     output_video_path = os.path.join(output_dir, f"{output_dir_name}_pose.avi")
     return output_dir_name, img_output_dir, json_output_dir, output_video_path

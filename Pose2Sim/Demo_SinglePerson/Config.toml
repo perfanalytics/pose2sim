@@ -35,11 +35,12 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 [pose]
 orientation = 'landscape' #'landscape' or 'portrait'
-vid_img_extension = 'webcam' # any video or image extension or 'webcam'
-webcam_ids = [0, 1, 2, 3] # your webcam id 0, or [0, 1, ...] (0 is default)
+vid_img_extension = 'mp4' # any video or image extension or 'webcam'
+webcam_ids = 0 # your webcam id 0, or [0, 1, ...] (0 is default)
 
 input_size = [] # [W, H]. Lower resolution will be faster but less precise.
 capture_mode = 'continuous' #'continuous' or 'alternating'
+combined_frames = true
 
 pose_model = 'Body_with_feet'  #With RTMLib: 
                          # - Body_with_feet (default HALPE_26 model), 
