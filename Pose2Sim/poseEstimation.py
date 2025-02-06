@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+
 '''
 ###########################################################################
 ## POSE ESTIMATION                                                       ##
@@ -50,9 +51,10 @@ from pathlib import Path
 from functools import partial
 from multiprocessing import shared_memory
 from tqdm import tqdm
-from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
+from anytree.importer import DictImporter
 
-from Pose2Sim.common import natural_sort_key, sort_people_sports2d
+from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
+from Pose2Sim.common import natural_sort_key, sort_people_sports2d, colors, thickness, draw_bounding_box, draw_keypts, draw_skel
 from Pose2Sim.skeletons import *
 
 
@@ -76,11 +78,13 @@ def get_formatted_timestamp():
 
 def safe_resize(frame, target_w, target_h):
     h, w = frame.shape[:2]
-    if w <= target_w and h <= target_h:
+    if w == target_w and h == target_h:
         return frame
-    ratio = min(target_w / float(w), target_h / float(h))
-    new_w, new_h = int(w * ratio), int(h * ratio)
-    return cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    if w < target_w or h < target_h:
+        return cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+    else:
+        return cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
+
 
 
 def init_pose_tracker(pose_tracker_settings):
@@ -100,7 +104,7 @@ def init_pose_tracker(pose_tracker_settings):
     - pose_tracker: PoseTracker. The initialized pose tracker object    
     '''
 
-    ModelClass, det_frequency, mode, tracking, backend, device = pose_tracker_settings
+    ModelClass, det_frequency, mode, tracking, backend, device, *others = pose_tracker_settings
     pose_tracker = PoseTracker(
         ModelClass,
         det_frequency=det_frequency,
@@ -210,26 +214,22 @@ class PoseEstimatorWorker(multiprocessing.Process):
                 self.stop()
                 break
 
-            item = self.queue.get(timeout=0.1)
-            if item:
+            try:
+                item = self.queue.get_nowait()
                 self.process_frame(item)
+            except queue.Empty:
+                time.sleep(0.005)
 
     def process_frame(self, item):
         # Unpack frame info
         buffer_name, idx, frame_shape, frame_dtype, *others = item
-    
         # Convert shared memory to numpy
         frame = np.ndarray(frame_shape, dtype=frame_dtype, buffer=self.buffers[buffer_name].buf)
         
-        if not others[1]:
-            keypoints, scores = self.pose_tracker(frame)
-            result = (buffer_name, idx, frame_shape, frame_dtype, None, others[1], keypoints, scores, others[0]) if self.combined_frames else (buffer_name, idx, frame_shape, frame_dtype, others[0], others[1], keypoints, scores)
-            self.result_queue.put(result)
-        else:
-            self.result_queue.put((buffer_name, idx, frame_shape, frame_dtype, others[0], others[1], None, None))
-        
-        # Return buffer
-        self.available_buffers.put(buffer_name)
+        keypoints, scores = self.pose_tracker(frame) if not others[1] else (None, None)
+
+        result = (buffer_name, idx, frame_shape, frame_dtype, others[0], others[1], keypoints, scores)
+        self.result_queue.put(result)
 
     def stop(self):
         self.stopped = True
@@ -301,29 +301,27 @@ class BaseSynchronizer:
             self.stop()
 
     def get_frames_list(self):
-        frames_list = []
-        for source in self.sources:
-            sid = source['id']
-            if sid in self.sync_data:
-                buffer_name, frame_shape, frame_dtype, keypoints, scores = self.sync_data.pop(sid)
-                frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype), buffer=self.frame_buffers[buffer_name].buf)
-                orig_w, orig_h = frame_shape[1], frame_shape[0]
+        if not self.sync_data:
+            return None
 
-                is_placeholder = self.placeholder_map.pop(sid, False)
-                if is_placeholder:
-                    frame = safe_resize(frame, self.frame_size[0], self.frame_size[1])
-                    cv2.putText(frame, "Not connected", (50, 50),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 2)
-
-                frames_list.append((frame, sid, orig_w, orig_h, keypoints, scores))
-                self.available_frame_buffers.put(buffer_name)
-            else:
-                frame = np.zeros((self.frame_size[1], self.frame_size[0], 3), dtype=np.uint8)
-                cv2.putText(frame, "No frames yet", (50, 50),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
-                orig_w, orig_h = self.frame_size[0], self.frame_size[1]
-                frames_list.append((frame, sid, orig_w, orig_h, None, None))
-        return frames_list
+        for idx in sorted(self.sync_data.keys()):
+            group = self.sync_data[idx]
+            if len(group) == len(self.sources):
+                complete_group = self.sync_data.pop(idx)
+                frames_list = []
+                for source in self.sources:
+                    sid = source['id']
+                    buffer_name, frame_shape, frame_dtype, keypoints, scores, is_placeholder = complete_group[sid]
+                    frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype), buffer=self.frame_buffers[buffer_name].buf).copy()
+                    self.available_frame_buffers.put(buffer_name)
+                    orig_w, orig_h = frame_shape[1], frame_shape[0]
+                    if is_placeholder:
+                        frame = safe_resize(frame, self.frame_size[0], self.frame_size[1])
+                        cv2.putText(frame, "Not connected", (50, 50),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 2)
+                    frames_list.append((frame, sid, orig_w, orig_h, keypoints, scores))
+                return frames_list
+        return None
 
     def build_mosaic(self, frames_list):
         target_w, target_h = self.frame_size
@@ -342,7 +340,7 @@ class BaseSynchronizer:
                 if idx >= n:
                     break
                 frame, *others = frames_list[idx]
-                frame_resized = cv2.resize(frame, (target_w, target_h))
+                frame_resized = safe_resize(frame, target_w, target_h)
                 x_off = c * target_w
                 y_off = r * target_h
                 mosaic[y_off:y_off+target_h, x_off:x_off+target_w] = frame_resized
@@ -359,9 +357,10 @@ class BaseSynchronizer:
         return mosaic, subinfo
 
     def read_mosaic(self, mosaic_np, subinfo, keypoints, scores):
-        annotated_frames = {}
+        frames = {}
         recovered_keypoints = {}
         recovered_scores = {}
+
         for s in self.sources:
             sid = s['id']
             if sid not in subinfo:
@@ -375,23 +374,32 @@ class BaseSynchronizer:
             orig_h = info["orig_h"]
 
             frame_region = mosaic_np[y_off:y_off+sc_h, x_off:x_off+sc_w].copy()
-            annotated_frames[sid] = frame_region
+            frames[sid] = frame_region
 
             rec_kpts = []
             rec_scores = []
             for p in range(len(keypoints)):
-                kp_person = []
-                sc_person = []
-                for (xk, yk), scv in zip(keypoints[p], scores[p]):
-                    x_local = (xk - x_off) * (orig_w / float(sc_w))
-                    y_local = (yk - y_off) * (orig_h / float(sc_h))
-                    kp_person.append([x_local, y_local])
-                    sc_person.append(scv)
-                rec_kpts.append(np.array(kp_person))
-                rec_scores.append(np.array(sc_person))
+                kp_person = keypoints[p]
+                sc_person = scores[p]
+
+                center_x = np.mean([x for (x, y) in kp_person])
+                center_y = np.mean([y for (x, y) in kp_person])
+
+                if x_off <= center_x <= x_off + sc_w and y_off <= center_y <= y_off + sc_h:
+                    local_kpts = []
+                    local_scores = []
+                    
+                    for (xk, yk), scv in zip(kp_person, sc_person):
+                        x_local = (xk - x_off) * (orig_w / float(sc_w))
+                        y_local = (yk - y_off) * (orig_h / float(sc_h))
+                        local_kpts.append([x_local, y_local])
+                        local_scores.append(scv)
+                    rec_kpts.append(np.array(local_kpts))
+                    rec_scores.append(np.array(local_scores))
             recovered_keypoints[sid] = rec_kpts
             recovered_scores[sid] = rec_scores
-        return annotated_frames, recovered_keypoints, recovered_scores
+
+        return frames, recovered_keypoints, recovered_scores
 
     def stop(self):
         self.stopped = True
@@ -408,9 +416,10 @@ class FrameQueueProcessor(multiprocessing.Process, BaseSynchronizer):
         while not self.stopped:
             try:
                 buffer_name, idx, frame_shape, frame_dtype, sid, is_placeholder = self.frame_queue.get_nowait()
-                self.sync_data[sid] = (buffer_name, frame_shape, frame_dtype, None, None)
-                self.placeholder_map[sid] = is_placeholder
-
+                if idx not in self.sync_data:
+                    self.sync_data[idx] = {}
+                self.sync_data[idx][sid] = (buffer_name, frame_shape, frame_dtype, None, None, is_placeholder)
+                
                 if frames_list := self.get_frames_list():
                     mosaic, subinfo = self.build_mosaic(frames_list)
                     pose_buf_name = self.available_pose_buffers.get_nowait()
@@ -425,6 +434,7 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
         multiprocessing.Process.__init__(self)
         BaseSynchronizer.__init__(self, **kwargs)
         self.result_queue = result_queue
+        self.prev_keypoints = {}
 
     def run(self):
         self.init_video_writers()
@@ -441,57 +451,81 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
         cv2.destroyAllWindows()
 
     def process_result_item(self, result_item):
-        buffer_name, idx, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, *others = result_item
+        buffer_name, idx, frame_shape, frame_dtype, info, is_placeholder, keypoints, scores = result_item
         if self.combined_frames:
-            shm = self.pose_buffers[buffer_name]
-            mosaic_np = np.ndarray(frame_shape, dtype=frame_dtype, buffer=shm.buf)
-            self.handle_combined_frames(mosaic_np, keypoints, scores, others, idx)
+            self.handle_combined_frames(buffer_name, frame_shape, frame_dtype, keypoints, scores, info, idx)
         else:
-            self.handle_individual_frames(buffer_name, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, idx)
+            self.handle_individual_frames(buffer_name, frame_shape, frame_dtype, info, is_placeholder, keypoints, scores, idx)
 
-    def handle_combined_frames(self, mosaic_np, keypoints, scores, subinfo, idx):
+    def handle_combined_frames(self, buffer_name, frame_shape, frame_dtype, keypoints, scores, subinfo, idx):
+        shm = self.pose_buffers[buffer_name]
+        frame = np.ndarray(frame_shape, dtype=frame_dtype, buffer=shm.buf)
+
         if self.save_images or self.save_video or self.display_detection:
-            mosaic_np = draw_skeleton(mosaic_np, keypoints, scores, kpt_thr=0.1)
+            frame = draw_skeleton(frame, keypoints, scores, kpt_thr=0.1)
             if self.display_detection:
                 desired_w, desired_h = 1280, 720
-                display_frame = cv2.resize(mosaic_np, (desired_w, desired_h))
+                display_frame = safe_resize(frame, desired_w, desired_h)
                 self.show_mosaic(display_frame)
-        frame, recovered_keypoints, recovered_scores = self.read_mosaic(mosaic_np, subinfo, keypoints, scores)
-        for (sid, frame, keypoints, scores) in (frame, recovered_keypoints, recovered_scores):
-            self.handle_output(sid, frame, keypoints, scores, idx)
+        frame, recovered_keypoints, recovered_scores = self.read_mosaic(frame, subinfo, keypoints, scores)
+
+        for sid in frame:
+            self.handle_output(sid, frame[sid], recovered_keypoints[sid], recovered_scores[sid], idx)
+        self.available_pose_buffers.put(buffer_name)
 
     def handle_individual_frames(self, buffer_name, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, idx):
-        self.sync_data[sid] = (buffer_name, frame_shape, frame_dtype, keypoints, scores)
-        self.placeholder_map[sid] = is_placeholder
+        if idx not in self.sync_data:
+            self.sync_data[idx] = {}
+        self.sync_data[idx][sid] = (buffer_name, frame_shape, frame_dtype, keypoints, scores, is_placeholder)
         frames_list = self.get_frames_list()
         if frames_list:
             self.process_frames(frames_list, idx)
 
     def process_frames(self, frames_list, idx):
         annotated_frames = []
-        for (sid, frame, orig_w, orig_h, *others) in frames_list:
+        for (frame, sid, orig_w, orig_h, *others) in frames_list:
             if others[0] is not None:
+                # Draw skeleton on the frame
                 if self.save_images or self.save_video or self.display_detection:
-                    frame = draw_skeleton(frame, others[0], others[1], kpt_thr=0.1)
+                    # try:
+                    #     # MMPose skeleton
+                    #     frame = draw_skeleton(frame, others[0], others[1], kpt_thr=0.1) # maybe change this value if 0.1 is too low
+                    # except:
+                        # Sports2D skeleton
+                        valid_X, valid_Y, valid_scores = [], [], []
+                        for person_keypoints, person_scores in zip(others[0], others[1]):
+                            person_X, person_Y = person_keypoints[:, 0], person_keypoints[:, 1]
+                            valid_X.append(person_X)
+                            valid_Y.append(person_Y)
+                            valid_scores.append(person_scores)
+                        if self.multi_person: frame = draw_bounding_box(frame, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
+                        frame = draw_keypts(frame, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
+                        frame = draw_skel(frame, valid_X, valid_Y, self.pose_model)
                 annotated_frames.append((frame, sid, orig_w, orig_h))
                 self.handle_output(sid, frame, others[0], others[1], idx)
             
         if self.display_detection:
             mosaic, _ = self.build_mosaic(annotated_frames)
             desired_w, desired_h = 1280, 720
-            mosaic = cv2.resize(mosaic, (desired_w, desired_h))
+            mosaic = safe_resize(mosaic, desired_w, desired_h)
             self.show_mosaic(mosaic)
 
     def handle_output(self, sid, frame, keypoints, scores, idx):
         out_dirs = self.source_outputs[sid]
         file_name = f"{out_dirs[0]}_{idx}"
+
+        # Tracking people IDs across frames
+        if self.multi_person:
+            if sid not in self.prev_keypoints:
+                self.prev_keypoints[sid] = keypoints
+            self.prev_keypoints[sid], keypoints, scores = sort_people_sports2d(self.prev_keypoints[sid], keypoints, scores=scores)
+
+        # Save to json
         if 'openpose' in self.output_format:
-            json_file_name = f"{file_name}.json"
-            json_path = os.path.join(out_dirs[2], json_file_name)
+            json_path = os.path.join(out_dirs[2], f"{file_name}.json")
             save_keypoints_to_openpose(json_path, keypoints, scores)
         if self.save_images:
-            img_file_name = f"{file_name}.jpg"
-            cv2.imwrite(os.path.join(out_dirs[1], img_file_name), frame)
+            cv2.imwrite(os.path.join(out_dirs[1], f"{file_name}.jpg"), frame)
         if self.save_video:
             frm_resized = safe_resize(frame, self.frame_size[0], self.frame_size[1])
             if sid in self.video_writers:
@@ -949,13 +983,13 @@ def rtm_estimator(config_dict):
 
         logging.info(f"Allocating {frame_buffer_count} buffers.")
     else:
-        pose_buffer_count = math.ceil(n_buffers_total / (num_sources + 1))
-
-        logging.info(f"Allocating {pose_buffer_count} pose buffers.")
-
-        frame_buffer_count = n_buffers_total - pose_buffer_count
+        frame_buffer_count = num_sources * 3
 
         logging.info(f"Allocating {frame_buffer_count} frame buffers.")
+
+        pose_buffer_count = n_buffers_total - frame_buffer_count
+
+        logging.info(f"Allocating {pose_buffer_count} pose buffers.")
 
     frame_queue = multiprocessing.Queue(maxsize=frame_buffer_count)
     pose_queue = multiprocessing.Queue()
@@ -1044,7 +1078,8 @@ def rtm_estimator(config_dict):
         combined_frames = combined_frames,
         multi_person = multi_person,
         output_format = output_format,
-        display_detection= display_detection
+        display_detection= display_detection,
+        pose_model=pose_tracker_settings[-1]
     )
     result_processor.start()
 
@@ -1071,7 +1106,8 @@ def rtm_estimator(config_dict):
             combined_frames = combined_frames,
             multi_person = multi_person, 
             output_format = output_format, 
-            display_detection = display_detection
+            display_detection = display_detection,
+            pose_model=pose_tracker_settings[-1]
         )
         frame_processor.start()
 
@@ -1395,7 +1431,12 @@ def determine_tracker_settings(config_dict):
     try:
         pose_model = eval(model_name)
     except:
-        raise ValueError(f"Pose model '{model_name}' not supported yet.")
+        try: # from Config.toml
+            pose_model = DictImporter().import_(config_dict.get('pose').get(pose_model))
+            if pose_model.id == 'None':
+                pose_model.id = None
+        except:
+            raise NameError(f'{pose_model} not found in skeletons.py nor in Config.toml')
 
     # Select device and backend
     backend, device = init_backend_device(backend=backend, device=device)
@@ -1405,8 +1446,8 @@ def determine_tracker_settings(config_dict):
         try:
             try:
                 mode = ast.literal_eval(mode)
-            except:  # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
-                mode = mode.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/', ':/').replace('":"\\', ':\\')
+            except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+                mode = mode.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/',':/').replace('":"\\',':\\')
                 mode = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', mode) # changes "[640", "640]" to [640,640]
                 mode = json.loads(mode)
             det_class = mode.get('det_class')
@@ -1429,7 +1470,7 @@ def determine_tracker_settings(config_dict):
     logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
     logging.info(f'Mode: {mode}.')
 
-    return (ModelClass, det_frequency, mode, False, backend, device)
+    return (ModelClass, det_frequency, mode, False, backend, device, pose_model)
 
 
 def find_largest_frame_size(sources, vid_img_extension):
