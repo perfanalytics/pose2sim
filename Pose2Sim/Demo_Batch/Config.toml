@@ -34,12 +34,15 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 
 [pose]
-orientation = 'landscape' #'landscape' or 'portrait'
-vid_img_extension = 'mp4' # any video or image extension or 'webcam'
-webcam_ids = 0 # your webcam id 0, or [0, 1, ...] (0 is default)
+rotation = 0 # Degree of rotation applied to the image, allowed in multiples of 90. Use [90, 90, ...] for different angles per source.
+vid_img_extension = 'mp4' # File extension for videos or images, or 'webcam' for webcam input.
+webcam_ids = 0 # Webcam ID to use. Default is 0. For multiple webcams, use a list like [0, 1, ...].
 
-input_size = [] # [W, H]. Lower resolution will be faster but less precise.
-capture_mode = 'continuous' #'continuous' or 'alternating'
+input_size = [] # Input resolution as [Width, Height]. Lower resolutions are faster but less precise.
+
+capture_mode = 'continuous' # 'Continuous' captures frames as soon as buffer space is available; 'alternating' waits until the buffer is free.
+combined_frames = true # Accelerates process by batch processing frames.  (Beta feature)
+multi_workers = false # Enables multiple worker processes for parallel frame analysis. (Not recommended)
 
 pose_model = 'Body_with_feet'  #With RTMLib: 
                          # - Body_with_feet (default HALPE_26 model), 

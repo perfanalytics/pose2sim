@@ -76,16 +76,12 @@ def get_formatted_timestamp():
     return dt.strftime("%Y%m%d_%H%M%S_") + f"{ms:03d}"
 
 
-def safe_resize(frame, target_w, target_h):
+def safe_resize(frame, desired_w, desired_h):
     h, w = frame.shape[:2]
-    if w == target_w and h == target_h:
-        return frame
-    if w < target_w or h < target_h:
-        return cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
-    else:
-        return cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
-
-
+    scale = min(desired_w / w, desired_h / h)
+    if scale != 0:
+        frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+    return frame
 
 def init_pose_tracker(pose_tracker_settings):
     '''
@@ -279,27 +275,6 @@ class BaseSynchronizer:
         self.video_writers = {}
         self.stopped = False
 
-    def init_video_writers(self):
-        if self.save_video and self.source_outputs:
-            for s in self.sources:
-                sid = s['id']
-                out_dirs = self.source_outputs[sid]
-                output_video_path = out_dirs[-1]
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                self.video_writers[sid] = cv2.VideoWriter(
-                    output_video_path,
-                    fourcc,
-                    self.frame_rate,
-                    (self.frame_size[0], self.frame_size[1])
-                )
-
-    def show_mosaic(self, mosaic):
-        cv2.imshow("Display", mosaic)
-        key = cv2.waitKey(1)
-        if key in [ord('q'), 27]:
-            logging.info("User closed display.")
-            self.stop()
-
     def get_frames_list(self):
         if not self.sync_data:
             return None
@@ -316,7 +291,6 @@ class BaseSynchronizer:
                     self.available_frame_buffers.put(buffer_name)
                     orig_w, orig_h = frame_shape[1], frame_shape[0]
                     if is_placeholder:
-                        frame = safe_resize(frame, self.frame_size[0], self.frame_size[1])
                         cv2.putText(frame, "Not connected", (50, 50),
                                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 2)
                     frames_list.append((frame, sid, orig_w, orig_h, keypoints, scores))
@@ -340,10 +314,9 @@ class BaseSynchronizer:
                 if idx >= n:
                     break
                 frame, *others = frames_list[idx]
-                frame_resized = safe_resize(frame, target_w, target_h)
                 x_off = c * target_w
                 y_off = r * target_h
-                mosaic[y_off:y_off+target_h, x_off:x_off+target_w] = frame_resized
+                mosaic[y_off:y_off+target_h, x_off:x_off+target_w] = frame
                 if others is not None:
                     subinfo[others[0]] = {
                         "x_offset": x_off,
@@ -450,6 +423,20 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
             vw.release()
         cv2.destroyAllWindows()
 
+    def init_video_writers(self):
+        if self.save_video and self.source_outputs:
+            for s in self.sources:
+                sid = s['id']
+                out_dirs = self.source_outputs[sid]
+                output_video_path = out_dirs[-1]
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                self.video_writers[sid] = cv2.VideoWriter(
+                    output_video_path,
+                    fourcc,
+                    self.frame_rate,
+                    (self.frame_size[0], self.frame_size[1])
+                )
+
     def process_result_item(self, result_item):
         buffer_name, idx, frame_shape, frame_dtype, info, is_placeholder, keypoints, scores = result_item
         if self.combined_frames:
@@ -459,19 +446,18 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
 
     def handle_combined_frames(self, buffer_name, frame_shape, frame_dtype, keypoints, scores, subinfo, idx):
         shm = self.pose_buffers[buffer_name]
-        frame = np.ndarray(frame_shape, dtype=frame_dtype, buffer=shm.buf)
+        mosaic = np.ndarray(frame_shape, dtype=frame_dtype, buffer=shm.buf)
 
         if self.save_images or self.save_video or self.display_detection:
-            frame = draw_skeleton(frame, keypoints, scores, kpt_thr=0.1)
+            mosaic = draw_skeleton(mosaic, keypoints, scores)
             if self.display_detection:
-                desired_w, desired_h = 1280, 720
-                display_frame = safe_resize(frame, desired_w, desired_h)
-                self.show_mosaic(display_frame)
-        frame, recovered_keypoints, recovered_scores = self.read_mosaic(frame, subinfo, keypoints, scores)
+                self.show_mosaic(mosaic)
 
-        for sid in frame:
-            self.handle_output(sid, frame[sid], recovered_keypoints[sid], recovered_scores[sid], idx)
+        frames, recovered_keypoints, recovered_scores = self.read_mosaic(mosaic, subinfo, keypoints, scores)
         self.available_pose_buffers.put(buffer_name)
+
+        for sid in frames:
+            self.handle_output(sid, frames[sid], recovered_keypoints[sid], recovered_scores[sid], idx)
 
     def handle_individual_frames(self, buffer_name, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, idx):
         if idx not in self.sync_data:
@@ -479,36 +465,43 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
         self.sync_data[idx][sid] = (buffer_name, frame_shape, frame_dtype, keypoints, scores, is_placeholder)
         frames_list = self.get_frames_list()
         if frames_list:
-            self.process_frames(frames_list, idx)
+            annotated_frames = []
+            for (frame, sid, orig_w, orig_h, *others) in frames_list:
+                if others[0] is not None:
+                    if self.save_images or self.save_video or self.display_detection:
+                        frame = draw_skeleton(frame, others[0], others[1])
+                    annotated_frames.append((frame, sid, orig_w, orig_h))
+                    self.handle_output(sid, frame, others[0], others[1], idx)
+                
+            if self.display_detection:
+                mosaic, _ = self.build_mosaic(annotated_frames)
+                self.show_mosaic(mosaic)
 
-    def process_frames(self, frames_list, idx):
-        annotated_frames = []
-        for (frame, sid, orig_w, orig_h, *others) in frames_list:
-            if others[0] is not None:
-                # Draw skeleton on the frame
-                if self.save_images or self.save_video or self.display_detection:
-                    # try:
-                    #     # MMPose skeleton
-                    #     frame = draw_skeleton(frame, others[0], others[1], kpt_thr=0.1) # maybe change this value if 0.1 is too low
-                    # except:
-                        # Sports2D skeleton
-                        valid_X, valid_Y, valid_scores = [], [], []
-                        for person_keypoints, person_scores in zip(others[0], others[1]):
-                            person_X, person_Y = person_keypoints[:, 0], person_keypoints[:, 1]
-                            valid_X.append(person_X)
-                            valid_Y.append(person_Y)
-                            valid_scores.append(person_scores)
-                        if self.multi_person: frame = draw_bounding_box(frame, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
-                        frame = draw_keypts(frame, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
-                        frame = draw_skel(frame, valid_X, valid_Y, self.pose_model)
-                annotated_frames.append((frame, sid, orig_w, orig_h))
-                self.handle_output(sid, frame, others[0], others[1], idx)
-            
-        if self.display_detection:
-            mosaic, _ = self.build_mosaic(annotated_frames)
-            desired_w, desired_h = 1280, 720
-            mosaic = safe_resize(mosaic, desired_w, desired_h)
-            self.show_mosaic(mosaic)
+    def draw_skeleton(self, frame, keypoints, scores):
+        # try:
+        #     # MMPose skeleton
+        #     frame = draw_skeleton(frame, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+        # except:
+            # Sports2D skeleton
+            valid_X, valid_Y, valid_scores = [], [], []
+            for person_keypoints, person_scores in zip(keypoints, scores):
+                person_X, person_Y = person_keypoints[:, 0], person_keypoints[:, 1]
+                valid_X.append(person_X)
+                valid_Y.append(person_Y)
+                valid_scores.append(person_scores)
+            if self.multi_person: frame = draw_bounding_box(frame, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
+            frame = draw_keypts(frame, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
+            frame = draw_skel(frame, valid_X, valid_Y, self.pose_model)
+            return frame
+
+    def show_mosaic(self, mosaic):          
+        desired_w, desired_h = 1280, 720
+        mosaic = safe_resize(mosaic, desired_w, desired_h)
+        cv2.imshow("Display", mosaic)
+        key = cv2.waitKey(1)
+        if key in [ord('q'), 27]:
+            logging.info("User closed display.")
+            self.stop()
 
     def handle_output(self, sid, frame, keypoints, scores, idx):
         out_dirs = self.source_outputs[sid]
@@ -527,9 +520,9 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
         if self.save_images:
             cv2.imwrite(os.path.join(out_dirs[1], f"{file_name}.jpg"), frame)
         if self.save_video:
-            frm_resized = safe_resize(frame, self.frame_size[0], self.frame_size[1])
+            # frame = safe_resize(frame, self.frame_size[0], self.frame_size[1])
             if sid in self.video_writers:
-                self.video_writers[sid].write(frm_resized)
+                self.video_writers[sid].write(frame)
 
 
 class CaptureCoordinator(multiprocessing.Process):
@@ -1563,7 +1556,7 @@ def find_lowest_fps(sources):
         if s['type'] == 'video':
             cap = cv2.VideoCapture(s['path'])
             if cap.isOpened():
-                fps = cap.get(cv2.CAP_PROP_FPS)
+                fps = round(cap.get(cv2.CAP_PROP_FPS))
                 if fps <= 0 or math.isnan(fps):
                     fps = 30
                 min_fps = min(min_fps, fps)
