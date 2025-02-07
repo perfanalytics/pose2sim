@@ -76,12 +76,40 @@ def get_formatted_timestamp():
     return dt.strftime("%Y%m%d_%H%M%S_") + f"{ms:03d}"
 
 
-def safe_resize(frame, desired_w, desired_h):
-    h, w = frame.shape[:2]
-    scale = min(desired_w / w, desired_h / h)
+def transform(frame, desired_w, desired_h, full, rotation = 0):
+    rotation = rotation % 360
+    if rotation == 90:
+        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+    elif rotation == 180:
+        frame = cv2.rotate(frame, cv2.ROTATE_180)
+    elif rotation == 270:
+        frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+    rotated_h, rotated_w = frame.shape[:2]
+
+    scale = min(desired_w / rotated_w, desired_h / rotated_h)
+    new_w = int(rotated_w * scale)
+    new_h = int(rotated_h * scale)
     if scale != 0:
-        frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-    return frame
+        frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    if full:
+        canvas = np.zeros((desired_h, desired_w, 3), dtype=np.uint8)
+        x_offset = (desired_w - new_w) // 2
+        y_offset = (desired_h - new_h) // 2
+        canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = frame
+        bottom_left_offset_y = desired_h - (y_offset + new_h)
+        transform_info = {
+            'rotation': rotation,
+            'scale': scale,
+            'x_offset': x_offset,
+            'y_offset': bottom_left_offset_y,
+            'rotated_size': (rotated_w, rotated_h),
+            'canvas_size': (desired_w, desired_h)
+        }
+        return canvas, transform_info
+    else:
+        return frame, None
+
 
 def init_pose_tracker(pose_tracker_settings):
     '''
@@ -249,7 +277,8 @@ class BaseSynchronizer:
                  combined_frames,
                  multi_person,
                  output_format,
-                 display_detection):
+                 display_detection,
+                 pose_model):
         self.sources = sources
         self.frame_buffers = frame_buffers
         self.pose_buffers = pose_buffers
@@ -268,6 +297,7 @@ class BaseSynchronizer:
         self.multi_person = multi_person
         self.output_format = output_format
         self.display_detection = display_detection
+        self.pose_model = pose_model
 
         self.sync_data = {}
         self.placeholder_map = {}
@@ -286,14 +316,14 @@ class BaseSynchronizer:
                 frames_list = []
                 for source in self.sources:
                     sid = source['id']
-                    buffer_name, frame_shape, frame_dtype, keypoints, scores, is_placeholder = complete_group[sid]
+                    buffer_name, frame_shape, frame_dtype, keypoints, scores, is_placeholder, transform_info = complete_group[sid]
                     frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype), buffer=self.frame_buffers[buffer_name].buf).copy()
                     self.available_frame_buffers.put(buffer_name)
                     orig_w, orig_h = frame_shape[1], frame_shape[0]
                     if is_placeholder:
                         cv2.putText(frame, "Not connected", (50, 50),
                                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 2)
-                    frames_list.append((frame, sid, orig_w, orig_h, keypoints, scores))
+                    frames_list.append((frame, sid, orig_w, orig_h, transform_info, keypoints, scores))
                 return frames_list
         return None
 
@@ -324,7 +354,8 @@ class BaseSynchronizer:
                         "scaled_w": target_w,
                         "scaled_h": target_h,
                         "orig_w": others[1],
-                        "orig_h": others[2]
+                        "orig_h": others[2],
+                        "transform_info": others[3]
                     }
                 idx += 1
         return mosaic, subinfo
@@ -388,10 +419,10 @@ class FrameQueueProcessor(multiprocessing.Process, BaseSynchronizer):
     def run(self):
         while not self.stopped:
             try:
-                buffer_name, idx, frame_shape, frame_dtype, sid, is_placeholder = self.frame_queue.get_nowait()
+                buffer_name, idx, frame_shape, frame_dtype, sid, is_placeholder, _ = self.frame_queue.get_nowait()
                 if idx not in self.sync_data:
                     self.sync_data[idx] = {}
-                self.sync_data[idx][sid] = (buffer_name, frame_shape, frame_dtype, None, None, is_placeholder)
+                self.sync_data[idx][sid] = (buffer_name, frame_shape, frame_dtype, None, None, is_placeholder, None)
                 
                 if frames_list := self.get_frames_list():
                     mosaic, subinfo = self.build_mosaic(frames_list)
@@ -457,22 +488,23 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
         self.available_pose_buffers.put(buffer_name)
 
         for sid in frames:
-            self.handle_output(sid, frames[sid], recovered_keypoints[sid], recovered_scores[sid], idx)
+            trans_info = subinfo[sid].get("transform_info", None)
+            self.handle_output(sid, frames[sid], recovered_keypoints[sid], recovered_scores[sid], idx, trans_info)
 
     def handle_individual_frames(self, buffer_name, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, idx):
         if idx not in self.sync_data:
             self.sync_data[idx] = {}
-        self.sync_data[idx][sid] = (buffer_name, frame_shape, frame_dtype, keypoints, scores, is_placeholder)
+        self.sync_data[idx][sid] = (buffer_name, frame_shape, frame_dtype, keypoints, scores, is_placeholder, None)
         frames_list = self.get_frames_list()
         if frames_list:
             annotated_frames = []
-            for (frame, sid, orig_w, orig_h, *others) in frames_list:
+            for (frame, sid, orig_w, orig_h, transform_info, *others) in frames_list:
                 if others[0] is not None:
                     if self.save_images or self.save_video or self.display_detection:
                         frame = draw_skeleton(frame, others[0], others[1])
-                    annotated_frames.append((frame, sid, orig_w, orig_h))
-                    self.handle_output(sid, frame, others[0], others[1], idx)
-                
+                    annotated_frames.append((frame, sid, orig_w, orig_h, transform_info))
+                    self.handle_output(sid, frame, others[0], others[1], idx, transform_info)
+
             if self.display_detection:
                 mosaic, _ = self.build_mosaic(annotated_frames)
                 self.show_mosaic(mosaic)
@@ -496,14 +528,14 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
 
     def show_mosaic(self, mosaic):          
         desired_w, desired_h = 1280, 720
-        mosaic = safe_resize(mosaic, desired_w, desired_h)
+        mosaic = transform(mosaic, desired_w, desired_h, False)[0]
         cv2.imshow("Display", mosaic)
         key = cv2.waitKey(1)
         if key in [ord('q'), 27]:
             logging.info("User closed display.")
             self.stop()
 
-    def handle_output(self, sid, frame, keypoints, scores, idx):
+    def handle_output(self, sid, frame, keypoints, scores, idx, transform_info):
         out_dirs = self.source_outputs[sid]
         file_name = f"{out_dirs[0]}_{idx}"
 
@@ -514,6 +546,8 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
             self.prev_keypoints[sid], keypoints, scores = sort_people_sports2d(self.prev_keypoints[sid], keypoints, scores=scores)
 
         # Save to json
+        if transform_info is not None:
+            keypoints = self.inverse_transform_keypoints(keypoints, transform_info)
         if 'openpose' in self.output_format:
             json_path = os.path.join(out_dirs[2], f"{file_name}.json")
             save_keypoints_to_openpose(json_path, keypoints, scores)
@@ -523,6 +557,41 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
             # frame = safe_resize(frame, self.frame_size[0], self.frame_size[1])
             if sid in self.video_writers:
                 self.video_writers[sid].write(frame)
+
+    def inverse_transform_keypoints(keypoints, transform_info):
+        desired_w, desired_h = transform_info['canvas_size']
+        scale = transform_info['scale']
+        x_offset = transform_info['x_offset']
+        y_offset = transform_info['y_offset']
+        rotation = transform_info['rotation']
+        rotated_size = transform_info['rotated_size']
+        new_keypoints = []
+        for person in keypoints:
+            new_person = []
+            for (x, y) in person:
+
+                y_bl = desired_h - y
+                x_bl = desired_w - x
+
+                X = (x_bl - x_offset) / scale
+                Y = (y_bl - y_offset) / scale
+
+                if rotation % 360 == 0:
+                    orig_x, orig_y = X, Y
+                elif rotation % 360 == 90:
+                    orig_x = rotated_size[0] - Y
+                    orig_y = X
+                elif rotation % 360 == 180:
+                    orig_x = rotated_size[0] - X
+                    orig_y = rotated_size[1] - Y
+                elif rotation % 360 == 270:
+                    orig_x = Y
+                    orig_y = rotated_size[1] - X
+                else:
+                    orig_x, orig_y = X, Y
+                new_person.append([orig_x, orig_y])
+            new_keypoints.append(np.array(new_person))
+        return new_keypoints
 
 
 class CaptureCoordinator(multiprocessing.Process):
@@ -650,7 +719,8 @@ class MediaSource(multiprocessing.Process):
         frame_ranges,
         webcam_ready=None,
         source_ended=None,
-        orientation='landscape'
+        orientation='landscape',
+        rotation=0
     ):
         super().__init__()
         self.source = source
@@ -665,6 +735,7 @@ class MediaSource(multiprocessing.Process):
         self.webcam_ready = webcam_ready
         self.source_ended = source_ended
         self.orientation = orientation
+        self.rotation = rotation
 
         self.frame_idx = 0
         self.total_frames = 0
@@ -723,9 +794,9 @@ class MediaSource(multiprocessing.Process):
                         if self.orientation == 'portrait':
                             frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
-                        frame = safe_resize(frame, self.frame_size[0], self.frame_size[1])
+                        frame, transform_info = transform(frame, self.frame_size[0], self.frame_size[1], True, self.rotation)
 
-                        self.send_frame(frame, buffer_name, is_placeholder)
+                        self.send_frame(frame, buffer_name, is_placeholder, transform_info)
 
                     elif cmd[0] == "STOP_CAPTURE":
                         self.stop()
@@ -826,18 +897,19 @@ class MediaSource(multiprocessing.Process):
 
         return None, False
 
-    def send_frame(self, frame, buffer_name, is_placeholder):
+    def send_frame(self, frame, buffer_name, is_placeholder, transform_info):
         shm = self.frame_buffers[buffer_name]
         np_frame = np.ndarray(frame.shape, dtype=frame.dtype, buffer=shm.buf)
         np_frame[:] = frame
 
         item = (
             buffer_name,
-            self.frame_idx if not self.source['type'] == 'webcam' else get_formatted_timestamp(),
+            self.frame_idx if self.source['type'] != 'webcam' else get_formatted_timestamp(),
             frame.shape,
             frame.dtype.str,
             self.source['id'],
-            is_placeholder
+            is_placeholder,
+            transform_info
         )
         self.frame_queue.put(item)
 
@@ -901,6 +973,7 @@ def estimate_pose_all(config_dict):
     multi_workers = config_dict['pose'].get('multi_workers', False)
     multi_person = config_dict['project'].get('multi_person', False)
     output_format = config_dict['project'].get('output_format', 'openpose')
+    rotation = config_dict['pose'].get('rotation', 0)
 
     # Gather sources
     sources = []
@@ -1048,7 +1121,8 @@ def estimate_pose_all(config_dict):
             frame_ranges = frame_range,
             webcam_ready = webcam_ready,
             source_ended = source_ended,
-            orientation = orientation
+            orientation = orientation,
+            rotation = rotation
         )
         ms.start()
         media_sources.append(ms)
@@ -1379,6 +1453,7 @@ def create_output_folders(source_path, output_dir, save_images):
     json_output_dir = os.path.join(output_dir, f"{output_dir_name}_json")
     os.makedirs(json_output_dir, exist_ok=True)
 
+    img_output_dir = None
     if save_images:
         img_output_dir = os.path.join(output_dir, f"{output_dir_name}_img")
         os.makedirs(img_output_dir, exist_ok=True)
