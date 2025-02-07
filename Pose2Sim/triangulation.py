@@ -731,9 +731,7 @@ def triangulate_all(config_dict):
     
     # Check that camera number is consistent between calibration file and pose folders
     if n_cams != len(P):
-        raise Exception(f'Error: The number of cameras is not consistent:\
-                    Found {len(P)} cameras in the calibration file,\
-                    and {n_cams} cameras based on the number of pose folders.')
+        raise Exception(f'Error: The number of cameras is not consistent: Found {len(P)} cameras in the calibration file, and {n_cams} cameras based on the number of pose folders.')
     
     # Triangulation
     if multi_person:

@@ -39,7 +39,7 @@ participant_mass = [70.0, 63.5]     # float (eg 70.0), or list of floats (eg [70
 #                          # - Body_with_feet (default HALPE_26 model), 
 #                          # - Whole_body_wrist (COCO_133: body + feet + 2 hand_points), 
 #                          # - Whole_body (COCO_133: body + feet + hands), 
-#                          # - Body (COCO_17), 
+#                          # - Body (COCO_17). Marker augmentation won't work, Kinematic analysis will work, 
 #                          # - Hand (HAND_21, only lightweight mode. Potentially better results with Whole_body), 
 #                          # - Face (FACE_106), 
 #                          # - Animal (ANIMAL2D_17)
@@ -55,7 +55,8 @@ participant_mass = [70.0, 63.5]     # float (eg 70.0), or list of floats (eg [70
 # mode = 'balanced' # 'lightweight', 'balanced', 'performance', 
 #                   # or """{dictionary}""" (see below)
 # # A dictionary (WITHIN THREE DOUBLE QUOTES) allows you to manually select the person detection (if top_down approach) and/or pose estimation models (see https://github.com/Tau-J/rtmlib). 
-# # Make sure the input_sizes are within triple quotes, and that they are in the opposite order from the one in the model path (for example, it would be [192,256] for rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip). 
+# # Models can be local paths or URLs.
+# # Make sure the input_sizes are within square brackets, and that they are in the opposite order from the one in the model path (for example, it would be [192,256] for rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip). 
 # # If your pose_model is not provided in skeletons.py, you may have to create your own one (see example at the end of the file).
 # # Example, equivalent to mode='balanced':
 # # mode = """{'det_class':'YOLOX',

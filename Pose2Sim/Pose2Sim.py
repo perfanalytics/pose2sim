@@ -208,7 +208,7 @@ def poseEstimation(config=None):
     or the function can be called without an argument, in which case it the config directory is the current one.
     '''
 
-    from Pose2Sim.poseEstimation import rtm_estimator # The name of the function might change
+    from Pose2Sim.poseEstimation import estimate_pose_all # The name of the function might change
 
     level, config_dicts = read_config_files(config)
 
@@ -240,7 +240,7 @@ def poseEstimation(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        rtm_estimator(config_dict)
+        estimate_pose_all(config_dict)
         
         end = time.time()
         elapsed = end - start
@@ -449,7 +449,7 @@ def markerAugmentation(config=None):
     or the function can be called without an argument, in which case it the config directory is the current one.
     '''
 
-    from Pose2Sim.markerAugmentation import augmentTRC
+    from Pose2Sim.markerAugmentation import augment_markers_all
     level, config_dicts = read_config_files(config)
 
     if type(config) == dict:
@@ -478,7 +478,7 @@ def markerAugmentation(config=None):
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
-        augmentTRC(config_dict)
+        augment_markers_all(config_dict)
         
         end = time.time()
         elapsed = end-start

@@ -21,10 +21,12 @@ import c3d
 import sys
 import itertools as it
 import logging
+from anytree import PreOrderIter
 
 import matplotlib as mpl
 mpl.use('qt5agg')
 mpl.rc('figure', max_open_warning=0)
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
@@ -79,6 +81,12 @@ angle_dict = { # lowercase!
     'right hand': [['RIndex', 'RWrist'], 'horizontal', 0, -1],
     'left hand': [['LIndex', 'LWrist'], 'horizontal', 0, -1]
     }
+
+colors = [(255, 0, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255), (0, 0, 0), (255, 255, 255),
+            (125, 0, 0), (0, 125, 0), (0, 0, 125), (125, 125, 0), (125, 0, 125), (0, 125, 125), 
+            (255, 125, 125), (125, 255, 125), (125, 125, 255), (255, 255, 125), (255, 125, 255), (125, 255, 255), (125, 125, 125),
+            (255, 0, 125), (255, 125, 0), (0, 125, 255), (0, 255, 125), (125, 0, 255), (125, 255, 0), (0, 255, 0)]
+thickness = 2
 
 
 ## CLASSES
@@ -404,7 +412,7 @@ def euclidean_distance(q1, q2):
     q2 = np.array(q2)
     dist = q2 - q1
     if np.isnan(dist).all():
-        dist =  np.empty_like(dist)
+        dist = np.empty_like(dist)
         dist[...] = np.inf
     
     if len(dist.shape)==1:
@@ -942,9 +950,11 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords.iloc[:,kpt:kpt+3].diff(), axis=1) for kpt in range(n_markers)], axis=0))
     sum_speeds = sum_speeds[sum_speeds>close_to_zero_speed] # Removing when speeds close to zero (out of frame)
     if len(sum_speeds)==0:
-        raise ValueError('All frames have speed close to zero. Make sure the person is moving and correctly detected, or change close_to_zero_speed to a lower value.')
-    min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
-    Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
+        logging.warning('All frames have speed close to zero. Make sure the person is moving and correctly detected, or change close_to_zero_speed to a lower value. Not restricting the speeds to be above any threshold.')
+        Q_coords_low_speeds = Q_coords
+    else:
+        min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
+        Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
     
     # Only keep frames with hip and knee flexion angles below 45% 
     # (if more than 50 of them, else take 50 smallest values)
@@ -954,7 +964,7 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
         if len(Q_coords_low_speeds_low_angles) < 50:
             Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
     except:
-        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these agles to be below {large_hip_knee_angles}°.")
+        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}°.")
 
     if n_markers_init < n_markers:
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
@@ -987,7 +997,7 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     try:
         rfoot, lfoot = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in feet_pairs]
     except:
-        rfoot, lfoot = 10, 10
+        rfoot, lfoot = 0.10, 0.10
         logging.warning('The Heel marker is missing from your model. Considering Foot to Heel size as 10 cm.')
 
     ankle_to_shoulder_pairs =  [['RAnkle', 'RKnee'], ['RKnee', 'RHip'], ['RHip', 'RShoulder'],
@@ -1017,3 +1027,112 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     height = trimmed_mean(heights, trimmed_extrema_percent=trimmed_extrema_percent)
 
     return height
+
+
+def draw_bounding_box(img, X, Y, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)], fontSize=0.3, thickness=1):
+    '''
+    Draw bounding boxes and person ID around list of lists of X and Y coordinates.
+    Bounding boxes have a different color for each person.
+    
+    INPUTS:
+    - img: opencv image
+    - X: list of list of x coordinates
+    - Y: list of list of y coordinates
+    - colors: list of colors to cycle through
+    
+    OUTPUT:
+    - img: image with rectangles and person IDs
+    '''
+   
+    color_cycle = it.cycle(colors)
+
+    for i,(x,y) in enumerate(zip(X,Y)):
+        color = next(color_cycle)
+        if not np.isnan(x).all():
+            x_min, y_min = np.nanmin(x).astype(int), np.nanmin(y).astype(int)
+            x_max, y_max = np.nanmax(x).astype(int), np.nanmax(y).astype(int)
+            if x_min < 0: x_min = 0
+            if x_max > img.shape[1]: x_max = img.shape[1]
+            if y_min < 0: y_min = 0
+            if y_max > img.shape[0]: y_max = img.shape[0]
+
+            # Draw rectangles
+            cv2.rectangle(img, (x_min-25, y_min-25), (x_max+25, y_max+25), color, thickness) 
+        
+            # Write person ID
+            cv2.putText(img, str(i), (x_min-30, y_min-30), cv2.FONT_HERSHEY_SIMPLEX, fontSize, color, 2, cv2.LINE_AA) 
+    
+    return img
+
+
+def draw_skel(img, X, Y, model):
+    '''
+    Draws keypoints and skeleton for each person.
+    Skeletons have a different color for each person.
+
+    INPUTS:
+    - img: opencv image
+    - X: list of list of x coordinates
+    - Y: list of list of y coordinates
+    - model: skeleton model (from skeletons.py)
+    - colors: list of colors to cycle through
+    
+    OUTPUT:
+    - img: image with keypoints and skeleton
+    '''
+    
+    # Get (unique) pairs between which to draw a line
+    id_pairs, name_pairs = [], []
+    for data_i in PreOrderIter(model.root, filter_=lambda node: node.is_leaf):
+        node_branch_ids = [node_i.id for node_i in data_i.path]
+        node_branch_names = [node_i.name for node_i in data_i.path]
+        id_pairs += [[node_branch_ids[i],node_branch_ids[i+1]] for i in range(len(node_branch_ids)-1)]
+        name_pairs += [[node_branch_names[i],node_branch_names[i+1]] for i in range(len(node_branch_names)-1)]
+    node_pairs = {tuple(name_pair): id_pair for (name_pair,id_pair) in zip(name_pairs,id_pairs)}
+
+    
+    # Draw lines
+    for (x,y) in zip(X,Y):
+        if not np.isnan(x).all():
+            for names, ids in node_pairs.items():
+                if not None in ids and not (np.isnan(x[ids[0]]) or np.isnan(y[ids[0]]) or np.isnan(x[ids[1]]) or np.isnan(y[ids[1]])):
+                    if any(n.startswith('R') for n in names) and not any(n.startswith('L') for n in names):
+                        c = (255,128,0)
+                    elif any(n.startswith('L') for n in names) and not any(n.startswith('R') for n in names):
+                        c = (0,255,0)
+                    else:
+                        c = (51, 153, 255)
+                    cv2.line(img, (int(x[ids[0]]), int(y[ids[0]])), (int(x[ids[1]]), int(y[ids[1]])), c, thickness)
+
+    return img
+
+
+def draw_keypts(img, X, Y, scores, cmap_str='RdYlGn'):
+    '''
+    Draws keypoints and skeleton for each person.
+    Keypoints' colors depend on their score.
+
+    INPUTS:
+    - img: opencv image
+    - X: list of list of x coordinates
+    - Y: list of list of y coordinates
+    - scores: list of list of scores
+    - cmap_str: colormap name
+    
+    OUTPUT:
+    - img: image with keypoints and skeleton
+    '''
+    
+    scores = np.where(np.isnan(scores), 0, scores)
+    # scores = (scores - 0.4) / (1-0.4) # to get a red color for scores lower than 0.4
+    scores = np.where(scores>0.99, 0.99, scores)
+    scores = np.where(scores<0, 0, scores)
+    
+    cmap = plt.get_cmap(cmap_str)
+    for (x,y,s) in zip(X,Y,scores):
+        c_k = np.array(cmap(s))[:,:-1]*255
+        [cv2.circle(img, (int(x[i]), int(y[i])), thickness+4, c_k[i][::-1], -1)
+            for i in range(len(x))
+            if not (np.isnan(x[i]) or np.isnan(y[i]))]
+
+    return img

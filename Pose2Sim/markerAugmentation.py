@@ -77,7 +77,7 @@ def check_neck_data(trc_file):
     return trc_file
 
 
-def augmentTRC(config_dict):
+def augment_markers_all(config_dict):
     # get parameters from Config.toml
     project_dir = config_dict.get('project').get('project_dir')
     pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))

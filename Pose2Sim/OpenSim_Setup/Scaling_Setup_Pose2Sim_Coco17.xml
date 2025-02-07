@@ -233,11 +233,11 @@
 							<objects>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> Head Nose</markers>
+									<markers> LShoulder Nose</markers>
 								</MarkerPair>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> Head Neck</markers>
+									<markers> RShoulder Nose</markers>
 								</MarkerPair>
 							</objects>
 							<groups />

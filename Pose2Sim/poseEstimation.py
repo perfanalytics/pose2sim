@@ -852,7 +852,7 @@ class MediaSource(multiprocessing.Process):
             self.cap.release()
 
 
-def rtm_estimator(config_dict):
+def estimate_pose_all(config_dict):
     '''
     Estimate pose from webcams, video files, or a folder of images, and write the results to JSON files, videos, and/or images.
     Results can optionally be displayed in real-time.

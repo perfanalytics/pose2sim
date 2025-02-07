@@ -60,7 +60,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 - [x] **v0.8** *(04/2024)*: New synchronization tool
 - [x] **v0.9** *(07/2024)*: Integration of pose estimation in the pipeline
 - [x] **v0.10 *(09/2024)*: Integration of OpenSim in the pipeline**
-- [ ] v0.11: Integration of Sports2D, and documentation on new website
+- [ ] v0.11: Integration of Sports2D, monocular 3D pose estimation, and documentation on new website
 - [ ] v0.12: Graphical User Interface
 - [ ] v0.13: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
 - [ ] v1.0: First full release
@@ -351,18 +351,46 @@ Pose2Sim.poseEstimation()
 
 </br>
 
-*N.B.:* To speed up the process:
+***N.B.:* To analyse wrist motion:**\
+'Whole_body_wrist' or 'Whole_body' `pose_model` is required in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml). Note that these are slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints. 
+
+<br>
+
+***N.B.:* To speed up the process:**
 - Disable `display_detection` and `save_video` 
 - Increase the value of `det_frequency`. In that case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames)
-- Use your GPU (See [Installation](#installation)). Slightly more involved, but often worth it
-- Run pose estimation in `lightweight` mode instead of `balanced` or `performance`. However, this will reduce the quality of results 
+- Use your GPU (See [Installation](#installation)). Slightly more involved, but often worth it. Note that the optimal device _(CPU or GPU)_ and backend for your configuration will be automatically selected, but you can also manually select them in Config.toml.
+- Run pose estimation in `lightweight` mode instead of `balanced` or `performance`. However, this will reduce the quality of results. 
 
-*N.B.:* The default model is '**Body_with_feet**', but for wrist motion, the '**Whole_body**' `pose_model` is required. Note that it is much slower and slightly less accurate on body keypoints.\
-Alternatively, it is possible to manually select **any .onnx or .zip model** for person, animal, or object detection, and for pose estimation. 
+<br>
 
-*N.B.:* You can manually select the desired device _(CPU, CUDA, MPS for macOS, ROCM for AMD GPUs)_ and backend _(OpenVINO, ONNXRuntime, OpenCV)_. Otherwise, the best ones for your configuration will be automatically selected.
+***N.B.:* To use custom detection and pose models:**
+- Other than 'lightweight', 'balanced', or 'performance' modes, you can use any other pose estimation models through [RTMLib](https://github.com/Tau-J/rtmlib) (hand, face, animal, or any custom trained models).
+- The (optional) detection model, pose model, and input sizes can be written in a dictionary (**within triple quotes**) as shown below. Models can be local paths or URLs, with .onnx or .zip extensions. Make sure the input_sizes are **within square brackets**. 
 
-*N.B.:* 
+  ```
+  # Equivalent to mode='balanced', with body_with_feet pose model
+  mode = """{'det_class':'YOLOX',
+         'det_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/yolox_m_8xb8-300e_humanart-c2c7a14a.zip',
+         'det_input_size':[640, 640],
+         'pose_class':'RTMPose',
+         'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip',
+         'pose_input_size':[192,256]}"""
+
+  # With one-stage RTMO model 
+  # Requires pose_model = 'Body'. Marker augmentation won't work, Kinematic analysis will
+  mode = """{'pose_class':'RTMO', 
+         'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.zip', 
+         'pose_input_size':[640, 640]}"""
+
+  # With animal pose estimation:
+  # Marker augmentation won't work, and you will need to create your own OpenSim skeleton for kinematic analysis.
+  mode = """{'pose_class':'RTMPose',
+         'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.zip',
+         'pose_input_size':[256,256]}"""
+
+  # Same approach for hand or face pose estimation, check the RTMLib documentation for more information.
+  ```
 
 <img src="Content/Pose2D.png" width="760">
 
@@ -657,7 +685,7 @@ _**Note that inverse kinematic results are not necessarily better after marker a
 **Make sure that `participant_height` is correct in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.** `participant_mass` is mostly optional for IK.\
 Only works with models estimating at least the following keypoints (e.g., not COCO):
 ``` python
- ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
+ ["RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
  "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
  "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
 ```
