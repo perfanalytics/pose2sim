@@ -1029,6 +1029,176 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     return height
 
 
+def sort_people_sports2d(keyptpre, keypt, scores=None):
+    '''
+    Associate persons across frames (Sports2D method)
+    Persons' indices are sometimes swapped when changing frame
+    A person is associated to another in the next frame when they are at a small distance
+    
+    N.B.: Requires min_with_single_indices and euclidian_distance function (see common.py)
+
+    INPUTS:
+    - keyptpre: (K, L, M) array of 2D coordinates for K persons in the previous frame, L keypoints, M 2D coordinates
+    - keypt: idem keyptpre, for current frame
+    - score: (K, L) array of confidence scores for K persons, L keypoints (optional) 
+    
+    OUTPUTS:
+    - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
+    - sorted_keypoints: array with reordered persons --> if scores is not None
+    - sorted_scores: array with reordered scores     --> if scores is not None
+    - associated_tuples: list of tuples with correspondences between persons across frames --> if scores is None (for Pose2Sim.triangulation())
+    '''
+    
+    # Generate possible person correspondences across frames
+    max_len = max(len(keyptpre), len(keypt))
+    keyptpre = pad_shape(keyptpre, max_len, fill_value=np.nan)
+    keypt = pad_shape(keypt, max_len, fill_value=np.nan)
+    if scores is not None:
+        scores = pad_shape(scores, max_len, fill_value=np.nan)
+    
+    # Compute distance between persons from one frame to another
+    personsIDs_comb = sorted(list(it.product(range(len(keyptpre)), range(len(keypt)))))
+    frame_by_frame_dist = [euclidean_distance(keyptpre[comb[0]],keypt[comb[1]]) for comb in personsIDs_comb]
+    frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
+    
+    # Sort correspondences by distance
+    _, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
+    
+    # Associate points to same index across frames, nan if no correspondence
+    sorted_keypoints = []
+    for i in range(len(keyptpre)):
+        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+        if len(id_in_old) > 0:      sorted_keypoints += [keypt[id_in_old[0]]]
+        else:                       sorted_keypoints += [keypt[i]]
+    sorted_keypoints = np.array(sorted_keypoints)
+
+    if scores is not None:
+        sorted_scores = []
+        for i in range(len(keyptpre)):
+            id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+            if len(id_in_old) > 0:  sorted_scores += [scores[id_in_old[0]]]
+            else:                   sorted_scores += [scores[i]]
+        sorted_scores = np.array(sorted_scores)
+
+    # Keep track of previous values even when missing for more than one frame
+    sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints) & ~np.isnan(keyptpre), keyptpre, sorted_keypoints)
+    
+    if scores is not None:
+        return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+    else: # For Pose2Sim.triangulation()
+        return sorted_keypoints, associated_tuples
+
+
+def sort_people_rtmlib(pose_tracker, keypoints, scores):
+    '''
+    Associate persons across frames (RTMLib method)
+
+    INPUTS:
+    - pose_tracker: PoseTracker. The initialized RTMLib pose tracker object
+    - keypoints: array of shape K, L, M with K the number of detected persons,
+    L the number of detected keypoints, M their 2D coordinates
+    - scores: array of shape K, L with K the number of detected persons,
+    L the confidence of detected keypoints
+
+    OUTPUT:
+    - sorted_keypoints: array with reordered persons
+    - sorted_scores: array with reordered scores
+    '''
+    
+    try:
+        desired_size = max(pose_tracker.track_ids_last_frame)+1
+        sorted_keypoints = np.full((desired_size, keypoints.shape[1], 2), np.nan)
+        sorted_keypoints[pose_tracker.track_ids_last_frame] = keypoints[:len(pose_tracker.track_ids_last_frame), :, :]
+        sorted_scores = np.full((desired_size, scores.shape[1]), np.nan)
+        sorted_scores[pose_tracker.track_ids_last_frame] = scores[:len(pose_tracker.track_ids_last_frame), :]
+    except:
+        sorted_keypoints, sorted_scores = keypoints, scores
+
+    return sorted_keypoints, sorted_scores
+
+
+def sort_people_deepsort(keypoints, scores, deepsort_tracker, frame,frame_count):
+    '''
+    Associate persons across frames (DeepSort method)
+
+    INPUTS:
+    - keypoints: array of shape K, L, M with K the number of detected persons,
+    L the number of detected keypoints, M their 2D coordinates
+    - scores: array of shape K, L with K the number of detected persons,
+    L the confidence of detected keypoints
+    - deepsort_tracker: The initialized DeepSort tracker object
+    - frame: np.array. The current image opened with cv2.imread
+
+    OUTPUT:
+    - sorted_keypoints: array with reordered persons
+    - sorted_scores: array with reordered scores
+    '''
+
+    try:
+        # Compute bboxes from keypoints and create detections (bboxes, scores, class_ids)
+        bboxes_ltwh = bbox_ltwh_compute(keypoints, padding=20)
+        bbox_scores = np.mean(scores, axis=1)
+        class_ids = np.array(['person']*len(bboxes_ltwh))
+        detections = list(zip(bboxes_ltwh, bbox_scores, class_ids))
+
+        # Estimates the tracks and retrieve indexes of the original detections
+        det_ids = [i for i in range(len(detections))]
+        tracks = deepsort_tracker.update_tracks(detections, frame=frame, others=det_ids)
+        track_ids_frame, orig_det_ids = [], []
+        for track in tracks:
+            if not track.is_confirmed():
+                continue
+            track_ids_frame.append(int(track.track_id)-1)       # ID of people
+            orig_det_ids.append(track.get_det_supplementary())  # ID of detections
+
+        # Correspondence between person IDs and original detection IDs
+        desired_size = max(track_ids_frame) + 1
+        sorted_keypoints = np.full((desired_size, keypoints.shape[1], 2), np.nan)
+        sorted_scores = np.full((desired_size, scores.shape[1]), np.nan)
+        for i,v in enumerate(track_ids_frame):
+            if orig_det_ids[i] is not None:    
+                sorted_keypoints[v] = keypoints[orig_det_ids[i]]
+                sorted_scores[v] = scores[orig_det_ids[i]]
+
+    except Exception as e:
+        sorted_keypoints, sorted_scores = keypoints, scores
+        if frame_count > deepsort_tracker.tracker.n_init:
+            logging.warning(f"Tracking error: {e}. Sorting persons with DeepSort method failed for this frame.")
+
+    return sorted_keypoints, sorted_scores
+
+
+def bbox_ltwh_compute(keypoints, padding=0):
+    '''
+    Compute bounding boxes in (x_min, y_min, width, height) format
+    Optionally add padding to the bounding boxes 
+    as a percentage of the bounding box size (+padding% horizontally, +padding/2% vertically)
+
+    INPUTS:
+    - keypoints: array of shape K, L, M with K the number of detected persons,
+                    L the number of detected keypoints, M their 2D coordinates
+    - padding: int. The padding to add to the bounding boxes, in perceptage
+    '''
+
+    x_coords = keypoints[:, :, 0]
+    y_coords = keypoints[:, :, 1]
+
+    x_min, x_max = np.min(x_coords, axis=1), np.max(x_coords, axis=1)
+    y_min, y_max = np.min(y_coords, axis=1), np.max(y_coords, axis=1)
+    width = x_max - x_min
+    height = y_max - y_min
+
+    if padding > 0:
+        x_min = x_min - width*padding/100
+        y_min = y_min - height/2*padding/100
+        width = width + 2*width*padding/100
+        height = height + height*padding/100
+
+    bbox_ltwh = np.stack((x_min, y_min, width, height), axis=1)
+
+    return bbox_ltwh
+
+
 def draw_bounding_box(img, X, Y, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)], fontSize=0.3, thickness=1):
     '''
     Draw bounding boxes and person ID around list of lists of X and Y coordinates.

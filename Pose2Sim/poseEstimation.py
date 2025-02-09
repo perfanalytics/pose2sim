@@ -45,7 +45,8 @@ from anytree.importer import DictImporter
 import cv2
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
-from Pose2Sim.common import natural_sort_key, sort_people_sports2d, \
+from deep_sort_realtime.deepsort_tracker import DeepSort
+from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort, sort_people_rtmlib,\
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel
 from Pose2Sim.skeletons import *
 
@@ -187,7 +188,7 @@ def save_to_openpose(json_file_path, keypoints, scores):
         json.dump(json_output, json_file)
 
 
-def process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person):
+def process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker):
     '''
     Estimate pose from a video file
     
@@ -200,6 +201,9 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     - save_images: bool. Whether to save the output images
     - display_detection: bool. Whether to show real-time visualization
     - frame_range: list. Range of frames to process
+    - multi_person: bool. Whether to detect multiple people in the video
+    - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
+    - deepsort_tracker: DeepSort. Initialized DeepSort tracker object
 
     OUTPUTS:
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
@@ -236,21 +240,25 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     f_range = [[total_frames] if frame_range==[] else frame_range][0]
     with tqdm(total=total_frames, desc=f'Processing {os.path.basename(video_path)}') as pbar:
+        frame_count = 0
         while cap.isOpened():
             # print('\nFrame ', frame_idx)
             success, frame = cap.read()
+            frame_count += 1
             if not success:
                 break
             
             if frame_idx in range(*f_range):
-                # Perform pose estimation on the frame
+                # Detect poses
                 keypoints, scores = pose_tracker(frame)
 
-                # Tracking people IDs across frames
-                if multi_person:
+                # Track poses across frames
+                if tracking_mode == 'deepsort':
+                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count)
+                if tracking_mode == 'sports2d': 
                     if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
                     prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
-           
+                    
                 # Save to json
                 if 'openpose' in output_format:
                     json_file_path = os.path.join(json_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.json')
@@ -300,7 +308,7 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
         cv2.destroyAllWindows()
 
 
-def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, multi_person):
+def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker):
     '''
     Estimate pose estimation from a folder of images
     
@@ -314,6 +322,9 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
     - save_images: bool. Whether to save the output images
     - display_detection: bool. Whether to show real-time visualization
     - frame_range: list. Range of frames to process
+    - multi_person: bool. Whether to detect multiple people in the video
+    - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
+    - deepsort_tracker: DeepSort. Initialized DeepSort tracker object
 
     OUTPUTS:
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
@@ -344,17 +355,20 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
         if frame_idx in range(*f_range):
             try:
                 frame = cv2.imread(image_file)
+                frame_idx += 1
             except:
                 raise NameError(f"{image_file} is not an image. Videos must be put in the video directory, not in subdirectories.")
             
-            # Perform pose estimation on the image
+            # Detect poses
             keypoints, scores = pose_tracker(frame)
 
-            # Tracking people IDs across frames
-            if multi_person:
+            # Track poses across frames
+            if tracking_mode == 'deepsort':
+                keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
+            if tracking_mode == 'sports2d': 
                 if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores)
-            
+                prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+                    
             # Extract frame number from the filename
             if 'openpose' in output_format:
                 json_file_path = os.path.join(json_output_dir, f"{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.json")
@@ -375,7 +389,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
                         valid_Y.append(person_Y)
                         valid_scores.append(person_scores)
                     img_show = frame.copy()
-                    img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
+                    if multi_person: img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                     img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
                     img_show = draw_skel(img_show, valid_X, valid_Y, pose_model)
 
@@ -445,7 +459,17 @@ def estimate_pose_all(config_dict):
     display_detection = config_dict['pose']['display_detection']
     overwrite_pose = config_dict['pose']['overwrite_pose']
     det_frequency = config_dict['pose']['det_frequency']
-    backend = config_dict['pose']['backend']
+    tracking_mode = config_dict.get('pose').get('tracking_mode')
+    if tracking_mode == 'deepsort':
+        deepsort_params = config_dict.get('pose').get('deepsort_params')
+        try:
+            deepsort_params = ast.literal_eval(deepsort_params)
+        except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+            deepsort_params = deepsort_params.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/',':/').replace('":"\\',':\\')
+            deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params) # changes "[640", "640]" to [640,640]
+            deepsort_params = json.loads(deepsort_params)
+        deepsort_tracker = DeepSort(**deepsort_params)
+        backend = config_dict['pose']['backend']
     device = config_dict['pose']['device']
 
     # Determine frame rate
@@ -538,6 +562,7 @@ def estimate_pose_all(config_dict):
             logging.warning('Using the default "balanced" mode.')
             mode = 'balanced'
 
+
     # Estimate pose
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
@@ -555,8 +580,13 @@ def estimate_pose_all(config_dict):
         except:
             logging.error('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
             raise ValueError('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
+
+        if tracking_mode not in ['deepsort', 'sports2d']:
+            logging.warning(f"Tracking mode {tracking_mode} not recognized. Using sports2d method.")
+            tracking_mode = 'sports2d'
         logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
-        logging.info(f'Mode: {mode}.\n')
+        logging.info(f'Mode: {mode}.')
+        logging.info(f'Tracking is done with {tracking_mode} {"" if not tracking_mode=="deepsort" else f"with parameters: {deepsort_params}"}.\n')
 
         video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
         if not len(video_files) == 0: 
@@ -564,7 +594,8 @@ def estimate_pose_all(config_dict):
             logging.info(f'Found video files with {vid_img_extension} extension.')
             for video_path in video_files:
                 pose_tracker.reset()
-                process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person)
+                deepsort_tracker.tracker.delete_all_tracks()
+                process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
 
         else:
             # Process image folders
@@ -572,5 +603,6 @@ def estimate_pose_all(config_dict):
             image_folders = sorted([f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
             for image_folder in image_folders:
                 pose_tracker.reset()
+                deepsort_tracker.tracker.delete_all_tracks()
                 image_folder_path = os.path.join(video_dir, image_folder)
-                process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person)
+                process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
