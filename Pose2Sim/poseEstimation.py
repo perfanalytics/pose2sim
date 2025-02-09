@@ -203,7 +203,7 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     - frame_range: list. Range of frames to process
     - multi_person: bool. Whether to detect multiple people in the video
     - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
-    - deepsort_tracker: DeepSort. Initialized DeepSort tracker object
+    - deepsort_tracker: DeepSort tracker object or None
 
     OUTPUTS:
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
@@ -324,7 +324,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
     - frame_range: list. Range of frames to process
     - multi_person: bool. Whether to detect multiple people in the video
     - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
-    - deepsort_tracker: DeepSort. Initialized DeepSort tracker object
+    - deepsort_tracker: DeepSort tracker object or None
 
     OUTPUTS:
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
@@ -469,7 +469,9 @@ def estimate_pose_all(config_dict):
             deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params) # changes "[640", "640]" to [640,640]
             deepsort_params = json.loads(deepsort_params)
         deepsort_tracker = DeepSort(**deepsort_params)
-        backend = config_dict['pose']['backend']
+    else:
+        deepsort_tracker = None
+    backend = config_dict['pose']['backend']
     device = config_dict['pose']['device']
 
     # Determine frame rate
@@ -594,7 +596,7 @@ def estimate_pose_all(config_dict):
             logging.info(f'Found video files with {vid_img_extension} extension.')
             for video_path in video_files:
                 pose_tracker.reset()
-                deepsort_tracker.tracker.delete_all_tracks()
+                if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()
                 process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
 
         else:
@@ -603,6 +605,6 @@ def estimate_pose_all(config_dict):
             image_folders = sorted([f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
             for image_folder in image_folders:
                 pose_tracker.reset()
-                deepsort_tracker.tracker.delete_all_tracks()
                 image_folder_path = os.path.join(video_dir, image_folder)
+                if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()                
                 process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
