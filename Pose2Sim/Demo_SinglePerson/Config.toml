@@ -84,7 +84,7 @@ backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
 tracking_mode = 'sports2d' # 'sports2d' or 'deepsort'. 'deepsort' is slower but more robust in difficult configurations
 deepsort_params = """{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8, 'embedder_gpu': True}""" # """{dictionary between 3 double quotes}"""
                   # More robust in crowded scenes but Can be tricky to parametrize. More information there: https://github.com/levan92/deep_sort_realtime/blob/master/deep_sort_realtime/deepsort_tracker.py#L51
-                  # Note: For even more robust tracking, use 'embedder':'torchreid', which runs osnet_ain_x1_0 by default. Install additional dependencies with: `pip install torchreid gdown tensorboard`
+                  # Note: For even more robust tracking, use 'embedder':'torchreid', which runs osnet_ain_x1_0 by default. Install additional dependencies with: `pip install torch torchreid gdown tensorboard`
 
 display_detection = true
 overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
