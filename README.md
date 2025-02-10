@@ -114,7 +114,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 
    Once installed, open an Anaconda prompt and create a virtual environment:
    ```
-   conda create -n Pose2Sim python=3.9 -y 
+   conda create -n Pose2Sim python=3.10 -y 
    conda activate Pose2Sim
    ```
 
@@ -125,7 +125,7 @@ Install the OpenSim Python API (if you do not want to install via conda, refer [
    ```
    
 3. **Install Pose2Sim**:\
-If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9 is installed. 
+If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.10 is installed. 
    - OPTION 1: **Quick install:** Open a terminal. 
        ``` cmd
        pip install pose2sim
