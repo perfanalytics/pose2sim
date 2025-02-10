@@ -253,11 +253,12 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                 keypoints, scores = pose_tracker(frame)
 
                 # Track poses across frames
-                if tracking_mode == 'deepsort':
-                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count)
-                if tracking_mode == 'sports2d': 
-                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+                if multi_person:
+                    if tracking_mode == 'deepsort':
+                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count)
+                    if tracking_mode == 'sports2d': 
+                        if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                        prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
                     
                 # Save to json
                 if 'openpose' in output_format:
@@ -279,7 +280,7 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                             valid_Y.append(person_Y)
                             valid_scores.append(person_scores)
                         img_show = frame.copy()
-                        if multi_person: img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
+                        img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                         img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
                         img_show = draw_skel(img_show, valid_X, valid_Y, pose_model)
                 
@@ -363,11 +364,12 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
             keypoints, scores = pose_tracker(frame)
 
             # Track poses across frames
-            if tracking_mode == 'deepsort':
-                keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
-            if tracking_mode == 'sports2d': 
-                if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+            if multi_person:
+                if tracking_mode == 'deepsort':
+                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
+                if tracking_mode == 'sports2d': 
+                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
                     
             # Extract frame number from the filename
             if 'openpose' in output_format:
@@ -389,7 +391,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
                         valid_Y.append(person_Y)
                         valid_scores.append(person_scores)
                     img_show = frame.copy()
-                    if multi_person: img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
+                    img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                     img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
                     img_show = draw_skel(img_show, valid_X, valid_Y, pose_model)
 
@@ -460,7 +462,7 @@ def estimate_pose_all(config_dict):
     overwrite_pose = config_dict['pose']['overwrite_pose']
     det_frequency = config_dict['pose']['det_frequency']
     tracking_mode = config_dict.get('pose').get('tracking_mode')
-    if tracking_mode == 'deepsort':
+    if tracking_mode == 'deepsort' and multi_person:
         deepsort_params = config_dict.get('pose').get('deepsort_params')
         try:
             deepsort_params = ast.literal_eval(deepsort_params)
@@ -588,7 +590,7 @@ def estimate_pose_all(config_dict):
             tracking_mode = 'sports2d'
         logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
         logging.info(f'Mode: {mode}.')
-        logging.info(f'Tracking is done with {tracking_mode} {"" if not tracking_mode=="deepsort" else f"with parameters: {deepsort_params}"}.\n')
+        logging.info(f'Tracking is done with {tracking_mode}{" " if not tracking_mode=="deepsort" else f" with parameters: {deepsort_params}"}.\n')
 
         video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
         if not len(video_files) == 0: 
