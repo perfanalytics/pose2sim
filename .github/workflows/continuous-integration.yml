@@ -60,7 +60,7 @@ jobs:
           conda run -n pose2sim python -m pip install --upgrade pip
           conda run -n pose2sim python -m pip install flake8 pytest
           conda run -n pose2sim python -m pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
-          conda run -n pose2sim python -m pip install torch
+          # conda run -n pose2sim python -m pip install torch torchvision
       
       - name: Lint with flake8
         run: |
