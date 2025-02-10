@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest, macos-13]
+        os: [ubuntu-latest, windows-latest, macos-latest, macos-13] # Mac ARM M1 vs Intel processors
         python-version: [3.9, "3.10", "3.11"]
 
     steps:
@@ -60,6 +60,7 @@ jobs:
           conda run -n pose2sim python -m pip install --upgrade pip
           conda run -n pose2sim python -m pip install flake8 pytest
           conda run -n pose2sim python -m pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
+          conda run -n pose2sim python -m pip install torch
       
       - name: Lint with flake8
         run: |
