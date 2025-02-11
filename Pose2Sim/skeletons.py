@@ -359,9 +359,7 @@ COCO_133 = Node("Hip", id=None, children=[
                                                                         Node("Mouth17", id=87, children=[
                                                                             Node("Mouth18", id=88, children=[
                                                                                 Node("Mouth19", id=89, children=[
-                                                                                    Node("Mouth20", id=90, children=[
-                                                                                        Node("Mouth21", id=91)
-                                                                                    ]),
+                                                                                    Node("Mouth20", id=90)
                                                                                 ]),
                                                                             ]),
                                                                         ]),
