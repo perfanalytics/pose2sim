@@ -224,9 +224,10 @@ make_c3d = true # save triangulated data in c3d format in addition to trc
 
 [kinematics]
 use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
+use_contacts_muscles = true # true or false (lowercase) # If true, contact spheres and muscles are added to the model
 right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)
-default_height = 1.7 # meters # If automatic height calculation did not work, this value is used to scale the model
 
+default_height = 1.7 # meters # If automatic height calculation did not work, this value is used to scale the model
 remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
 remove_individual_IK_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
 fastest_frames_to_remove_percent = 0.1 # Frames with high speed are considered as outliers

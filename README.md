@@ -718,6 +718,7 @@ This can be either done fully automatically within Pose2Sim, or manually within 
 > Model scaling is done according to the mean of the segment lengths, across a subset of frames. We remove the 10% fastest frames (potential outliers), the frames where the speed is 0 (person probably out of frame), the frames where the average knee and hip flexion angles are above 45° (pose estimation is not precise when the person is crouching) and the 20% most extreme segment values after the previous operations (potential outliers).
 
 In your Config.toml file, set `use_augmentation = false` is you don't want to use the results with augmented marker (this is sometimes better).\
+Set `use_contacts_muscles = false` if you do not need contact spheres or muscles in your model.\
 Set `right_left_symmetry = false` if you have good reasons to think the participant is not symmetrical (e.g. if they wear a prosthetic limb).
 
 Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\

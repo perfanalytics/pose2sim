@@ -77,7 +77,7 @@ def get_opensim_setup_dir():
     return setup_dir
 
 
-def get_model_path(pose_model, osim_setup_dir):
+def get_model_path(use_contact_muscles, osim_setup_dir):
     '''
     Retrieve the path of the OpenSim model file.
 
@@ -89,32 +89,54 @@ def get_model_path(pose_model, osim_setup_dir):
     - pose_model_path: (Path) Path to the OpenSim model file.
     '''
 
-    if pose_model == 'BODY_25B':
-        pose_model_file = 'Model_Setup_Pose2Sim_Body25b.osim'
-    elif pose_model == 'BODY_25':
-        pose_model_file = 'Model_Pose2Sim_Body25.osim'
-    elif pose_model == 'BODY_135':
-        pose_model_file = 'Model_Pose2Sim_Body135.osim'
-    elif pose_model == 'BLAZEPOSE':
-        pose_model_file = 'Model_Pose2Sim_Blazepose.osim'
-    elif pose_model == 'HALPE_26':
-        pose_model_file = 'Model_Pose2Sim_Halpe26.osim'
-    elif pose_model == 'HALPE_68' or pose_model == 'HALPE_136':
-        pose_model_file = 'Model_Pose2Sim_Halpe68_136.osim'
-    elif pose_model == 'COCO_133' or pose_model == 'COCO_133_WRIST':
-        pose_model_file = 'Model_Pose2Sim_Coco133.osim'
-    # elif pose_model == 'COCO' or pose_model == 'MPII':
-    #     pose_model_file = 'Model_Pose2Sim_Coco.osim'
-    elif pose_model == 'COCO_17':
-        pose_model_file = 'Model_Pose2Sim_Coco17.osim'
-    elif pose_model == 'LSTM':
-        pose_model_file = 'Model_Pose2Sim_LSTM.osim'
+    if use_contact_muscles:
+        pose_model_file = 'Model_Pose2Sim_contacts_muscles.osim'
     else:
-        raise ValueError(f"Pose model '{pose_model}' not supported yet.")
+        pose_model_file = 'Model_Pose2Sim.osim'
 
     unscaled_model_path = osim_setup_dir / pose_model_file
 
     return unscaled_model_path
+
+
+def get_markers_path(pose_model, osim_setup_dir):
+    '''
+    Retrieve the path of the marker file.
+
+    INPUTS:
+    - pose_model (str): Name of the model
+    - osim_setup_dir (Path): Path to the OpenSim setup directory.
+
+    OUTPUTS:
+    - markers_path: (Path) Path to the marker file.
+    '''
+
+    if pose_model == 'BODY_25B':
+        marker_file = 'Markers_Body25b.xml'
+    elif pose_model == 'BODY_25':
+        marker_file = 'Markers_Body25.xml'
+    elif pose_model == 'BODY_135':
+        marker_file = 'Markers_Body135.xml'
+    elif pose_model == 'BLAZEPOSE':
+        marker_file = 'Markers_Blazepose.xml'
+    elif pose_model == 'HALPE_26':
+        marker_file = 'Markers_Halpe26.xml'
+    elif pose_model == 'HALPE_68' or pose_model == 'HALPE_136':
+        marker_file = 'Markers_Halpe68_136.xml'
+    elif pose_model == 'COCO_133' or pose_model == 'COCO_133_WRIST':
+        marker_file = 'Markers_Coco133.xml'
+    # elif pose_model == 'COCO' or pose_model == 'MPII':
+    #     marker_file = 'Markers_Coco.xml'
+    elif pose_model == 'COCO_17':
+        marker_file = 'Markers_Coco17.xml'
+    elif pose_model == 'LSTM':
+        marker_file = 'Markers_LSTM.xml'
+    else:
+        raise ValueError(f"Pose model '{pose_model}' not supported yet.")
+
+    markers_path = osim_setup_dir / marker_file
+
+    return markers_path
 
 
 def get_scaling_setup(pose_model, osim_setup_dir):
@@ -379,7 +401,8 @@ def update_scale_values(scaling_root, segment_ratio_dict):
         scale_set.append(new_scale)
         
 
-def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, pose_model, right_left_symmetry=True, subject_height=1.75, subject_mass=70, 
+def perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir, 
+                    use_contacts_muscles=False, right_left_symmetry=True, subject_height=1.75, subject_mass=70, 
                     remove_scaling_setup=True, fastest_frames_to_remove_percent=0.1,close_to_zero_speed_m=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Perform model scaling based on the (not necessarily static) TRC file:
@@ -393,6 +416,7 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, pose_model, right_
     - kinematics_dir (Path): The directory where the kinematics files are saved.
     - osim_setup_dir (Path): The directory where the OpenSim setup and model files are stored.
     - pose_model (str): The name of the model.
+    - use_contacts_muscles (bool): Whether to use the model with contact spheres and muscles.
     - right_left_symmetry (bool): Whether to consider right and left side of equal size.
     - subject_height (float): The height of the subject.
     - subject_mass (float): The mass of the subject.
@@ -408,12 +432,18 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, pose_model, right_
     try:
         # Load model
         opensim.ModelVisualizer.addDirToGeometrySearchPaths(str(osim_setup_dir / 'Geometry'))
-        unscaled_model_path = get_model_path(pose_model, osim_setup_dir)
+        unscaled_model_path = get_model_path(use_contacts_muscles, osim_setup_dir)
         if not unscaled_model_path:
             raise ValueError(f"Unscaled OpenSim model not found at: {unscaled_model_path}")
         unscaled_model = opensim.Model(str(unscaled_model_path))
+        # Add markers to model
+        markers_path = get_markers_path(pose_model, osim_setup_dir)
+        markerset = opensim.MarkerSet(str(markers_path))
+        unscaled_model.set_MarkerSet(markerset)
+        # Initialize and save model with markers
         unscaled_model.initSystem()
-        scaled_model_path = (kinematics_dir / (trc_file.stem + '.osim')).resolve()
+        scaled_model_path = str((kinematics_dir / (trc_file.stem + '.osim')).resolve())
+        unscaled_model.printToXML(scaled_model_path)
 
         # Load scaling setup
         scaling_path = get_scaling_setup(pose_model, osim_setup_dir)
@@ -437,16 +467,16 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, pose_model, right_
         # Update scaling setup file
         scaling_root[0].find('mass').text = str(subject_mass)
         scaling_root[0].find('height').text = str(subject_height)
-        scaling_root[0].find('GenericModelMaker').find('model_file').text = str(unscaled_model_path)
+        scaling_root[0].find('GenericModelMaker').find('model_file').text = scaled_model_path
         scaling_root[0].find(".//scaling_order").text = ' manualScale measurements'
         deactivate_measurements(scaling_root)
         update_scale_values(scaling_root, segment_ratio_dict)
         for mk_f in scaling_root[0].findall(".//marker_file"): mk_f.text = "Unassigned"
-        scaling_root[0].find('ModelScaler').find('output_model_file').text = str(scaled_model_path)
+        scaling_root[0].find('ModelScaler').find('output_model_file').text = scaled_model_path
 
         etree.indent(scaling_tree, space='\t', level=0)
         scaling_tree.write(scaling_path_temp, pretty_print=True, xml_declaration=True, encoding='utf-8')
-    
+
         # Run scaling
         opensim.ScaleTool(scaling_path_temp).run()
 
@@ -541,6 +571,7 @@ def kinematics_all(config_dict):
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     use_augmentation = config_dict.get('kinematics').get('use_augmentation')
+    use_contacts_muscles = config_dict.get('kinematics').get('use_contacts_muscles')
 
     right_left_symmetry = config_dict.get('kinematics').get('right_left_symmetry')
     subject_height = config_dict.get('project').get('participant_height')
@@ -596,7 +627,6 @@ def kinematics_all(config_dict):
         else:
             raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
 
-
     # Calculate subject heights
     if subject_height is None or subject_height == 0:
         subject_height = [1.75] * len(trc_files)
@@ -646,7 +676,7 @@ def kinematics_all(config_dict):
         logging.info(f"Processing TRC file: {trc_file.resolve()}")
 
         logging.info("\nScaling...")
-        perform_scaling(trc_file, kinematics_dir, osim_setup_dir, pose_model, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], 
+        perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir, use_contacts_muscles, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], 
                         remove_scaling_setup=remove_scaling_setup, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, trimmed_extrema_percent=trimmed_extrema_percent,close_to_zero_speed_m=close_to_zero_speed)
         logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
         logging.info(f"\tScaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
