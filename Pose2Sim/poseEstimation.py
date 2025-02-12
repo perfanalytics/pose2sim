@@ -111,7 +111,43 @@ def transform(frame, desired_w, desired_h, full, rotation = 0):
         return frame, None
 
 
-def init_pose_tracker(pose_tracker_settings):
+def inverse_transform_keypoints(keypoints, transform_info):
+    desired_w, desired_h = transform_info['canvas_size']
+    scale = transform_info['scale']
+    x_offset = transform_info['x_offset']
+    y_offset = transform_info['y_offset']
+    rotation = transform_info['rotation']
+    rotated_size = transform_info['rotated_size']
+    new_keypoints = []
+    for person in keypoints:
+        new_person = []
+        for (x, y) in person:
+
+            y_bl = desired_h - y
+            x_bl = desired_w - x
+
+            X = (x_bl - x_offset) / scale
+            Y = (y_bl - y_offset) / scale
+
+            if rotation % 360 == 0:
+                orig_x, orig_y = X, Y
+            elif rotation % 360 == 90:
+                orig_x = rotated_size[0] - Y
+                orig_y = X
+            elif rotation % 360 == 180:
+                orig_x = rotated_size[0] - X
+                orig_y = rotated_size[1] - Y
+            elif rotation % 360 == 270:
+                orig_x = Y
+                orig_y = rotated_size[1] - X
+            else:
+                orig_x, orig_y = X, Y
+            new_person.append([orig_x, orig_y])
+        new_keypoints.append(np.array(new_person))
+    return new_keypoints
+
+
+def init_pose_tracker(pose_tracker_settings, num_sources):
     '''
     Set up the RTMLib pose tracker with the appropriate model and backend.
     If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
@@ -131,7 +167,7 @@ def init_pose_tracker(pose_tracker_settings):
     ModelClass, det_frequency, mode, tracking, backend, device, *others = pose_tracker_settings
     pose_tracker = PoseTracker(
         ModelClass,
-        det_frequency=det_frequency,
+        det_frequency=det_frequency * num_sources,
         mode=mode,
         backend=backend,
         device=device,
@@ -230,7 +266,10 @@ class PoseEstimatorWorker(multiprocessing.Process):
 
     def run(self):
         # Initialize pose tracker
-        self.pose_tracker = init_pose_tracker(self.pose_tracker_settings)
+        self.pose_tracker = init_pose_tracker(pose_tracker_settings=self.pose_tracker_settings,num_sources=1 if self.combined else self.num_sources)
+        if self.pose_tracker_ready_event is not None:
+            self.pose_tracker_ready_event.set()
+
         while not self.stopped:
             # If no new frames and no active sources remain, stop
             if self.queue.empty() and self.active_sources.value == 0:
@@ -331,9 +370,15 @@ class BaseSynchronizer:
         target_w, target_h = self.frame_size
         if not frames_list:
             return np.zeros((target_h, target_w, 3), dtype=np.uint8), {}
+
         n = len(frames_list)
-        cols = int(math.ceil(math.sqrt(n)))
-        rows = int(math.ceil(n / cols))
+        if target_w >= target_h:
+            cols = math.ceil(math.sqrt(n))
+            rows = math.ceil(n / cols)
+        else:
+            rows = math.ceil(math.sqrt(n))
+            cols = math.ceil(n / rows)
+
         mosaic_h = rows * target_h
         mosaic_w = cols * target_w
         mosaic = np.zeros((mosaic_h, mosaic_w, 3), dtype=np.uint8)
@@ -346,7 +391,7 @@ class BaseSynchronizer:
                 frame, *others = frames_list[idx]
                 x_off = c * target_w
                 y_off = r * target_h
-                mosaic[y_off:y_off+target_h, x_off:x_off+target_w] = frame
+                mosaic[y_off:y_off + target_h, x_off:x_off + target_w] = frame
                 if others is not None:
                     subinfo[others[0]] = {
                         "x_offset": x_off,
@@ -547,7 +592,7 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
 
         # Save to json
         if transform_info is not None:
-            keypoints = self.inverse_transform_keypoints(keypoints, transform_info)
+            keypoints = inverse_transform_keypoints(keypoints, transform_info)
         if 'openpose' in self.output_format:
             json_path = os.path.join(out_dirs[2], f"{file_name}.json")
             save_keypoints_to_openpose(json_path, keypoints, scores)
@@ -558,40 +603,6 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
             if sid in self.video_writers:
                 self.video_writers[sid].write(frame)
 
-    def inverse_transform_keypoints(keypoints, transform_info):
-        desired_w, desired_h = transform_info['canvas_size']
-        scale = transform_info['scale']
-        x_offset = transform_info['x_offset']
-        y_offset = transform_info['y_offset']
-        rotation = transform_info['rotation']
-        rotated_size = transform_info['rotated_size']
-        new_keypoints = []
-        for person in keypoints:
-            new_person = []
-            for (x, y) in person:
-
-                y_bl = desired_h - y
-                x_bl = desired_w - x
-
-                X = (x_bl - x_offset) / scale
-                Y = (y_bl - y_offset) / scale
-
-                if rotation % 360 == 0:
-                    orig_x, orig_y = X, Y
-                elif rotation % 360 == 90:
-                    orig_x = rotated_size[0] - Y
-                    orig_y = X
-                elif rotation % 360 == 180:
-                    orig_x = rotated_size[0] - X
-                    orig_y = rotated_size[1] - Y
-                elif rotation % 360 == 270:
-                    orig_x = Y
-                    orig_y = rotated_size[1] - X
-                else:
-                    orig_x, orig_y = X, Y
-                new_person.append([orig_x, orig_y])
-            new_keypoints.append(np.array(new_person))
-        return new_keypoints
 
 
 class CaptureCoordinator(multiprocessing.Process):
@@ -603,7 +614,8 @@ class CaptureCoordinator(multiprocessing.Process):
                  source_ended,
                  webcam_ready,
                  frame_rate,
-                 mode):
+                 mode,
+                 pose_tracker_ready_event):
         super().__init__(daemon=True)
         self.sources = sources
         self.command_queues = command_queues
@@ -612,11 +624,13 @@ class CaptureCoordinator(multiprocessing.Process):
         self.source_ended = source_ended
         self.webcam_ready = webcam_ready
         self.mode = mode
+        self.pose_tracker_ready_event = pose_tracker_ready_event
 
         self.min_interval = 1.0 / frame_rate if frame_rate > 0 else 0.0
         self.stopped = multiprocessing.Value('b', False)
 
     def run(self):
+        self.pose_tracker_ready_event.wait()
         last_capture_time = time.time()
         while not self.stopped.value:
             if all(self.source_ended[s['id']] for s in self.sources):
@@ -1006,6 +1020,8 @@ def estimate_pose_all(config_dict):
     # Pose tracker settings
     pose_tracker_settings = determine_tracker_settings(config_dict)
 
+    det_input_size = pose_tracker_settings[-1]
+
     # Handle frame_range
     def parse_frame_ranges(frame_range):
         if not frame_range:
@@ -1093,7 +1109,42 @@ def estimate_pose_all(config_dict):
             'total': multiprocessing.Value('i', 0)
         }
 
+    # Decide how many workers to start
+    cpu_count = multiprocessing.cpu_count()
+
     active_sources = multiprocessing.Value('i', len(sources))
+
+    if combined_frames:
+        initial_workers = max(1, cpu_count - len(sources) - 3)
+    else:
+        initial_workers = max(1, cpu_count - len(sources) - 2)
+
+    if not multi_workers:
+        initial_workers = 1
+
+    logging.info(f"Starting {initial_workers} workers.")
+
+    pose_tracker_ready_event = multiprocessing.Event()
+
+    def spawn_new_worker():
+        worker = PoseEstimatorWorker(
+            queue=pose_queue if combined_frames else frame_queue,
+            result_queue=result_queue,
+            shared_counts=shared_counts,
+            pose_tracker_settings=pose_tracker_settings,
+            buffers=pose_buffers if combined_frames else frame_buffers,
+            available_buffers=available_pose_buffers if combined_frames else available_frame_buffers,
+            active_sources=active_sources,
+            combined_frames=combined_frames,
+            pose_tracker_ready_event=pose_tracker_ready_event,
+            num_sources=num_sources
+        )
+        worker.start()
+        return worker
+
+
+    workers = [spawn_new_worker() for _ in range(initial_workers)]
+
     manager = multiprocessing.Manager()
     webcam_ready = manager.dict()
     source_ended = manager.dict()
@@ -1146,12 +1197,9 @@ def estimate_pose_all(config_dict):
         multi_person = multi_person,
         output_format = output_format,
         display_detection= display_detection,
-        pose_model=pose_tracker_settings[-1]
+        pose_model=pose_tracker_settings[-2]
     )
     result_processor.start()
-
-    # Decide how many workers to start
-    cpu_count = multiprocessing.cpu_count()
 
     if combined_frames:
         frame_processor = FrameQueueProcessor(
@@ -1174,35 +1222,9 @@ def estimate_pose_all(config_dict):
             multi_person = multi_person, 
             output_format = output_format, 
             display_detection = display_detection,
-            pose_model=pose_tracker_settings[-1]
+            pose_model=pose_tracker_settings[-2]
         )
         frame_processor.start()
-
-        initial_workers = max(1, cpu_count - len(sources) - 3)
-    else:
-        initial_workers = max(1, cpu_count - len(sources) - 2)
-
-    if not multi_workers:
-        initial_workers = 1
-
-    logging.info(f"Starting {initial_workers} workers.")
-
-    def spawn_new_worker():
-        worker = PoseEstimatorWorker(
-            queue=pose_queue if combined_frames else frame_queue,
-            result_queue=result_queue,
-            shared_counts=shared_counts,
-            pose_tracker_settings=pose_tracker_settings,
-            buffers=pose_buffers if combined_frames else frame_buffers,
-            available_buffers=available_pose_buffers if combined_frames else available_frame_buffers,
-            active_sources=active_sources,
-            combined_frames=combined_frames
-        )
-        worker.start()
-        return worker
-
-
-    workers = [spawn_new_worker() for _ in range(initial_workers)]
 
     # Start capture coordinator
     capture_coordinator = CaptureCoordinator(
@@ -1213,7 +1235,8 @@ def estimate_pose_all(config_dict):
         source_ended=source_ended,
         webcam_ready=webcam_ready,
         frame_rate=frame_rate if vid_img_extension == 'webcam' else 0,
-        mode=capture_mode
+        mode=capture_mode,
+        pose_tracker_ready_event=pose_tracker_ready_event
     )
     capture_coordinator.start()
 
@@ -1538,7 +1561,9 @@ def determine_tracker_settings(config_dict):
     logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
     logging.info(f'Mode: {mode}.')
 
-    return (ModelClass, det_frequency, mode, False, backend, device, pose_model)
+    det_input_size = ModelClass.MODE[mode]['det_input_size']
+
+    return (ModelClass, det_frequency, mode, False, backend, device, pose_model, det_input_size)
 
 
 def find_largest_frame_size(sources, vid_img_extension):
