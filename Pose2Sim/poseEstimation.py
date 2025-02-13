@@ -965,7 +965,7 @@ def estimate_pose_all(config_dict):
         else:
             x_off = c * frame_size[0]
             y_off = r * frame_size[1]
-            mosaic_subinfo[sid] = {"x_offset": x_off, "y_offset": y_off, "scaled_w": target_frame_size[0], "scaled_h": target_frame_size[1]}
+            mosaic_subinfo[sid] = {"x_offset": x_off, "y_offset": y_off, "scaled_w": frame_size[0], "scaled_h": frame_size[1]}
 
     available_memory = psutil.virtual_memory().available
     frame_bytes = frame_size[0] * frame_size[1] * 3
