@@ -147,35 +147,6 @@ def inverse_transform_keypoints(keypoints, transform_info):
     return new_keypoints
 
 
-def init_pose_tracker(pose_tracker_settings, num_sources):
-    '''
-    Set up the RTMLib pose tracker with the appropriate model and backend.
-    If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
-
-    INPUTS:
-    - ModelClass: class. The RTMlib model class to use for pose detection (Body, BodyWithFeet, Wholebody)
-    - det_frequency: int. The frequency of pose detection (every N frames)
-    - mode: str. The mode of the pose tracker ('lightweight', 'balanced', 'performance')
-    - tracking: bool. Whether to track persons across frames with RTMlib tracker
-    - backend: str. The backend to use for pose detection (onnxruntime, openvino, opencv)
-    - device: str. The device to use for pose detection (cpu, cuda, rocm, mps)
-
-    OUTPUTS:
-    - pose_tracker: PoseTracker. The initialized pose tracker object    
-    '''
-
-    ModelClass, det_frequency, mode, tracking, backend, device, *others = pose_tracker_settings
-    pose_tracker = PoseTracker(
-        ModelClass,
-        det_frequency=det_frequency * num_sources,
-        mode=mode,
-        backend=backend,
-        device=device,
-        tracking=tracking,
-        to_openpose=False)
-    return pose_tracker
-
-
 def init_backend_device(backend='auto', device='auto'):
     '''
     Set up the backend and device for the pose tracker based on the availability of hardware acceleration.
@@ -261,14 +232,21 @@ class PoseEstimatorWorker(multiprocessing.Process):
     def __init__(self, **kwargs):
         super().__init__()
         self.__dict__.update(kwargs)
-        self.pose_tracker = None
         self.stopped = False
 
     def run(self):
-        # Initialize pose tracker
-        self.pose_tracker = init_pose_tracker(pose_tracker_settings=self.pose_tracker_settings,num_sources=1 if self.combined else self.num_sources)
-        if self.pose_tracker_ready_event is not None:
-            self.pose_tracker_ready_event.set()
+        model = self.ModelClass(mode=self.mode,
+            to_openpose=self.to_openpose,
+            backend=self.backend,
+            device=self.device)
+    
+        try:
+            self.det_model = model.det_model
+        except: # rtmo
+            self.det_model = None
+        self.pose_model = model.pose_model
+
+        self.tracker_ready_event.set()
 
         while not self.stopped:
             # If no new frames and no active sources remain, stop
@@ -288,8 +266,18 @@ class PoseEstimatorWorker(multiprocessing.Process):
         buffer_name, idx, frame_shape, frame_dtype, *others = item
         # Convert shared memory to numpy
         frame = np.ndarray(frame_shape, dtype=frame_dtype, buffer=self.buffers[buffer_name].buf)
-        
-        keypoints, scores = self.pose_tracker(frame) if not others[1] else (None, None)
+
+        if not others[1]:
+            if self.det_model is not None:
+                # if self.frame_cnt % self.det_frequency == 0:
+                    bboxes = self.det_model(frame)
+                # else:
+                #     bboxes = self.bboxes_last_frame
+                    keypoints, scores = self.pose_model(frame, bboxes=bboxes)
+            else:  # rtmo
+                keypoints, scores = self.pose_model(frame)
+        else:
+            keypoints, scores = None, None
 
         result = (buffer_name, idx, frame_shape, frame_dtype, others[0], others[1], keypoints, scores)
         self.result_queue.put(result)
@@ -299,44 +287,8 @@ class PoseEstimatorWorker(multiprocessing.Process):
 
 
 class BaseSynchronizer:
-    def __init__(self,
-                 sources,
-                 frame_buffers,
-                 pose_buffers,
-                 available_frame_buffers,
-                 available_pose_buffers,
-                 vid_img_extension,
-                 source_outputs,
-                 shared_counts,
-                 save_images,
-                 save_video,
-                 frame_size,
-                 frame_rate,
-                 orientation,
-                 combined_frames,
-                 multi_person,
-                 output_format,
-                 display_detection,
-                 pose_model):
-        self.sources = sources
-        self.frame_buffers = frame_buffers
-        self.pose_buffers = pose_buffers
-        self.available_frame_buffers = available_frame_buffers
-        self.available_pose_buffers = available_pose_buffers
-
-        self.vid_img_extension = vid_img_extension
-        self.source_outputs = source_outputs
-        self.shared_counts = shared_counts
-        self.save_images = save_images
-        self.save_video = save_video
-        self.frame_size = frame_size
-        self.frame_rate = frame_rate
-        self.orientation = orientation
-        self.combined_frames = combined_frames
-        self.multi_person = multi_person
-        self.output_format = output_format
-        self.display_detection = display_detection
-        self.pose_model = pose_model
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
 
         self.sync_data = {}
         self.placeholder_map = {}
@@ -368,41 +320,23 @@ class BaseSynchronizer:
 
     def build_mosaic(self, frames_list):
         target_w, target_h = self.frame_size
-        if not frames_list:
-            return np.zeros((target_h, target_w, 3), dtype=np.uint8), {}
-
-        n = len(frames_list)
-        if target_w >= target_h:
-            cols = math.ceil(math.sqrt(n))
-            rows = math.ceil(n / cols)
-        else:
-            rows = math.ceil(math.sqrt(n))
-            cols = math.ceil(n / rows)
-
-        mosaic_h = rows * target_h
-        mosaic_w = cols * target_w
-        mosaic = np.zeros((mosaic_h, mosaic_w, 3), dtype=np.uint8)
+        mosaic = np.zeros((self.mosaic_rows * target_h, self.mosaic_cols * target_w, 3), dtype=np.uint8)
         subinfo = {}
-        idx = 0
-        for r in range(rows):
-            for c in range(cols):
-                if idx >= n:
-                    break
-                frame, *others = frames_list[idx]
-                x_off = c * target_w
-                y_off = r * target_h
-                mosaic[y_off:y_off + target_h, x_off:x_off + target_w] = frame
-                if others is not None:
-                    subinfo[others[0]] = {
-                        "x_offset": x_off,
-                        "y_offset": y_off,
-                        "scaled_w": target_w,
-                        "scaled_h": target_h,
-                        "orig_w": others[1],
-                        "orig_h": others[2],
-                        "transform_info": others[3]
-                    }
-                idx += 1
+        for frame_tuple in frames_list:
+            frame, *others = frame_tuple
+            info = self.mosaic_subinfo[others[0]]
+            x_off = info["x_offset"]
+            y_off = info["y_offset"]
+            mosaic[y_off:y_off+target_h, x_off:x_off+target_w] = frame
+            subinfo[others[0]] = {
+                "x_offset": x_off,
+                "y_offset": y_off,
+                "scaled_w": target_w,
+                "scaled_h": target_h,
+                "orig_w": others[1],
+                "orig_h": others[2],
+                "transform_info": others[3]
+            }
         return mosaic, subinfo
 
     def read_mosaic(self, mosaic_np, subinfo, keypoints, scores):
@@ -479,10 +413,11 @@ class FrameQueueProcessor(multiprocessing.Process, BaseSynchronizer):
 
 
 class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
-    def __init__(self, result_queue, **kwargs):
+    def __init__(self, result_queue, pose_model, **kwargs):
         multiprocessing.Process.__init__(self)
         BaseSynchronizer.__init__(self, **kwargs)
         self.result_queue = result_queue
+        self.pose_model = pose_model
         self.prev_keypoints = {}
 
     def run(self):
@@ -504,7 +439,7 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
             for s in self.sources:
                 sid = s['id']
                 out_dirs = self.source_outputs[sid]
-                output_video_path = out_dirs[-1]
+                output_video_path = out_dirs[-2]
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                 self.video_writers[sid] = cv2.VideoWriter(
                     output_video_path,
@@ -584,12 +519,6 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
         out_dirs = self.source_outputs[sid]
         file_name = f"{out_dirs[0]}_{idx}"
 
-        # Tracking people IDs across frames
-        if self.multi_person:
-            if sid not in self.prev_keypoints:
-                self.prev_keypoints[sid] = keypoints
-            self.prev_keypoints[sid], keypoints, scores = sort_people_sports2d(self.prev_keypoints[sid], keypoints, scores=scores)
-
         # Save to json
         if transform_info is not None:
             keypoints = inverse_transform_keypoints(keypoints, transform_info)
@@ -599,38 +528,20 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
         if self.save_images:
             cv2.imwrite(os.path.join(out_dirs[1], f"{file_name}.jpg"), frame)
         if self.save_video:
-            # frame = safe_resize(frame, self.frame_size[0], self.frame_size[1])
             if sid in self.video_writers:
                 self.video_writers[sid].write(frame)
 
 
-
 class CaptureCoordinator(multiprocessing.Process):
-    def __init__(self,
-                 sources,
-                 command_queues,
-                 available_frame_buffers,
-                 shared_counts,
-                 source_ended,
-                 webcam_ready,
-                 frame_rate,
-                 mode,
-                 pose_tracker_ready_event):
-        super().__init__(daemon=True)
-        self.sources = sources
-        self.command_queues = command_queues
-        self.available_frame_buffers = available_frame_buffers
-        self.shared_counts = shared_counts
-        self.source_ended = source_ended
-        self.webcam_ready = webcam_ready
-        self.mode = mode
-        self.pose_tracker_ready_event = pose_tracker_ready_event
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.__dict__.update(kwargs)
 
-        self.min_interval = 1.0 / frame_rate if frame_rate > 0 else 0.0
+        self.min_interval = 1.0 / self.frame_rate if self.frame_rate > 0 else 0.0
         self.stopped = multiprocessing.Value('b', False)
 
     def run(self):
-        self.pose_tracker_ready_event.wait()
+        self.tracker_ready_event.wait()
         last_capture_time = time.time()
         while not self.stopped.value:
             if all(self.source_ended[s['id']] for s in self.sources):
@@ -720,36 +631,9 @@ class CaptureCoordinator(multiprocessing.Process):
 
 
 class MediaSource(multiprocessing.Process):
-    def __init__(
-        self,
-        source,
-        frame_queue,
-        frame_buffers,
-        shared_counts,
-        frame_size,
-        active_sources,
-        command_queue,
-        vid_img_extension,
-        frame_ranges,
-        webcam_ready=None,
-        source_ended=None,
-        orientation='landscape',
-        rotation=0
-    ):
+    def __init__(self, **kwargs):
         super().__init__()
-        self.source = source
-        self.frame_queue = frame_queue
-        self.frame_buffers = frame_buffers
-        self.shared_counts = shared_counts
-        self.frame_size = frame_size
-        self.active_sources = active_sources
-        self.command_queue = command_queue
-        self.vid_img_extension = vid_img_extension
-        self.frame_ranges = frame_ranges
-        self.webcam_ready = webcam_ready
-        self.source_ended = source_ended
-        self.orientation = orientation
-        self.rotation = rotation
+        self.__dict__.update(kwargs)
 
         self.frame_idx = 0
         self.total_frames = 0
@@ -766,6 +650,12 @@ class MediaSource(multiprocessing.Process):
                 if self.webcam_ready is not None:
                     self.webcam_ready[self.source['id']] = (self.cap is not None and self.cap.isOpened())
 
+                if self.webcam_recording and self.cap is not None and self.cap.isOpened() and self.output_raw_video_path:
+                    raw_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                    raw_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    self.raw_writer = cv2.VideoWriter(self.source_outputs[-1], fourcc, 30, (raw_width, raw_height))
+            
             elif self.source['type'] == 'video':
                 self.open_video()
                 if self.frame_ranges:
@@ -804,9 +694,6 @@ class MediaSource(multiprocessing.Process):
 
                         with self.shared_counts[self.source['id']]['processed'].get_lock():
                             self.shared_counts[self.source['id']]['processed'].value += 1
-
-                        if self.orientation == 'portrait':
-                            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
                         frame, transform_info = transform(frame, self.frame_size[0], self.frame_size[1], True, self.rotation)
 
@@ -982,12 +869,12 @@ def estimate_pose_all(config_dict):
     save_files = config_dict['pose'].get('save_video', [])
     save_images = ('to_images' in save_files)
     save_video = ('to_video' in save_files)
-    orientation = config_dict['pose'].get('orientation', 'landscape')
     combined_frames = config_dict['pose'].get('combined_frames', False)
     multi_workers = config_dict['pose'].get('multi_workers', False)
     multi_person = config_dict['project'].get('multi_person', False)
     output_format = config_dict['project'].get('output_format', 'openpose')
     rotation = config_dict['pose'].get('rotation', 0)
+    webcam_recording = config_dict['pose'].get('webcam_recording', False)
 
     # Gather sources
     sources = []
@@ -1018,9 +905,9 @@ def estimate_pose_all(config_dict):
     logging.info(f"Sources: {sources}")
 
     # Pose tracker settings
-    pose_tracker_settings = determine_tracker_settings(config_dict)
+    ModelClass, det_frequency, mode, to_openpose, backend, device, pose_model, frame_size = determine_tracker_settings(config_dict)
 
-    det_input_size = pose_tracker_settings[-1]
+    logging.info(f"Model input size: {frame_size[0]}x{frame_size[1]}")
 
     # Handle frame_range
     def parse_frame_ranges(frame_range):
@@ -1035,15 +922,6 @@ def estimate_pose_all(config_dict):
     if vid_img_extension != 'webcam':
         frame_range = parse_frame_ranges(config_dict['project'].get('frame_range', []))
 
-    # Decide on input_size
-    requested_size = config_dict['pose'].get('input_size', None)
-    if not requested_size:
-        fw, fh = find_largest_frame_size(sources, vid_img_extension)
-        logging.info(f"Auto-detected largest frame size: {fw}x{fh}")
-    else:
-        fw, fh = requested_size
-        logging.info(f"Using user-defined frame size: {fw}x{fh}")
-
     # Determine FPS if 'auto'
     frame_rate = config_dict['project'].get('frame_rate', 30)
     if str(frame_rate).lower() == 'auto':
@@ -1054,8 +932,43 @@ def estimate_pose_all(config_dict):
 
     # Prepare shared memory
     num_sources = len(sources)
+
+    fw, fh = find_largest_frame_size(sources, vid_img_extension)
+
+    if fw >= fh:
+        mosaic_cols = math.ceil(math.sqrt(num_sources))
+        mosaic_rows = math.ceil(num_sources / mosaic_cols)
+    else:
+        mosaic_rows = math.ceil(math.sqrt(num_sources))
+        mosaic_cols = math.ceil(num_sources / mosaic_rows)
+
+    if combined_frames:
+        cell_w = frame_size[0] // mosaic_cols
+        cell_h = frame_size[1] // mosaic_rows
+
+        logging.info(f"Combined frames: {mosaic_rows} rows & {mosaic_cols} cols")
+        logging.info(f"Frame input size: {cell_w}x{cell_h}")
+
+        frame_size = (cell_w, cell_h)
+    else:
+        frame_size = frame_size
+
+    mosaic_subinfo = {}
+    for i, s in enumerate(sources):
+        sid = s['id']
+        r = i // mosaic_cols
+        c = i % mosaic_cols
+        if combined_frames:
+            x_off = c * cell_w
+            y_off = r * cell_h
+            mosaic_subinfo[sid] = {"x_offset": x_off, "y_offset": y_off, "scaled_w": cell_w, "scaled_h": cell_h}
+        else:
+            x_off = c * frame_size[0]
+            y_off = r * frame_size[1]
+            mosaic_subinfo[sid] = {"x_offset": x_off, "y_offset": y_off, "scaled_w": target_frame_size[0], "scaled_h": target_frame_size[1]}
+
     available_memory = psutil.virtual_memory().available
-    frame_bytes = fw * fh * 3
+    frame_bytes = frame_size[0] * frame_size[1] * 3
     n_buffers_total = int((available_memory / 2) / (frame_bytes * (num_sources / (num_sources + 1))))
 
     frame_buffer_count = 0
@@ -1124,20 +1037,24 @@ def estimate_pose_all(config_dict):
 
     logging.info(f"Starting {initial_workers} workers.")
 
-    pose_tracker_ready_event = multiprocessing.Event()
+    tracker_ready_event = multiprocessing.Event()
 
     def spawn_new_worker():
         worker = PoseEstimatorWorker(
             queue=pose_queue if combined_frames else frame_queue,
             result_queue=result_queue,
             shared_counts=shared_counts,
-            pose_tracker_settings=pose_tracker_settings,
+            ModelClass = ModelClass,
+            det_frequency=det_frequency,
+            mode=mode,
+            to_openpose=to_openpose,
+            backend=backend,
+            device=device,
             buffers=pose_buffers if combined_frames else frame_buffers,
             available_buffers=available_pose_buffers if combined_frames else available_frame_buffers,
             active_sources=active_sources,
             combined_frames=combined_frames,
-            pose_tracker_ready_event=pose_tracker_ready_event,
-            num_sources=num_sources
+            tracker_ready_event=tracker_ready_event
         )
         worker.start()
         return worker
@@ -1154,7 +1071,7 @@ def estimate_pose_all(config_dict):
     for s in sources:
         source_ended[s['id']] = False
         command_queues[s['id']] = manager.Queue()
-        out_dirs = create_output_folders(s['path'], pose_dir, save_images)
+        out_dirs = create_output_folders(s['path'], pose_dir, save_images, webcam_recording)
         source_outputs[s['id']] = out_dirs
 
         if s['type'] == 'webcam':
@@ -1165,21 +1082,22 @@ def estimate_pose_all(config_dict):
             frame_queue = frame_queue,
             frame_buffers = frame_buffers,
             shared_counts = shared_counts,
-            frame_size = (fw, fh),
+            frame_size = frame_size,
             active_sources = active_sources,
             command_queue = command_queues[s['id']],
             vid_img_extension = vid_img_extension,
             frame_ranges = frame_range,
             webcam_ready = webcam_ready,
             source_ended = source_ended,
-            orientation = orientation,
-            rotation = rotation
+            rotation = rotation,
+            webcam_recording = webcam_recording,
         )
         ms.start()
         media_sources.append(ms)
 
     result_processor = ResultQueueProcessor(
         result_queue = result_queue,
+        pose_model = pose_model,
         sources = sources,
         frame_buffers = frame_buffers, 
         pose_buffers = pose_buffers,
@@ -1190,14 +1108,15 @@ def estimate_pose_all(config_dict):
         shared_counts = shared_counts,
         save_images = save_images,
         save_video = save_video,
-        frame_size = (fw, fh),
+        frame_size = frame_size,
         frame_rate = frame_rate,
-        orientation = orientation,
         combined_frames = combined_frames,
         multi_person = multi_person,
         output_format = output_format,
         display_detection= display_detection,
-        pose_model=pose_tracker_settings[-2]
+        mosaic_cols=mosaic_cols,
+        mosaic_rows=mosaic_rows,
+        mosaic_subinfo=mosaic_subinfo
     )
     result_processor.start()
 
@@ -1214,15 +1133,16 @@ def estimate_pose_all(config_dict):
             source_outputs = source_outputs,
             shared_counts = shared_counts,
             save_images = save_images, 
-            save_video = save_video, 
-            frame_size = (fw, fh), 
+            save_video = save_video,
+            frame_size = frame_size,
             frame_rate = frame_rate,
-            orientation = orientation,
             combined_frames = combined_frames,
             multi_person = multi_person, 
             output_format = output_format, 
             display_detection = display_detection,
-            pose_model=pose_tracker_settings[-2]
+            mosaic_cols=mosaic_cols,
+            mosaic_rows=mosaic_rows,
+            mosaic_subinfo=mosaic_subinfo
         )
         frame_processor.start()
 
@@ -1236,7 +1156,7 @@ def estimate_pose_all(config_dict):
         webcam_ready=webcam_ready,
         frame_rate=frame_rate if vid_img_extension == 'webcam' else 0,
         mode=capture_mode,
-        pose_tracker_ready_event=pose_tracker_ready_event
+        tracker_ready_event=tracker_ready_event
     )
     capture_coordinator.start()
 
@@ -1458,7 +1378,7 @@ def estimate_pose_all(config_dict):
             cv2.destroyAllWindows()
 
 
-def create_output_folders(source_path, output_dir, save_images):
+def create_output_folders(source_path, output_dir, save_images, webcam_recording):
     '''
     Set up output directories for saving images and JSON files.
 
@@ -1482,7 +1402,12 @@ def create_output_folders(source_path, output_dir, save_images):
         os.makedirs(img_output_dir, exist_ok=True)
 
     output_video_path = os.path.join(output_dir, f"{output_dir_name}_pose.avi")
-    return output_dir_name, img_output_dir, json_output_dir, output_video_path
+
+    output_record_path = None
+    if webcam_recording:
+        output_video_path = os.path.join(output_dir, f"{output_dir_name}_record.avi")
+
+    return output_dir_name, img_output_dir, json_output_dir, output_video_path, output_record_path
 
 
 def determine_tracker_settings(config_dict):

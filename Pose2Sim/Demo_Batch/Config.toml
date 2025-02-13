@@ -35,7 +35,6 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 [pose]
 rotation = 0  # Degree of rotation applied to the image, allowed in multiples of 90. Use [90, 90, ...] for different angles per source.
-input_size = []  # Input resolution as [Width, Height]. Lower resolutions are faster but less precise.
 vid_img_extension = 'mp4'  # File extension for videos or images, or 'webcam' for webcam input.
 
 webcam_ids = 0  # Webcam ID to use. Default is 0. For multiple webcams, use a list like [0, 1, ...].
@@ -90,7 +89,7 @@ det_frequency = 1 # Run person detection only every N frames, and inbetween trac
 device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
 
-display_detection = false
+display_detection = true
 overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
 save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now

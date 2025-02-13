@@ -35,7 +35,6 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 [pose]
 rotation = 0  # Degree of rotation applied to the image, allowed in multiples of 90. Use [90, 90, ...] for different angles per source.
-input_size = []  # Input resolution as [Width, Height]. Lower resolutions are faster but less precise.
 vid_img_extension = 'mp4'  # File extension for videos or images, or 'webcam' for webcam input.
 
 webcam_ids = 0  # Webcam ID to use. Default is 0. For multiple webcams, use a list like [0, 1, ...].
