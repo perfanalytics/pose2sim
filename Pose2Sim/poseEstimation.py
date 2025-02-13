@@ -71,165 +71,7 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
-## FUNCTIONS
-def get_formatted_timestamp():
-    dt = datetime.now()
-    ms = dt.microsecond // 1000
-    return dt.strftime("%Y%m%d_%H%M%S_") + f"{ms:03d}"
-
-
-def transform(frame, desired_w, desired_h, full, rotation = 0):
-    rotation = rotation % 360
-    if rotation == 90:
-        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
-    elif rotation == 180:
-        frame = cv2.rotate(frame, cv2.ROTATE_180)
-    elif rotation == 270:
-        frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
-
-    rotated_h, rotated_w = frame.shape[:2]
-
-    scale = min(desired_w / rotated_w, desired_h / rotated_h)
-    new_w = int(rotated_w * scale)
-    new_h = int(rotated_h * scale)
-    if scale != 0:
-        frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
-    if full:
-        canvas = np.zeros((desired_h, desired_w, 3), dtype=np.uint8)
-        x_offset = (desired_w - new_w) // 2
-        y_offset = (desired_h - new_h) // 2
-        canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = frame
-        bottom_left_offset_y = desired_h - (y_offset + new_h)
-        transform_info = {
-            'rotation': rotation,
-            'scale': scale,
-            'x_offset': x_offset,
-            'y_offset': bottom_left_offset_y,
-            'rotated_size': (rotated_w, rotated_h),
-            'canvas_size': (desired_w, desired_h)
-        }
-        return canvas, transform_info
-    else:
-        return frame, None
-
-
-def inverse_transform_keypoints(keypoints, transform_info):
-    desired_w, desired_h = transform_info['canvas_size']
-    scale = transform_info['scale']
-    x_offset = transform_info['x_offset']
-    y_offset = transform_info['y_offset']
-    rotation = transform_info['rotation']
-    rotated_size = transform_info['rotated_size']
-    new_keypoints = []
-    for person in keypoints:
-        new_person = []
-        for (x, y) in person:
-
-            y_bl = desired_h - y
-            x_bl = desired_w - x
-
-            X = (x_bl - x_offset) / scale
-            Y = (y_bl - y_offset) / scale
-
-            if rotation % 360 == 0:
-                orig_x, orig_y = X, Y
-            elif rotation % 360 == 90:
-                orig_x = rotated_size[0] - Y
-                orig_y = X
-            elif rotation % 360 == 180:
-                orig_x = rotated_size[0] - X
-                orig_y = rotated_size[1] - Y
-            elif rotation % 360 == 270:
-                orig_x = Y
-                orig_y = rotated_size[1] - X
-            else:
-                orig_x, orig_y = X, Y
-            new_person.append([orig_x, orig_y])
-        new_keypoints.append(np.array(new_person))
-    return new_keypoints
-
-
-def init_backend_device(backend='auto', device='auto'):
-    '''
-    Set up the backend and device for the pose tracker based on the availability of hardware acceleration.
-    TensorRT is not supported by RTMLib yet: https://github.com/Tau-J/rtmlib/issues/12
-
-    If device and backend are not specified, they are automatically set up in the following order of priority:
-    1. GPU with CUDA and ONNXRuntime backend (if CUDAExecutionProvider is available)
-    2. GPU with ROCm and ONNXRuntime backend (if ROCMExecutionProvider is available, for AMD GPUs)
-    3. GPU with MPS or CoreML and ONNXRuntime backend (for macOS systems)
-    4. CPU with OpenVINO backend (default fallback)
-    '''
-
-    if device == 'auto' or backend == 'auto':
-        if device != 'auto' or backend != 'auto':
-            logging.warning("If you set device or backend to 'auto', you must set the other to 'auto' as well. Both device and backend will be determined automatically.")
-
-        try:
-            import torch
-            import onnxruntime as ort
-            if torch.cuda.is_available() and 'CUDAExecutionProvider' in ort.get_available_providers():
-                logging.info("Valid CUDA installation found: using ONNXRuntime backend with GPU.")
-                return 'onnxruntime', 'cuda'
-            elif torch.cuda.is_available() and 'ROCMExecutionProvider' in ort.get_available_providers():
-                logging.info("Valid ROCM installation found: using ONNXRuntime backend with GPU.")
-                return 'onnxruntime', 'rocm'
-            else:
-                raise
-        except:
-            try:
-                import onnxruntime as ort
-                if ('MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers()):
-                    logging.info("Valid MPS installation found: using ONNXRuntime backend with GPU.")
-                    return 'onnxruntime', 'mps'
-                else:
-                    raise
-            except:
-                logging.info("No valid CUDA installation found: using OpenVINO backend with CPU.")
-                return 'openvino', 'cpu'
-    else:
-        return backend.lower(), device.lower()
-
-
-def save_keypoints_to_openpose(json_file_path, all_keypoints, all_scores):
-    '''
-    Save the keypoints and scores to a JSON file in the OpenPose format
-
-    INPUTS:
-    - json_file_path: Path to save the JSON file
-    - keypoints: Detected keypoints
-    - scores: Confidence scores for each keypoint
-
-    OUTPUTS:
-    - JSON file with the detected keypoints and confidence scores in the OpenPose format
-    '''
-
-    detections = []
-
-    for idx_person in range(len(all_keypoints)):
-        keypoints_with_confidence_i = []
-        for (kp, score) in zip(all_keypoints[idx_person], all_scores[idx_person]):
-            keypoints_with_confidence_i.extend([kp[0].item(), kp[1].item(), score.item()])
-        detections.append({
-            "person_id": [-1],
-            "pose_keypoints_2d": keypoints_with_confidence_i,
-            "face_keypoints_2d": [],
-            "hand_left_keypoints_2d": [],
-            "hand_right_keypoints_2d": [],
-            "pose_keypoints_3d": [],
-            "face_keypoints_3d": [],
-            "hand_left_keypoints_3d": [],
-            "hand_right_keypoints_3d": []
-        })
-
-    # Create JSON output structure
-    json_output = {"version": 1.3, "people": detections}
-
-    # Save JSON output for each frame
-    with open(json_file_path, 'w') as outfile:
-        json.dump(json_output, outfile)
-
-
+## CLASSES
 class PoseEstimatorWorker(multiprocessing.Process):
     def __init__(self, **kwargs):
         super().__init__()
@@ -855,6 +697,7 @@ class MediaSource(multiprocessing.Process):
             self.cap.release()
 
 
+## FUNCTIONS
 def estimate_pose_all(config_dict):
     '''
     Estimate pose from webcams, video files, or a folder of images, and write the results to JSON files, videos, and/or images.
@@ -1422,6 +1265,158 @@ def estimate_pose_all(config_dict):
 
         if display_detection:
             cv2.destroyAllWindows()
+
+
+def transform(frame, desired_w, desired_h, full, rotation = 0):
+    rotation = rotation % 360
+    if rotation == 90:
+        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+    elif rotation == 180:
+        frame = cv2.rotate(frame, cv2.ROTATE_180)
+    elif rotation == 270:
+        frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+    rotated_h, rotated_w = frame.shape[:2]
+
+    scale = min(desired_w / rotated_w, desired_h / rotated_h)
+    new_w = int(rotated_w * scale)
+    new_h = int(rotated_h * scale)
+    if scale != 0:
+        frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    if full:
+        canvas = np.zeros((desired_h, desired_w, 3), dtype=np.uint8)
+        x_offset = (desired_w - new_w) // 2
+        y_offset = (desired_h - new_h) // 2
+        canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = frame
+        bottom_left_offset_y = desired_h - (y_offset + new_h)
+        transform_info = {
+            'rotation': rotation,
+            'scale': scale,
+            'x_offset': x_offset,
+            'y_offset': bottom_left_offset_y,
+            'rotated_size': (rotated_w, rotated_h),
+            'canvas_size': (desired_w, desired_h)
+        }
+        return canvas, transform_info
+    else:
+        return frame, None
+
+
+def inverse_transform_keypoints(keypoints, transform_info):
+    desired_w, desired_h = transform_info['canvas_size']
+    scale = transform_info['scale']
+    x_offset = transform_info['x_offset']
+    y_offset = transform_info['y_offset']
+    rotation = transform_info['rotation']
+    rotated_size = transform_info['rotated_size']
+    new_keypoints = []
+    for person in keypoints:
+        new_person = []
+        for (x, y) in person:
+
+            y_bl = desired_h - y
+            x_bl = desired_w - x
+
+            X = (x_bl - x_offset) / scale
+            Y = (y_bl - y_offset) / scale
+
+            if rotation % 360 == 0:
+                orig_x, orig_y = X, Y
+            elif rotation % 360 == 90:
+                orig_x = rotated_size[0] - Y
+                orig_y = X
+            elif rotation % 360 == 180:
+                orig_x = rotated_size[0] - X
+                orig_y = rotated_size[1] - Y
+            elif rotation % 360 == 270:
+                orig_x = Y
+                orig_y = rotated_size[1] - X
+            else:
+                orig_x, orig_y = X, Y
+            new_person.append([orig_x, orig_y])
+        new_keypoints.append(np.array(new_person))
+    return new_keypoints
+
+
+def init_backend_device(backend='auto', device='auto'):
+    '''
+    Set up the backend and device for the pose tracker based on the availability of hardware acceleration.
+    TensorRT is not supported by RTMLib yet: https://github.com/Tau-J/rtmlib/issues/12
+
+    If device and backend are not specified, they are automatically set up in the following order of priority:
+    1. GPU with CUDA and ONNXRuntime backend (if CUDAExecutionProvider is available)
+    2. GPU with ROCm and ONNXRuntime backend (if ROCMExecutionProvider is available, for AMD GPUs)
+    3. GPU with MPS or CoreML and ONNXRuntime backend (for macOS systems)
+    4. CPU with OpenVINO backend (default fallback)
+    '''
+
+    if device == 'auto' or backend == 'auto':
+        if device != 'auto' or backend != 'auto':
+            logging.warning("If you set device or backend to 'auto', you must set the other to 'auto' as well. Both device and backend will be determined automatically.")
+
+        try:
+            import torch
+            import onnxruntime as ort
+            if torch.cuda.is_available() and 'CUDAExecutionProvider' in ort.get_available_providers():
+                logging.info("Valid CUDA installation found: using ONNXRuntime backend with GPU.")
+                return 'onnxruntime', 'cuda'
+            elif torch.cuda.is_available() and 'ROCMExecutionProvider' in ort.get_available_providers():
+                logging.info("Valid ROCM installation found: using ONNXRuntime backend with GPU.")
+                return 'onnxruntime', 'rocm'
+            else:
+                raise
+        except:
+            try:
+                import onnxruntime as ort
+                if ('MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers()):
+                    logging.info("Valid MPS installation found: using ONNXRuntime backend with GPU.")
+                    return 'onnxruntime', 'mps'
+                else:
+                    raise
+            except:
+                logging.info("No valid CUDA installation found: using OpenVINO backend with CPU.")
+                return 'openvino', 'cpu'
+    else:
+        return backend.lower(), device.lower()
+
+
+def save_keypoints_to_openpose(json_file_path, all_keypoints, all_scores):
+    '''
+    Save the keypoints and scores to a JSON file in the OpenPose format
+
+    INPUTS:
+    - json_file_path: Path to save the JSON file
+    - keypoints: Detected keypoints
+    - scores: Confidence scores for each keypoint
+
+    OUTPUTS:
+    - JSON file with the detected keypoints and confidence scores in the OpenPose format
+    '''
+
+    detections = []
+
+    for idx_person in range(len(all_keypoints)):
+        keypoints_with_confidence_i = []
+        for (kp, score) in zip(all_keypoints[idx_person], all_scores[idx_person]):
+            keypoints_with_confidence_i.extend([kp[0].item(), kp[1].item(), score.item()])
+        detections.append({
+            "person_id": [-1],
+            "pose_keypoints_2d": keypoints_with_confidence_i,
+            "face_keypoints_2d": [],
+            "hand_left_keypoints_2d": [],
+            "hand_right_keypoints_2d": [],
+            "pose_keypoints_3d": [],
+            "face_keypoints_3d": [],
+            "hand_left_keypoints_3d": [],
+            "hand_right_keypoints_3d": []
+        })
+
+    # Create JSON output structure
+    json_output = {"version": 1.3, "people": detections}
+
+    # Save JSON output for each frame
+    with open(json_file_path, 'w') as outfile:
+        json.dump(json_output, outfile)
 
 
 def create_output_folders(source_path, output_dir, save_images, webcam_recording):
