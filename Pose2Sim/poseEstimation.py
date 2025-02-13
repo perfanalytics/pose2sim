@@ -46,14 +46,14 @@ import psutil
 import cv2
 import numpy as np
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from functools import partial
 from multiprocessing import shared_memory
 from tqdm import tqdm
 from anytree.importer import DictImporter
 
-from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
+from rtmlib import BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
 
 from deep_sort_realtime.deepsort_tracker import DeepSort
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort, sort_people_rtmlib, colors, thickness, draw_bounding_box, draw_keypts, draw_skel
@@ -236,6 +236,7 @@ class PoseEstimatorWorker(multiprocessing.Process):
         self.__dict__.update(kwargs)
         self.stopped = False
         self.prev_keypoints = {}
+        self.prev_bboxes = {}
 
     def run(self):
         model = self.ModelClass(mode=self.mode,
@@ -266,30 +267,42 @@ class PoseEstimatorWorker(multiprocessing.Process):
 
     def process_frame(self, item):
         # Unpack frame info
-        buffer_name, idx, frame_shape, frame_dtype, *others = item
+        buffer_name, timestamp, idx, frame_shape, frame_dtype, *others = item
         # Convert shared memory to numpy
         frame = np.ndarray(frame_shape, dtype=frame_dtype, buffer=self.buffers[buffer_name].buf)
 
         if not others[1]:
             if self.det_model is not None:
-                # if self.frame_cnt % self.det_frequency == 0:
+                if idx % self.det_frequency == 0:
                     bboxes = self.det_model(frame)
-                # else:
-                #     bboxes = self.bboxes_last_frame
-                    keypoints, scores = self.pose_model(frame, bboxes=bboxes)
+                    if others[0] != -1:
+                        self.prev_bboxes[others[0]] = bboxes
+                    else:
+                        self.prev_bboxes = bboxes
+                else:
+                    if others[0] != -1:
+                        bboxes = self.prev_bboxes.get(others[0], None)
+                        keypoints, scores = self.pose_model(frame, bboxes=bboxes)
+                    else:
+                        bboxes = self.prev_bboxes
+                keypoints, scores = self.pose_model(frame, bboxes=bboxes)
             else:  # rtmo
                 keypoints, scores = self.pose_model(frame)
+
+            if self.multi_person:
+                if self.tracking_mode == 'deepsort':
+                    keypoints, scores = sort_people_deepsort(keypoints, scores, self.deepsort_tracker, frame, idx)
+                if self.tracking_mode == 'sports2d':
+                    if others[0] is not None:
+                        prev_kpts = self.prev_keypoints.get(others[0], None)
+                        updated_prev, keypoints, scores = sort_people_sports2d(prev_kpts, keypoints, scores=scores)
+                        self.prev_keypoints[others[0]] = updated_prev
+                    else:
+                        self.prev_keypoints, keypoints, scores = sort_people_sports2d(self.prev_keypoints, keypoints, scores=scores)
         else:
             keypoints, scores = None, None
-            
-         if multi_person:
-                  if tracking_mode == 'deepsort':
-                      keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count)
-                  if tracking_mode == 'sports2d': 
-                      if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                      prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
 
-        result = (buffer_name, idx, frame_shape, frame_dtype, others[0], others[1], keypoints, scores)
+        result = (buffer_name, timestamp, idx, frame_shape, frame_dtype, others[0], others[1], others[2], keypoints, scores)
         self.result_queue.put(result)
 
     def stop(self):
@@ -408,7 +421,7 @@ class FrameQueueProcessor(multiprocessing.Process, BaseSynchronizer):
     def run(self):
         while not self.stopped:
             try:
-                buffer_name, idx, frame_shape, frame_dtype, sid, is_placeholder, _ = self.frame_queue.get_nowait()
+                buffer_name, timestamp, idx, frame_shape, frame_dtype, sid, is_placeholder, _ = self.frame_queue.get_nowait()
                 if idx not in self.sync_data:
                     self.sync_data[idx] = {}
                 self.sync_data[idx][sid] = (buffer_name, frame_shape, frame_dtype, None, None, is_placeholder, None)
@@ -417,7 +430,7 @@ class FrameQueueProcessor(multiprocessing.Process, BaseSynchronizer):
                     mosaic, subinfo = self.build_mosaic(frames_list)
                     pose_buf_name = self.available_pose_buffers.get_nowait()
                     np.ndarray(mosaic.shape, dtype=mosaic.dtype, buffer=self.pose_buffers[pose_buf_name].buf)[:] = mosaic
-                    self.pose_queue.put((pose_buf_name, idx, mosaic.shape, mosaic.dtype.str, subinfo, False))
+                    self.pose_queue.put((pose_buf_name, timestamp, idx, mosaic.shape, mosaic.dtype.str, -1, False, subinfo))
             except queue.Empty:
                 time.sleep(0.005)
 
@@ -458,13 +471,13 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
                 )
 
     def process_result_item(self, result_item):
-        buffer_name, idx, frame_shape, frame_dtype, info, is_placeholder, keypoints, scores = result_item
+        buffer_name, timestamp, idx, frame_shape, frame_dtype, sid, is_placeholder, info, keypoints, scores = result_item
         if self.combined_frames:
-            self.handle_combined_frames(buffer_name, frame_shape, frame_dtype, keypoints, scores, info, idx)
+            self.handle_combined_frames(buffer_name, frame_shape, frame_dtype, keypoints, scores, info, timestamp, idx)
         else:
-            self.handle_individual_frames(buffer_name, frame_shape, frame_dtype, info, is_placeholder, keypoints, scores, idx)
+            self.handle_individual_frames(buffer_name, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, timestamp, idx)
 
-    def handle_combined_frames(self, buffer_name, frame_shape, frame_dtype, keypoints, scores, subinfo, idx):
+    def handle_combined_frames(self, buffer_name, frame_shape, frame_dtype, keypoints, scores, subinfo, timestamp, idx):
         shm = self.pose_buffers[buffer_name]
         mosaic = np.ndarray(frame_shape, dtype=frame_dtype, buffer=shm.buf)
 
@@ -478,9 +491,9 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
 
         for sid in frames:
             trans_info = subinfo[sid].get("transform_info", None)
-            self.handle_output(sid, frames[sid], recovered_keypoints[sid], recovered_scores[sid], idx, trans_info)
+            self.handle_output(sid, frames[sid], recovered_keypoints[sid], recovered_scores[sid], timestamp, idx, trans_info)
 
-    def handle_individual_frames(self, buffer_name, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, idx):
+    def handle_individual_frames(self, buffer_name, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, timestamp, idx):
         if idx not in self.sync_data:
             self.sync_data[idx] = {}
         self.sync_data[idx][sid] = (buffer_name, frame_shape, frame_dtype, keypoints, scores, is_placeholder, None)
@@ -492,7 +505,7 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
                     if self.save_images or self.save_video or self.display_detection:
                         frame = draw_skeleton(frame, others[0], others[1])
                     annotated_frames.append((frame, sid, orig_w, orig_h, transform_info))
-                    self.handle_output(sid, frame, others[0], others[1], idx, transform_info)
+                    self.handle_output(sid, frame, others[0], others[1], timestamp, idx, transform_info)
 
             if self.display_detection:
                 mosaic, _ = self.build_mosaic(annotated_frames)
@@ -524,9 +537,9 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
             logging.info("User closed display.")
             self.stop()
 
-    def handle_output(self, sid, frame, keypoints, scores, idx, transform_info):
+    def handle_output(self, sid, frame, keypoints, scores, timestamp, idx, transform_info):
         out_dirs = self.source_outputs[sid]
-        file_name = f"{out_dirs[0]}_{idx}"
+        file_name = f"{out_dirs[0]}_{timestamp}_{idx:06d}"
 
         # Save to json
         if transform_info is not None:
@@ -667,6 +680,7 @@ class MediaSource(multiprocessing.Process):
             
             elif self.source['type'] == 'video':
                 self.open_video()
+                self.start_timestamp = get_file_utc_timestamp(self.source['path'])
                 if self.frame_ranges:
                     self.total_frames = len(self.frame_ranges)
                 else:
@@ -675,6 +689,7 @@ class MediaSource(multiprocessing.Process):
 
             elif self.source['type'] == 'images':
                 self.load_images()
+                self.start_timestamp = get_file_utc_timestamp(self.image_files[0])
                 self.shared_counts[self.source['id']]['total'].value = self.total_frames
 
             while not self.stopped:
@@ -812,9 +827,15 @@ class MediaSource(multiprocessing.Process):
         np_frame = np.ndarray(frame.shape, dtype=frame.dtype, buffer=shm.buf)
         np_frame[:] = frame
 
+        if self.source['type'] in ('video', 'images'):
+            timestamp_str = get_frame_utc_timestamp(self.start_timestamp, self.frame_idx, self.frame_rate)
+        else:
+            timestamp_str = get_formatted_utc_timestamp()
+
         item = (
             buffer_name,
-            self.frame_idx if self.source['type'] != 'webcam' else get_formatted_timestamp(),
+            timestamp_str,
+            self.frame_idx,
             frame.shape,
             frame.dtype.str,
             self.source['id'],
@@ -884,6 +905,18 @@ def estimate_pose_all(config_dict):
     output_format = config_dict['project'].get('output_format', 'openpose')
     rotation = config_dict['pose'].get('rotation', 0)
     webcam_recording = config_dict['pose'].get('webcam_recording', False)
+    tracking_mode = config_dict['pose'].get('tracking_mode')
+
+    deepsort_tracker = None
+    if tracking_mode == 'deepsort' and multi_person:
+        deepsort_params = config_dict.get['pose'].get('deepsort_params')
+        try:
+            deepsort_params = ast.literal_eval(deepsort_params)
+        except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+            deepsort_params = deepsort_params.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/',':/').replace('":"\\',':\\')
+            deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params) # changes "[640", "640]" to [640,640]
+            deepsort_params = json.loads(deepsort_params)
+        deepsort_tracker = DeepSort(**deepsort_params)
 
     # Gather sources
     sources = []
@@ -1063,7 +1096,10 @@ def estimate_pose_all(config_dict):
             available_buffers=available_pose_buffers if combined_frames else available_frame_buffers,
             active_sources=active_sources,
             combined_frames=combined_frames,
-            tracker_ready_event=tracker_ready_event
+            tracker_ready_event=tracker_ready_event,
+            multi_person = multi_person,
+            tracking_mode = tracking_mode,
+            deepsort_tracker = deepsort_tracker
         )
         worker.start()
         return worker
@@ -1092,6 +1128,7 @@ def estimate_pose_all(config_dict):
             frame_buffers = frame_buffers,
             shared_counts = shared_counts,
             frame_size = frame_size,
+            frame_rate = frame_rate,
             active_sources = active_sources,
             command_queue = command_queues[s['id']],
             vid_img_extension = vid_img_extension,
@@ -1614,5 +1651,19 @@ def check_stop_window_open():
 
 def stop_all_cameras_immediately(sources, command_queues):
     for s in sources:
-        if s['type'] == 'webcam':
-            command_queues[s['id']].put(("STOP_CAPTURE", None))
+        command_queues[s['id']].put(("STOP_CAPTURE", None))
+
+
+def get_formatted_utc_timestamp():
+    dt = datetime.now(timezone.utc)
+    return dt.strftime("%Y%m%dT%H%M%S") + f"{dt.microsecond:06d}"
+
+
+def get_file_utc_timestamp(file_path):
+    ts = os.path.getmtime(file_path)
+    return datetime.fromtimestamp(ts, timezone.utc).replace(tzinfo=timezone.utc)
+
+
+def get_frame_utc_timestamp(start_timestamp, frame_idx, fps):
+    frame_time = start_timestamp + timedelta(seconds=(frame_idx / fps))
+    return frame_time.strftime("%Y%m%dT%H%M%S") + f"{frame_time.microsecond:06d}"
