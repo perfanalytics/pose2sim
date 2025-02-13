@@ -185,7 +185,11 @@ def calibration(config=None):
     currentDateAndTime = datetime.now()
 
     # Run calibration
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
+    try:
+        calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
+    except:
+        logging.error('Could not find the calibration folder or files.')
+        raise ValueError('Could not find the calibration folder or files.')
     logging.info("\n---------------------------------------------------------------------")
     logging.info("Camera calibration")
     logging.info(f"On {currentDateAndTime.strftime('%A %d. %B %Y, %H:%M:%S')}")

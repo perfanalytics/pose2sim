@@ -125,6 +125,7 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.markerAugmentation(config_dict)
         Pose2Sim.kinematics(config_dict)
 
+
         # Run all
         # overwrite pose, balanced
         config_dict.get("project").update({"participant_height":1.7})
@@ -133,6 +134,7 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("pose").update({"mode":'balanced'})
         config_dict.get("pose").update({"overwrite_pose":True})
         config_dict.get("pose").update({"save_video":'none'})
+        config_dict.get('synchronization').update({'keypoints_to_consider':['RWrist']})
         Pose2Sim.runAll(config_dict)
         
 
@@ -151,6 +153,7 @@ class TestWorkflow(unittest.TestCase):
                                                    'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.zip', 
                                                    'pose_input_size':[640, 640]}"""})
         config_dict.get("pose").update({"display_detection":False})
+        config_dict.get("pose").update({"save_video":'none'})
         config_dict.get("synchronization").update({"display_sync_plots":False})
         config_dict.get("filtering").update({"display_figures":False})
 
@@ -166,6 +169,8 @@ class TestWorkflow(unittest.TestCase):
 
         # Run all
         # No marker augmentation
+        config_dict.get("pose").update({"tracking_mode":'deepsort'})
+        config_dict.get("pose").update({"deepsort_params":"""{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8, 'embedder':None}"""})
         Pose2Sim.runAll(config_dict, do_synchronization=False, do_markerAugmentation=False)
 
 

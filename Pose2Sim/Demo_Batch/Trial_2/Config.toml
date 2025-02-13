@@ -79,6 +79,11 @@ participant_mass = [70.0, 63.5]     # float (eg 70.0), or list of floats (eg [70
 # device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 # backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
 
+# tracking_mode = 'sports2d' # 'sports2d' or 'deepsort'. 'deepsort' is slower but more robust in difficult configurations
+# deepsort_params = """{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8}""" # """{dictionary between 3 double quotes}"""
+#                   # More robust in crowded scenes but Can be tricky to parametrize. More information there: https://github.com/levan92/deep_sort_realtime/blob/master/deep_sort_realtime/deepsort_tracker.py#L51
+#                   # Note: For faster and more robust tracking, use {'embedder_gpu': True, embedder':'torchreid'}, which uses the GPU and runs osnet_ain_x1_0 by default. requires `pip install torch torchvision torchreid gdown tensorboard`
+
 # display_detection = true
 # overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
 # save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
@@ -218,9 +223,10 @@ keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, f
 
 # [kinematics]
 # use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
+# use_contacts_muscles = true # true or false (lowercase) # If true, contact spheres and muscles are added to the model
 # right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)
-# default_height = 1.7 # m # If no frames left after removing fastest frames, frames with zero speed, frames with large hip and knee angles, and frames with extreme values.
 
+# default_height = 1.7 # meters # If automatic height calculation did not work, this value is used to scale the model
 # remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
 # remove_individual_IK_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
 

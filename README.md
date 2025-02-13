@@ -114,7 +114,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 
    Once installed, open an Anaconda prompt and create a virtual environment:
    ```
-   conda create -n Pose2Sim python=3.9 -y 
+   conda create -n Pose2Sim python=3.10 -y 
    conda activate Pose2Sim
    ```
 
@@ -125,7 +125,7 @@ Install the OpenSim Python API (if you do not want to install via conda, refer [
    ```
    
 3. **Install Pose2Sim**:\
-If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9 is installed. 
+If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.10 is installed. 
    - OPTION 1: **Quick install:** Open a terminal. 
        ``` cmd
        pip install pose2sim
@@ -358,9 +358,10 @@ Pose2Sim.poseEstimation()
 
 ***N.B.:* To speed up the process:**
 - Disable `display_detection` and `save_video` 
-- Increase the value of `det_frequency`. In that case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames)
+- Increase the value of `det_frequency`. In this case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames)
 - Use your GPU (See [Installation](#installation)). Slightly more involved, but often worth it. Note that the optimal device _(CPU or GPU)_ and backend for your configuration will be automatically selected, but you can also manually select them in Config.toml.
 - Run pose estimation in `lightweight` mode instead of `balanced` or `performance`. However, this will reduce the quality of results. 
+- Use `tracking_mode = 'sports2d'`: Will use the default Sports2D tracker. Unlike DeepSort, it is faster, does not require any parametrization, and is as good in non-crowded scenes. 
 
 <br>
 
@@ -717,6 +718,7 @@ This can be either done fully automatically within Pose2Sim, or manually within 
 > Model scaling is done according to the mean of the segment lengths, across a subset of frames. We remove the 10% fastest frames (potential outliers), the frames where the speed is 0 (person probably out of frame), the frames where the average knee and hip flexion angles are above 45° (pose estimation is not precise when the person is crouching) and the 20% most extreme segment values after the previous operations (potential outliers).
 
 In your Config.toml file, set `use_augmentation = false` is you don't want to use the results with augmented marker (this is sometimes better).\
+Set `use_contacts_muscles = false` if you do not need contact spheres or muscles in your model.\
 Set `right_left_symmetry = false` if you have good reasons to think the participant is not symmetrical (e.g. if they wear a prosthetic limb).
 
 Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\

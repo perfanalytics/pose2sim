@@ -54,7 +54,9 @@ from tqdm import tqdm
 from anytree.importer import DictImporter
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
-from Pose2Sim.common import natural_sort_key, sort_people_sports2d, colors, thickness, draw_bounding_box, draw_keypts, draw_skel
+
+from deep_sort_realtime.deepsort_tracker import DeepSort
+from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort, sort_people_rtmlib, colors, thickness, draw_bounding_box, draw_keypts, draw_skel
 from Pose2Sim.skeletons import *
 
 
@@ -233,13 +235,14 @@ class PoseEstimatorWorker(multiprocessing.Process):
         super().__init__()
         self.__dict__.update(kwargs)
         self.stopped = False
+        self.prev_keypoints = {}
 
     def run(self):
         model = self.ModelClass(mode=self.mode,
             to_openpose=self.to_openpose,
             backend=self.backend,
             device=self.device)
-    
+  
         try:
             self.det_model = model.det_model
         except: # rtmo
@@ -278,6 +281,13 @@ class PoseEstimatorWorker(multiprocessing.Process):
                 keypoints, scores = self.pose_model(frame)
         else:
             keypoints, scores = None, None
+            
+         if multi_person:
+                  if tracking_mode == 'deepsort':
+                      keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count)
+                  if tracking_mode == 'sports2d': 
+                      if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                      prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
 
         result = (buffer_name, idx, frame_shape, frame_dtype, others[0], others[1], keypoints, scores)
         self.result_queue.put(result)
@@ -418,7 +428,6 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
         BaseSynchronizer.__init__(self, **kwargs)
         self.result_queue = result_queue
         self.pose_model = pose_model
-        self.prev_keypoints = {}
 
     def run(self):
         self.init_video_writers()
