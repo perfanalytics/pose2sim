@@ -18,7 +18,7 @@
 
 > **_News_: Version 0.10.0:**\
 > **OpenSim scaling and inverse kinematics are now integrated in Pose2Sim!** No static trial needed.\
-> **Other recently added features**: Pose estimation, Automatic camera synchronization, Multi-person analysis, Blender visualization, Marker augmentation, Batch processing.
+> **Other recently added features**: Pose estimation, Automatic camera synchronization, Multi-person analysis, Blender visualization and rig, Marker augmentation, Batch processing.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
 > To upgrade, type `pip install pose2sim --upgrade`
