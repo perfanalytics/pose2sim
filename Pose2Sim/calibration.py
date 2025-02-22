@@ -690,8 +690,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
 
             # Find corners or label by hand
             if extrinsics_method == 'board':
-                imgp = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=object_coords_3d, show=show_reprojection_error)
-                objp = object_coords_3d
+                imgp, objp = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=object_coords_3d, show=show_reprojection_error)
                 if len(imgp) == 0:
                     logging.exception('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
                     raise ValueError('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
@@ -709,7 +708,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             
             # Calculate extrinsics
             mtx, dist = np.array(K[i]), np.array(D[i])
-            _, r, t = cv2.solvePnP(np.array(objp)*1000, imgp, mtx, dist)
+            _, r, t = cv2.solvePnP(np.array(objp)*1000, np.array(imgp), mtx, dist)
             r, t = r.flatten(), t.flatten()
             t /= 1000 
 
@@ -764,6 +763,56 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
     return ret, C, S, D, K, R, T
 
 
+def crop_image(original_img):
+    """
+    Crop the chessboard area from the original image using an interactive ROI selection.
+
+    Parameters:
+        original_img (numpy.ndarray): The original image.
+
+    Returns:
+        cropped_img (numpy.ndarray): The cropped image (or the original image if the crop is too small).
+        offset_x (int): The x-coordinate offset of the cropped region in the original image.
+        offset_y (int): The y-coordinate offset of the cropped region in the original image.
+    """
+    max_display_size = 800
+    h, w = original_img.shape[:2]
+    scale_factor = 1.0
+
+    if w > max_display_size or h > max_display_size:
+        scale_factor = min(max_display_size / w, max_display_size / h)
+        resized_img = cv2.resize(
+            original_img,
+            (int(w * scale_factor), int(h * scale_factor)),
+            interpolation=cv2.INTER_AREA
+        )
+    else:
+        resized_img = original_img.copy()
+
+    instructions = "Select the Chessboard. Press ENTER to confirm, ESC to cancel."
+    cv2.putText(resized_img, instructions, (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+    roi = cv2.selectROI("Reframe - Select the Chessboard", resized_img,
+                          fromCenter=False, showCrosshair=True)
+    cv2.destroyWindow("Reframe - Select the Chessboard")
+    x, y, w_roi, h_roi = roi
+
+    x_orig = int(x / scale_factor)
+    y_orig = int(y / scale_factor)
+    w_orig_roi = int(w_roi / scale_factor)
+    h_orig_roi = int(h_roi / scale_factor)
+
+    if w_orig_roi >= 2 and h_orig_roi >= 2:
+        cropped_img = original_img[y_orig:y_orig+h_orig_roi, x_orig:x_orig+w_orig_roi].copy()
+    else:
+        logging.warning("Crop dimensions are less than 2 pixels. Using the full image for detection.")
+        cropped_img = original_img.copy()
+        x_orig, y_orig = 0, 0
+
+    return cropped_img, x_orig, y_orig
+
+
 def findCorners(img_path, corner_nb, objp=[], show=True):
     '''
     Find corners in the photo of a checkerboard.
@@ -789,46 +838,134 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
     '''
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001) # stop refining after 30 iterations or if error less than 0.001px
-    
-    img = cv2.imread(img_path)
-    if img is None:
+
+    original_img = cv2.imread(img_path)
+    if original_img is None:
         cap = cv2.VideoCapture(img_path)
-        ret, img = cap.read()
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    
-    # Find corners
-    ret, corners = cv2.findChessboardCorners(gray, corner_nb, None)
-    # If corners are found, refine corners
-    if ret == True: 
-        imgp = cv2.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
+        ret, original_img = cap.read()
+        cap.release()
+        if not ret:
+            logging.error(f"Failed to read frame from: {img_path}")
+            return None
+
+    working_img = original_img.copy()
+    offset_x, offset_y = 0, 0
+
+    # Crop the image interactively if display is enabled
+    if show:
+        working_img, offset_x, offset_y = crop_image(original_img)
+
+    gray = cv2.cvtColor(working_img, cv2.COLOR_BGR2GRAY)
+
+    # Preprocessing steps
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    gray_clahe = clahe.apply(gray)
+    gray_eq = cv2.equalizeHist(gray)
+    gray_eq_blur = cv2.GaussianBlur(gray_eq, (5, 5), 0)
+    gray_clahe_blur = cv2.GaussianBlur(gray_clahe, (5, 5), 0)
+
+    kernel_sharpen = np.array([[0, -1, 0],
+                               [-1, 5, -1],
+                               [0, -1, 0]], dtype=np.float32)
+    gray_sharp = cv2.filter2D(gray, -1, kernel_sharpen)
+
+    # List of candidate images for corner detection
+    candidates = [
+        ("gray", gray),
+        ("equalized", gray_eq),
+        ("CLAHE", gray_clahe),
+        ("equalized_blur", gray_eq_blur),
+        ("CLAHE_blur", gray_clahe_blur),
+        ("sharpen", gray_sharp),
+    ]
+
+    scales = [1.0, 0.75, 0.5, 1.25, 1.5]
+
+    flags_sb = [
+        cv2.CALIB_CB_NORMALIZE_IMAGE | cv2.CALIB_CB_EXHAUSTIVE | cv2.CALIB_CB_ACCURACY,
+        cv2.CALIB_CB_NORMALIZE_IMAGE | cv2.CALIB_CB_EXHAUSTIVE,
+        cv2.CALIB_CB_NORMALIZE_IMAGE
+    ]
+    flags_cb = [
+        cv2.CALIB_CB_ADAPTIVE_THRESH | cv2.CALIB_CB_NORMALIZE_IMAGE,
+        cv2.CALIB_CB_NORMALIZE_IMAGE
+    ]
+
+    final_corners = None
+    found = False
+
+    # Attempt to find chessboard corners using multiple methods
+    for desc, proc_img in candidates:
+        for scale in scales:
+            if scale != 1.0:
+                resized = cv2.resize(proc_img, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+            else:
+                resized = proc_img.copy()
+
+            for flag in flags_sb:
+                ret, corners = cv2.findChessboardCornersSB(resized, corner_nb, flags=flag)
+                if ret:
+                    if scale != 1.0:
+                        corners = corners / scale
+                    final_corners = corners
+                    found = True
+                    break
+            if found:
+                break
+
+            for flag in flags_cb:
+                ret, corners = cv2.findChessboardCorners(resized, corner_nb, flags=flag)
+                if ret:
+                    if scale != 1.0:
+                        corners = corners / scale
+                    final_corners = corners
+                    found = True
+                    break
+            if found:
+                break
+        if found:
+            break
+
+    display_img = cv2.cvtColor(original_img.copy(), cv2.COLOR_BGR2RGB)
+
+    if found:
+        # If corners are found, refine corners
+        refined_corners = cv2.cornerSubPix(gray, final_corners, (11, 11), (-1, -1), criteria)
+        if offset_x or offset_y:
+            refined_corners += np.array([[offset_x, offset_y]], dtype=refined_corners.dtype)
         logging.info(f'{os.path.basename(img_path)}: Corners found.')
-        
+
         if show:
             # Draw corners
-            cv2.drawChessboardCorners(img, corner_nb, imgp, ret)
+            cv2.drawChessboardCorners(display_img, corner_nb, refined_corners, ret)
             # Add corner index 
-            for i, corner in enumerate(imgp):
-                if i in [0, corner_nb[0]-1, corner_nb[0]*(corner_nb[1]-1), corner_nb[0]*corner_nb[1] -1]:
+            indices_to_label = [0, corner_nb[0]-1, corner_nb[0]*(corner_nb[1]-1), corner_nb[0]*corner_nb[1]-1]
+            for i, corner in enumerate(refined_corners):
+                if i in indices_to_label:
                     x, y = corner.ravel()
-                    cv2.putText(img, str(i+1), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .8, (255, 255, 255), 7) 
-                    cv2.putText(img, str(i+1), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .8, (0,0,0), 2) 
-            
+                    cv2.putText(display_img, str(i+1), (int(x)-5, int(y)-5),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 7)
+                    cv2.putText(display_img, str(i+1), (int(x)-5, int(y)-5),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+
             # Visualizer and key press event handler
             for var_to_delete in ['imgp_confirmed', 'objp_confirmed']:
                 if var_to_delete in globals():
                     del globals()[var_to_delete]
-            imgp_objp_confirmed = imgp_objp_visualizer_clicker(img, imgp=imgp, objp=objp, img_path=img_path)
+            imgp_objp_confirmed = imgp_objp_visualizer_clicker(
+                display_img, imgp=refined_corners, objp=objp, img_path=img_path
+            )
         else:
-            imgp_objp_confirmed = imgp
-            
+            imgp_objp_confirmed = refined_corners
 
     # If corners are not found, dismiss or click points by hand
     else:
         if show:
             # Visualizer and key press event handler
             logging.info(f'{os.path.basename(img_path)}: Corners not found: please label them by hand.')
-            imgp_objp_confirmed = imgp_objp_visualizer_clicker(img, imgp=[], objp=objp, img_path=img_path)
+            imgp_objp_confirmed = imgp_objp_visualizer_clicker(
+                display_img, imgp=[], objp=objp, img_path=img_path
+            )
         else:
             logging.info(f'{os.path.basename(img_path)}: Corners not found. To label them by hand, set "show_detection_intrinsics" to true in the Config.toml file.')
             imgp_objp_confirmed = []
