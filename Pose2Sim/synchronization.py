@@ -657,23 +657,10 @@ def synchronize_cams_all(config_dict):
 
     # Determine frames to consider for synchronization
     if isinstance(approx_time_maxspeed, list): # search around max speed
-        logging.info(f'Synchronization is calculated around the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
-        if len(approx_time_maxspeed) == 1 and cam_nb > 1:
-            approx_time_maxspeed *= cam_nb
         approx_frame_maxspeed = [int(fps * t) for t in approx_time_maxspeed]
         nb_frames_per_cam = [len(fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json')) for json_dir in json_dirs]
-
-        search_around_frames = []
-        for i, frame in enumerate(approx_frame_maxspeed):
-            start_frame = max(int(frame - lag_range), 0)
-            end_frame = min(int(frame + lag_range), nb_frames_per_cam[i] + f_range[0])
-
-            if start_frame != frame - lag_range:
-                logging.warning(f'Frame range start adjusted for camera {i}: {frame - lag_range} -> {start_frame}')
-            if end_frame != frame + lag_range:
-                logging.warning(f'Frame range end adjusted for camera {i}: {frame + lag_range} -> {end_frame}')
-
-            search_around_frames.append([start_frame, end_frame])
+        search_around_frames = [[int(a-lag_range) if a-lag_range>0 else 0, int(a+lag_range) if a+lag_range<nb_frames_per_cam[i] else nb_frames_per_cam[i]+f_range[0]] for i,a in enumerate(approx_frame_maxspeed)]
+        logging.info(f'Synchronization is calculated around the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
     elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
         search_around_frames = [[f_range[0], f_range[0]+nb_frames_per_cam[i]] for i in range(cam_nb)]
         logging.info('Synchronization is calculated on the whole sequence. This may take a while.')
@@ -694,21 +681,18 @@ def synchronize_cams_all(config_dict):
     # Extract, interpolate, and filter keypoint coordinates
     logging.info('Synchronizing...')
     df_coords = []
-    b, a = signal.butter(int(filter_order/2), filter_cutoff/(fps/2), 'low', analog = False)
+    b, a = signal.butter(filter_order/2, filter_cutoff/(fps/2), 'low', analog = False) 
     json_files_names_range = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*frames_cam)] for (json_files_cam, frames_cam) in zip(json_files_names,search_around_frames)]
+    json_files_range = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names_range[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     if np.array([j==[] for j in json_files_names_range]).any():
         raise ValueError(f'No json files found within the specified frame range ({frame_range}) at the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
-    
-    json_files_range = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names_range[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # Handle manual selection if multi person is True
     if multi_person:
         selected_id_list = select_person(vid_or_img_files, cam_names, json_files_names_range, search_around_frames, pose_dir, json_dirs_names)
     else:
         selected_id_list = [None] * cam_nb
-
-    padlen = 3 * (max(len(a), len(b)) - 1)
 
     for i in range(cam_nb):
         df_coords.append(convert_json2pandas(json_files_range[i], likelihood_threshold=likelihood_threshold, keypoints_ids=keypoints_ids, multi_person=multi_person, selected_id=selected_id_list[i]))
@@ -729,13 +713,7 @@ def synchronize_cams_all(config_dict):
         df_coords[i] = df_coords[i][kpt_indices]
         df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args = ['linear'])
         df_coords[i] = df_coords[i].bfill().ffill()
-        if df_coords[i].shape[0] > padlen:
-            df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0))
-        else:
-            logging.warning(
-                f"Camera {i}: insufficient number of samples ({df_coords[i].shape[0]} < {padlen + 1}) to apply the Butterworth filter. "
-                "Data will remain unfiltered."
-            )
+        df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0))
 
 
     # Compute sum of speeds
@@ -749,14 +727,8 @@ def synchronize_cams_all(config_dict):
         
         # # Replace 0 by random values, otherwise 0 padding may lead to unreliable correlations
         # sum_speeds[i].loc[sum_speeds[i] < 1] = sum_speeds[i].loc[sum_speeds[i] < 1].apply(lambda x: np.random.normal(0,1))
-
-        if sum_speeds[i].shape[0] > padlen:
-            sum_speeds[i] = pd.DataFrame(signal.filtfilt(b, a, sum_speeds[i], axis=0)).squeeze()
-        else:
-            logging.warning(
-                f"Camera {i}: insufficient number of samples ({sum_speeds[i].shape[0]} < {padlen + 1}) to apply the Butterworth filter. "
-                "Data will remain unfiltered."
-            )
+        
+        sum_speeds[i] = pd.DataFrame(signal.filtfilt(b, a, sum_speeds[i], axis=0)).squeeze()
 
 
     # Compute offset for best synchronization:
