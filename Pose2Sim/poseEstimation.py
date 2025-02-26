@@ -239,7 +239,7 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     f_range = [[total_frames] if frame_range==[] else frame_range][0]
-    with tqdm(total=total_frames, desc=f'Processing {os.path.basename(video_path)}') as pbar:
+    with tqdm(iterable=range(*f_range), desc=f'Processing {os.path.basename(video_path)}') as pbar:
         frame_count = 0
         while cap.isOpened():
             # print('\nFrame ', frame_idx)
