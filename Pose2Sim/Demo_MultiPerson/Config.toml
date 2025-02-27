@@ -38,7 +38,7 @@ vid_img_extension = 'mp4' # any video or image extension
 
 pose_model = 'Body_with_feet'  #With RTMLib: 
                          # - Body_with_feet (default HALPE_26 model), 
-                         # - Whole_body_wrist (COCO_133: body + feet + 2 hand_points), 
+                         # - Whole_body_wrist (COCO_133_WRIST: body + feet + 2 hand_points), 
                          # - Whole_body (COCO_133: body + feet + hands), 
                          # - Body (COCO_17). Marker augmentation won't work, Kinematic analysis will work, 
                          # - Hand (HAND_21, only lightweight mode. Potentially better results with Whole_body), 
@@ -228,7 +228,7 @@ right_left_symmetry = true # true or false (lowercase) # Set to false only if yo
 
 default_height = 1.7 # meters # If automatic height calculation did not work, this value is used to scale the model
 remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
-remove_individual_IK_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
+remove_individual_ik_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
 
 fastest_frames_to_remove_percent = 0.2 # Frames with high speed are considered as outliers
 close_to_zero_speed_m = 0.1 # Sum for all keypoints: about 0.1 m/frame

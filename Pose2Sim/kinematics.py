@@ -584,7 +584,7 @@ def kinematics_all(config_dict):
     default_height = config_dict.get('kinematics').get('default_height')
 
     remove_scaling_setup = config_dict.get('kinematics').get('remove_individual_scaling_setup')
-    remove_IK_setup = config_dict.get('kinematics').get('remove_individual_IK_setup')
+    remove_IK_setup = config_dict.get('kinematics').get('remove_individual_ik_setup')
 
     pose3d_dir = Path(project_dir) / 'pose-3d'
     kinematics_dir = Path(project_dir) / 'kinematics'
