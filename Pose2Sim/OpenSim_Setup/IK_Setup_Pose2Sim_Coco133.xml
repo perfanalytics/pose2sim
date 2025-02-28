@@ -28,13 +28,13 @@
 					<!--Whether or not this task will be used during inverse kinematics solve, default is true.-->
 					<apply>true</apply>
 					<!--Weight given to the task when solving inverse kinematics problems, default is 0.-->
-					<weight>0.10000000000000001</weight>
+					<weight>0.05000000000000001</weight>
 				</IKMarkerTask>
 				<IKMarkerTask name="LEye">
 					<!--Whether or not this task will be used during inverse kinematics solve, default is true.-->
 					<apply>true</apply>
 					<!--Weight given to the task when solving inverse kinematics problems, default is 0.-->
-					<weight>0.20000000000000001</weight>
+					<weight>0.05000000000000001</weight>
 				</IKMarkerTask>
 				<IKMarkerTask name="LShoulder">
 					<!--Whether or not this task will be used during inverse kinematics solve, default is true.-->

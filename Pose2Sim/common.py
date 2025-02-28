@@ -964,6 +964,7 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
         if len(Q_coords_low_speeds_low_angles) < 50:
             Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
     except:
+        Q_coords_low_speeds_low_angles = Q_coords_low_speeds
         logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}°.")
 
     if n_markers_init < n_markers:
