@@ -23,9 +23,6 @@ import itertools as it
 import logging
 from anytree import PreOrderIter
 
-import matplotlib as mpl
-mpl.use('qt5agg')
-mpl.rc('figure', max_open_warning=0)
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
