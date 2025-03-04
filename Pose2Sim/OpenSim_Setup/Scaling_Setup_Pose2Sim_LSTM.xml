@@ -285,6 +285,38 @@
 									<!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
 									<axes> X Y</axes>
 								</BodyScale>
+                                <BodyScale name="lumbar5">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> X Y</axes>
+                                </BodyScale>
+                                <BodyScale name="lumbar4">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> X Y</axes>
+                                </BodyScale>
+                                <BodyScale name="lumbar3">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> X Y</axes>
+                                </BodyScale>
+                                <BodyScale name="lumbar2">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> X Y</axes>
+                                </BodyScale>
+                                <BodyScale name="lumbar1">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> X Y</axes>
+                                </BodyScale>
+                                <BodyScale name="Abdomen">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> X Y</axes>
+                                </BodyScale>
+								<BodyScale name="head">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> X Y</axes>
+                                </BodyScale>
+								<BodyScale name="sacrum">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> X Y</axes>
+                                </BodyScale>
 							</objects>
 							<groups />
 						</BodyScaleSet>
@@ -317,6 +349,38 @@
 									<!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
 									<axes> Z</axes>
 								</BodyScale>
+								<BodyScale name="lumbar5">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> Z</axes>
+                                </BodyScale>
+                                <BodyScale name="lumbar4">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> Z</axes>
+                                </BodyScale>
+                                <BodyScale name="lumbar3">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> Z</axes>
+                                </BodyScale>
+                                <BodyScale name="lumbar2">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> Z</axes>
+                                </BodyScale>
+                                <BodyScale name="lumbar1">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> Z</axes>
+                                </BodyScale>
+                                <BodyScale name="Abdomen">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> Z</axes>
+                                </BodyScale>
+								<BodyScale name="head">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> Z</axes>
+                                </BodyScale>
+								<BodyScale name="sacrum">
+                                    <!--Axes (X Y Z) along which to scale a body. For example, 'X Y Z' scales along all three axes, and 'Y' scales just along the Y axis.-->
+									<axes> Z</axes>
+                                </BodyScale>
 							</objects>
 							<groups />
 						</BodyScaleSet>

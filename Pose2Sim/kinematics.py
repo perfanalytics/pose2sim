@@ -624,8 +624,8 @@ def kinematics_all(config_dict):
         elif pose_model.upper() == 'HAND': pose_model = 'HAND_21'
         elif pose_model.upper() == 'FACE': pose_model = 'FACE_106'
         elif pose_model.upper() == 'ANIMAL': pose_model = 'ANIMAL2D_17'
-        else:
-            raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
+        # else:
+        #     raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
 
     # Calculate subject heights
     if subject_height is None or subject_height == 0:
@@ -657,7 +657,7 @@ def kinematics_all(config_dict):
             subject_height.append(height)
     elif not type(subject_height) == list: # int or float
         subject_height = [subject_height]
-    elif len(subject_height) < len(trc_files):
+    if len(subject_height) < len(trc_files):
         logging.warning("\nNumber of subject heights does not match number of TRC files. Missing heights are set to 1.75m.")
         subject_height += [1.75] * (len(trc_files) - len(subject_height))
 
@@ -667,7 +667,7 @@ def kinematics_all(config_dict):
         logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
     elif not type(subject_mass) == list:
         subject_mass = [subject_mass]
-    elif len(subject_mass) < len(trc_files):
+    if len(subject_mass) < len(trc_files):
         logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.\n")
         subject_mass += [70] * (len(trc_files) - len(subject_mass))
 
