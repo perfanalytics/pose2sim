@@ -1146,7 +1146,7 @@ def load_frame_and_bounding_boxes(cap, frame_number, frame_to_json, pose_dir, js
     return frame_rgb, bounding_boxes_list
 
 
-def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], multi_person=False, selected_id=None):
+def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], synchronization_gui=False, selected_id=None):
     '''
     Convert a list of JSON files to a pandas DataFrame.
     Only takes one person in the JSON file.
@@ -1179,7 +1179,7 @@ def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], 
                 # json_data = np.array([max_confidence_person['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
 
                 # latest approach: uses person with largest bounding box
-                if not multi_person:
+                if not synchronization_gui:
                     bbox_area = [
                                 (keypoints[:, 0].max() - keypoints[:, 0].min()) * (keypoints[:, 1].max() - keypoints[:, 1].min())
                                 if 'pose_keypoints_2d' in p else 0
@@ -1189,7 +1189,7 @@ def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], 
                     max_area_person = json_data_all[np.argmax(bbox_area)]
                     json_data = np.array([max_area_person['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
 
-                elif multi_person:
+                elif synchronization_gui:
                     if selected_id is not None: # We can sfely assume that selected_id is always not greater than len(json_data_all) because padding with 0 was done in the previous step
                         selected_person = json_data_all[selected_id]
                         json_data = np.array([selected_person['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
@@ -1349,7 +1349,7 @@ def synchronize_cams_all(config_dict):
     project_dir = config_dict.get('project').get('project_dir')
     pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
     pose_model = config_dict.get('pose').get('pose_model')
-    multi_person = config_dict.get('project').get('multi_person')
+    # multi_person = config_dict.get('project').get('multi_person')
     fps =  config_dict.get('project').get('frame_rate')
     frame_range = config_dict.get('project').get('frame_range')
     display_sync_plots = config_dict.get('synchronization').get('display_sync_plots')
@@ -1425,10 +1425,26 @@ def synchronize_cams_all(config_dict):
 
     # Determine frames to consider for synchronization
     if isinstance(approx_time_maxspeed, list): # search around max speed
+        logging.info(f'Synchronization is calculated around the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
+
+        if len(approx_time_maxspeed) == 1 and cam_nb > 1:
+            approx_time_maxspeed *= cam_nb
+
         approx_frame_maxspeed = [int(fps * t) for t in approx_time_maxspeed]
         nb_frames_per_cam = [len(fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json')) for json_dir in json_dirs]
-        search_around_frames = [[int(a-lag_range) if a-lag_range>0 else 0, int(a+lag_range) if a+lag_range<nb_frames_per_cam[i] else nb_frames_per_cam[i]+f_range[0]] for i,a in enumerate(approx_frame_maxspeed)]
-        logging.info(f'Synchronization is calculated around the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
+
+        search_around_frames = []
+        for i, frame in enumerate(approx_frame_maxspeed):
+            start_frame = max(int(frame - lag_range), 0)
+            end_frame = min(int(frame + lag_range), nb_frames_per_cam[i] + f_range[0])
+
+            if start_frame != frame - lag_range:
+                logging.warning(f'Frame range start adjusted for camera {i}: {frame - lag_range} -> {start_frame}')
+            if end_frame != frame + lag_range:
+                logging.warning(f'Frame range end adjusted for camera {i}: {frame + lag_range} -> {end_frame}')
+
+            search_around_frames.append([start_frame, end_frame])
+
     elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
         search_around_frames = [[f_range[0], f_range[0]+nb_frames_per_cam[i]] for i in range(cam_nb)]
         logging.info('Synchronization is calculated on the whole sequence. This may take a while.')
@@ -1449,12 +1465,13 @@ def synchronize_cams_all(config_dict):
     # Extract, interpolate, and filter keypoint coordinates
     logging.info('Synchronizing...')
     df_coords = []
-    b, a = signal.butter(filter_order/2, filter_cutoff/(fps/2), 'low', analog = False) 
+    b, a = signal.butter(int(filter_order/2), filter_cutoff/(fps/2), 'low', analog = False)
     json_files_names_range = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*frames_cam)] for (json_files_cam, frames_cam) in zip(json_files_names,search_around_frames)]
-    json_files_range = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names_range[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     if np.array([j==[] for j in json_files_names_range]).any():
         raise ValueError(f'No json files found within the specified frame range ({frame_range}) at the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
+    
+    json_files_range = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names_range[j]] for j, j_dir in enumerate(json_dirs_names)]
     
     # Handle manual selection if synchronization_gui is True
     if synchronization_gui:
@@ -1480,9 +1497,11 @@ def synchronize_cams_all(config_dict):
                                
     else:
         selected_id_list = [None] * cam_nb
+
+    padlen = 3 * (max(len(a), len(b)) - 1)
     
     for i in range(cam_nb):
-        df_coords.append(convert_json2pandas(json_files_range[i], likelihood_threshold=likelihood_threshold, keypoints_ids=keypoints_ids, multi_person=multi_person, selected_id=selected_id_list[i]))
+        df_coords.append(convert_json2pandas(json_files_range[i], likelihood_threshold=likelihood_threshold, keypoints_ids=keypoints_ids, synchronization_gui=synchronization_gui, selected_id=selected_id_list[i]))
         df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
         if keypoints_to_consider == 'right':
             kpt_indices = [i for i in range(len(keypoints_ids)) if keypoints_names[i].startswith('R') or keypoints_names[i].startswith('right')]
@@ -1500,7 +1519,13 @@ def synchronize_cams_all(config_dict):
         df_coords[i] = df_coords[i][kpt_indices]
         df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args = ['linear'])
         df_coords[i] = df_coords[i].bfill().ffill()
-        df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0))
+        if df_coords[i].shape[0] > padlen:
+            df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0))
+        else:
+            logging.warning(
+                f"Camera {i}: insufficient number of samples ({df_coords[i].shape[0]} < {padlen + 1}) to apply the Butterworth filter. "
+                "Data will remain unfiltered."
+            )
     
     # Compute sum of speeds
     df_speed = []
@@ -1508,8 +1533,19 @@ def synchronize_cams_all(config_dict):
     for i in range(cam_nb):
         df_speed.append(vert_speed(df_coords[i]))
         sum_speeds.append(abs(df_speed[i]).sum(axis=1))
-        sum_speeds[i] = pd.DataFrame(signal.filtfilt(b, a, sum_speeds[i], axis=0)).squeeze()
+        # nb_coords = df_speed[i].shape[1]
+        # sum_speeds[i][ sum_speeds[i]>vmax*nb_coords ] = 0
 
+        # # Replace 0 by random values, otherwise 0 padding may lead to unreliable correlations
+        # sum_speeds[i].loc[sum_speeds[i] < 1] = sum_speeds[i].loc[sum_speeds[i] < 1].apply(lambda x: np.random.normal(0,1))
+
+        if sum_speeds[i].shape[0] > padlen:
+            sum_speeds[i] = pd.DataFrame(signal.filtfilt(b, a, sum_speeds[i], axis=0)).squeeze()
+        else:
+            logging.warning(
+                f"Camera {i}: insufficient number of samples ({sum_speeds[i].shape[0]} < {padlen + 1}) to apply the Butterworth filter. "
+                "Data will remain unfiltered."
+            )
 
     # Compute offset for best synchronization:
     # Highest correlation of sum of absolute speeds for each cam compared to reference cam
