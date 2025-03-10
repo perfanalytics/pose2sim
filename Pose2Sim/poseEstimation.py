@@ -31,7 +31,7 @@
 '''
 
 
-## INIT
+# INIT
 import os
 import time
 import math
@@ -56,11 +56,20 @@ from anytree.importer import DictImporter
 from rtmlib import BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
 
 from deep_sort_realtime.deepsort_tracker import DeepSort
-from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort, sort_people_rtmlib, colors, thickness, draw_bounding_box, draw_keypts, draw_skel
+from Pose2Sim.common import (
+    natural_sort_key,
+    sort_people_sports2d,
+    sort_people_deepsort,
+    colors,
+    thickness,
+    draw_bounding_box,
+    draw_keypts,
+    draw_skel,
+)
 from Pose2Sim.skeletons import *
 
 
-## AUTHORSHIP INFORMATION
+# AUTHORSHIP INFORMATION
 __author__ = "HunMin Kim, David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["HunMin Kim", "David Pagnon"]
@@ -71,7 +80,7 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
-## CLASSES
+# CLASSES
 class PoseEstimatorWorker(multiprocessing.Process):
     def __init__(self, **kwargs):
         super().__init__()
@@ -85,10 +94,10 @@ class PoseEstimatorWorker(multiprocessing.Process):
             to_openpose=self.to_openpose,
             backend=self.backend,
             device=self.device)
-  
+
         try:
             self.det_model = model.det_model
-        except: # rtmo
+        except AttributeError:  # rtmo
             self.det_model = None
         self.pose_model = model.pose_model
 
@@ -140,7 +149,11 @@ class PoseEstimatorWorker(multiprocessing.Process):
                         updated_prev, keypoints, scores = sort_people_sports2d(prev_kpts, keypoints, scores=scores)
                         self.prev_keypoints[others[0]] = updated_prev
                     else:
-                        self.prev_keypoints, keypoints, scores = sort_people_sports2d(self.prev_keypoints, keypoints, scores=scores)
+                        self.prev_keypoints, keypoints, scores = sort_people_sports2d(
+                            self.prev_keypoints, 
+                            keypoints, 
+                            scores=scores
+                            )
         else:
             keypoints, scores = None, None
 
@@ -172,8 +185,14 @@ class BaseSynchronizer:
                 frames_list = []
                 for source in self.sources:
                     sid = source['id']
-                    buffer_name, frame_shape, frame_dtype, keypoints, scores, is_placeholder, transform_info = complete_group[sid]
-                    frame = np.ndarray(frame_shape, dtype=np.dtype(frame_dtype), buffer=self.frame_buffers[buffer_name].buf).copy()
+                    buffer_name, frame_shape, frame_dtype, keypoints, scores, is_placeholder, transform_info = (
+                        complete_group[sid]
+                    )
+                    frame = np.ndarray(
+                        frame_shape,
+                        dtype=np.dtype(frame_dtype),
+                        buffer=self.frame_buffers[buffer_name].buf,
+                    ).copy()
                     self.available_frame_buffers.put(buffer_name)
                     orig_w, orig_h = frame_shape[1], frame_shape[0]
                     if is_placeholder:
@@ -216,8 +235,8 @@ class BaseSynchronizer:
             info = subinfo[sid]
             x_off = info["x_offset"]
             y_off = info["y_offset"]
-            sc_w  = info["scaled_w"]
-            sc_h  = info["scaled_h"]
+            sc_w = info["scaled_w"]
+            sc_h = info["scaled_h"]
             orig_w = info["orig_w"]
             orig_h = info["orig_h"]
 
@@ -236,7 +255,7 @@ class BaseSynchronizer:
                 if x_off <= center_x <= x_off + sc_w and y_off <= center_y <= y_off + sc_h:
                     local_kpts = []
                     local_scores = []
-                    
+
                     for (xk, yk), scv in zip(kp_person, sc_person):
                         x_local = (xk - x_off) * (orig_w / float(sc_w))
                         y_local = (yk - y_off) * (orig_h / float(sc_h))
@@ -267,7 +286,7 @@ class FrameQueueProcessor(multiprocessing.Process, BaseSynchronizer):
                 if idx not in self.sync_data:
                     self.sync_data[idx] = {}
                 self.sync_data[idx][sid] = (buffer_name, frame_shape, frame_dtype, None, None, is_placeholder, None)
-                
+
                 if frames_list := self.get_frames_list():
                     mosaic, subinfo = self.build_mosaic(frames_list)
                     pose_buf_name = self.available_pose_buffers.get_nowait()
@@ -867,7 +886,7 @@ def estimate_pose_all(config_dict):
 
         logging.info(f"Allocating {frame_buffer_count} frame buffers.")
 
-        pose_buffer_count = n_buffers_total - frame_buffer_count
+        pose_buffer_count = min(n_buffers_total - frame_buffer_count, 10000)
 
         logging.info(f"Allocating {pose_buffer_count} pose buffers.")
 
@@ -940,9 +959,9 @@ def estimate_pose_all(config_dict):
             active_sources=active_sources,
             combined_frames=combined_frames,
             tracker_ready_event=tracker_ready_event,
-            multi_person = multi_person,
-            tracking_mode = tracking_mode,
-            deepsort_tracker = deepsort_tracker
+            multi_person=multi_person,
+            tracking_mode=tracking_mode,
+            deepsort_tracker=deepsort_tracker
         )
         worker.start()
         return worker
@@ -966,43 +985,43 @@ def estimate_pose_all(config_dict):
             webcam_ready[s['id']] = False
 
         ms = MediaSource(
-            source = s,
-            frame_queue = frame_queue,
-            frame_buffers = frame_buffers,
-            shared_counts = shared_counts,
-            frame_size = frame_size,
-            frame_rate = frame_rate,
-            active_sources = active_sources,
-            command_queue = command_queues[s['id']],
-            vid_img_extension = vid_img_extension,
-            frame_ranges = frame_range,
-            webcam_ready = webcam_ready,
-            source_ended = source_ended,
-            rotation = rotation,
-            webcam_recording = webcam_recording,
+            source=s,
+            frame_queue=frame_queue,
+            frame_buffers=frame_buffers,
+            shared_counts=shared_counts,
+            frame_size=frame_size,
+            frame_rate=frame_rate,
+            active_sources=active_sources,
+            command_queue=command_queues[s['id']],
+            vid_img_extension=vid_img_extension,
+            frame_ranges=frame_range,
+            webcam_ready=webcam_ready,
+            source_ended=source_ended,
+            rotation=rotation,
+            webcam_recording=webcam_recording,
         )
         ms.start()
         media_sources.append(ms)
 
     result_processor = ResultQueueProcessor(
-        result_queue = result_queue,
-        pose_model = pose_model,
-        sources = sources,
-        frame_buffers = frame_buffers, 
-        pose_buffers = pose_buffers,
-        available_frame_buffers = available_frame_buffers,
-        available_pose_buffers = available_pose_buffers,
-        vid_img_extension= vid_img_extension,
-        source_outputs = source_outputs,
-        shared_counts = shared_counts,
-        save_images = save_images,
-        save_video = save_video,
-        frame_size = frame_size,
-        frame_rate = frame_rate,
-        combined_frames = combined_frames,
-        multi_person = multi_person,
-        output_format = output_format,
-        display_detection= display_detection,
+        result_queue=result_queue,
+        pose_model=pose_model,
+        sources=sources,
+        frame_buffers=frame_buffers,
+        pose_buffers=pose_buffers,
+        available_frame_buffers=available_frame_buffers,
+        available_pose_buffers=available_pose_buffers,
+        vid_img_extension=vid_img_extension,
+        source_outputs=source_outputs,
+        shared_counts=shared_counts,
+        save_images=save_images,
+        save_video=save_video,
+        frame_size=frame_size,
+        frame_rate=frame_rate,
+        combined_frames=combined_frames,
+        multi_person=multi_person,
+        output_format=output_format,
+        display_detection=display_detection,
         mosaic_cols=mosaic_cols,
         mosaic_rows=mosaic_rows,
         mosaic_subinfo=mosaic_subinfo
@@ -1011,24 +1030,24 @@ def estimate_pose_all(config_dict):
 
     if combined_frames:
         frame_processor = FrameQueueProcessor(
-            frame_queue = frame_queue,
-            pose_queue = pose_queue,
-            sources = sources,
-            frame_buffers = frame_buffers,
-            pose_buffers = pose_buffers,
-            available_frame_buffers = available_frame_buffers, 
-            available_pose_buffers = available_pose_buffers,
-            vid_img_extension = vid_img_extension,
-            source_outputs = source_outputs,
-            shared_counts = shared_counts,
-            save_images = save_images, 
-            save_video = save_video,
-            frame_size = frame_size,
-            frame_rate = frame_rate,
-            combined_frames = combined_frames,
-            multi_person = multi_person, 
-            output_format = output_format, 
-            display_detection = display_detection,
+            frame_queue=frame_queue,
+            pose_queue=pose_queue,
+            sources=sources,
+            frame_buffers=frame_buffers,
+            pose_buffers=pose_buffers,
+            available_frame_buffers=available_frame_buffers,
+            available_pose_buffers=available_pose_buffers,
+            vid_img_extension=vid_img_extension,
+            source_outputs=source_outputs,
+            shared_counts=shared_counts,
+            save_images=save_images,
+            save_video=save_video,
+            frame_size=frame_size,
+            frame_rate=frame_rate,
+            combined_frames=combined_frames,
+            multi_person=multi_person,
+            output_format=output_format,
+            display_detection=display_detection,
             mosaic_cols=mosaic_cols,
             mosaic_rows=mosaic_rows,
             mosaic_subinfo=mosaic_subinfo
