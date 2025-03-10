@@ -1452,6 +1452,7 @@ def create_output_folders(source_path, output_dir, save_images, webcam_recording
     else:
         output_dir_name = os.path.basename(os.path.splitext(str(source_path))[0])
 
+
     os.makedirs(output_dir, exist_ok=True)
     json_output_dir = os.path.join(output_dir, f"{output_dir_name}_json")
     os.makedirs(json_output_dir, exist_ok=True)

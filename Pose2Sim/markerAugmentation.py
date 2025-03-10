@@ -141,7 +141,7 @@ def augment_markers_all(config_dict):
             subject_height.append(height)
     elif not type(subject_height) == list: # int or float
         subject_height = [subject_height]
-    elif len(subject_height) < len(trc_files):
+    if len(subject_height) < len(trc_files):
         logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to {default_height}m.")
         subject_height += [default_height] * (len(trc_files) - len(subject_height))
 
@@ -151,7 +151,7 @@ def augment_markers_all(config_dict):
         logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
     elif not type(subject_mass) == list:
         subject_mass = [subject_mass]
-    elif len(subject_mass) < len(trc_files):
+    if len(subject_mass) < len(trc_files):
         logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.")
         subject_mass += [70] * (len(trc_files) - len(subject_mass))
 

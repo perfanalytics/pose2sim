@@ -17,3 +17,4 @@ dist/
 **/pose/
 **/pose-sync/
 **/pose-associated/
+**/kinematics/
