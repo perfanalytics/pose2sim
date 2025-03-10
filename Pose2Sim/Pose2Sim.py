@@ -392,3 +392,7 @@ def markerAugmentation(config=None):
 def kinematics(config=None):
     pipeline = Pose2SimPipeline(config)
     pipeline.kinematics()
+
+def runAll(config=None, **kwargs):
+    pipeline = Pose2SimPipeline(config)
+    pipeline.runAll(**kwargs)
