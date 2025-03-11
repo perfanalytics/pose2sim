@@ -160,9 +160,11 @@ def read_config_files(config):
 class Pose2SimPipeline:
     def __init__(self, config=None):
         self.level, self.config_dicts = read_config_files(config)
-        self.session_dir = os.path.realpath(
-            os.path.join(self.config_dicts[0].get('project').get('project_dir'), '.')
-        )
+        try:
+            self.session_dir = os.path.realpath([os.getcwd() if self.level==2 else os.path.join(os.getcwd(), '..')][0])
+            [os.path.join(self.session_dir, c) for c in os.listdir(self.session_dir) if 'calib' in c.lower() and not c.lower().endswith('.py')][0]
+        except:
+            self.session_dir = os.path.realpath(os.getcwd())
         use_custom_logging = self.config_dicts[0].get('logging').get('use_custom_logging')
         if not use_custom_logging:
             setup_logging(self.session_dir)
