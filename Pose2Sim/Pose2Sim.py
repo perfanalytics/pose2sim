@@ -183,13 +183,13 @@ class Pose2SimPipeline:
     def calibration(self):
         from Pose2Sim.calibration import calibrate_cams_all
         config_dict = self.config_dicts[0]
-        config_dict.get("project").update({"project_dir": self.session_dir})
+        config_dict["project"]["project_dir"] = os.path.realpath(config_dict["project"]["project_dir"])
 
         try:
             calib_dirs = [
-                os.path.join(self.session_dir, c)
-                for c in os.listdir(self.session_dir)
-                if os.path.isdir(os.path.join(self.session_dir, c)) and 'calib' in c.lower()
+                os.path.join(config_dict["project"]["project_dir"], c)
+                for c in os.listdir(config_dict["project"]["project_dir"])
+                if os.path.isdir(os.path.join(config_dict["project"]["project_dir"], c)) and 'calib' in c.lower()
             ]
             calib_dir = calib_dirs[0]
         except IndexError:
