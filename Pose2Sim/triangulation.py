@@ -617,6 +617,62 @@ def extract_files_frame_f(json_tracked_files_f, keypoints_ids, nb_persons_to_det
     return x_files, y_files, likelihood_files
 
 
+def triangulate_single(config_dict, f, json_files_names, json_dirs_names, pose_dir,
+                            keypoints_ids, nb_persons_to_detect, keypoints_idx, keypoints_idx_swapped,
+                            P, calib_params, likelihood_threshold, undistort_points):
+
+    n_cams = len(json_files_names)
+    
+    # print(f'\nFrame {f}:')        
+    # Get x,y,likelihood values from files
+    json_files_names_f = [[j for j in json_files_names[c] if int(re.split(r'(\d+)',j)[-2])==f] for c in range(n_cams)]
+    json_files_names_f = [j for j_list in json_files_names_f for j in (j_list or ['none'])]
+    json_files_f = [os.path.join(pose_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
+
+    x_files, y_files, likelihood_files = extract_files_frame_f(json_files_f, keypoints_ids, nb_persons_to_detect)
+    # [[[list of coordinates] * n_cams ] * nb_persons_to_detect]
+    # vs. [[list of coordinates] * n_cams ] 
+    
+    # undistort points
+    if undistort_points:
+        for n in range(nb_persons_to_detect):
+            points = [np.array(tuple(zip(x_files[n][i],y_files[n][i]))).reshape(-1, 1, 2).astype('float32') for i in range(n_cams)]
+            undistorted_points = [cv2.undistortPoints(points[i], calib_params['K'][i], calib_params['dist'][i], None, calib_params['optim_K'][i]) for i in range(n_cams)]
+            x_files[n] =  np.array([[u[i][0][0] for i in range(len(u))] for u in undistorted_points])
+            y_files[n] =  np.array([[u[i][0][1] for i in range(len(u))] for u in undistorted_points])
+            # This is good for slight distortion. For fisheye camera, the model does not work anymore. See there for an example https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301
+
+    # Replace likelihood by 0 if under likelihood_threshold
+    with np.errstate(invalid='ignore'):
+        for n in range(nb_persons_to_detect):
+            x_files[n][likelihood_files[n] < likelihood_threshold] = np.nan
+            y_files[n][likelihood_files[n] < likelihood_threshold] = np.nan
+            likelihood_files[n][likelihood_files[n] < likelihood_threshold] = np.nan
+
+    Q = [[] for _ in range(nb_persons_to_detect)]
+    error = [[] for _ in range(nb_persons_to_detect)]
+    nb_cams_excluded = [[] for _ in range(nb_persons_to_detect)]
+    id_excluded_cams = [[] for _ in range(nb_persons_to_detect)]
+    
+    for n in range(nb_persons_to_detect):
+        for keypoint_idx in keypoints_idx:
+        # keypoints_nb = 2
+        # for keypoint_idx in range(2):
+        # Triangulate cameras with min reprojection error
+            # print('\n', keypoints_names[keypoint_idx])
+            coords_2D_kpt = np.array( (x_files[n][:, keypoint_idx], y_files[n][:, keypoint_idx], likelihood_files[n][:, keypoint_idx]) )
+            coords_2D_kpt_swapped = np.array(( x_files[n][:, keypoints_idx_swapped[keypoint_idx]], y_files[n][:, keypoints_idx_swapped[keypoint_idx]], likelihood_files[n][:, keypoints_idx_swapped[keypoint_idx]] ))
+
+            Q_kpt, error_kpt, nb_cams_excluded_kpt, id_excluded_cams_kpt = triangulation_from_best_cameras(config_dict, coords_2D_kpt, coords_2D_kpt_swapped, P, calib_params) # P has been modified if undistort_points=True
+
+            Q[n].append(Q_kpt)
+            error[n].append(error_kpt)
+            nb_cams_excluded[n].append(nb_cams_excluded_kpt)
+            id_excluded_cams[n].append(id_excluded_cams_kpt)
+
+    return Q, error, nb_cams_excluded, id_excluded_cams
+
+
 def triangulate_all(config_dict):
     '''
     For each frame
@@ -739,92 +795,57 @@ def triangulate_all(config_dict):
     else:
         nb_persons_to_detect = 1
 
-    Q = [[[np.nan]*3]*keypoints_nb for n in range(nb_persons_to_detect)]
-    Q_old = [[[np.nan]*3]*keypoints_nb for n in range(nb_persons_to_detect)]
-    error = [[] for n in range(nb_persons_to_detect)]
-    nb_cams_excluded = [[] for n in range(nb_persons_to_detect)]
-    id_excluded_cams = [[] for n in range(nb_persons_to_detect)]
-    Q_tot, error_tot, nb_cams_excluded_tot,id_excluded_cams_tot = [], [], [], []
+    Q_tot, error_tot, nb_cams_excluded_tot, id_excluded_cams_tot = [], [], [], []
+    Q_old = None
+    
     for f in tqdm(range(*f_range)):
-        # print(f'\nFrame {f}:')        
-        # Get x,y,likelihood values from files
-        json_files_names_f = [[j for j in json_files_names[c] if int(re.split(r'(\d+)',j)[-2])==f] for c in range(n_cams)]
-        json_files_names_f = [j for j_list in json_files_names_f for j in (j_list or ['none'])]
-        json_files_f = [os.path.join(pose_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
+        Q_current, error_current, nb_cams_excluded_current, id_excluded_cams_current = triangulate_single(
+            config_dict, f, json_files_names, json_dirs_names, pose_dir,
+        keypoints_ids, nb_persons_to_detect, keypoints_idx, keypoints_idx_swapped,
+        P, calib_params, likelihood_threshold, undistort_points
+    )
 
-        x_files, y_files, likelihood_files = extract_files_frame_f(json_files_f, keypoints_ids, nb_persons_to_detect)
-        # [[[list of coordinates] * n_cams ] * nb_persons_to_detect]
-        # vs. [[list of coordinates] * n_cams ] 
-        
-        # undistort points
-        if undistort_points:
-            for n in range(nb_persons_to_detect):
-                points = [np.array(tuple(zip(x_files[n][i],y_files[n][i]))).reshape(-1, 1, 2).astype('float32') for i in range(n_cams)]
-                undistorted_points = [cv2.undistortPoints(points[i], calib_params['K'][i], calib_params['dist'][i], None, calib_params['optim_K'][i]) for i in range(n_cams)]
-                x_files[n] =  np.array([[u[i][0][0] for i in range(len(u))] for u in undistorted_points])
-                y_files[n] =  np.array([[u[i][0][1] for i in range(len(u))] for u in undistorted_points])
-                # This is good for slight distortion. For fisheye camera, the model does not work anymore. See there for an example https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301
-
-        # Replace likelihood by 0 if under likelihood_threshold
-        with np.errstate(invalid='ignore'):
-            for n in range(nb_persons_to_detect):
-                x_files[n][likelihood_files[n] < likelihood_threshold] = np.nan
-                y_files[n][likelihood_files[n] < likelihood_threshold] = np.nan
-                likelihood_files[n][likelihood_files[n] < likelihood_threshold] = np.nan
-        
-        # Q_old = Q except when it has nan, otherwise it takes the Q_old value
-        nan_mask = np.isnan(Q)
-        Q_old = np.where(nan_mask, Q_old, Q)
-        Q = [[] for n in range(nb_persons_to_detect)]
-        error = [[] for n in range(nb_persons_to_detect)]
-        nb_cams_excluded = [[] for n in range(nb_persons_to_detect)]
-        id_excluded_cams = [[] for n in range(nb_persons_to_detect)]
-        
-        for n in range(nb_persons_to_detect):
-            for keypoint_idx in keypoints_idx:
-            # keypoints_nb = 2
-            # for keypoint_idx in range(2):
-            # Triangulate cameras with min reprojection error
-                # print('\n', keypoints_names[keypoint_idx])
-                coords_2D_kpt = np.array( (x_files[n][:, keypoint_idx], y_files[n][:, keypoint_idx], likelihood_files[n][:, keypoint_idx]) )
-                coords_2D_kpt_swapped = np.array(( x_files[n][:, keypoints_idx_swapped[keypoint_idx]], y_files[n][:, keypoints_idx_swapped[keypoint_idx]], likelihood_files[n][:, keypoints_idx_swapped[keypoint_idx]] ))
-
-                Q_kpt, error_kpt, nb_cams_excluded_kpt, id_excluded_cams_kpt = triangulation_from_best_cameras(config_dict, coords_2D_kpt, coords_2D_kpt_swapped, P, calib_params) # P has been modified if undistort_points=True
-
-                Q[n].append(Q_kpt)
-                error[n].append(error_kpt)
-                nb_cams_excluded[n].append(nb_cams_excluded_kpt)
-                id_excluded_cams[n].append(id_excluded_cams_kpt)
-        
         if multi_person:
             # reID persons across frames by checking the distance from one frame to another
             # print('Q before ordering ', np.array(Q)[:,:2])
-            if f !=0:
-                Q, associated_tuples = sort_people_sports2d(Q_old, Q)
-                # Q, personsIDs_sorted, associated_tuples = sort_people(Q_old, Q)
-                # print('Q after ordering ', personsIDs_sorted, associated_tuples, np.array(Q)[:,:2])
-                
+            if Q_old is not None:
+                # Mise à jour de Q_old en gardant les valeurs non NaN
+                Q_old_updated = []
+                for n in range(nb_persons_to_detect):
+                    person_old = []
+                    for k in range(keypoints_nb):
+                        if np.isnan(Q_current[n][k]).any():
+                            person_old.append(Q_old[n][k])
+                        else:
+                            person_old.append(Q_current[n][k])
+                    Q_old_updated.append(person_old)
+                Q_old = Q_old_updated
+                # Re-identification
+                Q_current, associated_tuples = sort_people_sports2d(Q_old, Q_current)
+                # Réordonner les autres listes en fonction de associated_tuples
                 error_sorted, nb_cams_excluded_sorted, id_excluded_cams_sorted = [], [], []
-                for i in range(len(Q)):
-                    id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
-                    if len(id_in_old) > 0:
-                        # personsIDs_sorted += id_in_old
-                        error_sorted += [error[id_in_old[0]]]
-                        nb_cams_excluded_sorted += [nb_cams_excluded[id_in_old[0]]]
-                        id_excluded_cams_sorted += [id_excluded_cams[id_in_old[0]]]
+                for i in range(len(Q_current)):
+                    ids = associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+                    if len(ids) > 0:
+                        error_sorted.append(error_current[ids[0]])
+                        nb_cams_excluded_sorted.append(nb_cams_excluded_current[ids[0]])
+                        id_excluded_cams_sorted.append(id_excluded_cams_current[ids[0]])
                     else:
-                        # personsIDs_sorted += [-1]
-                        error_sorted += [error[i]]
-                        nb_cams_excluded_sorted += [nb_cams_excluded[i]]
-                        id_excluded_cams_sorted += [id_excluded_cams[i]]
-                error, nb_cams_excluded, id_excluded_cams = error_sorted, nb_cams_excluded_sorted, id_excluded_cams_sorted
-        
+                        error_sorted.append(error_current[i])
+                        nb_cams_excluded_sorted.append(nb_cams_excluded_current[i])
+                        id_excluded_cams_sorted.append(id_excluded_cams_current[i])
+                error_current = error_sorted
+                nb_cams_excluded_current = nb_cams_excluded_sorted
+                id_excluded_cams_current = id_excluded_cams_sorted
+            else:
+                Q_old = Q_current
+
         # TODO: if distance > threshold, new person
         
         # Add triangulated points, errors and excluded cameras to pandas dataframes
         Q_tot.append([np.concatenate(Q[n]) for n in range(nb_persons_to_detect)])
-        error_tot.append([error[n] for n in range(nb_persons_to_detect)])
-        nb_cams_excluded_tot.append([nb_cams_excluded[n] for n in range(nb_persons_to_detect)])
+        error_tot.append([error_tot[n] for n in range(nb_persons_to_detect)])
+        nb_cams_excluded_tot.append([nb_cams_excluded_tot[n] for n in range(nb_persons_to_detect)])
         id_excluded_cams = [[id_excluded_cams[n][k] for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
         id_excluded_cams_tot.append(id_excluded_cams)
             
