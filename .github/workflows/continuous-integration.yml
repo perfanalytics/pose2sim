@@ -25,6 +25,8 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest, macos-13] # Mac ARM M1 vs Intel processors
         python-version: ["3.10", "3.11"]
 
+    timeout-minutes: 720
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

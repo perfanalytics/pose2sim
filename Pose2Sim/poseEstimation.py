@@ -150,8 +150,8 @@ class PoseEstimatorWorker(multiprocessing.Process):
                         self.prev_keypoints[others[0]] = updated_prev
                     else:
                         self.prev_keypoints, keypoints, scores = sort_people_sports2d(
-                            self.prev_keypoints, 
-                            keypoints, 
+                            self.prev_keypoints,
+                            keypoints,
                             scores=scores
                             )
         else:
@@ -384,12 +384,13 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
                 valid_X.append(person_X)
                 valid_Y.append(person_Y)
                 valid_scores.append(person_scores)
-            if self.multi_person: frame = draw_bounding_box(frame, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
+            if self.multi_person: 
+                frame = draw_bounding_box(frame, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
             frame = draw_keypts(frame, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
             frame = draw_skel(frame, valid_X, valid_Y, self.pose_model)
             return frame
 
-    def show_mosaic(self, mosaic):          
+    def show_mosaic(self, mosaic):   
         desired_w, desired_h = 1280, 720
         mosaic = transform(mosaic, desired_w, desired_h, False)[0]
         cv2.imshow("Display", mosaic)
@@ -538,7 +539,7 @@ class MediaSource(multiprocessing.Process):
                     raw_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                     self.raw_writer = cv2.VideoWriter(self.source_outputs[-1], fourcc, 30, (raw_width, raw_height))
-            
+
             elif self.source['type'] == 'video':
                 self.open_video()
                 self.start_timestamp = get_file_utc_timestamp(self.source['path'])
@@ -774,9 +775,9 @@ def estimate_pose_all(config_dict):
         deepsort_params = config_dict.get['pose'].get('deepsort_params')
         try:
             deepsort_params = ast.literal_eval(deepsort_params)
-        except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
-            deepsort_params = deepsort_params.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/',':/').replace('":"\\',':\\')
-            deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params) # changes "[640", "640]" to [640,640]
+        except:  # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+            deepsort_params = deepsort_params.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/', ':/').replace('":"\\', ':\\')
+            deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params)  # changes "[640", "640]" to [640,640]
             deepsort_params = json.loads(deepsort_params)
         deepsort_tracker = DeepSort(**deepsort_params)
 
@@ -948,7 +949,7 @@ def estimate_pose_all(config_dict):
             queue=pose_queue if combined_frames else frame_queue,
             result_queue=result_queue,
             shared_counts=shared_counts,
-            ModelClass = ModelClass,
+            ModelClass=ModelClass,
             det_frequency=det_frequency,
             mode=mode,
             to_openpose=to_openpose,
@@ -1286,7 +1287,7 @@ def estimate_pose_all(config_dict):
             cv2.destroyAllWindows()
 
 
-def transform(frame, desired_w, desired_h, full, rotation = 0):
+def transform(frame, desired_w, desired_h, full, rotation=0):
     rotation = rotation % 360
     if rotation == 90:
         frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
@@ -1452,7 +1453,6 @@ def create_output_folders(source_path, output_dir, save_images, webcam_recording
     else:
         output_dir_name = os.path.basename(os.path.splitext(str(source_path))[0])
 
-
     os.makedirs(output_dir, exist_ok=True)
     json_output_dir = os.path.join(output_dir, f"{output_dir_name}_json")
     os.makedirs(json_output_dir, exist_ok=True)
@@ -1481,7 +1481,7 @@ def determine_tracker_settings(config_dict):
     # Select the appropriate model based on the model_type
     if pose_model.upper() in ('HALPE_26', 'BODY_WITH_FEET'):
         model_name = 'HALPE_26'
-        ModelClass = BodyWithFeet # 26 keypoints(halpe26)
+        ModelClass = BodyWithFeet  # 26 keypoints(halpe26)
         logging.info("Using HALPE_26 model (body and feet) for pose estimation.")
     elif pose_model.upper() in ('COCO_133', 'WHOLE_BODY', 'WHOLE_BODY_WRIST'):
         model_name = 'COCO_133'
@@ -1495,7 +1495,7 @@ def determine_tracker_settings(config_dict):
         model_name = 'HAND_21'
         ModelClass = Hand
         logging.info("Using HAND_21 model for pose estimation.")
-    elif pose_model.upper() =='FACE':
+    elif pose_model.upper() == 'FACE':
         model_name = 'FACE_106'
         logging.info("Using FACE_106 model for pose estimation.")
     elif pose_model.upper() == 'ANIMAL':
@@ -1508,7 +1508,7 @@ def determine_tracker_settings(config_dict):
     try:
         pose_model = eval(model_name)
     except:
-        try: # from Config.toml
+        try:  # from Config.toml
             pose_model = DictImporter().import_(config_dict.get('pose').get(pose_model))
             if pose_model.id == 'None':
                 pose_model.id = None
@@ -1523,9 +1523,9 @@ def determine_tracker_settings(config_dict):
         try:
             try:
                 mode = ast.literal_eval(mode)
-            except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
-                mode = mode.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/',':/').replace('":"\\',':\\')
-                mode = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', mode) # changes "[640", "640]" to [640,640]
+            except:  # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+                mode = mode.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/', ':/').replace('":"\\', ':\\')
+                mode = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', mode)  # changes "[640", "640]" to [640,640]
                 mode = json.loads(mode)
             det_class = mode.get('det_class')
             det = mode.get('det_model')
@@ -1554,7 +1554,7 @@ def determine_tracker_settings(config_dict):
 
 def find_largest_frame_size(sources, vid_img_extension):
     '''
-    If input_size is not specified, find the maximum (width, height) 
+    If input_size is not specified, find the maximum (width, height)
     among all sources (videos, images, webcams).
     '''
 
@@ -1605,13 +1605,13 @@ def measure_webcam_fps(cam_index, warmup_frames=20, measure_frames=50):
     cap = cv2.VideoCapture(cam_index, cv2.CAP_DSHOW)
     if not cap.isOpened():
         return 30
-    
+
     for _ in range(warmup_frames):
         ret, _ = cap.read()
         if not ret:
             cap.release()
             return 30
-    
+
     import time
     start = time.time()
     count = 0
@@ -1620,7 +1620,7 @@ def measure_webcam_fps(cam_index, warmup_frames=20, measure_frames=50):
         if not ret:
             break
         count += 1
-    
+
     end = time.time()
     cap.release()
     if count < 1:
@@ -1651,7 +1651,7 @@ def find_lowest_fps(sources):
         elif s['type'] == 'webcam':
             fps = measure_webcam_fps(int(s['id']))
             min_fps = min(min_fps, fps)
-    
+
     return int(math.ceil(min_fps)) if min_fps < 9999 else 30
 
 
