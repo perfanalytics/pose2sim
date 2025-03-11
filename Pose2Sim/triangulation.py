@@ -843,7 +843,7 @@ def triangulate_all(config_dict):
         # TODO: if distance > threshold, new person
         
         # Add triangulated points, errors and excluded cameras to pandas dataframes
-        Q_tot.append([np.concatenate(Q[n]) for n in range(nb_persons_to_detect)])
+        Q_tot.append([np.concatenate(Q_current[n]) for n in range(nb_persons_to_detect)])
         error_tot.append([error_tot[n] for n in range(nb_persons_to_detect)])
         nb_cams_excluded_tot.append([nb_cams_excluded_tot[n] for n in range(nb_persons_to_detect)])
         id_excluded_cams = [[id_excluded_cams[n][k] for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
