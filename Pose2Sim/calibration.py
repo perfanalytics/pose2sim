@@ -1276,7 +1276,7 @@ def calibrate_cams_all(config_dict):
     '''
 
     # Read config_dict
-    project_dir = config_dict.get('project').get('project_dir')
+    project_dir = config_dict.get('project').get('session_dir')
     calib_dir = [os.path.join(project_dir, c) for c in os.listdir(project_dir) if ('Calib' in c or 'calib' in c)][0]
     calib_type = config_dict.get('calibration').get('calibration_type')
 
