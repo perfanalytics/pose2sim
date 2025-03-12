@@ -595,7 +595,7 @@ Pose2Sim.synchronization()
 
 You can choose the keypoints to synchronize on, the reference person, and the time when the vertical speed is the highest. You can either tune these parameters in the GUI (set `synchronization_gui = true`) or set them in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
-<img src="Content/synchro_multi.jpg" width="380">
+<img src="Content/synchro_multi.jpg" width="760">
 
 <img src="Content/synchro.jpg" width="760">
 
