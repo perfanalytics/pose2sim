@@ -42,7 +42,6 @@ import toml
 from tqdm import tqdm
 import cv2
 from anytree import RenderTree, PreOrderIter
-from anytree.importer import DictImporter
 import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
@@ -152,7 +151,7 @@ def triangulate_comb(comb, coords, P_all, calib_params, config_dict):
     return error_comb, comb, Q_comb
 
 
-def best_persons_and_cameras_combination(config_dict, json_files_framef, personsIDs_combinations, projection_matrices, tracked_keypoint_id, calib_params):
+def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_combinations, projection_matrices, tracked_keypoint_id, calib_params):
     '''
     Chooses the right person among the multiple ones found by
     OpenPose & excludes cameras with wrong 2d-pose estimation.
@@ -551,7 +550,7 @@ def rewrite_json_files(json_tracked_files_f, json_files_f, proposals, n_cams):
             os.remove(json_tracked_files_f[cam])
 
 
-def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
+def recap_tracking(config, error=0, nb_cams_excluded=0):
     '''
     Print a message giving statistics on reprojection errors (in pixel and in m)
     as well as the number of cameras that had to be excluded to reach threshold
@@ -609,7 +608,7 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
     logging.info(f'\nTracked json files are stored in {os.path.realpath(poseTracked_dir)}.')
     
 
-def associate_all(config_dict):
+def associate_all(config):
     '''
     For each frame,
     - Find all possible combinations of detected persons
@@ -636,7 +635,6 @@ def associate_all(config_dict):
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     multi_person = config_dict.get('project').get('multi_person')
-    pose_model = config_dict.get('pose').get('pose_model')
     tracked_keypoint = config_dict.get('personAssociation').get('single_person').get('tracked_keypoint')
     min_cameras_for_triangulation = config_dict.get('triangulation').get('min_cameras_for_triangulation')
     reconstruction_error_threshold = config_dict.get('personAssociation').get('multi_person').get('reconstruction_error_threshold')
@@ -661,23 +659,7 @@ def associate_all(config_dict):
     calib_params = retrieve_calib_params(calib_file)
         
     # selection of tracked keypoint id
-    try: # from skeletons.py
-        if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
-        elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
-        elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
-        elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
-        elif pose_model.upper() == 'HAND': pose_model = 'HAND_21'
-        elif pose_model.upper() == 'FACE': pose_model = 'FACE_106'
-        elif pose_model.upper() == 'ANIMAL': pose_model = 'ANIMAL2D_17'
-        else: pass
-        model = eval(pose_model)
-    except:
-        try: # from Config.toml
-            model = DictImporter().import_(config_dict.get('pose').get(pose_model))
-            if model.id == 'None':
-                model.id = None
-        except:
-            raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
+    model = config.pose_model.load_model_instance()
 
     # 2d-pose files selection
     pose_listdirs_names = next(os.walk(pose_dir))[1]

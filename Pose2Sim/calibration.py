@@ -46,8 +46,6 @@ import warnings
 import matplotlib.pyplot as plt
 from mpl_interactions import zoom_factory, panhandler
 from PIL import Image
-from contextlib import contextmanager,redirect_stderr,redirect_stdout
-from os import devnull
 
 
 ## AUTHORSHIP INFORMATION
@@ -193,7 +191,7 @@ def read_qca(qca_path, binning_factor):
     return ret, C, S, D, K, R, T
 
 
-def calib_optitrack_fun(config_dict, binning_factor=1):
+def calib_optitrack_fun(file_to_convert_path, binning_factor=1):
     '''
     Convert an Optitrack calibration file 
 
@@ -466,7 +464,7 @@ def calib_opencap_fun(files_to_convert_paths, binning_factor=1):
     return ret, C, S, D, K, R, T
     
 
-def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
+def calib_calc_fun(config):
     '''
     Calibrates intrinsic and extrinsic parameters
     from images or videos of a checkerboard
@@ -486,57 +484,48 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
     - R: extrinsic rotation: list of arrays of floats (Rodrigues)
     - T: extrinsic translation: list of arrays of floats
     '''
-    
-    overwrite_intrinsics = intrinsics_config_dict.get('overwrite_intrinsics')
-    calculate_extrinsics = extrinsics_config_dict.get('calculate_extrinsics')
+
+    calculate_extrinsics, use_existing_intrinsics, calib_file, extrinsics_dir = config.get_calib_calc_params()
 
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
-    try:
-        calib_file = glob.glob(os.path.join(calib_dir, f'Calib*.toml'))[0]
-    except:
-        pass
-    if not overwrite_intrinsics and 'calib_file' in locals():
-        logging.info(f'\nPreexisting calibration file found: \'{calib_file}\'.')
-        logging.info(f'\nRetrieving intrinsic parameters from file. Set "overwrite_intrinsics" to true in Config.toml to recalculate them.')
-        calib_file = glob.glob(os.path.join(calib_dir, f'Calib*.toml'))[0]
+    if use_existing_intrinsics:
         calib_data = toml.load(calib_file)
-
         ret, C, S, D, K, R, T = [], [], [], [], [], [], []
         for cam in calib_data:
             if cam != 'metadata':
-                ret += [0.0]
-                C += [calib_data[cam]['name']]
-                S += [calib_data[cam]['size']]
-                K += [np.array(calib_data[cam]['matrix'])]
-                D += [calib_data[cam]['distortions']]
-                R += [[0.0, 0.0, 0.0]]
-                T += [[0.0, 0.0, 0.0]]
+                ret.append(0.0)
+                C.append(calib_data[cam]['name'])
+                S.append(calib_data[cam]['size'])
+                K.append(np.array(calib_data[cam]['matrix']))
+                D.append(calib_data[cam]['distortions'])
+                R.append([0.0, 0.0, 0.0])
+                T.append([0.0, 0.0, 0.0])
         nb_cams_intrinsics = len(C)
     
     # calculate intrinsics otherwise
     else:
         logging.info(f'\nCalculating intrinsic parameters...')
-        ret, C, S, D, K, R, T = calibrate_intrinsics(calib_dir, intrinsics_config_dict)
+        ret, C, S, D, K, R, T = calibrate_intrinsics(config)
         nb_cams_intrinsics = len(C)
 
     # calculate extrinsics
     if calculate_extrinsics:
         logging.info(f'\nCalculating extrinsic parameters...')
-        
+
         # check that the number of cameras is consistent
-        nb_cams_extrinsics = len(next(os.walk(os.path.join(calib_dir, 'extrinsics')))[1])
+        nb_cams_extrinsics = len(next(os.walk(extrinsics_dir))[1])
         if nb_cams_intrinsics != nb_cams_extrinsics:
             raise Exception(f'Error: The number of cameras is not consistent:\
                     Found {nb_cams_intrinsics} cameras based on the number of intrinsic folders or on calibration file data,\
                     and {nb_cams_extrinsics} cameras based on the number of extrinsic folders.')
-        ret, C, S, D, K, R, T = calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D)
+        ret, C, S, D, K, R, T = calibrate_extrinsics(config, C, S, K, D)
     else:
         logging.info(f'\nExtrinsic parameters won\'t be calculated. Set "calculate_extrinsics" to true in Config.toml to calculate them.')
 
     return ret, C, S, D, K, R, T
 
 
-def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
+def calibrate_intrinsics(config):
     '''
     Calculate intrinsic parameters
     from images or videos of a checkerboard
@@ -550,21 +539,11 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
     - D: distorsion: list of arrays of floats
     - K: intrinsic parameters: list of 3x3 arrays of floats
     '''
+    show_detection_intrinsics, intrinsics_corners_nb, extract_every_N_sec, overwrite_extraction, intrinsics_square_size, img_vid_files_list = config.get_intrinsics_params()
 
-    try:
-        intrinsics_cam_listdirs_names = next(os.walk(os.path.join(calib_dir, 'intrinsics')))[1]
-    except StopIteration:
-        logging.exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
-        raise Exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
-    intrinsics_extension = intrinsics_config_dict.get('intrinsics_extension')
-    extract_every_N_sec = intrinsics_config_dict.get('extract_every_N_sec')
-    overwrite_extraction = False
-    show_detection_intrinsics = intrinsics_config_dict.get('show_detection_intrinsics')
-    intrinsics_corners_nb = intrinsics_config_dict.get('intrinsics_corners_nb')
-    intrinsics_square_size = intrinsics_config_dict.get('intrinsics_square_size') / 1000 # convert to meters
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
 
-    for i,cam in enumerate(intrinsics_cam_listdirs_names):
+    for cam, img_vid_files in enumerate(img_vid_files_list):
         # Prepare object points
         objp = np.zeros((intrinsics_corners_nb[0]*intrinsics_corners_nb[1],3), np.float32) 
         objp[:,:2] = np.mgrid[0:intrinsics_corners_nb[0],0:intrinsics_corners_nb[1]].T.reshape(-1,2)
@@ -573,10 +552,6 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
         imgpoints = [] # 2d points in image plane
 
         logging.info(f'\nCamera {cam}:')
-        img_vid_files = glob.glob(os.path.join(calib_dir, 'intrinsics', cam, f'*.{intrinsics_extension}'))
-        if len(img_vid_files) == 0:
-            logging.exception(f'The folder {os.path.join(calib_dir, "intrinsics", cam)} does not exist or does not contain any files with extension .{intrinsics_extension}.')
-            raise ValueError(f'The folder {os.path.join(calib_dir, "intrinsics", cam)} does not exist or does not contain any files with extension .{intrinsics_extension}.')
         img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
         
         # extract frames from video if video
@@ -586,7 +561,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
             if cap.read()[0] == False:
                 raise
             extract_frames(img_vid_files[0], extract_every_N_sec, overwrite_extraction)
-            img_vid_files = glob.glob(os.path.join(calib_dir, 'intrinsics', cam, f'*.png'))
+            img_vid_files = glob.glob(os.path.join(config.calib_dir, 'intrinsics', cam, f'*.png'))
             img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)])
         except:
             pass
@@ -625,7 +600,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
     return ret, C, S, D, K, R, T
 
 
-def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
+def calibrate_extrinsics(config, C, S, K, D):
     '''
     Calibrates extrinsic parameters
     from an image or the first frame of a video
@@ -640,43 +615,31 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
     - T: extrinsic translation: list of arrays of floats
     '''
 
-    try:
-        extrinsics_cam_listdirs_names = next(os.walk(os.path.join(calib_dir, 'extrinsics')))[1]
-    except StopIteration:
-        logging.exception(f'Error: No {os.path.join(calib_dir, "extrinsics")} folder found.')
-        raise Exception(f'Error: No {os.path.join(calib_dir, "extrinsics")} folder found.')
-    
-    extrinsics_method = extrinsics_config_dict.get('extrinsics_method')
+
+    show_reprojection_error, extrinsics_method, img_vid_files_list, calib_output_path = config.get_extrinsics_params()
+
     ret, R, T = [], [], []
-    
+
     if extrinsics_method in {'board', 'scene'}:
-                
+
         # Define 3D object points
         if extrinsics_method == 'board':
-            extrinsics_corners_nb = extrinsics_config_dict.get('board').get('extrinsics_corners_nb')
-            extrinsics_square_size = extrinsics_config_dict.get('board').get('extrinsics_square_size') / 1000 # convert to meters
+            extrinsics_corners_nb = config.extrinsics_square_size
+            extrinsics_square_size = config.extrinsics_corners_nb
             object_coords_3d = np.zeros((extrinsics_corners_nb[0] * extrinsics_corners_nb[1], 3), np.float32)
             object_coords_3d[:, :2] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]].T.reshape(-1, 2)
             object_coords_3d[:, :2] = object_coords_3d[:, 0:2] * extrinsics_square_size
         elif extrinsics_method == 'scene':
-            object_coords_3d = np.array(extrinsics_config_dict.get('scene').get('object_coords_3d'), np.float32)
-                
+            object_coords_3d = config.object_coords_3d
+
         # Save reference 3D coordinates as trc
-        calib_output_path = os.path.join(calib_dir, f'Object_points.trc')
         trc_write(object_coords_3d, calib_output_path)
-    
-        for i, cam in enumerate(extrinsics_cam_listdirs_names):
+
+        for cam, img_vid_files in enumerate(img_vid_files_list):
             logging.info(f'\nCamera {cam}:')
             
             # Read images or video
-            extrinsics_extension = [extrinsics_config_dict.get('board').get('extrinsics_extension') if extrinsics_method == 'board'
-                                    else extrinsics_config_dict.get('scene').get('extrinsics_extension')][0]
-            show_reprojection_error = [extrinsics_config_dict.get('board').get('show_reprojection_error') if extrinsics_method == 'board'
-                                    else extrinsics_config_dict.get('scene').get('show_reprojection_error')][0]
-            img_vid_files = glob.glob(os.path.join(calib_dir, 'extrinsics', cam, f'*.{extrinsics_extension}'))
-            if len(img_vid_files) == 0:
-                logging.exception(f'The folder {os.path.join(calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
-                raise ValueError(f'The folder {os.path.join(calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
+
             img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
             
             # extract frames from image, or from video if imread is None
@@ -702,10 +665,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
                     raise ValueError('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
                 if len(objp) < 10:
                     logging.info(f'Only {len(objp)} reference points for camera {cam}. Calibration of extrinsic parameters may not be accurate with fewer than 10 reference points, as spread out in the captured volume as possible.')
-            
-            elif extrinsics_method == 'keypoints':
-                logging.info('Calibration based on keypoints is not available yet.')
-            
+
             # Calculate extrinsics
             mtx, dist = np.array(K[i]), np.array(D[i])
             _, r, t = cv2.solvePnP(np.array(objp)*1000, imgp, mtx, dist)
@@ -753,10 +713,10 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             ret.append(rms_px)
             R.append(r)
             T.append(t)
-        
+
     elif extrinsics_method == 'keypoints':
         raise NotImplementedError('This has not been integrated yet.')
-    
+
     else:
         raise ValueError('Wrong value for extrinsics_method')
 
@@ -1261,7 +1221,7 @@ def recap_calibrate(ret, calib_path, calib_full_type):
     logging.info(f'Calibration file is stored at {calib_path}.')
 
 
-def calibrate_cams_all(config_dict):
+def calibrate_cams_all(config):
     '''
     Either converts a preexisting calibration file, 
     or calculates calibration from scratch (from a board or from points).
@@ -1276,67 +1236,8 @@ def calibrate_cams_all(config_dict):
     '''
 
     # Read config_dict
-    project_dir = config_dict.get('project').get('session_dir')
-    calib_dir = [os.path.join(project_dir, c) for c in os.listdir(project_dir) if ('Calib' in c or 'calib' in c)][0]
-    calib_type = config_dict.get('calibration').get('calibration_type')
+    calib_output_path, calib_full_type, args_calib_fun = config.get_calibration_params()
 
-    if calib_type=='convert':
-        convert_filetype = config_dict.get('calibration').get('convert').get('convert_from')
-        try:
-            if convert_filetype=='qualisys':
-                convert_ext = '.qca.txt'
-                file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
-                binning_factor = config_dict.get('calibration').get('convert').get('qualisys').get('binning_factor')
-            elif convert_filetype=='optitrack':
-                file_to_convert_path = ['']
-                binning_factor = 1
-            elif convert_filetype=='vicon':
-                convert_ext = '.xcp'
-                file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}'))[0]
-                binning_factor = 1
-            elif convert_filetype=='opencap': # all files with .pickle extension
-                convert_ext = '.pickle'
-                file_to_convert_path = sorted(glob.glob(os.path.join(calib_dir, f'*{convert_ext}')))
-                binning_factor = 1
-            elif convert_filetype=='easymocap': #intri.yml and intri.yml
-                convert_ext = '.yml'
-                file_to_convert_path = sorted(glob.glob(os.path.join(calib_dir, f'*{convert_ext}')))
-                binning_factor = 1
-            elif convert_filetype=='biocv': # all files without extension -> now with .calib extension
-                # convert_ext = 'no'
-                # list_dir = os.listdir(calib_dir)
-                # list_dir_noext = sorted([os.path.splitext(f)[0] for f in list_dir if os.path.splitext(f)[1]==''])
-                # file_to_convert_path = [os.path.join(calib_dir,f) for f in list_dir_noext if os.path.isfile(os.path.join(calib_dir, f))]
-                convert_ext = '.calib'
-                file_to_convert_path = sorted(glob.glob(os.path.join(calib_dir, f'*{convert_ext}')))
-                binning_factor = 1
-            elif convert_filetype=='anipose' or convert_filetype=='freemocap' or convert_filetype=='caliscope': # no conversion needed, skips this stage
-                logging.info(f'\n--> No conversion needed from Caliscope, AniPose, nor from FreeMocap. Calibration skipped.\n')
-                return
-            else:
-                convert_ext = '???'
-                file_to_convert_path = ['']
-                raise NameError(f'Calibration conversion from {convert_filetype} is not supported.') from None
-            assert file_to_convert_path!=[]
-        except:
-            raise NameError(f'No file with {convert_ext} extension found in {calib_dir}.')
-        
-        calib_output_path = os.path.join(calib_dir, f'Calib_{convert_filetype}.toml')
-        calib_full_type = '_'.join([calib_type, convert_filetype])
-        args_calib_fun = [file_to_convert_path, binning_factor]
-        
-    elif calib_type=='calculate':
-        intrinsics_config_dict = config_dict.get('calibration').get('calculate').get('intrinsics')
-        extrinsics_config_dict = config_dict.get('calibration').get('calculate').get('extrinsics')
-        extrinsics_method = config_dict.get('calibration').get('calculate').get('extrinsics').get('extrinsics_method')
-
-        calib_output_path = os.path.join(calib_dir, f'Calib_{extrinsics_method}.toml')
-        calib_full_type = calib_type
-        args_calib_fun = [calib_dir, intrinsics_config_dict, extrinsics_config_dict]
-
-    else:
-        logging.info('Wrong calibration_type in Config.toml')
-    
     # Map calib function
     calib_mapping = {
         'convert_qualisys': calib_qca_fun,
@@ -1354,6 +1255,6 @@ def calibrate_cams_all(config_dict):
 
     # Write calibration file
     toml_write(calib_output_path, C, S, D, K, R, T)
-    
+
     # Recap message
     recap_calibrate(ret, calib_output_path, calib_full_type)

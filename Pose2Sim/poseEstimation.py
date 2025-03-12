@@ -38,13 +38,11 @@ import json
 import re
 import logging
 import ast
-import numpy as np
 from functools import partial
 from tqdm import tqdm
-from anytree.importer import DictImporter
 import cv2
 
-from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
+from rtmlib import PoseTracker, Custom, draw_skeleton
 from deep_sort_realtime.deepsort_tracker import DeepSort
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort, sort_people_rtmlib,\
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel
@@ -415,7 +413,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
         cv2.destroyAllWindows()
 
 
-def estimate_pose_all(config_dict):
+def estimate_pose_all(config):
     '''
     Estimate pose from a video file or a folder of images and 
     write the results to JSON files, videos, and/or images.
@@ -451,7 +449,6 @@ def estimate_pose_all(config_dict):
     video_dir = os.path.join(project_dir, 'videos')
     pose_dir = os.path.join(project_dir, 'pose')
 
-    pose_model = config_dict['pose']['pose_model']
     mode = config_dict['pose']['mode'] # lightweight, balanced, performance
     vid_img_extension = config_dict['pose']['vid_img_extension']
     
@@ -501,41 +498,7 @@ def estimate_pose_all(config_dict):
 
     # Select the appropriate model based on the model_type
     logging.info('\nEstimating pose...')
-    if pose_model.upper() in ('HALPE_26', 'BODY_WITH_FEET'):
-        model_name = 'HALPE_26'
-        ModelClass = BodyWithFeet # 26 keypoints(halpe26)
-        logging.info(f"Using HALPE_26 model (body and feet) for pose estimation.")
-    elif pose_model.upper() in ('COCO_133', 'WHOLE_BODY', 'WHOLE_BODY_WRIST'):
-        model_name = 'COCO_133'
-        ModelClass = Wholebody
-        logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation.")
-    elif pose_model.upper() in ('COCO_17', 'BODY'):
-        model_name = 'COCO_17'
-        ModelClass = Body
-        logging.info(f"Using COCO_17 model (body) for pose estimation.")
-    elif pose_model.upper() =='HAND':
-        model_name = 'HAND_21'
-        ModelClass = Hand
-        logging.info(f"Using HAND_21 model for pose estimation.")
-    elif pose_model.upper() =='FACE':
-        model_name = 'FACE_106'
-        logging.info(f"Using FACE_106 model for pose estimation.")
-    elif pose_model.upper() =='ANIMAL':
-        model_name = 'ANIMAL2D_17'
-        logging.info(f"Using ANIMAL2D_17 model for pose estimation.")
-    else:
-        model_name = pose_model.upper()
-        logging.info(f"Using model {model_name} for pose estimation.")
-    pose_model_name = pose_model
-    try:
-        pose_model = eval(model_name)
-    except:
-        try: # from Config.toml
-            pose_model = DictImporter().import_(config_dict.get('pose').get(pose_model))
-            if pose_model.id == 'None':
-                pose_model.id = None
-        except:
-            raise NameError(f'{pose_model} not found in skeletons.py nor in Config.toml')
+    ModelClass = config.pose_model.get_model_class()
 
     # Select device and backend
     backend, device = setup_backend_device(backend=backend, device=device)
@@ -588,7 +551,7 @@ def estimate_pose_all(config_dict):
         if tracking_mode not in ['deepsort', 'sports2d']:
             logging.warning(f"Tracking mode {tracking_mode} not recognized. Using sports2d method.")
             tracking_mode = 'sports2d'
-        logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
+        logging.info(f'\nPose tracking set up for "{config.pose_mode}" model.')
         logging.info(f'Mode: {mode}.')
         logging.info(f'Tracking is done with {tracking_mode}{" " if not tracking_mode=="deepsort" else f" with parameters: {deepsort_params}"}.\n')
 
@@ -599,7 +562,7 @@ def estimate_pose_all(config_dict):
             for video_path in video_files:
                 pose_tracker.reset()
                 if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()
-                process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
+                process_video(video_path, pose_tracker, config.pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
 
         else:
             # Process image folders
@@ -609,4 +572,4 @@ def estimate_pose_all(config_dict):
                 pose_tracker.reset()
                 image_folder_path = os.path.join(video_dir, image_folder)
                 if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()                
-                process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
+                process_images(image_folder_path, vid_img_extension, pose_tracker, config.pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)

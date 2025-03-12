@@ -47,12 +47,11 @@ from tqdm import tqdm
 from scipy import interpolate
 from collections import Counter
 from anytree import RenderTree
-from anytree.importer import DictImporter
 import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
     reprojection, euclidean_distance, sort_people_sports2d, \
-    sort_stringlist_by_last_number, min_with_single_indices, zup2yup, convert_to_c3d
+    sort_stringlist_by_last_number, zup2yup, convert_to_c3d
 from Pose2Sim.skeletons import *
 
 
@@ -673,7 +672,7 @@ def triangulate_single(config_dict, f, json_files_names, json_dirs_names, pose_d
     return Q, error, nb_cams_excluded, id_excluded_cams
 
 
-def triangulate_all(config_dict):
+def triangulate_all(config):
     '''
     For each frame
     For each keypoint
@@ -701,7 +700,6 @@ def triangulate_all(config_dict):
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     multi_person = config_dict.get('project').get('multi_person')
-    pose_model = config_dict.get('pose').get('pose_model')
     frame_range = config_dict.get('project').get('frame_range')
     likelihood_threshold = config_dict.get('triangulation').get('likelihood_threshold_triangulation')
     interpolation_kind = config_dict.get('triangulation').get('interpolation')
@@ -728,23 +726,7 @@ def triangulate_all(config_dict):
     calib_params = retrieve_calib_params(calib_file)
         
     # Retrieve keypoints from model
-    try: # from skeletons.py
-        if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
-        elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
-        elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
-        elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
-        elif pose_model.upper() == 'HAND': pose_model = 'HAND_21'
-        elif pose_model.upper() == 'FACE': pose_model = 'FACE_106'
-        elif pose_model.upper() == 'ANIMAL': pose_model = 'ANIMAL2D_17'
-        else: pass
-        model = eval(pose_model)
-    except:
-        try: # from Config.toml
-            model = DictImporter().import_(config_dict.get('pose').get(pose_model))
-            if model.id == 'None':
-                model.id = None
-        except:
-            raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
+    model = config.pose_model.load_model_instance()
             
     keypoints_ids = [node.id for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
