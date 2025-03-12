@@ -69,6 +69,36 @@ __status__ = "Development"
 # Global matplotlib settings - remove toolbar
 plt.rcParams['toolbar'] = 'none'
 
+# Define keypoint UI parameters
+TITLE_SIZE = 12
+LABEL_SIZE_KEYPOINTS = 8 # defined twice
+BTN_WIDTH_KEYPOINTS = 0.16 # defined twice
+BTN_HEIGHT = 0.04
+BTN_Y = 0.02
+CENTER_X = 0.5
+SELECTED_COLOR = 'darkorange'
+UNSELECTED_COLOR = 'blue'
+NONE_COLOR = 'silver'
+BTN_COLOR = 'white'  # Light gray
+BTN_HOVER_COLOR = '#D3D3D3'  # Darker gray on hover
+
+# Define person UI parameters
+BACKGROUND_COLOR = 'white'
+TEXT_COLOR = 'black'
+CONTROL_COLOR = 'white'
+CONTROL_HOVER_COLOR = '#D3D3D3'
+SLIDER_COLOR = '#4682B4'
+SLIDER_HIGHLIGHT_COLOR = 'moccasin'
+SLIDER_EDGE_COLOR = (0.5, 0.5, 0.5, 0.5)
+LABEL_SIZE_PERSON = 10
+TEXT_SIZE = 9.5
+BUTTON_SIZE = 10
+TEXTBOX_WIDTH = 0.09
+BTN_WIDTH_PERSON = 0.04
+CONTROL_HEIGHT = 0.04
+Y_POSITION = 0.1
+
+
 def reset_styles(rect, annotation):
     '''
     Resets the visual style of a bounding box and its annotation to default.
@@ -118,7 +148,7 @@ def create_textbox(ax_pos, label, initial, UI_PARAMS):
 
 
 ## Handlers
-def handle_ok_button(ui, fps, i, selected_id_list, approx_time_maxspeed):
+def handle_ok_button(ui):
     '''
     Handles the OK button click event.
     
@@ -133,7 +163,7 @@ def handle_ok_button(ui, fps, i, selected_id_list, approx_time_maxspeed):
     try:
         float(ui['controls']['main_time_textbox'].text)
         float(ui['controls']['time_RAM_textbox'].text)
-        selected_id_list.append(ui['containers']['selected_idx'][0])
+        int(ui['controls']['person_textbox'].text)
         plt.close(ui['fig'])
     except ValueError:
         logging.warning('Invalid input in textboxes.')
@@ -188,12 +218,12 @@ def handle_frame_navigation(direction, frame_textbox, search_around_frames, i, c
     if (direction < 0 and current > search_around_frames[i][0]) or \
        (direction > 0 and current < search_around_frames[i][1]):
         next_frame = current + direction
-        handle_frame_change(None, next_frame, frame_textbox, cap, ax_video, frame_to_json,
+        handle_frame_change(next_frame, frame_textbox, cap, ax_video, frame_to_json,
                             pose_dir, json_dir_name, rects, annotations, bounding_boxes_list,
                             fig, search_around_frames, i, time_range_around_maxspeed, fps, ui)
 
 
-def handle_frame_change(text, frame_number, frame_textbox, cap, ax_video, frame_to_json, 
+def handle_frame_change(frame_number, frame_textbox, cap, ax_video, frame_to_json, 
                         pose_dir, json_dir_name, rects, annotations, bounding_boxes_list, 
                         fig, search_around_frames, i, time_range_around_maxspeed, fps, ui):
     '''
@@ -267,14 +297,13 @@ def handle_key_press(event, frame_textbox, search_around_frames, i, cap, ax_vide
         direction = -1
     elif event.key == 'right':
         direction = 1
-        
     if direction != 0:
         handle_frame_navigation(direction, frame_textbox, search_around_frames, i, cap, ax_video, frame_to_json,
                               pose_dir, json_dir_name, rects, annotations, bounding_boxes_list, fig,
                               time_range_around_maxspeed, fps, ui)
 
 
-def handle_toggle_labels(event, keypoint_texts, containers, btn_toggle):
+def handle_toggle_labels(keypoint_texts, containers, btn_toggle):
     '''
     Handle toggle labels button click.
     
@@ -304,7 +333,7 @@ def highlight_selected_box(rect, annotation):
     '''
 
     rect.set_linewidth(2)
-    rect.set_edgecolor('darkorange')
+    rect.set_edgecolor(SELECTED_COLOR)
     rect.set_facecolor((1, 1, 1, 0.1))
     annotation.set_fontsize(8)
     annotation.set_fontweight('bold')
@@ -320,7 +349,7 @@ def highlight_hover_box(rect, annotation):
     '''
 
     rect.set_linewidth(2)
-    rect.set_edgecolor('darkorange')
+    rect.set_edgecolor(SELECTED_COLOR)
     rect.set_facecolor((1, 1, 0, 0.2))
     annotation.set_fontsize(8)
     annotation.set_fontweight('bold')
@@ -457,7 +486,7 @@ def update_highlight(current_frame, time_RAM, fps, search_around_frames, cam_ind
     range_end = min(current_frame + time_RAM * fps, search_around_frames[cam_index][1])
     controls['range_highlight'] = ax_slider.axvspan(range_start, range_end, 
                                                   ymin=0.20, ymax=0.80,
-                                                  color='darkorange', alpha=0.5, zorder=4)
+                                                  color=SLIDER_HIGHLIGHT_COLOR, alpha=0.5, zorder=4)
 
 
 def update_main_time(text, fps, search_around_frames, i, ui, cap, frame_to_json, pose_dir, json_dirs_names, bounding_boxes_list):
@@ -482,7 +511,7 @@ def update_main_time(text, fps, search_around_frames, i, ui, cap, frame_to_json,
         frame_num = int(round(main_time * fps))
         frame_num = max(search_around_frames[i][0], min(frame_num, search_around_frames[i][1]))
         ui['controls']['frame_slider'].set_val(frame_num)
-        update_frame(frame_num, fps, ui, cap, frame_to_json, pose_dir, json_dirs_names, i, search_around_frames, bounding_boxes_list)
+        update_frame(frame_num, fps, ui, frame_to_json, pose_dir, json_dirs_names, i, search_around_frames, bounding_boxes_list)
     except ValueError:
         pass
 
@@ -593,7 +622,7 @@ def update_keypoint_selection(selected_keypoints, all_keypoints, keypoints_names
     plt.draw()
 
 
-def update_frame(val, fps, ui, cap, frame_to_json, pose_dir, json_dirs_names, i, search_around_frames, bounding_boxes_list):
+def update_frame(val, fps, ui, frame_to_json, pose_dir, json_dirs_names, i, search_around_frames, bounding_boxes_list):
     '''
     Synchronizes all UI elements when the frame number changes.
     
@@ -687,7 +716,7 @@ def update_play(cap, image, frame_number, frame_to_json, pose_dir, json_dir_name
     fig.canvas.draw_idle()
 
 
-def keypoints_ui(keypoints_names):
+def keypoints_ui(keypoints_to_consider, keypoints_names):
     '''
     Step 1: Initializes the UI for selecting keypoints.
 
@@ -711,20 +740,6 @@ def keypoints_ui(keypoints_names):
     - selected_keypoints: List of strings. The names of the selected keypoints.
     '''
     
-    # Define text sizes
-    TITLE_SIZE = 12
-    LABEL_SIZE = 8
-    BUTTON_SIZE = 10
-    BTN_WIDTH = 0.16
-    BTN_HEIGHT = 0.04
-    BTN_Y = 0.02
-    CENTER_X = 0.5
-    SELECTED_COLOR = 'darkorange'
-    UNSELECTED_COLOR = 'blue'
-    NONE_COLOR = 'silver'
-    BTN_COLOR = '#D3D3D3'  # Light gray
-    BTN_HOVER_COLOR = '#A9A9A9'  # Darker gray on hover
-    
     # Create figure
     fig = plt.figure(figsize=(6, 8), num='Synchronizing cameras')
     fig.patch.set_facecolor('white')
@@ -736,32 +751,32 @@ def keypoints_ui(keypoints_names):
     
     # Define all keypoints and their positions
     all_keypoints = [
-        'Hip', 'RHip', 'LHip', 'RShoulder', 'RElbow', 'RWrist', 'RKnee', 'RAnkle',
-        'RSmallToe', 'RBigToe', 'RHeel', 'LShoulder', 'LElbow', 'LWrist', 'LKnee',
-        'LAnkle', 'LSmallToe', 'LBigToe', 'LHeel'
+        'Hip', 'Neck', 'Head', 'Nose', 
+        'RHip', 'RShoulder', 'RElbow', 'RWrist', 
+        'RKnee', 'RAnkle', 'RSmallToe', 'RBigToe', 'RHeel', 
+        'LHip', 'LShoulder', 'LElbow', 'LWrist', 
+        'LKnee', 'LAnkle', 'LSmallToe', 'LBigToe', 'LHeel',
     ]
     keypoints_positions = {
-        'Hip': (0.50, 0.42), 'RHip': (0.42, 0.42), 'LHip': (0.58, 0.42),
-        'RShoulder': (0.40, 0.75), 'RElbow': (0.35, 0.65), 'RWrist': (0.25, 0.50),
-        'RKnee': (0.40, 0.25), 'RAnkle': (0.40, 0.05),
-        'RSmallToe': (0.35, 0.0), 'RBigToe': (0.42, 0.0), 'RHeel': (0.40, 0.02),
-        'LShoulder': (0.60, 0.75), 'LElbow': (0.65, 0.65), 'LWrist': (0.75, 0.50),
-        'LKnee': (0.60, 0.25), 'LAnkle': (0.60, 0.05),
-        'LSmallToe': (0.65, 0.0), 'LBigToe': (0.58, 0.0), 'LHeel': (0.60, 0.02)
+        'Hip': (0.50, 0.42), 'Neck': (0.50, 0.75), 'Head': (0.50, 0.85), 'Nose': (0.53, 0.82), 
+        'RHip': (0.42, 0.42), 'RShoulder': (0.40, 0.75), 'RElbow': (0.35, 0.65), 'RWrist': (0.25, 0.50),
+        'LHip': (0.58, 0.42), 'LShoulder': (0.60, 0.75), 'LElbow': (0.65, 0.65), 'LWrist': (0.75, 0.50),
+        'RKnee': (0.40, 0.25), 'RAnkle': (0.40, 0.05), 'RSmallToe': (0.35, 0.0), 'RBigToe': (0.42, 0.0), 'RHeel': (0.40, 0.02),
+        'LKnee': (0.60, 0.25), 'LAnkle': (0.60, 0.05), 'LSmallToe': (0.65, 0.0), 'LBigToe': (0.58, 0.0), 'LHeel': (0.60, 0.02)
     }
     
     # Generate keypoint coordinates
     keypoints_x, keypoints_y = zip(*[keypoints_positions[name] for name in all_keypoints])
     
     # Set initial colors
-    initial_colors = [UNSELECTED_COLOR if kp in keypoints_names else NONE_COLOR for kp in all_keypoints]
+    initial_colors = [SELECTED_COLOR if kp in keypoints_to_consider else UNSELECTED_COLOR if kp in keypoints_names else NONE_COLOR for kp in all_keypoints]
     
     # Create scatter plot
-    selected_keypoints = []
+    selected_keypoints = keypoints_to_consider
     scatter = ax_keypoints.scatter(keypoints_x, keypoints_y, c=initial_colors, picker=True)
     
     # Add keypoint labels
-    keypoint_texts = [ax_keypoints.text(x + 0.02, y, name, va='center', fontsize=LABEL_SIZE, color='black', visible=False)
+    keypoint_texts = [ax_keypoints.text(x + 0.02, y, name, va='center', fontsize=LABEL_SIZE_KEYPOINTS, color='black', visible=False)
                       for x, y, name in zip(keypoints_x, keypoints_y, all_keypoints)]
     
     ax_keypoints.set_xlim(0, 1)
@@ -772,13 +787,15 @@ def keypoints_ui(keypoints_names):
     ax_selected = plt.axes([0.1, 0.08, 0.8, 0.04])
     ax_selected.axis('off')
     ax_selected.set_facecolor('black')
-    selected_text = ax_selected.text(0.0, 0.5, 'Selected: None\nClick on keypoints to select them', 
+    text_parts = ['Selected: '] + [f'$\\bf{{{kp}}}$' if i == 0 else f', $\\bf{{{kp}}}$' for i, kp in enumerate(selected_keypoints)]
+    selected_text = ax_selected.text(0.0, 0.5, ''.join(text_parts), 
                                     va='center', fontsize=BUTTON_SIZE, wrap=True, color='black')
     
     # Add buttons
-    btn_all_none = plt.Button(plt.axes([CENTER_X - 1.5*BTN_WIDTH - 0.01, BTN_Y, BTN_WIDTH, BTN_HEIGHT]), 'Select All')
-    btn_toggle = plt.Button(plt.axes([CENTER_X - BTN_WIDTH/2, BTN_Y, BTN_WIDTH, BTN_HEIGHT]), 'Show names')
-    btn_ok = plt.Button(plt.axes([CENTER_X + 0.5*BTN_WIDTH + 0.01, BTN_Y, BTN_WIDTH, BTN_HEIGHT]), 'OK')
+    btn_all_none = plt.Button(plt.axes([CENTER_X - 1.5*BTN_WIDTH_KEYPOINTS - 0.01, BTN_Y, BTN_WIDTH_KEYPOINTS, BTN_HEIGHT]), 'Select All')
+    btn_toggle = plt.Button(plt.axes([CENTER_X - BTN_WIDTH_KEYPOINTS/2, BTN_Y, BTN_WIDTH_KEYPOINTS, BTN_HEIGHT]), 'Show names')
+    btn_ok = plt.Button(plt.axes([CENTER_X + 0.5*BTN_WIDTH_KEYPOINTS + 0.01, BTN_Y, BTN_WIDTH_KEYPOINTS, BTN_HEIGHT]), label='OK')
+    btn_ok.label.set_fontweight('bold')
     
     # button colors
     for btn in [btn_all_none, btn_toggle, btn_ok]:
@@ -792,7 +809,7 @@ def keypoints_ui(keypoints_names):
     }
 
     # Connect button events
-    btn_toggle.on_clicked(lambda event: handle_toggle_labels(event, keypoint_texts, containers, btn_toggle))
+    btn_toggle.on_clicked(lambda event: handle_toggle_labels(keypoint_texts, containers, btn_toggle))
     btn_ok.on_clicked(lambda event: plt.close())
     btn_all_none.on_clicked(lambda event: (
         selected_keypoints.clear() if selected_keypoints else selected_keypoints.extend(keypoints_names),
@@ -834,21 +851,6 @@ def person_ui(frame_rgb, cam_name, frame_number, search_around_frames, time_rang
     - ui: Dictionary containing all UI elements and state
     '''
     
-    # Define UI parameters
-    BACKGROUND_COLOR = 'white'
-    TEXT_COLOR = 'black'
-    CONTROL_COLOR = '#D3D3D3'
-    CONTROL_HOVER_COLOR = '#A9A9A9'
-    SLIDER_COLOR = '#4682B4'
-    SLIDER_EDGE_COLOR = (0.5, 0.5, 0.5, 0.5)
-    LABEL_SIZE = 10
-    TEXT_SIZE = 9.5
-    BUTTON_SIZE = 10
-    TEXTBOX_WIDTH = 0.09
-    BTN_WIDTH = 0.04
-    CONTROL_HEIGHT = 0.04
-    Y_POSITION = 0.1
-
     # Set up UI based on frame size and orientation
     frame_height, frame_width = frame_rgb.shape[:2]
     is_vertical = frame_height > frame_width
@@ -896,7 +898,7 @@ def person_ui(frame_rgb, cam_name, frame_number, search_around_frames, time_rang
     range_end = min(frame_number + time_range_around_maxspeed * fps, search_around_frames[cam_index][1])
     highlight = ax_slider.axvspan(range_start, range_end, 
                                   ymin=0.20, ymax=0.80,
-                                  color='darkorange', alpha=0.5, zorder=4)
+                                  color=SLIDER_HIGHLIGHT_COLOR, alpha=0.5, zorder=4)
 
     # Save highlight for later updates
     controls = {'range_highlight': highlight}
@@ -912,7 +914,7 @@ def person_ui(frame_rgb, cam_name, frame_number, search_around_frames, time_rang
         f"{cam_name}: Synchronize on person number",
         '0',
         {'colors': {'background': BACKGROUND_COLOR, 'text': TEXT_COLOR, 'control': CONTROL_COLOR, 'control_hover': CONTROL_HOVER_COLOR},
-         'sizes': {'label': LABEL_SIZE, 'text': TEXT_SIZE}}
+         'sizes': {'label': LABEL_SIZE_PERSON, 'text': TEXT_SIZE}}
     )
 
     # Create main time textbox (lower left)
@@ -921,7 +923,7 @@ def person_ui(frame_rgb, cam_name, frame_number, search_around_frames, time_rang
         'around time',
         f"{frame_number / fps:.2f}",
         {'colors': {'background': BACKGROUND_COLOR, 'text': TEXT_COLOR, 'control': CONTROL_COLOR, 'control_hover': CONTROL_HOVER_COLOR},
-         'sizes': {'label': LABEL_SIZE, 'text': TEXT_SIZE}}
+         'sizes': {'label': LABEL_SIZE_PERSON, 'text': TEXT_SIZE}}
     )
 
     # Create time RAM textbox (lower center)
@@ -930,20 +932,21 @@ def person_ui(frame_rgb, cam_name, frame_number, search_around_frames, time_rang
         '±',
         f"{time_range_around_maxspeed:.2f}",
         {'colors': {'background': BACKGROUND_COLOR, 'text': TEXT_COLOR, 'control': CONTROL_COLOR, 'control_hover': CONTROL_HOVER_COLOR},
-         'sizes': {'label': LABEL_SIZE, 'text': TEXT_SIZE}}
+         'sizes': {'label': LABEL_SIZE_PERSON, 'text': TEXT_SIZE}}
     )
     
     # Create OK button (lower right)
-    ok_ax = plt.axes([0.5 - TEXTBOX_WIDTH/2 + 0.17, lower_controls_y, BTN_WIDTH * 1.5, CONTROL_HEIGHT])
+    ok_ax = plt.axes([0.5 - TEXTBOX_WIDTH/2 + 0.17, lower_controls_y, BTN_WIDTH_PERSON * 1.5, CONTROL_HEIGHT])
     ok_ax.set_facecolor(CONTROL_COLOR)
     controls['btn_ok'] = Button(
         ok_ax, 
-        'OK',
+        label='OK', 
         color=CONTROL_COLOR,
         hovercolor=CONTROL_HOVER_COLOR
     )
     controls['btn_ok'].label.set_color(TEXT_COLOR)
     controls['btn_ok'].label.set_fontsize(BUTTON_SIZE)
+    controls['btn_ok'].label.set_fontweight('bold')
     
     # Initialize containers for dynamic elements
     containers = {
@@ -977,7 +980,7 @@ def person_ui(frame_rgb, cam_name, frame_number, search_around_frames, time_rang
     return ui
 
 
-def select_person(vid_or_img_files, cam_names, json_files_names_range, search_around_frames, pose_dir, json_dirs_names, keypoints_names, time_range_around_maxspeed, fps):
+def select_person(vid_or_img_files, cam_names, json_files_names_range, search_around_frames, pose_dir, json_dirs_names, keypoints_names, keypoints_to_consider, time_range_around_maxspeed, fps):
     '''
     This function manages the process of selecting keypoints and persons for each camera.
     It performs two main steps:
@@ -1003,8 +1006,11 @@ def select_person(vid_or_img_files, cam_names, json_files_names_range, search_ar
     '''
     
     # Step 1
-    selected_keypoints = keypoints_ui(keypoints_names)
-    logging.info(f'Selected keypoints for all cameras: {selected_keypoints}')
+    selected_keypoints = keypoints_ui(keypoints_to_consider, keypoints_names)
+    if len(selected_keypoints) == 0:
+        logging.warning('Synchronization requires to select at least one reference keypoint, none were selected. Selecting all of them.')
+    else:
+        logging.info(f'Selected keypoints: {selected_keypoints}')
     
     # Step 2
     selected_id_list = []
@@ -1018,8 +1024,6 @@ def select_person(vid_or_img_files, cam_names, json_files_names_range, search_ar
         video_files_dict = {cam_name: files for cam_name in cam_names for files in vid_or_img_files if cam_name in os.path.basename(files[0])}
 
     for i, cam_name in enumerate(cam_names):
-        selected_idx_container = [0]
-        
         vid_or_img_files_cam = video_files_dict.get(cam_name)
         if not vid_or_img_files_cam:
             logging.warning(f'No video file nor image directory found for camera {cam_name}')
@@ -1055,7 +1059,7 @@ def select_person(vid_or_img_files, cam_names, json_files_names_range, search_ar
                                           ui['containers']['rects'], 
                                           ui['containers']['annotations'])
         ui['containers']['bounding_boxes_list'] = bounding_boxes_list 
-        ui['controls']['frame_slider'].on_changed(lambda val: update_frame(val, fps, ui, ui['cap'], frame_to_json, pose_dir, json_dirs_names, i, search_around_frames, bounding_boxes_list))
+        ui['controls']['frame_slider'].on_changed(lambda val: update_frame(val, fps, ui, frame_to_json, pose_dir, json_dirs_names, i, search_around_frames, bounding_boxes_list))
         
         # Update main time textbox to also update slider
         ui['controls']['main_time_textbox'].on_submit(lambda text: update_main_time(text, fps, search_around_frames, i, ui, ui['cap'], frame_to_json, pose_dir, json_dirs_names, ui['containers']['bounding_boxes_list']))
@@ -1074,7 +1078,7 @@ def select_person(vid_or_img_files, cam_names, json_files_names_range, search_ar
 
         # OK button
         btn_ok = ui['controls']['btn_ok']
-        btn_ok.on_clicked(lambda event: handle_ok_button(ui, fps, i, selected_id_list, approx_time_maxspeed))
+        btn_ok.on_clicked(lambda event: handle_ok_button(ui))
 
         # Keyboard navigation
         ui['fig'].canvas.mpl_connect('key_press_event', lambda event: handle_key_press(event, ui['controls']['main_time_textbox'],
@@ -1087,12 +1091,12 @@ def select_person(vid_or_img_files, cam_names, json_files_names_range, search_ar
         cap.release()
 
         # Store selected values after OK button is clicked
-        selected_id_list.append(selected_idx_container[0])
+        selected_id_list.append(int(ui['controls']['person_textbox'].text))
         current_frame = int(round(float(ui['controls']['main_time_textbox'].text) * fps))
         approx_time_maxspeed.append(current_frame / fps)
         current_time_RAM = float(ui['controls']['time_RAM_textbox'].text)
         time_RAM_list.append(current_time_RAM)  # Store the time_RAM for this camera
-        logging.info(f'--> Camera #{i}: selected person #{selected_idx_container[0]} at time #{current_frame / fps:.2f}±{current_time_RAM:.2f}')
+        logging.info(f'--> Camera #{i}: selected person #{ui["controls"]["person_textbox"].text} at time {current_frame / fps:.2f} ± {current_time_RAM:.2f} s')
 
     return selected_id_list, keypoints_to_consider, approx_time_maxspeed, time_RAM_list
 
@@ -1203,6 +1207,10 @@ def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], 
                 json_data = [np.nan] * nb_coords*3
         json_coords.append(json_data)
     df_json_coords = pd.DataFrame(json_coords)
+
+    if df_json_coords.isnull().all().all():
+        logging.error('No valid coordinates found in the JSON files. There may be a mismatch between the "pose_model" specified for pose estimation and for synchronization. If not, make sure that your likelihood_threshold for synchronization is not set too high.')
+        raise ValueError('No valid coordinates found in the JSON files. There may be a mismatch between the "pose_model" specified for pose estimation and for synchronization. If not, make sure that your likelihood_threshold for synchronization is not set too high.')
 
     return df_json_coords
 
@@ -1452,13 +1460,19 @@ def synchronize_cams_all(config_dict):
         raise ValueError('approx_time_maxspeed should be a list of floats or "auto"')
     
     if keypoints_to_consider == 'right':
+        keypoints_to_consider = [keypoints_names[i] for i in range(len(keypoints_ids)) if keypoints_names[i].startswith('R') or keypoints_names[i].startswith('right')]
         logging.info(f'Keypoints used to compute the best synchronization offset: right side.')
     elif keypoints_to_consider == 'left':
+        keypoints_to_consider = [keypoints_names[i] for i in range(len(keypoints_ids)) if keypoints_names[i].startswith('L') or keypoints_names[i].startswith('left')]
         logging.info(f'Keypoints used to compute the best synchronization offset: left side.')
     elif isinstance(keypoints_to_consider, list):
         logging.info(f'Keypoints used to compute the best synchronization offset: {keypoints_to_consider}.')
     elif keypoints_to_consider == 'all':
+        keypoints_to_consider = [keypoints_names[i] for i in range(len(keypoints_ids))]
         logging.info(f'All keypoints are used to compute the best synchronization offset.')
+    else:
+        raise ValueError('keypoints_to_consider should be "all", "right", "left", or a list of keypoint names.\n\
+                        If you specified keypoints, make sure that they exist in your pose_model.')
     logging.info(f'These keypoints are filtered with a Butterworth filter (cut-off frequency: {filter_cutoff} Hz, order: {filter_order}).')
     logging.info(f'They are removed when their likelihood is below {likelihood_threshold}.\n')
 
@@ -1472,12 +1486,14 @@ def synchronize_cams_all(config_dict):
         raise ValueError(f'No json files found within the specified frame range ({frame_range}) at the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
     
     json_files_range = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names_range[j]] for j, j_dir in enumerate(json_dirs_names)]
+    kpt_indices = [i for i,k in zip(keypoints_ids, keypoints_names) if k in keypoints_to_consider]
+    kpt_id_in_df = np.array([[keypoints_ids.index(k)*2,keypoints_ids.index(k)*2+1]  for k in kpt_indices]).ravel()
     
     # Handle manual selection if synchronization_gui is True
     if synchronization_gui:
         selected_id_list, keypoints_to_consider, approx_time_maxspeed, time_RAM_list = select_person(
             vid_or_img_files, cam_names, json_files_names_range, search_around_frames, 
-            pose_dir, json_dirs_names, keypoints_names, time_range_around_maxspeed, fps)
+            pose_dir, json_dirs_names, keypoints_names, keypoints_to_consider, time_range_around_maxspeed, fps)
         
         # Calculate lag_ranges using time_RAM_list
         lag_ranges = [int(dt * fps) for dt in time_RAM_list]
@@ -1503,20 +1519,7 @@ def synchronize_cams_all(config_dict):
     for i in range(cam_nb):
         df_coords.append(convert_json2pandas(json_files_range[i], likelihood_threshold=likelihood_threshold, keypoints_ids=keypoints_ids, synchronization_gui=synchronization_gui, selected_id=selected_id_list[i]))
         df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
-        if keypoints_to_consider == 'right':
-            kpt_indices = [i for i in range(len(keypoints_ids)) if keypoints_names[i].startswith('R') or keypoints_names[i].startswith('right')]
-        elif keypoints_to_consider == 'left':
-            kpt_indices = [i for i in range(len(keypoints_ids)) if keypoints_names[i].startswith('L') or keypoints_names[i].startswith('left')]
-        elif isinstance(keypoints_to_consider, list):
-            kpt_indices = [i for i in range(len(keypoints_ids)) if keypoints_names[i] in keypoints_to_consider]
-        elif keypoints_to_consider == 'all':
-            kpt_indices = [i for i in range(len(keypoints_ids))]
-        else:
-            raise ValueError('keypoints_to_consider should be "all", "right", "left", or a list of keypoint names.\n\
-                            If you specified keypoints, make sure that they exist in your pose_model.')
-
-        kpt_indices = np.sort(np.concatenate([np.array(kpt_indices)*2, np.array(kpt_indices)*2+1]))
-        df_coords[i] = df_coords[i][kpt_indices]
+        df_coords[i] = df_coords[i][kpt_id_in_df]
         df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args = ['linear'])
         df_coords[i] = df_coords[i].bfill().ffill()
         if df_coords[i].shape[0] > padlen:
@@ -1556,6 +1559,7 @@ def synchronize_cams_all(config_dict):
     cam_list.pop(ref_cam_id)
     cam_names.pop(ref_cam_id)
     offset = []
+    logging.info('')
     for cam_id, cam_name in zip(cam_list, cam_names):
         offset_cam_section, max_corr_cam = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=display_sync_plots, ref_cam_name=ref_cam_name, cam_name=cam_name)
         offset_cam = offset_cam_section - (search_around_frames[ref_cam_id][0] - search_around_frames[cam_id][0])
