@@ -77,45 +77,11 @@ def check_neck_data(trc_file):
     return trc_file
 
 
-def augment_markers_all(config_dict):
-    # get parameters from Config.toml
-    project_dir = config_dict.get('project').get('project_dir')
-    pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    pathOutputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    make_c3d = config_dict.get('markerAugmentation').get('make_c3d')
-    subject_height = config_dict.get('project').get('participant_height')
-    subject_mass = config_dict.get('project').get('participant_mass')
-    
-    fastest_frames_to_remove_percent = config_dict.get('kinematics').get('fastest_frames_to_remove_percent')
-    close_to_zero_speed = config_dict.get('kinematics').get('close_to_zero_speed_m')
-    large_hip_knee_angles = config_dict.get('kinematics').get('large_hip_knee_angles')
-    trimmed_extrema_percent = config_dict.get('kinematics').get('trimmed_extrema_percent')
-    default_height = config_dict.get('kinematics').get('default_height')
+def augment_markers_all(config):
 
-    augmenterDir = os.path.dirname(utilsDataman.__file__)
-    augmenterModelName = 'LSTM'
-    augmenter_model = 'v0.3'
-    offset = True
-
-    # Apply all trc files
-    all_trc_files = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if '_LSTM' not in f]
-    trc_no_filtering = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if
-                        '_LSTM' not in f and 'filt' not in f]
-    trc_filtering = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if '_LSTM' not in f and 'filt' in f]
-
-    if len(all_trc_files) == 0:
-        raise ValueError('No trc files found.')
-    if len(trc_filtering) > 0:
-        trc_files = trc_filtering
-    else:
-        trc_files = trc_no_filtering
-    sorted(trc_files, key=natural_sort_key)
-
+    trc_files, fastest_frames_to_remove_percent, close_to_zero_speed, large_hip_knee_angles, trimmed_extrema_percent, default_height, augmenter_model, augmenterDir, augmenterModelName, pathInputTRCFile, pathOutputTRCFile, make_c3d, offset = config.get_augment_markers_params()
     # Calculate subject heights
-    if subject_height is None or subject_height == 0:
-        subject_height = [default_height] * len(trc_files)
-        logging.warning(f"No subject height found in Config.toml. Using default height of {default_height}m.")
-    elif isinstance(subject_height, str) and subject_height.lower() == 'auto':
+    if isinstance(subject_height, str) and subject_height.lower() == 'auto':
         subject_height = []
         for trc_file in trc_files:
             try:
@@ -146,18 +112,14 @@ def augment_markers_all(config_dict):
         subject_height += [default_height] * (len(trc_files) - len(subject_height))
 
     # Get subject masses
-    if subject_mass is None or subject_mass == 0:
-        subject_mass = [70] * len(trc_files)
-        logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
-    elif not type(subject_mass) == list:
+    if not type(subject_mass) == list:
         subject_mass = [subject_mass]
     if len(subject_mass) < len(trc_files):
         logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.")
         subject_mass += [70] * (len(trc_files) - len(subject_mass))
 
-    for p in range(len(subject_mass)):
-        pathInputTRCFile = trc_files[p]
-        pathOutputTRCFile = os.path.splitext(pathInputTRCFile)[0] + '_LSTM.trc'
+    for p, trc_file_input in enumerate(trc_files):
+        trc_file_input = os.path.splitext(trc_file_input)[0] + '_LSTM.trc'
     
         # This is by default - might need to be adjusted in the future.
         featureHeight = True
@@ -183,14 +145,14 @@ def augment_markers_all(config_dict):
         # %% Process data.
         # Import TRC file
         try:
-            trc_file = utilsDataman.TRCFile(pathInputTRCFile)
+            trc_file = utilsDataman.TRCFile(trc_file_input)
         except:
             raise ValueError('Cannot read TRC file. You may need to enable interpolation in Config.toml while triangulating.')
         
         # add neck and midhip data if not in file
         trc_file = check_midhip_data(trc_file)
         trc_file = check_neck_data(trc_file)
-        trc_file.write(pathInputTRCFile)
+        trc_file.write(trc_file_input)
         
         # Verify that all feature markers are present in the TRC file.
         feature_markers_joined = set(feature_markers_all[0]+feature_markers_all[1])

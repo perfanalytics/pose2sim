@@ -24,6 +24,7 @@ from copy import deepcopy
 
 from Pose2Sim.model import PoseModel
 from Pose2Sim.common import natural_sort_key
+from Pose2Sim.MarkerAugmenter import utilsDataman
 
 class SubConfig:
     def __init__(self, config_dict, session_dir):
@@ -383,6 +384,49 @@ class SubConfig:
         remove_IK_setup = self.get('kinematics').get('remove_individual_ik_setup')
 
         return ik_path, remove_IK_setup
+    
+    def get_augment_markers_params(self):
+        project_dir = self.get('project').get('project_dir')
+        pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
+        pathOutputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
+        make_c3d = self.get('markerAugmentation').get('make_c3d')
+        subject_height = self.get('project').get('participant_height')
+        subject_mass = self.get('project').get('participant_mass')
+        
+        fastest_frames_to_remove_percent = self.get('kinematics').get('fastest_frames_to_remove_percent')
+        close_to_zero_speed = self.get('kinematics').get('close_to_zero_speed_m')
+        large_hip_knee_angles = self.get('kinematics').get('large_hip_knee_angles')
+        trimmed_extrema_percent = self.get('kinematics').get('trimmed_extrema_percent')
+        default_height = self.get('kinematics').get('default_height')
+
+        augmenterDir = os.path.dirname(utilsDataman.__file__)
+        augmenterModelName = 'LSTM'
+        augmenter_model = 'v0.3'
+        offset = True
+
+        # Apply all trc files
+        all_trc_files = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if '_LSTM' not in f]
+        trc_no_filtering = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if
+                            '_LSTM' not in f and 'filt' not in f]
+        trc_filtering = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if '_LSTM' not in f and 'filt' in f]
+
+        if len(all_trc_files) == 0:
+            raise ValueError('No trc files found.')
+        if len(trc_filtering) > 0:
+            trc_files = trc_filtering
+        else:
+            trc_files = trc_no_filtering
+        sorted(trc_files, key=natural_sort_key)
+
+        if subject_height is None or subject_height == 0:
+            subject_height = [default_height] * len(trc_files)
+            logging.warning(f"No subject height found in Config.toml. Using default height of {default_height}m.")
+
+        if subject_mass is None or subject_mass == 0:
+            subject_mass = [70] * len(trc_files)
+            logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
+
+        return trc_files, fastest_frames_to_remove_percent, close_to_zero_speed, large_hip_knee_angles, trimmed_extrema_percent, default_height, augmenter_model, augmenterDir, augmenterModelName, pathInputTRCFile, pathOutputTRCFile, make_c3d, offset
 
 
 class Config:

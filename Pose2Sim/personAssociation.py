@@ -94,7 +94,7 @@ def persons_combinations(json_files_framef):
     return personsIDs_comb
 
 
-def triangulate_comb(comb, coords, P_all, calib_params, config_dict):
+def triangulate_comb(comb, coords, P_all, calib_params, config):
     '''
     Triangulate 2D points and compute reprojection error for a combination of cameras.
     INPUTS:
@@ -211,7 +211,7 @@ def best_persons_and_cameras_combination(config, json_files_framef, personsIDs_c
             # Try all subsets
             error_comb_all, comb_all, Q_comb_all = [], [], []
             for comb in combinations_with_cams_off:
-                error_comb, comb, Q_comb = triangulate_comb(comb, coords, projection_matrices, calib_params, config_dict)
+                error_comb, comb, Q_comb = triangulate_comb(comb, coords, projection_matrices, calib_params, config)
                 error_comb_all.append(error_comb)
                 comb_all.append(comb)
                 Q_comb_all.append(Q_comb)
