@@ -46,7 +46,6 @@ from rtmlib import PoseTracker, Custom, draw_skeleton
 from deep_sort_realtime.deepsort_tracker import DeepSort
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort, sort_people_rtmlib,\
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel
-from Pose2Sim.skeletons import *
 
 
 ## AUTHORSHIP INFORMATION
@@ -439,28 +438,17 @@ def estimate_pose_all(config):
     '''
 
     # Read config
-    project_dir = config_dict['project']['project_dir']
-    # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
-    # if single trial
-    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-    frame_range = config_dict.get('project').get('frame_range')
-    multi_person = config_dict.get('project').get('multi_person')
-    video_dir = os.path.join(project_dir, 'videos')
-    pose_dir = os.path.join(project_dir, 'pose')
+    frame_rate, mode, output_format, save_video, save_images, display_detection, multi_person, det_frequency, frame_range, video_dir, vid_img_extension, det_frequency, tracking_mode, deepsort_params, backend, device = config.get_pose_estimation_params()
 
-    mode = config_dict['pose']['mode'] # lightweight, balanced, performance
-    vid_img_extension = config_dict['pose']['vid_img_extension']
-    
-    output_format = config_dict['pose']['output_format']
-    save_video = True if 'to_video' in config_dict['pose']['save_video'] else False
-    save_images = True if 'to_images' in config_dict['pose']['save_video'] else False
-    display_detection = config_dict['pose']['display_detection']
-    overwrite_pose = config_dict['pose']['overwrite_pose']
-    det_frequency = config_dict['pose']['det_frequency']
-    tracking_mode = config_dict.get('pose').get('tracking_mode')
+
+    # Select the appropriate model based on the model_type
+    logging.info('\nEstimating pose...')
+    ModelClass = config.pose_model.get_model_class()
+
+    # Select device and backend
+    backend, device = setup_backend_device(backend=backend, device=device)
+
     if tracking_mode == 'deepsort' and multi_person:
-        deepsort_params = config_dict.get('pose').get('deepsort_params')
         try:
             deepsort_params = ast.literal_eval(deepsort_params)
         except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
@@ -470,38 +458,6 @@ def estimate_pose_all(config):
         deepsort_tracker = DeepSort(**deepsort_params)
     else:
         deepsort_tracker = None
-    backend = config_dict['pose']['backend']
-    device = config_dict['pose']['device']
-
-    # Determine frame rate
-    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-    frame_rate = config_dict.get('project').get('frame_rate')
-    if frame_rate == 'auto': 
-        try:
-            cap = cv2.VideoCapture(video_files[0])
-            if not cap.isOpened():
-                raise FileNotFoundError(f'Error: Could not open {video_files[0]}. Check that the file exists.')
-            frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
-            if frame_rate == 0:
-                frame_rate = 30
-                logging.warning(f'Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps.')
-        except:
-            frame_rate = 30
-
-    # Set detection frequency
-    if det_frequency>1:
-        logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points.')
-    elif det_frequency==1:
-        logging.info(f'Inference run on every single frame.')
-    else:
-        raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
-
-    # Select the appropriate model based on the model_type
-    logging.info('\nEstimating pose...')
-    ModelClass = config.pose_model.get_model_class()
-
-    # Select device and backend
-    backend, device = setup_backend_device(backend=backend, device=device)
 
     # Manually select the models if mode is a dictionary rather than 'lightweight', 'balanced', or 'performance'
     if not mode in ['lightweight', 'balanced', 'performance'] or 'ModelClass' not in locals():
@@ -528,48 +484,35 @@ def estimate_pose_all(config):
             logging.warning("\nInvalid mode. Must be 'lightweight', 'balanced', 'performance', or '''{dictionary}''' of parameters within triple quotes. Make sure input_sizes are within square brackets.")
             logging.warning('Using the default "balanced" mode.')
             mode = 'balanced'
-
-
-    # Estimate pose
-    try:
-        pose_listdirs_names = next(os.walk(pose_dir))[1]
-        os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
-        if not overwrite_pose:
-            logging.info('Skipping pose estimation as it has already been done. Set overwrite_pose to true in Config.toml if you want to run it again.')
-        else:
-            logging.info('Overwriting previous pose estimation. Set overwrite_pose to false in Config.toml if you want to keep the previous results.')
-            raise
             
+    try:
+        pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
     except:
-        # Set up pose tracker
-        try:
-            pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
-        except:
-            logging.error('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
-            raise ValueError('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
+        logging.error('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
+        raise ValueError('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
 
-        if tracking_mode not in ['deepsort', 'sports2d']:
-            logging.warning(f"Tracking mode {tracking_mode} not recognized. Using sports2d method.")
-            tracking_mode = 'sports2d'
-        logging.info(f'\nPose tracking set up for "{config.pose_mode}" model.')
-        logging.info(f'Mode: {mode}.')
-        logging.info(f'Tracking is done with {tracking_mode}{" " if not tracking_mode=="deepsort" else f" with parameters: {deepsort_params}"}.\n')
+    if tracking_mode not in ['deepsort', 'sports2d']:
+        logging.warning(f"Tracking mode {tracking_mode} not recognized. Using sports2d method.")
+        tracking_mode = 'sports2d'
+    logging.info(f'\nPose tracking set up for "{config.pose_mode}" model.')
+    logging.info(f'Mode: {mode}.')
+    logging.info(f'Tracking is done with {tracking_mode}{" " if not tracking_mode=="deepsort" else f" with parameters: {deepsort_params}"}.\n')
 
-        video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
-        if not len(video_files) == 0: 
-            # Process video files
-            logging.info(f'Found video files with {vid_img_extension} extension.')
-            for video_path in video_files:
-                pose_tracker.reset()
-                if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()
-                process_video(video_path, pose_tracker, config.pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
+    video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
+    if not len(video_files) == 0: 
+        # Process video files
+        logging.info(f'Found video files with {vid_img_extension} extension.')
+        for video_path in video_files:
+            pose_tracker.reset()
+            if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()
+            process_video(video_path, pose_tracker, config.pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
 
-        else:
-            # Process image folders
-            logging.info(f'Found image folders with {vid_img_extension} extension.')
-            image_folders = sorted([f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
-            for image_folder in image_folders:
-                pose_tracker.reset()
-                image_folder_path = os.path.join(video_dir, image_folder)
-                if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()                
-                process_images(image_folder_path, vid_img_extension, pose_tracker, config.pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
+    else:
+        # Process image folders
+        logging.info(f'Found image folders with {vid_img_extension} extension.')
+        image_folders = sorted([f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
+        for image_folder in image_folders:
+            pose_tracker.reset()
+            image_folder_path = os.path.join(video_dir, image_folder)
+            if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()                
+            process_images(image_folder_path, vid_img_extension, pose_tracker, config.pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)

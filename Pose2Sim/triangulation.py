@@ -119,7 +119,7 @@ def count_persons_in_json(file_path):
         return len(data.get('people', []))
     
 
-def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
+def make_trc(config, Q, keypoints_names, f_range, id_person=-1):
     '''
     Make Opensim compatible trc file from a dataframe with 3D coordinates
 
@@ -133,31 +133,7 @@ def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
     - trc file
     '''
 
-    # Read config_dict
-    project_dir = config_dict.get('project').get('project_dir')
-    multi_person = config_dict.get('project').get('multi_person')
-    if multi_person:
-        seq_name = f'{os.path.basename(os.path.realpath(project_dir))}_P{id_person+1}'
-    else:
-        seq_name = f'{os.path.basename(os.path.realpath(project_dir))}'
-    pose3d_dir = os.path.join(project_dir, 'pose-3d')
-
-    # Get frame_rate
-    video_dir = os.path.join(project_dir, 'videos')
-    vid_img_extension = config_dict['pose']['vid_img_extension']
-    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-    frame_rate = config_dict.get('project').get('frame_rate')
-    if frame_rate == 'auto': 
-        try:
-            cap = cv2.VideoCapture(video_files[0])
-            cap.read()
-            if cap.read()[0] == False:
-                raise
-            frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
-        except:
-            frame_rate = 60
-
-    trc_f = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
+    trc_path, trc_f, frame_rate = config.get_make_trc_params(f_range, id_person)
 
     #Header
     DataRate = CameraRate = OrigDataRate = frame_rate
@@ -168,18 +144,16 @@ def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
             '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, f_range[0], f_range[1]])),
             'Frame#\tTime\t' + '\t\t\t'.join(keypoints_names) + '\t\t\t',
             '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(keypoints_names))]) + '\t']
-    
+
     # Zup to Yup coordinate system
     Q = zup2yup(Q)
-    
+
     #Add Frame# and Time columns
     Q.index = np.array(range(f_range[0], f_range[1]))
     Q.insert(0, 't', Q.index/ frame_rate)
     # Q = Q.fillna(' ')
 
     #Write file
-    if not os.path.exists(pose3d_dir): os.mkdir(pose3d_dir)
-    trc_path = os.path.realpath(os.path.join(pose3d_dir, trc_f))
     with open(trc_path, 'w') as trc_o:
         [trc_o.write(line+'\n') for line in header_trc]
         Q.to_csv(trc_o, sep='\t', index=True, header=None, lineterminator='\n')
@@ -224,106 +198,7 @@ def retrieve_right_trc_order(trc_paths):
     return trc_id
 
 
-def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, trc_path):
-    '''
-    Print a message giving statistics on reprojection errors (in pixel and in m)
-    as well as the number of cameras that had to be excluded to reach threshold 
-    conditions. Also stored in User/logs.txt.
-
-    INPUT:
-    - a Config.toml file
-    - error: dataframe 
-    - nb_cams_excluded: dataframe
-    - keypoints_names: list of strings
-
-    OUTPUT:
-    - Message in console
-    '''
-
-    # Read config_dict
-    project_dir = config_dict.get('project').get('project_dir')
-    # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
-    # if single trial
-    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
-    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
-    calib = toml.load(calib_file)
-    cal_keys = [c for c in calib.keys() 
-            if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
-            and isinstance(calib[c],dict)]
-    cam_names = np.array([calib[c].get('name') if calib[c].get('name') else c for c in cal_keys])
-    cam_names = cam_names[list(cam_excluded_count[0].keys())]
-    error_threshold_triangulation = config_dict.get('triangulation').get('reproj_error_threshold_triangulation')
-    likelihood_threshold = config_dict.get('triangulation').get('likelihood_threshold_triangulation')
-    show_interp_indices = config_dict.get('triangulation').get('show_interp_indices')
-    interpolation_kind = config_dict.get('triangulation').get('interpolation')
-    interp_gap_smaller_than = config_dict.get('triangulation').get('interp_if_gap_smaller_than')
-    fill_large_gaps_with = config_dict.get('triangulation').get('fill_large_gaps_with')
-    make_c3d = config_dict.get('triangulation').get('make_c3d')
-    handle_LR_swap = config_dict.get('triangulation').get('handle_LR_swap')
-    undistort_points = config_dict.get('triangulation').get('undistort_points')
-    
-    # Recap
-    calib_cam1 = calib[cal_keys[0]]
-    fm = calib_cam1['matrix'][0][0]
-    Dm = euclidean_distance(calib_cam1['translation'], [0,0,0])
-
-    logging.info('')
-    nb_persons_to_detect = len(error)
-    for n in range(nb_persons_to_detect):
-        if nb_persons_to_detect > 1:
-            logging.info(f'\n\nPARTICIPANT {n+1}\n')
-        
-        for idx, name in enumerate(keypoints_names):
-            mean_error_keypoint_px = np.around(error[n].iloc[:,idx].mean(), decimals=1) # RMS à la place?
-            mean_error_keypoint_m = np.around(mean_error_keypoint_px * Dm / fm, decimals=3)
-            mean_cam_excluded_keypoint = np.around(nb_cams_excluded[n].iloc[:,idx].mean(), decimals=2)
-            logging.info(f'Mean reprojection error for {name} is {mean_error_keypoint_px} px (~ {mean_error_keypoint_m} m), reached with {mean_cam_excluded_keypoint} excluded cameras. ')
-            if show_interp_indices:
-                if interpolation_kind != 'none':
-                    if len(list(interp_frames[n][idx])) == 0 and len(list(non_interp_frames[n][idx])) == 0:
-                        logging.info(f'  No frames needed to be interpolated.')
-                    if len(list(interp_frames[n][idx]))>0: 
-                        interp_str = str(interp_frames[n][idx]).replace(":", " to ").replace("'", "").replace("]", "").replace("[", "")
-                        logging.info(f'  Frames {interp_str} were interpolated.')
-                    if len(list(non_interp_frames[n][idx]))>0:
-                        noninterp_str = str(non_interp_frames[n][idx]).replace(":", " to ").replace("'", "").replace("]", "").replace("[", "")
-                        logging.info(f'  Frames {noninterp_str} were not interpolated.')
-                else:
-                    logging.info(f'  No frames were interpolated because \'interpolation_kind\' was set to none. ')
-        
-        mean_error_px = np.around(error[n]['mean'].mean(), decimals=1)
-        mean_error_mm = np.around(mean_error_px * Dm / fm *1000, decimals=1)
-        mean_cam_excluded = np.around(nb_cams_excluded[n]['mean'].mean(), decimals=2)
-
-        logging.info(f'\n--> Mean reprojection error for all points on all frames is {mean_error_px} px, which roughly corresponds to {mean_error_mm} mm. ')
-        logging.info(f'Cameras were excluded if likelihood was below {likelihood_threshold} and if the reprojection error was above {error_threshold_triangulation} px.') 
-        if interpolation_kind != 'none':
-            logging.info(f'Gaps were interpolated with {interpolation_kind} method if smaller than {interp_gap_smaller_than} frames. Larger gaps were filled with {["the last valid value" if fill_large_gaps_with == "last_value" else "zeros" if fill_large_gaps_with == "zeros" else "NaNs"][0]}.') 
-        logging.info(f'In average, {mean_cam_excluded} cameras had to be excluded to reach these thresholds.')
-        
-        cam_excluded_count[n] = {i: v for i, v in zip(cam_names, cam_excluded_count[n].values())}
-        cam_excluded_count[n] = {k: v for k, v in sorted(cam_excluded_count[n].items(), key=lambda item: item[1])[::-1]}
-        str_cam_excluded_count = ''
-        for i, (k, v) in enumerate(cam_excluded_count[n].items()):
-            if i ==0:
-                 str_cam_excluded_count += f'Camera {k} was excluded {int(np.round(v*100))}% of the time, '
-            elif i == len(cam_excluded_count[n])-1:
-                str_cam_excluded_count += f'and Camera {k}: {int(np.round(v*100))}%.'
-            else:
-                str_cam_excluded_count += f'Camera {k}: {int(np.round(v*100))}%, '
-        logging.info(str_cam_excluded_count)
-        logging.info(f'\n3D coordinates are stored at {trc_path[n]}.')
-        
-    logging.info('\n\n')
-    if make_c3d:
-        logging.info('All trc files have been converted to c3d.')
-    logging.info(f'Limb swapping was {"handled" if handle_LR_swap else "not handled"}.')
-    logging.info(f'Lens distortions were {"taken into account" if undistort_points else "not taken into account"}.')
-
-
-def triangulation_from_best_cameras(config_dict, coords_2D_kpt, coords_2D_kpt_swapped, projection_matrices, calib_params):
+def triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped, projection_matrices, calib_params):
     '''
     Triangulates 2D keypoint coordinates. If reprojection error is above threshold,
     tries swapping left and right sides. If still above, removes a camera until error
@@ -349,11 +224,8 @@ def triangulation_from_best_cameras(config_dict, coords_2D_kpt, coords_2D_kpt_sw
     '''
     
     # Read config_dict
-    error_threshold_triangulation = config_dict.get('triangulation').get('reproj_error_threshold_triangulation')
-    min_cameras_for_triangulation = config_dict.get('triangulation').get('min_cameras_for_triangulation')
-    handle_LR_swap = config_dict.get('triangulation').get('handle_LR_swap')
+    error_threshold_triangulation, min_cameras_for_triangulation, handle_LR_swap, undistort_points = config.get_triangulation_from_best_cameras_params()
 
-    undistort_points = config_dict.get('triangulation').get('undistort_points')
     if undistort_points:
         calib_params_K = calib_params['K']
         calib_params_dist = calib_params['dist']
@@ -616,7 +488,7 @@ def extract_files_frame_f(json_tracked_files_f, keypoints_ids, nb_persons_to_det
     return x_files, y_files, likelihood_files
 
 
-def triangulate_single(config_dict, f, json_files_names, json_dirs_names, pose_dir,
+def triangulate_single(config, f, json_files_names, json_dirs_names, pose_dir,
                             keypoints_ids, nb_persons_to_detect, keypoints_idx, keypoints_idx_swapped,
                             P, calib_params, likelihood_threshold, undistort_points):
 
@@ -662,7 +534,7 @@ def triangulate_single(config_dict, f, json_files_names, json_dirs_names, pose_d
             coords_2D_kpt = np.array( (x_files[n][:, keypoint_idx], y_files[n][:, keypoint_idx], likelihood_files[n][:, keypoint_idx]) )
             coords_2D_kpt_swapped = np.array(( x_files[n][:, keypoints_idx_swapped[keypoint_idx]], y_files[n][:, keypoints_idx_swapped[keypoint_idx]], likelihood_files[n][:, keypoints_idx_swapped[keypoint_idx]] ))
 
-            Q_kpt, error_kpt, nb_cams_excluded_kpt, id_excluded_cams_kpt = triangulation_from_best_cameras(config_dict, coords_2D_kpt, coords_2D_kpt_swapped, P, calib_params) # P has been modified if undistort_points=True
+            Q_kpt, error_kpt, nb_cams_excluded_kpt, id_excluded_cams_kpt = triangulation_from_best_cameras(config, coords_2D_kpt, coords_2D_kpt_swapped, P, calib_params) # P has been modified if undistort_points=True
 
             Q[n].append(Q_kpt)
             error[n].append(error_kpt)
@@ -693,40 +565,11 @@ def triangulate_all(config):
     - a .trc file with 3D coordinates in Y-up system coordinates 
     '''
     
-    # Read config_dict
-    project_dir = config_dict.get('project').get('project_dir')
-    # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
-    # if single trial
-    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-    multi_person = config_dict.get('project').get('multi_person')
-    frame_range = config_dict.get('project').get('frame_range')
-    likelihood_threshold = config_dict.get('triangulation').get('likelihood_threshold_triangulation')
-    interpolation_kind = config_dict.get('triangulation').get('interpolation')
-    interp_gap_smaller_than = config_dict.get('triangulation').get('interp_if_gap_smaller_than')
-    fill_large_gaps_with = config_dict.get('triangulation').get('fill_large_gaps_with')
-    show_interp_indices = config_dict.get('triangulation').get('show_interp_indices')
-    undistort_points = config_dict.get('triangulation').get('undistort_points')
-    make_c3d = config_dict.get('triangulation').get('make_c3d')
-    
-    try:
-        calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
-    except:
-        raise Exception(f'No .toml calibration direcctory found.')
-    try:
-        calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
-    except:
-        raise Exception(f'No .toml calibration file found in the {calib_dir}.')
-    pose_dir = os.path.join(project_dir, 'pose')
-    poseSync_dir = os.path.join(project_dir, 'pose-sync')
-    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
+    calib_file, model, pose_dir, poseSync_dir, poseTracked_dir, multi_person, frame_range, likelihood_threshold, interpolation_kind, interp_gap_smaller_than, fill_large_gaps_with, show_interp_indices, undistort_points, make_c3d, error_threshold_triangulation = config.get_triangulation_param()
     
     # Projection matrix from toml calibration file
     P = computeP(calib_file, undistort=undistort_points)
     calib_params = retrieve_calib_params(calib_file)
-        
-    # Retrieve keypoints from model
-    model = config.pose_model.load_model_instance()
             
     keypoints_ids = [node.id for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
@@ -782,7 +625,7 @@ def triangulate_all(config):
     
     for f in tqdm(range(*f_range)):
         Q_current, error_current, nb_cams_excluded_current, id_excluded_cams_current = triangulate_single(
-            config_dict, f, json_files_names, json_dirs_names, pose_dir,
+            config, f, json_files_names, json_dirs_names, pose_dir,
         keypoints_ids, nb_persons_to_detect, keypoints_idx, keypoints_idx_swapped,
         P, calib_params, likelihood_threshold, undistort_points
     )
@@ -894,8 +737,9 @@ def triangulate_all(config):
             Q_tot[n].replace(np.nan, 0, inplace=True)
     
     # Create TRC file
-    trc_paths = [make_trc(config_dict, Q_tot[n], keypoints_names, f_range, id_person=n) for n in range(len(Q_tot))]
+    trc_paths = [make_trc(config, Q_tot[n], keypoints_names, f_range, id_person=n) for n in range(len(Q_tot))]
     if make_c3d:
+        logging.info('All trc files have been converted to c3d.')
         c3d_paths = [convert_to_c3d(t) for t in trc_paths]
         
     # # Reorder TRC files
@@ -916,4 +760,61 @@ def triangulate_all(config):
 
 
     # Recap message
-    recap_triangulate(config_dict, error_tot, nb_cams_excluded_tot, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, trc_paths)
+    calib = toml.load(calib_file)
+    cal_keys = [c for c in calib.keys() 
+            if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
+            and isinstance(calib[c],dict)]
+    cam_names = np.array([calib[c].get('name') if calib[c].get('name') else c for c in cal_keys])
+    cam_names = cam_names[list(cam_excluded_count[0].keys())]
+    
+    # Recap
+    calib_cam1 = calib[cal_keys[0]]
+    fm = calib_cam1['matrix'][0][0]
+    Dm = euclidean_distance(calib_cam1['translation'], [0,0,0])
+
+    logging.info('')
+    nb_persons_to_detect = len(error_tot)
+    for n in range(nb_persons_to_detect):
+        if nb_persons_to_detect > 1:
+            logging.info(f'\n\nPARTICIPANT {n+1}\n')
+        
+        for idx, name in enumerate(keypoints_names):
+            mean_error_keypoint_px = np.around(error_tot[n].iloc[:,idx].mean(), decimals=1) # RMS à la place?
+            mean_error_keypoint_m = np.around(mean_error_keypoint_px * Dm / fm, decimals=3)
+            mean_cam_excluded_keypoint = np.around(nb_cams_excluded_tot[n].iloc[:,idx].mean(), decimals=2)
+            logging.info(f'Mean reprojection error for {name} is {mean_error_keypoint_px} px (~ {mean_error_keypoint_m} m), reached with {mean_cam_excluded_keypoint} excluded cameras. ')
+            if show_interp_indices:
+                if interpolation_kind != 'none':
+                    if len(list(interp_frames[n][idx])) == 0 and len(list(non_interp_frames[n][idx])) == 0:
+                        logging.info(f'  No frames needed to be interpolated.')
+                    if len(list(interp_frames[n][idx]))>0: 
+                        interp_str = str(interp_frames[n][idx]).replace(":", " to ").replace("'", "").replace("]", "").replace("[", "")
+                        logging.info(f'  Frames {interp_str} were interpolated.')
+                    if len(list(non_interp_frames[n][idx]))>0:
+                        noninterp_str = str(non_interp_frames[n][idx]).replace(":", " to ").replace("'", "").replace("]", "").replace("[", "")
+                        logging.info(f'  Frames {noninterp_str} were not interpolated.')
+                else:
+                    logging.info(f'No frames were interpolated because \'interpolation_kind\' was set to none.')
+        
+        mean_error_px = np.around(error_tot[n]['mean'].mean(), decimals=1)
+        mean_error_mm = np.around(mean_error_px * Dm / fm *1000, decimals=1)
+        mean_cam_excluded = np.around(nb_cams_excluded_tot[n]['mean'].mean(), decimals=2)
+
+        logging.info(f'\n--> Mean reprojection error for all points on all frames is {mean_error_px} px, which roughly corresponds to {mean_error_mm} mm. ')
+        logging.info(f'Cameras were excluded if likelihood was below {likelihood_threshold} and if the reprojection error was above {error_threshold_triangulation} px.') 
+        if interpolation_kind != 'none':
+            logging.info(f'Gaps were interpolated with {interpolation_kind} method if smaller than {interp_gap_smaller_than} frames. Larger gaps were filled with {["the last valid value" if fill_large_gaps_with == "last_value" else "zeros" if fill_large_gaps_with == "zeros" else "NaNs"][0]}.') 
+        logging.info(f'In average, {mean_cam_excluded} cameras had to be excluded to reach these thresholds.')
+        
+        cam_excluded_count[n] = {i: v for i, v in zip(cam_names, cam_excluded_count[n].values())}
+        cam_excluded_count[n] = {k: v for k, v in sorted(cam_excluded_count[n].items(), key=lambda item: item[1])[::-1]}
+        str_cam_excluded_count = ''
+        for i, (k, v) in enumerate(cam_excluded_count[n].items()):
+            if i ==0:
+                 str_cam_excluded_count += f'Camera {k} was excluded {int(np.round(v*100))}% of the time, '
+            elif i == len(cam_excluded_count[n])-1:
+                str_cam_excluded_count += f'and Camera {k}: {int(np.round(v*100))}%.'
+            else:
+                str_cam_excluded_count += f'Camera {k}: {int(np.round(v*100))}%, '
+        logging.info(str_cam_excluded_count)
+        logging.info(f'\n3D coordinates are stored at {trc_paths[n]}.')

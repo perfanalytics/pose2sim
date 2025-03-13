@@ -1,9 +1,9 @@
 import logging
 from enum import Enum
-from pathlib import Path
 from rtmlib import BodyWithFeet, Wholebody, Body, Hand
 from anytree.importer import DictImporter
-from Pose2Sim.model import PoseModel
+
+from Pose2Sim.skeletons import HALPE_26, COCO_133_WRIST, COCO_133, COCO_17, HAND_21, FACE_106, ANIMAL2D_17, BODY_25B, BODY_25, BODY_135, BLAZEPOSE, HALPE_68, HALPE_136, COCO, MPII
 
 class PoseModel(Enum):
     BODY_25B       = ('Markers_Body25b.xml',      'Scaling_Setup_Pose2Sim_Body25b.xml',      'IK_Setup_Pose2Sim_Body25b.xml')
@@ -47,7 +47,7 @@ class PoseModel(Enum):
             key = mapping[key]
         try:
             return cls[key]
-        except :
+        except KeyError:
             raise ValueError(f'{pose_model_str}')
 
     def get_model_class(self):
@@ -77,18 +77,44 @@ class PoseModel(Enum):
             logging.info(f"Using model {self.name} for pose estimation.")
             return None
 
+    def get_skeleton(self):
+        """
+        Renvoie le squelette (l'arbre des keypoints) associé au modèle.
+        Plutôt que d'utiliser eval(), on définit une correspondance explicite.
+        """
+        mapping = {
+            'BODY_25B':      BODY_25B,
+            'BODY_25':       BODY_25,
+            'BODY_135':      BODY_135,
+            'BLAZEPOSE':     BLAZEPOSE,
+            'HALPE_26':      HALPE_26,
+            'HALPE_68':      HALPE_68,
+            'HALPE_136':     HALPE_136,
+            'COCO_133':      COCO_133,
+            'COCO_133_WRIST':COCO_133_WRIST,
+            'COCO_17':       COCO_17,
+            'HAND_21':       HAND_21,
+            'FACE_106':      FACE_106,
+            'ANIMAL2D_17':   ANIMAL2D_17,
+            'COCO':   COCO,
+            'MPII':   MPII,
+        }
+        try:
+            return mapping[self.name]
+        except KeyError:
+            raise ValueError(f"Aucun squelette défini pour le modèle {self.name}.")
+
     def load_model_instance(self):
         """
         Tente de charger l'instance du modèle.
-        D'abord, on essaye d'utiliser la classe associée (via eval),
-        puis on essaie de l'importer via DictImporter en cas d'échec.
+        On récupère la classe associée et le squelette correspondant
+        à l'aide de get_model_class() et get_skeleton().
+        En cas d'échec, on essaie avec DictImporter.
         """
         model_class = self.get_model_class()
         try:
-            if model_class:
-                return model_class, eval(self.name)
-            else:
-                raise NameError
+            skeleton = self.get_skeleton()
+            return model_class, skeleton
         except Exception:
             try:
                 pose_instance = DictImporter().import_(self.name)

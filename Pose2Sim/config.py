@@ -428,7 +428,221 @@ class SubConfig:
 
         return trc_files, fastest_frames_to_remove_percent, close_to_zero_speed, large_hip_knee_angles, trimmed_extrema_percent, default_height, augmenter_model, augmenterDir, augmenterModelName, pathInputTRCFile, pathOutputTRCFile, make_c3d, offset
 
+    def get_triangulation_params(self):
+        # Read config_dict
+        project_dir = self.get('project').get('project_dir')
+        # if batch
+        session_dir = self.session_dir
+        # if single trial
+        session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
+        multi_person = self.get('project').get('multi_person')
+        frame_range = self.get('project').get('frame_range')
+        likelihood_threshold = self.get('triangulation').get('likelihood_threshold_triangulation')
+        interpolation_kind = self.get('triangulation').get('interpolation')
+        interp_gap_smaller_than = self.get('triangulation').get('interp_if_gap_smaller_than')
+        fill_large_gaps_with = self.get('triangulation').get('fill_large_gaps_with')
+        show_interp_indices = self.get('triangulation').get('show_interp_indices')
+        undistort_points = self.get('triangulation').get('undistort_points')
+        make_c3d = self.get('triangulation').get('make_c3d')
+        
+        try:
+            calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
+        except:
+            raise Exception(f'No .toml calibration direcctory found.')
+        try:
+            calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
+        except:
+            raise Exception(f'No .toml calibration file found in the {calib_dir}.')
+        pose_dir = os.path.join(project_dir, 'pose')
+        poseSync_dir = os.path.join(project_dir, 'pose-sync')
+        poseTracked_dir = os.path.join(project_dir, 'pose-associated')
+        error_threshold_triangulation = self.get('triangulation').get('reproj_error_threshold_triangulation')
+                
+        # Retrieve keypoints from model
+        model = self.pose_model.load_model_instance()
 
+        return calib_file, model, pose_dir, poseSync_dir, poseTracked_dir, multi_person, frame_range, likelihood_threshold, interpolation_kind, interp_gap_smaller_than, fill_large_gaps_with, show_interp_indices, undistort_points, make_c3d, error_threshold_triangulation
+
+    def get_triangulation_from_best_cameras_params(self):
+        error_threshold_triangulation = self.get('triangulation').get('reproj_error_threshold_triangulation')
+        min_cameras_for_triangulation = self.get('triangulation').get('min_cameras_for_triangulation')
+        handle_LR_swap = self.get('triangulation').get('handle_LR_swap')
+
+        undistort_points = self.get('triangulation').get('undistort_points')
+
+        logging.info(f'Limb swapping was {"handled" if handle_LR_swap else "not handled"}.')
+        logging.info(f'Lens distortions were {"taken into account" if undistort_points else "not taken into account"}.')
+
+        return error_threshold_triangulation, min_cameras_for_triangulation, handle_LR_swap, undistort_points
+    
+    def get_synchronization_params(self):
+        # Get parameters from Config.toml
+        project_dir = self.get('project').get('project_dir')
+        pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
+        pose_model = self.get('pose').get('pose_model')
+        # multi_person = config_dict.get('project').get('multi_person')
+        fps =  self.get('project').get('frame_rate')
+        frame_range = self.get('project').get('frame_range')
+        display_sync_plots = self.get('synchronization').get('display_sync_plots')
+        keypoints_to_consider = self.get('synchronization').get('keypoints_to_consider')
+        approx_time_maxspeed = self.get('synchronization').get('approx_time_maxspeed') 
+        time_range_around_maxspeed = self.get('synchronization').get('time_range_around_maxspeed')
+        synchronization_gui = self.get('synchronization').get('synchronization_gui')
+
+        likelihood_threshold = self.get('synchronization').get('likelihood_threshold')
+        filter_cutoff = int(self.get('synchronization').get('filter_cutoff'))
+        filter_order = int(self.get('synchronization').get('filter_order'))
+
+        # Determine frame rate
+        video_dir = os.path.join(project_dir, 'videos')
+        vid_img_extension = self['pose']['vid_img_extension']
+
+        vid_or_img_files = glob.glob(os.path.join(video_dir, '*' + vid_img_extension))
+        if not vid_or_img_files: # video_files is then img_dirs
+            image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
+            for image_folder in image_folders:
+                vid_or_img_files.append(glob.glob(os.path.join(video_dir, image_folder, '*'+vid_img_extension)))
+
+        if fps == 'auto': 
+            try:
+                cap = cv2.VideoCapture(vid_or_img_files[0])
+                cap.read()
+                if cap.read()[0] == False:
+                    raise
+                fps = round(cap.get(cv2.CAP_PROP_FPS))
+            except:
+                fps = 60  
+        lag_range = time_range_around_maxspeed*fps # frames
+
+        # Retrieve keypoints from model
+        model = self.pose_model.load_model_instance()
+
+        return pose_dir, fps, frame_range, display_sync_plots, keypoints_to_consider, approx_time_maxspeed, time_range_around_maxspeed, synchronization_gui, likelihood_threshold, filter_cutoff, filter_order, lag_range, model, vid_or_img_files
+
+    def get_make_trc_params(self, f_range, id_person):
+        # Read config_dict
+        project_dir = self.get('project').get('project_dir')
+        multi_person = self.get('project').get('multi_person')
+        if multi_person:
+            seq_name = f'{os.path.basename(os.path.realpath(project_dir))}_P{id_person+1}'
+        else:
+            seq_name = f'{os.path.basename(os.path.realpath(project_dir))}'
+        pose3d_dir = os.path.join(project_dir, 'pose-3d')
+
+        # Get frame_rate
+        video_dir = os.path.join(project_dir, 'videos')
+        vid_img_extension = self['pose']['vid_img_extension']
+        video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+        frame_rate = self.get('project').get('frame_rate')
+        if frame_rate == 'auto': 
+            try:
+                cap = cv2.VideoCapture(video_files[0])
+                cap.read()
+                if cap.read()[0] == False:
+                    raise
+                frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
+            except:
+                frame_rate = 60
+
+        if not os.path.exists(pose3d_dir): os.mkdir(pose3d_dir)
+        
+        trc_f = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
+        
+        trc_path = os.path.realpath(os.path.join(pose3d_dir, trc_f))
+
+        return trc_path, trc_f, frame_rate
+    
+    def get_pose_estimation_params(self, f_range, id_person):
+        project_dir = self['project']['project_dir']
+        # if batch
+        session_dir = os.path.realpath(os.path.join(project_dir, '..'))
+        # if single trial
+        session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
+        frame_range = self.get('project').get('frame_range')
+        multi_person = self.get('project').get('multi_person')
+        video_dir = os.path.join(project_dir, 'videos')
+        pose_dir = os.path.join(project_dir, 'pose')
+
+        mode = self['pose']['mode'] # lightweight, balanced, performance
+        vid_img_extension = self['pose']['vid_img_extension']
+        
+        output_format = self['pose']['output_format']
+        save_video = True if 'to_video' in self['pose']['save_video'] else False
+        save_images = True if 'to_images' in self['pose']['save_video'] else False
+        display_detection = self['pose']['display_detection']
+        overwrite_pose = self['pose']['overwrite_pose']
+        det_frequency = self['pose']['det_frequency']
+        tracking_mode = self.get('pose').get('tracking_mode')
+        deepsort_params = self.get('pose').get('deepsort_params')
+
+        backend = self['pose']['backend']
+        device = self['pose']['device']
+
+        # Determine frame rate
+        video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+        frame_rate = self.get('project').get('frame_rate')
+        if frame_rate == 'auto': 
+            try:
+                cap = cv2.VideoCapture(video_files[0])
+                if not cap.isOpened():
+                    raise FileNotFoundError(f'Error: Could not open {video_files[0]}. Check that the file exists.')
+                frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
+                if frame_rate == 0:
+                    frame_rate = 30
+                    logging.warning(f'Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps.')
+            except:
+                frame_rate = 30
+
+        
+        # Set detection frequency
+        if det_frequency>1:
+            logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points.')
+        elif det_frequency==1:
+            logging.info(f'Inference run on every single frame.')
+        else:
+            raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
+        
+        # Estimate pose
+        pose_listdirs_names = next(os.walk(pose_dir))[1]
+        os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
+        if not overwrite_pose:
+            logging.info('Skipping pose estimation as it has already been done. Set overwrite_pose to true in Config.toml if you want to run it again.')
+        else:
+            logging.info('Overwriting previous pose estimation. Set overwrite_pose to false in Config.toml if you want to keep the previous results.')
+            raise
+
+        return frame_rate, mode, output_format, save_video, save_images, display_detection, multi_person, det_frequency, frame_range, video_dir, vid_img_extension, det_frequency, tracking_mode, deepsort_params, backend, device
+
+
+    def get_person_association_params(self):
+        # Read config_dict
+        project_dir = self.get('project').get('project_dir')
+        # if single trial=
+        multi_person = self.get('project').get('multi_person')
+        tracked_keypoint = self.get('personAssociation').get('single_person').get('tracked_keypoint')
+        min_cameras_for_triangulation = self.get('triangulation').get('min_cameras_for_triangulation')
+        reconstruction_error_threshold = self.get('personAssociation').get('multi_person').get('reconstruction_error_threshold')
+        min_affinity = self.get('personAssociation').get('multi_person').get('min_affinity')
+        frame_range = self.get('project').get('frame_range')
+        undistort_points = self.get('triangulation').get('undistort_points')
+        error_threshold_tracking = self.get('personAssociation').get('single_person').get('reproj_error_threshold_association')
+        likelihood_threshold_association = self.get('personAssociation').get('likelihood_threshold_association')
+        # Retrieve keypoints from model
+        model = self.pose_model.load_model_instance()
+
+        try:
+            calib_dir = [os.path.join(self.session_dir, c) for c in os.listdir(self.session_dir) if os.path.isdir(os.path.join(self.session_dir, c)) and  'calib' in c.lower()][0]
+        except:
+            raise Exception(f'No .toml calibration direcctory found.')
+        try:
+            calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
+        except:
+            raise Exception(f'No .toml calibration file found in the {calib_dir}.')
+        pose_dir = os.path.join(project_dir, 'pose')
+        poseSync_dir = os.path.join(project_dir, 'pose-sync')
+        poseTracked_dir = os.path.join(project_dir, 'pose-associated')
+
+        return project_dir, self.session_dir, calib_file, model, pose_dir, poseSync_dir, poseTracked_dir, multi_person, frame_range, reconstruction_error_threshold, min_affinity, tracked_keypoint, min_cameras_for_triangulation, error_threshold_tracking, likelihood_threshold_association, undistort_points
 class Config:
     def __init__(self, config_input=None):
         """
