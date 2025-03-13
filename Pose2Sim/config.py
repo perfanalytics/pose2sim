@@ -277,62 +277,55 @@ class SubConfig:
         calib_type = self.calibration.get("calibration_type")
 
         if calib_type == "convert":
-            convert_filetype = self.calibration.get("convert", {}).get("convert_from")
-            try:
-                if convert_filetype == "qualisys":
-                    convert_ext = ".qca.txt"
-                    file_to_convert_path = glob.glob(os.path.join(self.calib_dir, f"*{convert_ext}*"))[0]
-                    binning_factor = self.calibration.get("convert", {}).get("qualisys", {}).get("binning_factor")
-                elif convert_filetype == "optitrack":
-                    file_to_convert_path = [""]
-                    binning_factor = 1
-                elif convert_filetype == "vicon":
-                    convert_ext = ".xcp"
-                    file_to_convert_path = glob.glob(os.path.join(self.calib_dir, f"*{convert_ext}"))[0]
-                    binning_factor = 1
-                elif convert_filetype == "opencap":
-                    convert_ext = ".pickle"
-                    file_to_convert_path = sorted(glob.glob(os.path.join(self.calib_dir, f"*{convert_ext}")))
-                    binning_factor = 1
-                elif convert_filetype == "easymocap":
-                    convert_ext = ".yml"
-                    file_to_convert_path = sorted(glob.glob(os.path.join(self.calib_dir, f"*{convert_ext}")))
-                    binning_factor = 1
-                elif convert_filetype == "biocv":
-                    convert_ext = ".calib"
-                    file_to_convert_path = sorted(glob.glob(os.path.join(self.calib_dir, f"*{convert_ext}")))
-                    binning_factor = 1
-                elif convert_filetype in ["anipose", "freemocap", "caliscope"]:
-                    logging.info(
-                        "\n--> No conversion needed for Caliscope, AniPose, or FreeMocap. Calibration will be ignored.\n"
-                    )
-                    return None
-                else:
-                    convert_ext = "???"
-                    file_to_convert_path = [""]
-                    raise NameError(f"Calibration conversion from {convert_filetype} is not supported.")
+            convert_path = self.calibration.get("convert", {}).get("convert_from")
+            if not convert_path:
+                raise NameError("Conversion file path not specified in configuration.")
 
-                assert file_to_convert_path != []
-            except Exception as e:
-                raise NameError(
-                    f"No file with extension {convert_ext} found in {self.calib_dir}."
-                ) from e
+            if not os.path.isabs(convert_path):
+                convert_path = os.path.join(self.calib_dir, convert_path)
+
+            if not os.path.exists(convert_path):
+                raise NameError(f"File {convert_path} not found in {self.calib_dir}.")
+
+            filename = os.path.basename(convert_path).lower()
+
+            if filename.endswith(".qca.txt"):
+                convert_filetype = "qualisys"
+                binning_factor = self.calibration.get("convert", {}).get("qualisys", {}).get("binning_factor", 1)
+            elif filename.endswith(".xcp"):
+                convert_filetype = "vicon"
+                binning_factor = 1
+            elif filename.endswith(".pickle"):
+                convert_filetype = "opencap"
+                binning_factor = 1
+            elif filename.endswith(".yml"):
+                convert_filetype = "easymocap"
+                binning_factor = 1
+            elif filename.endswith(".calib"):
+                convert_filetype = "biocv"
+                binning_factor = 1
+            elif filename.endswith(".csv"):
+                convert_filetype = "optitrack"
+                binning_factor = 1
+            elif any(filename.endswith(ext) for ext in [".anipose", ".freemocap", ".caliscope"]):
+                logging.info("\n--> No conversion required for Caliscope, AniPose, or FreeMocap. Calibration will be ignored.\n")
+                return None
+            else:
+                raise NameError(f"File extension of {filename} not supported for conversion.")
 
             calib_output_path = os.path.join(self.calib_dir, f"Calib_{convert_filetype}.toml")
-            calib_full_type = f"{calib_type}_{convert_filetype}"
-            args_calib_fun = [file_to_convert_path, binning_factor]
+            calib_type = f"{calib_type}_{convert_filetype}"
+            args_calib = [self, convert_path, binning_factor]
 
         elif calib_type == "calculate":
-            extrinsics_method = self.calibration.get("calculate", {}).get("extrinsics", {}).get("extrinsics_method")
-            calib_output_path = os.path.join(self.calib_dir, f"Calib_{extrinsics_method}.toml")
-            calib_full_type = calib_type
-            args_calib_fun = self
+            calib_output_path = os.path.join(self.calib_dir, f"Calib_{self.extrinsics_method}.toml")
+            args_calib = self
 
         else:
             logging.info("Invalid calibration_type in Config.toml")
             return None
 
-        return calib_output_path, calib_full_type, args_calib_fun
+        return calib_output_path, calib_type, args_calib
 
     def get_calib_calc_params(self):
         '''
@@ -360,45 +353,27 @@ class SubConfig:
 
         return use_existing_intrinsics, calib_file
 
-    def get_extrinsics_params(self):
-        '''
-        Returns all parameters needed for extrinsics calibration.
+    @property 
+    def intrinsics_extension(self):
+        return self.calibration.get("calculate", {}).get("intrinsics_extension")
 
-        Raises an exception if the 'extrinsics' folder is missing or has no files
-        matching the specified extension.
-        '''
-        try:
-            extrinsics_cam_listdirs_names = next(os.walk(os.path.join(self.calib_dir, "extrinsics")))[1]
-        except StopIteration:
-            logging.exception(f"Error: No {os.path.join(self.calib_dir, 'extrinsics')} folder found.")
-            raise Exception(f"Error: No {os.path.join(self.calib_dir, 'extrinsics')} folder found.")
+    @property 
+    def extrinsics_method(self):
+        return self.calibration.get("calculate", {}).get("extrinsics", {}).get("extrinsics_method")
 
-        extrinsics_method = self.calibration.get("calculate", {}).get("extrinsics", {}).get("extrinsics_method")
-        # We decide which extension to use depending on the extrinsics method
-        if extrinsics_method == "board":
-            extrinsics_extension = self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("extrinsics_extension")
-            show_reprojection_error = self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("show_reprojection_error")
+    @property 
+    def extrinsics_extension(self):
+        if self.extrinsics_method == "board":
+            return self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("extrinsics_extension")
         else:
-            extrinsics_extension = self.calibration.get("calculate", {}).get("extrinsics", {}).get("scene", {}).get("extrinsics_extension")
-            show_reprojection_error = self.calibration.get("calculate", {}).get("extrinsics", {}).get("scene", {}).get("show_reprojection_error")
+            return self.calibration.get("calculate", {}).get("extrinsics", {}).get("scene", {}).get("extrinsics_extension")
 
-        img_vid_files_list = []
-        for cam in extrinsics_cam_listdirs_names:
-            img_vid_files = glob.glob(
-                os.path.join(self.calib_dir, "extrinsics", cam, f"*.{extrinsics_extension}")
-            )
-            img_vid_files_list.append((cam, img_vid_files))
-            if len(img_vid_files) == 0:
-                logging.exception(
-                    f"The folder {os.path.join(self.calib_dir, 'extrinsics', cam)} "
-                    f"does not exist or has no files with extension .{extrinsics_extension}."
-                )
-                raise ValueError(
-                    f"The folder {os.path.join(self.calib_dir, 'extrinsics', cam)} does not contain "
-                    f"any .{extrinsics_extension} files."
-                )
-
-        return show_reprojection_error, extrinsics_method, img_vid_files_list
+    @property 
+    def show_reprojection_error(self):
+        if self.extrinsics_method == "board":
+            return self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("show_reprojection_error")
+        else:
+            return self.calibration.get("calculate", {}).get("extrinsics", {}).get("scene", {}).get("show_reprojection_error")
 
     def get_filtering_params(self):
         '''
