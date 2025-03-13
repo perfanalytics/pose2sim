@@ -24,12 +24,11 @@ import os
 import numpy as np
 import copy
 import tensorflow as tf
-import glob
 import logging
 
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.MarkerAugmenter.utils import TRC2numpy
-from Pose2Sim.common import convert_to_c3d, natural_sort_key, read_trc, compute_height
+from Pose2Sim.common import convert_to_c3d, read_trc, compute_height
 
 
 ## AUTHORSHIP INFORMATION
@@ -78,10 +77,12 @@ def check_neck_data(trc_file):
 
 
 def augment_markers_all(config):
-
-    trc_files, fastest_frames_to_remove_percent, close_to_zero_speed, large_hip_knee_angles, trimmed_extrema_percent, default_height, augmenter_model, augmenterDir, augmenterModelName, pathInputTRCFile, pathOutputTRCFile, make_c3d, offset = config.get_augment_markers_params()
+    subject_height, subject_mass, trc_files, fastest_frames_to_remove_percent, close_to_zero_speed, large_hip_knee_angles, trimmed_extrema_percent, augmenter_model, augmenterDir, augmenterModelName, pathInputTRCFile, pathOutputTRCFile, make_c3d, offset = config.get_augment_markers_params()
     # Calculate subject heights
-    if isinstance(subject_height, str) and subject_height.lower() == 'auto':
+    if not subject_height or subject_height == 0:
+        subject_height = [config.default_height] * len(trc_files)
+        logging.warning(f"No subject height found in Config.toml. Using default height of {config.default_height}m.")
+    elif isinstance(subject_height, str) and subject_height.lower() == 'auto':
         subject_height = []
         for trc_file in trc_files:
             try:
@@ -97,21 +98,24 @@ def augment_markers_all(config):
                 if not np.isnan(height):
                     logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m\n")
                 else:
-                    logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
+                    logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {config.default_height}m.")
                     logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, close_to_zero_speed_m, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
-                    height = default_height
+                    height = config.default_height
             except Exception as e:
-                logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
+                logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {config.default_height}m.")
                 logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, close_to_zero_speed_m, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
-                height = default_height
+                height = config.default_height
             subject_height.append(height)
     elif not type(subject_height) == list: # int or float
         subject_height = [subject_height]
     if len(subject_height) < len(trc_files):
         logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to {default_height}m.")
-        subject_height += [default_height] * (len(trc_files) - len(subject_height))
+        subject_height += [config.default_height] * (len(trc_files) - len(subject_height))
 
     # Get subject masses
+    if not subject_mass or subject_mass == 0:
+        subject_mass = [70] * len(trc_files)
+        logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
     if not type(subject_mass) == list:
         subject_mass = [subject_mass]
     if len(subject_mass) < len(trc_files):

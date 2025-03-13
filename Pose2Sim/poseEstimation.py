@@ -44,8 +44,10 @@ import cv2
 
 from rtmlib import PoseTracker, Custom, draw_skeleton
 from deep_sort_realtime.deepsort_tracker import DeepSort
-from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort, sort_people_rtmlib,\
-                        colors, thickness, draw_bounding_box, draw_keypts, draw_skel
+from Pose2Sim.common import (
+    natural_sort_key, sort_people_sports2d, sort_people_deepsort,
+    colors, thickness, draw_bounding_box, draw_keypts, draw_skel
+)
 
 
 ## AUTHORSHIP INFORMATION

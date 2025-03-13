@@ -42,8 +42,10 @@ from anytree import PreOrderIter
 
 import opensim
 
-from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean, read_trc, \
-                            best_coords_for_measurements, compute_height
+from Pose2Sim.common import (
+    euclidean_distance, trimmed_mean, read_trc,
+    best_coords_for_measurements, compute_height
+    )
 from Pose2Sim.skeletons import *
 
 

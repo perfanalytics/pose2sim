@@ -3,14 +3,14 @@
 
 
 '''
-###########################################################################
+##########################################################################
 ## CONFIG MODULE                                                        ##
-###########################################################################
+##########################################################################
 
 This module defines:
 - The main Config class that loads and merges Config.toml files.
 - The SubConfig subclass that encapsulates an individual configuration
-and directly exposes useful properties and methods to get the settings.
+  and directly exposes useful properties and methods to get the settings.
 '''
 
 import os
@@ -25,634 +25,884 @@ from copy import deepcopy
 from Pose2Sim.model import PoseModel
 from Pose2Sim.common import natural_sort_key
 from Pose2Sim.MarkerAugmenter import utilsDataman
+from Pose2Sim.source import WebcamSource, ImageSource, VideoSource
+from Pose2Sim.subject import Subject
+
 
 class SubConfig:
     def __init__(self, config_dict, session_dir):
         '''
         Initializes a sub-configuration from a dictionary and the session_dir
-        computed by the Config class.
+        calculated by the Config class.
         '''
         self._config = config_dict
-        self._session_dir = session_dir
+        self.session_dir = session_dir
+        self.subjects = self.subjects()
+        self.sources = self.sources()
+
+    def subjects(self):
+        """
+        Construit une liste d'objets Subject à partir de la config TOML.
+        """
+        subjects_data_list = self._config.get("subjects", [])
+        subjects_list = []
+        for sub_data in subjects_data_list:
+            subject_obj = Subject(sub_data)
+            subjects_list.append(subject_obj)
+        return subjects_list
+    
+    def sources(self):
+        """
+        Construit une liste d'objets Source à partir de la config TOML.
+        """
+        sources_data_list = self._config.get("sources", [])
+        sources_list = []
+        for src_data in sources_data_list:
+            path_str = src_data.get("path", "")
+
+            if os.path.isdir(path_str):
+                source_obj =  ImageSource(self, src_data)
+
+            elif os.path.isfile(path_str):
+                source_obj =  VideoSource(self, src_data)
+
+            else:
+                try:
+                    int(path_str)
+                    source_obj =  WebcamSource(self, src_data)
+                except ValueError:
+                    raise ValueError(f"Unable to determine source type for path='{path_str}'. Not a numeric index, not a folder, not a file.")
+        sources_list.append(source_obj)
+        return sources_list
+
+    @property
+    def calibration(self):
+        return self._config.get("calibration", {})
+
+    @property
+    def calib_dir(self):
+        '''
+        Returns the calibration folder based on session_dir.
+        If no folder containing 'calib' is found, an exception is raised.
+        '''
+        try:
+            calib_dirs = [
+                os.path.join(self.session_dir, c)
+                for c in os.listdir(self.session_dir)
+                if "calib" in c.lower() and os.path.isdir(os.path.join(self.session_dir, c))
+            ]
+            return calib_dirs[0]
+        except IndexError:
+            raise FileNotFoundError("No calibration folder found in the project directory.")
+
+    @property
+    def object_coords_3d(self):
+        return self.calibration.get("calculate", {}).get("extrinsics", {}).get("object_coords_3d", {})
+
+    @property
+    def extrinsics_corners_nb(self):
+        return self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("extrinsics_corners_nb")
+
+    @property
+    def extrinsics_square_size(self):
+        return self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("extrinsics_square_size") / 1000.0
+
+    @property
+    def calculate_extrinsics(self):
+        return self.calibration.get("calculate", {}).get("extrinsics", {}).get("calculate_extrinsics")
+
+    @property
+    def extrinsics_dir(self):
+        return os.path.join(self.calib_dir, "extrinsics")
+    
+    @property
+    def extract_every_N_sec(self):
+        return self.calibration.get("calculate", {}).get("intrinsics", {}).get("extract_every_N_sec")
+
+    @property
+    def overwrite_extraction(self):
+        return False
+
+    @property
+    def show_detection_intrinsics(self):
+        return self.calibration.get("calculate", {}).get("intrinsics", {}).get("show_detection_intrinsics")
+
+    @property
+    def intrinsics_corners_nb(self):
+        return self.calibration.get("calculate", {}).get("intrinsics", {}).get("intrinsics_corners_nb")
+
+    @property
+    def intrinsics_square_size(self):
+        return self.calibration.get("calculate", {}).get("intrinsics", {}).get("intrinsics_square_size") / 1000.0
+    
+    @property
+    def img_vid_files_list(self):
+        '''
+        Returns all parameters needed for intrinsics calibration.
+
+        Raises an exception if the 'intrinsics' folder is missing or has no files
+        matching the specified extension.
+        '''
+        try:
+            intrinsics_cam_listdirs_names = next(os.walk(os.path.join(self.calib_dir, "intrinsics")))[1]
+        except StopIteration:
+            logging.exception(f"Error: No {os.path.join(self.calib_dir, 'intrinsics')} folder found.")
+            raise Exception(f"Error: No {os.path.join(self.calib_dir, 'intrinsics')} folder found.")
+
+        intrinsics_extension = self.calibration.get("calculate", {}).get("intrinsics", {}).get("intrinsics_extension")
+
+        img_vid_files_list = []
+        for cam in intrinsics_cam_listdirs_names:
+            img_vid_files = glob.glob(
+                os.path.join(self.calib_dir, "intrinsics", cam, f"*.{intrinsics_extension}")
+            )
+            img_vid_files_list.append((cam, img_vid_files))
+            if len(img_vid_files) == 0:
+                logging.exception(
+                    f"The folder {os.path.join(self.calib_dir, 'intrinsics', cam)} "
+                    f"does not exist or has no files with extension .{intrinsics_extension}."
+                )
+                raise ValueError(
+                    f"The folder {os.path.join(self.calib_dir, 'intrinsics', cam)} "
+                    f"does not contain any .{intrinsics_extension} files."
+                )
+
+        return img_vid_files_list
+    
+    @property
+    def calib_output_path(self):
+        return os.path.join(self.calib_dir, "Object_points.trc")
+
+    @property
+    def logging(self):
+        return self._config.get("logging", {})
+
+    @property
+    def filtering(self):
+        return self._config.get("filtering", {})
+
+    @property
+    def kinematics(self):
+        return self._config.get("kinematics", {})
+    
+    @property
+    def fastest_frames_to_remove_percent(self):
+        return self.kinematics.get("fastest_frames_to_remove_percent")
+    
+    @property
+    def close_to_zero_speed_m(self):
+        return self.kinematics.get("close_to_zero_speed_m")
+    
+    @property
+    def large_hip_knee_angles(self):
+        return self.kinematics.get("large_hip_knee_angles")
+    
+    @property
+    def trimmed_extrema_percent(self):
+        return self.kinematics.get("trimmed_extrema_percent")
+
+    @property
+    def default_height(self):
+        return self.kinematics.get("default_height")
+
+    @property
+    def markerAugmentation(self):
+        return self._config.get("markerAugmentation", {})
+
+    @property
+    def triangulation(self):
+        return self._config.get("triangulation", {})
+
+    @property
+    def synchronization(self):
+        return self._config.get("synchronization", {})
+
+    @property
+    def personAssociation(self):
+        return self._config.get("personAssociation", {})
+    
+    @property
+    def project(self):
+        return self._config.get("project", {})
 
     @property
     def project_dir(self):
         '''
-        Returns the absolute path of the project directory.
-        Raises a FileNotFoundError if the project directory is not found.
+        Returns the absolute path to the project directory.
+        Raises FileNotFoundError if the directory is not found.
         '''
-        proj_dir = self._config.get("project", {}).get("project_dir")
-        abs_path = os.path.realpath(proj_dir)
+        project_dir = self.project.get("project_dir")
+        abs_path = os.path.realpath(project_dir)
         if not os.path.exists(abs_path):
             raise FileNotFoundError(f"Project directory does not exist: {abs_path}")
-        
         return abs_path
-
-    @property
-    def session_dir(self):
-        '''
-        Returns the session folder passed by the Config class.
-        '''
-        return self._session_dir
-
-    @property
-    def calib_dir(self):
-        '''
-        Returns the session folder passed by the Config class.
-        '''
-        calib_dir = [os.path.join(self.project_dir, c) for c in os.listdir(self.project_dir) if ('Calib' in c or 'calib' in c)][0]
-        return calib_dir
 
     @property
     def frame_range(self):
         '''
-        Returns the frame range defined in the configuration.
+        Returns the frame range specified in the configuration.
         '''
-        return self._config.get("project", {}).get("frame_range")
+        return self.project.get("frame_range")
 
     @property
-    def calib_dir(self):
-        """
-        Retourne le dossier de calibration basé sur session_dir.
-        Si aucun dossier contenant "calib" n'est trouvé, une exception est levée.
-        """
-        if self.session_dir is None:
-            raise ValueError("La propriété 'session_dir' n'est pas définie dans la configuration.")
-        try:
-            calib_dirs = [os.path.join(self.session_dir, c)
-                          for c in os.listdir(self.session_dir)
-                          if "calib" in c.lower() and os.path.isdir(os.path.join(self.session_dir, c))]
-            return calib_dirs[0]
-        except IndexError:
-            raise FileNotFoundError("Aucun dossier de calibration trouvé dans le dossier projet.")
+    def pose(self):
+        return self._config.get("pose", {})
 
-    @property
-    def calibration(self):
-        """Retourne la section [calibration] de la configuration."""
-        return self._config.get("calibration", {})
-    
     @property
     def pose_model(self):
-        return PoseModel.from_config(self._config.get("pose", {}).get("pose_model"))
-
-    @property
-    def logging(self):
-        """Retourne la configuration du logging."""
-        return self._config.get("logging", {})
-    
-    @property
-    def object_coords_3d(self):
-        return self.calibration.get('calculate', {}).get('extrinsics', {}).get('object_coords_3d', {})
-    
-    @property
-    def extrinsics_corners_nb(self):
-        return self.calibration.get('calculate', {}).get('extrinsics', {}).get('board').get('extrinsics_corners_nb')
-    
-    @property
-    def extrinsics_square_size(self):
-        return self.calibration.get('calculate', {}).get('extrinsics', {}).get('board').get('extrinsics_square_size') / 1000 # convert to meters
+        '''
+        Returns the PoseModel object initialized from the configuration.
+        '''
+        return PoseModel.from_config(self.pose.get("pose_model"))
 
     @property
     def osim_setup_dir(self):
-        pose2sim_path = Path(sys.modules['Pose2Sim'].__file__).resolve().parent
-        return pose2sim_path / 'OpenSim_Setup'
-           
+        '''
+        Returns the path to the 'OpenSim_Setup' directory within the Pose2Sim package.
+        '''
+        pose2sim_path = Path(sys.modules["Pose2Sim"].__file__).resolve().parent
+        return pose2sim_path / "OpenSim_Setup"
 
     def get_calibration_params(self):
-        """
-        Extrait et retourne les paramètres de calibration à partir de la configuration.
-        
-        Retourne un dictionnaire contenant :
-          - calib_output_path : chemin du fichier de calibration à écrire
-          - calib_full_type   : type complet de calibration (convert_qualisys, calculate, etc.)
-          - args_calib_fun    : arguments à passer à la fonction de calibration
-          
-        En cas d'erreur (exemple : type de calibration inconnu ou fichier introuvable), une exception est levée.
-        """
-        calib_dir = self.calib_dir
-        calib_settings = self.calibration
-        calib_type = calib_settings.get('calibration_type')
-        
-        if calib_type == 'convert':
-            convert_filetype = calib_settings.get('convert').get('convert_from')
+        '''
+        Extracts and returns calibration parameters from the configuration.
+
+        Returns a tuple:
+          - calib_output_path: path to the calibration file to write
+          - calib_full_type: full calibration type (e.g. 'convert_qualisys', 'calculate', etc.)
+          - args_calib_fun: arguments to pass to the calibration function
+
+        In case of error (unknown calibration type or missing file), raises an exception.
+        '''
+        calib_type = self.calibration.get("calibration_type")
+
+        if calib_type == "convert":
+            convert_filetype = self.calibration.get("convert", {}).get("convert_from")
             try:
-                if convert_filetype == 'qualisys':
-                    convert_ext = '.qca.txt'
-                    file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
-                    binning_factor = calib_settings.get('convert').get('qualisys').get('binning_factor')
-                elif convert_filetype == 'optitrack':
-                    file_to_convert_path = ['']
+                if convert_filetype == "qualisys":
+                    convert_ext = ".qca.txt"
+                    file_to_convert_path = glob.glob(os.path.join(self.calib_dir, f"*{convert_ext}*"))[0]
+                    binning_factor = self.calibration.get("convert", {}).get("qualisys", {}).get("binning_factor")
+                elif convert_filetype == "optitrack":
+                    file_to_convert_path = [""]
                     binning_factor = 1
-                elif convert_filetype == 'vicon':
-                    convert_ext = '.xcp'
-                    file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}'))[0]
+                elif convert_filetype == "vicon":
+                    convert_ext = ".xcp"
+                    file_to_convert_path = glob.glob(os.path.join(self.calib_dir, f"*{convert_ext}"))[0]
                     binning_factor = 1
-                elif convert_filetype == 'opencap':  # tous les fichiers avec extension .pickle
-                    convert_ext = '.pickle'
-                    file_to_convert_path = sorted(glob.glob(os.path.join(calib_dir, f'*{convert_ext}')))
+                elif convert_filetype == "opencap":
+                    convert_ext = ".pickle"
+                    file_to_convert_path = sorted(glob.glob(os.path.join(self.calib_dir, f"*{convert_ext}")))
                     binning_factor = 1
-                elif convert_filetype == 'easymocap':  # fichiers .yml
-                    convert_ext = '.yml'
-                    file_to_convert_path = sorted(glob.glob(os.path.join(calib_dir, f'*{convert_ext}')))
+                elif convert_filetype == "easymocap":
+                    convert_ext = ".yml"
+                    file_to_convert_path = sorted(glob.glob(os.path.join(self.calib_dir, f"*{convert_ext}")))
                     binning_factor = 1
-                elif convert_filetype == 'biocv':  # fichiers avec extension .calib
-                    convert_ext = '.calib'
-                    file_to_convert_path = sorted(glob.glob(os.path.join(calib_dir, f'*{convert_ext}')))
+                elif convert_filetype == "biocv":
+                    convert_ext = ".calib"
+                    file_to_convert_path = sorted(glob.glob(os.path.join(self.calib_dir, f"*{convert_ext}")))
                     binning_factor = 1
-                elif convert_filetype in ['anipose', 'freemocap', 'caliscope']:
-                    logging.info("\n--> Aucune conversion nécessaire pour Caliscope, AniPose ni FreeMocap. Calibration ignorée.\n")
+                elif convert_filetype in ["anipose", "freemocap", "caliscope"]:
+                    logging.info(
+                        "\n--> No conversion needed for Caliscope, AniPose, or FreeMocap. Calibration will be ignored.\n"
+                    )
                     return None
                 else:
-                    convert_ext = '???'
-                    file_to_convert_path = ['']
+                    convert_ext = "???"
+                    file_to_convert_path = [""]
                     raise NameError(f"Calibration conversion from {convert_filetype} is not supported.")
+
                 assert file_to_convert_path != []
             except Exception as e:
-                raise NameError(f"Aucun fichier avec l'extension {convert_ext} trouvé dans {calib_dir}.") from e
+                raise NameError(
+                    f"No file with extension {convert_ext} found in {self.calib_dir}."
+                ) from e
 
-            calib_output_path = os.path.join(calib_dir, f'Calib_{convert_filetype}.toml')
+            calib_output_path = os.path.join(self.calib_dir, f"Calib_{convert_filetype}.toml")
             calib_full_type = f"{calib_type}_{convert_filetype}"
             args_calib_fun = [file_to_convert_path, binning_factor]
 
-        elif calib_type == 'calculate':
-            extrinsics_method = calib_settings.get('calculate').get('extrinsics').get('extrinsics_method')
-            calib_output_path = os.path.join(calib_dir, f'Calib_{extrinsics_method}.toml')
+        elif calib_type == "calculate":
+            extrinsics_method = self.calibration.get("calculate", {}).get("extrinsics", {}).get("extrinsics_method")
+            calib_output_path = os.path.join(self.calib_dir, f"Calib_{extrinsics_method}.toml")
             calib_full_type = calib_type
             args_calib_fun = self
 
         else:
-            logging.info("Wrong calibration_type in Config.toml")
+            logging.info("Invalid calibration_type in Config.toml")
             return None
 
         return calib_output_path, calib_full_type, args_calib_fun
-    
-    def get_calib_calc_params(self):
-        """
-        Extrait les paramètres nécessaires pour la calibration (calculate) depuis la section [calibration][calculate].
 
-        Renvoie un dictionnaire contenant :
-          - calib_dir                : dossier de calibration
-          - intrinsics_config_dict   : dictionnaire des paramètres pour les intrinsics
-          - extrinsics_config_dict   : dictionnaire des paramètres pour les extrinsics
-          - overwrite_intrinsics     : booléen, True si on doit recalculer les intrinsics
-          - calculate_extrinsics     : booléen, True si on doit calculer les extrinsics
-          - use_existing_intrinsics  : booléen, True si on récupère les intrinsics depuis un fichier existant
-          - calib_file               : chemin vers le fichier de calibration existant (None sinon)
-        """
-        calib_dir = self.calib_dir
-        calculate_section = self.calibration.get('calculate', {})
-        intrinsics_config = calculate_section.get('intrinsics', {})
-        extrinsics_config = calculate_section.get('extrinsics', {})
-        overwrite_intrinsics = intrinsics_config.get('overwrite_intrinsics', False)
-        calculate_extrinsics = extrinsics_config.get('calculate_extrinsics', False)
-        extrinsics_dir = os.path.join(calib_dir, 'extrinsics')
-        
-        # Recherche d'un fichier de calibration existant
-        calib_file_list = glob.glob(os.path.join(calib_dir, 'Calib*.toml'))
+    def get_calib_calc_params(self):
+        '''
+        Extracts the parameters required for calibration (calculate) from the [calibration][calculate] section.
+
+        Returns a tuple:
+          - calculate_extrinsics (bool)
+          - use_existing_intrinsics (bool)
+          - calib_file (str or None)
+          - extrinsics_dir (str)
+        '''
+        overwrite_intrinsics = self.calibration.get("calculate", {}).get("intrinsics", {}).get("overwrite_intrinsics", False)
+
+        # Look for an existing calibration file
+        calib_file_list = glob.glob(os.path.join(self.calib_dir, "Calib*.toml"))
         use_existing_intrinsics = not overwrite_intrinsics and bool(calib_file_list)
         calib_file = calib_file_list[0] if use_existing_intrinsics else None
-        
+
         if use_existing_intrinsics:
-            logging.info(f'\nPreexisting calibration file found: \'{calib_file}\'.')
-            logging.info(f'\nRetrieving intrinsic parameters from file. Set "overwrite_intrinsics" to true in Config.toml to recalculate them.')
-        
-        return calculate_extrinsics, use_existing_intrinsics, calib_file, extrinsics_dir
-    
-    def get_intrinsics_params(self):
-        try:
-            intrinsics_cam_listdirs_names = next(os.walk(os.path.join(self.calib_dir, 'intrinsics')))[1]
-        except StopIteration:
-            logging.exception(f'Error: No {os.path.join(self.calib_dir, "intrinsics")} folder found.')
-            raise Exception(f'Error: No {os.path.join(self.calib_dir, "intrinsics")} folder found.')
-        intrinsics_config = self.calibration.get('calculate').get('intrinsics')
-        intrinsics_extension = intrinsics_config.get('intrinsics_extension')
-        extract_every_N_sec = intrinsics_config.get('extract_every_N_sec')
-        overwrite_extraction = False
-        show_detection_intrinsics = intrinsics_config.get('show_detection_intrinsics')
-        intrinsics_corners_nb = intrinsics_config.get('intrinsics_corners_nb')
-        intrinsics_square_size = intrinsics_config.get('intrinsics_square_size') / 1000 # convert to meters
+            logging.info(f"\nPreexisting calibration file found: '{calib_file}'.")
+            logging.info(
+                "\nRetrieving intrinsic parameters from file. "
+                'Set "overwrite_intrinsics" to true in Config.toml to recalculate them.'
+            )
 
-        img_vid_files_list = []
-        for i,cam in enumerate(intrinsics_cam_listdirs_names):
-            img_vid_files = glob.glob(os.path.join(self.calib_dir, 'intrinsics', cam, f'*.{intrinsics_extension}'))
-            img_vid_files_list.append(cam, img_vid_files)
-            if len(img_vid_files) == 0:
-                logging.exception(f'The folder {os.path.join(self.calib_dir, "intrinsics", cam)} does not exist or does not contain any files with extension .{intrinsics_extension}.')
-                raise ValueError(f'The folder {os.path.join(self.calib_dir, "intrinsics", cam)} does not exist or does not contain any files with extension .{intrinsics_extension}.')
+        return use_existing_intrinsics, calib_file
 
-        return show_detection_intrinsics, intrinsics_corners_nb, extract_every_N_sec, overwrite_extraction, intrinsics_square_size, img_vid_files_list
-    
     def get_extrinsics_params(self):
+        '''
+        Returns all parameters needed for extrinsics calibration.
+
+        Raises an exception if the 'extrinsics' folder is missing or has no files
+        matching the specified extension.
+        '''
         try:
-            extrinsics_cam_listdirs_names = next(os.walk(os.path.join(self.calib_dir, 'extrinsics')))[1]
+            extrinsics_cam_listdirs_names = next(os.walk(os.path.join(self.calib_dir, "extrinsics")))[1]
         except StopIteration:
-            logging.exception(f'Error: No {os.path.join(self.calib_dir, "extrinsics")} folder found.')
-            raise Exception(f'Error: No {os.path.join(self.calib_dir, "extrinsics")} folder found.')
-        
+            logging.exception(f"Error: No {os.path.join(self.calib_dir, 'extrinsics')} folder found.")
+            raise Exception(f"Error: No {os.path.join(self.calib_dir, 'extrinsics')} folder found.")
+
+        extrinsics_method = self.calibration.get("calculate", {}).get("extrinsics", {}).get("extrinsics_method")
+        # We decide which extension to use depending on the extrinsics method
+        if extrinsics_method == "board":
+            extrinsics_extension = self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("extrinsics_extension")
+            show_reprojection_error = self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("show_reprojection_error")
+        else:
+            extrinsics_extension = self.calibration.get("calculate", {}).get("extrinsics", {}).get("scene", {}).get("extrinsics_extension")
+            show_reprojection_error = self.calibration.get("calculate", {}).get("extrinsics", {}).get("scene", {}).get("show_reprojection_error")
+
         img_vid_files_list = []
-        for i, cam in enumerate(extrinsics_cam_listdirs_names):
-            extrinsics_extension = [self.calibration.get('calculate', {}).get('extrinsics', {}).get('board').get('extrinsics_extension') if extrinsics_method == 'board'
-                                    else self.calibration.get('calculate', {}).get('extrinsics', {}).get('scene').get('extrinsics_extension')][0]
-            show_reprojection_error = [self.calibration.get('calculate', {}).get('extrinsics', {}).get('board').get('show_reprojection_error') if extrinsics_method == 'board'
-                                    else self.calibration.get('calculate', {}).get('extrinsics', {}).get('scene').get('show_reprojection_error')][0]
-            img_vid_files = glob.glob(os.path.join(self.calib_dir, 'extrinsics', cam, f'*.{extrinsics_extension}'))
-            img_vid_files_list.append(cam, img_vid_files)
+        for cam in extrinsics_cam_listdirs_names:
+            img_vid_files = glob.glob(
+                os.path.join(self.calib_dir, "extrinsics", cam, f"*.{extrinsics_extension}")
+            )
+            img_vid_files_list.append((cam, img_vid_files))
             if len(img_vid_files) == 0:
-                logging.exception(f'The folder {os.path.join(self.calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
-                raise ValueError(f'The folder {os.path.join(self.calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
-        
-        extrinsics_method = self.calibration.get('calculate', {}).get('extrinsics', {}).get('extrinsics_method')
-        calib_output_path = os.path.join(self.calib_dir, f'Object_points.trc')
+                logging.exception(
+                    f"The folder {os.path.join(self.calib_dir, 'extrinsics', cam)} "
+                    f"does not exist or has no files with extension .{extrinsics_extension}."
+                )
+                raise ValueError(
+                    f"The folder {os.path.join(self.calib_dir, 'extrinsics', cam)} does not contain "
+                    f"any .{extrinsics_extension} files."
+                )
 
-        return show_reprojection_error, extrinsics_method, img_vid_files_list, calib_output_path
-    
+        return show_reprojection_error, extrinsics_method, img_vid_files_list
+
     def get_filtering_params(self):
-        project_dir = self.get('project').get('project_dir')
-        pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-        display_figures = self.get('filtering').get('display_figures')
-        filter_type = self.get('filtering').get('type')
-        make_c3d = self.get('filtering').get('make_c3d')
+        '''
+        Returns parameters related to data filtering, such as input TRC paths,
+        output TRC paths, filter type, frame rate, etc.
+        '''
+        pose3d_dir = os.path.realpath(os.path.join(self.project_dir, "pose-3d"))
+        display_figures = self.filtering.get("display_figures")
+        filter_type = self.filtering.get("type")
+        make_c3d = self.filtering.get("make_c3d")
 
-        video_dir = os.path.join(project_dir, 'videos')
-        vid_img_extension = self['pose']['vid_img_extension']
-        video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-        frame_rate = self.get('project').get('frame_rate')
-        if frame_rate == 'auto': 
+        video_dir = os.path.join(self.project_dir, "videos")
+        vid_img_extension = self.pose_conf.get("vid_img_extension")
+        video_files = glob.glob(os.path.join(video_dir, "*" + vid_img_extension))
+        frame_rate = self._config.get("project", {}).get("frame_rate")
+
+        if frame_rate == "auto":
             try:
                 cap = cv2.VideoCapture(video_files[0])
                 cap.read()
-                if cap.read()[0] == False:
-                    raise
+                if cap.read()[0] is False:
+                    raise ValueError("Could not read frame.")
                 frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
             except:
                 frame_rate = 60
 
-        
-        # Trc paths
-        trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in file]
-        trc_f_out = [f'{os.path.basename(t).split(".")[0]}_filt_{filter_type}.trc' for t in trc_path_in]
+        trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, "*.trc")) if "filt" not in file]
+        trc_f_out = [f"{os.path.basename(t).split('.')[0]}_filt_{filter_type}.trc" for t in trc_path_in]
         trc_path_out = [os.path.join(pose3d_dir, t) for t in trc_f_out]
 
         return trc_path_in, trc_path_out, filter_type, frame_rate, display_figures, make_c3d
-    
+
     def get_kinematics_params(self):
-        # Read config_dict
-        project_dir = self.get('project').get('project_dir')
-        session_dir = self.session_dir
-        session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-        use_augmentation = self.get('kinematics').get('use_augmentation')
+        '''
+        Returns parameters needed for kinematics calculations (OpenSim),
+        including file paths, subject height/mass, and trimming thresholds.
+        '''
+        subject_height = self.project.get("participant_height")
+        subject_mass = self.project.get("participant_mass")
 
-        subject_height = self.get('project').get('participant_height')
-        subject_mass = self.get('project').get('participant_mass')
+        use_augmentation = self.kinematics.get("use_augmentation")
 
-        fastest_frames_to_remove_percent = self.get('kinematics').get('fastest_frames_to_remove_percent')
-        large_hip_knee_angles = self.get('kinematics').get('large_hip_knee_angles')
-        trimmed_extrema_percent = self.get('kinematics').get('trimmed_extrema_percent')
-        close_to_zero_speed = self.get('kinematics').get('close_to_zero_speed_m')
-        default_height = self.get('kinematics').get('default_height')
-
-        pose3d_dir = Path(project_dir) / 'pose-3d'
-        kinematics_dir = Path(project_dir) / 'kinematics'
+        pose3d_dir = Path(self.project_dir) / "pose-3d"
+        kinematics_dir = Path(self.project_dir) / "kinematics"
         kinematics_dir.mkdir(parents=True, exist_ok=True)
-        opensim_logs_file = kinematics_dir / 'opensim_logs.txt'
+        opensim_logs_file = kinematics_dir / "opensim_logs.txt"
 
+        # Possibly override the pose model if we use marker augmentation
         if use_augmentation:
             self.pose_model = PoseModel.LSTM
 
-        # Find all trc files
+        # Find all TRC files
         if use_augmentation:
-            trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' in f.name]
+            trc_files = [f for f in pose3d_dir.glob("*.trc") if "_LSTM" in f.name]
             if not trc_files:
                 use_augmentation = False
-                logging.warning("Aucun fichier TRC LSTM trouvé. Utilisation des fichiers TRC non augmentés.")
+                logging.warning("No LSTM TRC file found. Using non-augmented TRC files.")
         else:
             trc_files = []
 
         if not trc_files:
-            trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' not in f.name and '_filt' in f.name and '_scaling' not in f.name]
+            trc_files = [
+                f
+                for f in pose3d_dir.glob("*.trc")
+                if "_LSTM" not in f.name and "_filt" in f.name and "_scaling" not in f.name
+            ]
 
         if not trc_files:
-            trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' not in f.name and '_scaling' not in f.name]
+            trc_files = [
+                f
+                for f in pose3d_dir.glob("*.trc")
+                if "_LSTM" not in f.name and "_scaling" not in f.name
+            ]
 
         if not trc_files:
-            raise ValueError(f'Aucun fichier TRC trouvé dans {pose3d_dir}.')
+            raise ValueError(f"No TRC file found in {pose3d_dir}.")
 
-        # Création d'une liste de dictionnaires avec les chemins associés pour chaque fichier TRC
+        # Create list of dicts describing the paths for each TRC file
         trc_files_info = []
         for trc_file in sorted(trc_files, key=natural_sort_key):
             file_info = {
-                'trc_file': trc_file.resolve(),
-                'scaled_model_path': (kinematics_dir / (trc_file.stem + '.osim')).resolve(),
-                'scaling_setup_path': (kinematics_dir / (trc_file.stem + '_scaling_setup.xml')).resolve(),
-                'ik_setup_path': (kinematics_dir / (trc_file.stem + '_ik_setup.xml')).resolve(),
-                'output_motion_file': (kinematics_dir / (trc_file.stem + '.mot')).resolve()
+                "trc_file": trc_file.resolve(),
+                "scaled_model_path": (kinematics_dir / (trc_file.stem + ".osim")).resolve(),
+                "scaling_setup_path": (kinematics_dir / (trc_file.stem + "_scaling_setup.xml")).resolve(),
+                "ik_setup_path": (kinematics_dir / (trc_file.stem + "_ik_setup.xml")).resolve(),
+                "output_motion_file": (kinematics_dir / (trc_file.stem + ".mot")).resolve(),
             }
             trc_files_info.append(file_info)
 
-        if subject_height is None or subject_height == 0:
+        if not subject_height or subject_height == 0:
             subject_height = [1.75] * len(trc_files)
-            logging.warning("No subject height found in Config.toml. Using default height of 1.75m.")
+            logging.warning("No subject height found in Config.toml. Using default of 1.75m.")
 
-        if subject_mass is None or subject_mass == 0:
+        if not subject_mass or subject_mass == 0:
             subject_mass = [70] * len(trc_files)
-            logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
+            logging.warning("No subject mass found in Config.toml. Using default of 70kg.")
 
-        return opensim_logs_file, trc_files, fastest_frames_to_remove_percent, close_to_zero_speed, large_hip_knee_angles, trimmed_extrema_percent, default_height, kinematics_dir
+        return (
+            opensim_logs_file,
+            trc_files,
+            kinematics_dir,
+        )
 
     def get_scaling_params(self):
-        geometry_path = str(self.osim_setup_dir / 'Geometry')
-        
-        use_contacts_muscles = self.get('kinematics').get('use_contacts_muscles')
+        '''
+        Returns parameters needed for scaling an OpenSim model.
+        '''
+        geometry_path = str(self.osim_setup_dir / "Geometry")
+
+        use_contacts_muscles = self.kinematics.get("use_contacts_muscles")
         if use_contacts_muscles:
-            pose_model_file = 'Model_Pose2Sim_contacts_muscles.osim'
+            pose_model_file = "Model_Pose2Sim_contacts_muscles.osim"
         else:
-            pose_model_file = 'Model_Pose2Sim.osim'
-        
+            pose_model_file = "Model_Pose2Sim.osim"
+
         unscaled_model_path = self.osim_setup_dir / pose_model_file
         if not unscaled_model_path:
             raise ValueError(f"Unscaled OpenSim model not found at: {unscaled_model_path}")
+
         markers_path = self.osim_setup_dir / self.pose_model.marker_file
         scaling_path = self.osim_setup_dir / self.pose_model.scaling_file
-        
-        right_left_symmetry = self.get('kinematics').get('right_left_symmetry')
-        remove_scaling_setup = self.get('kinematics').get('remove_individual_scaling_setup')
+
+        right_left_symmetry = self.kinematics.get("right_left_symmetry")
+        remove_scaling_setup = self.kinematics.get("remove_individual_scaling_setup")
 
         return geometry_path, unscaled_model_path, markers_path, scaling_path, right_left_symmetry, remove_scaling_setup
-    
+
     def get_performI_K_params(self):
+        '''
+        Returns IK (Inverse Kinematics) setup parameters.
+        '''
         ik_path = self.osim_setup_dir / self.pose_model.ik_file
-        remove_IK_setup = self.get('kinematics').get('remove_individual_ik_setup')
+        remove_IK_setup = self.kinematics.get("remove_individual_ik_setup")
 
         return ik_path, remove_IK_setup
-    
+
     def get_augment_markers_params(self):
-        project_dir = self.get('project').get('project_dir')
-        pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-        pathOutputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-        make_c3d = self.get('markerAugmentation').get('make_c3d')
-        subject_height = self.get('project').get('participant_height')
-        subject_mass = self.get('project').get('participant_mass')
-        
-        fastest_frames_to_remove_percent = self.get('kinematics').get('fastest_frames_to_remove_percent')
-        close_to_zero_speed = self.get('kinematics').get('close_to_zero_speed_m')
-        large_hip_knee_angles = self.get('kinematics').get('large_hip_knee_angles')
-        trimmed_extrema_percent = self.get('kinematics').get('trimmed_extrema_percent')
-        default_height = self.get('kinematics').get('default_height')
+        '''
+        Returns parameters needed for marker augmentation (LSTM-based).
+        '''
+        pathInputTRCFile = os.path.realpath(os.path.join(self.project_dir, "pose-3d"))
+        pathOutputTRCFile = os.path.realpath(os.path.join(self.project_dir, "pose-3d"))
+
+        make_c3d = self.markerAugmentation.get("make_c3d")
+
+        subject_height = self.project.get("participant_height")
+        subject_mass = self.project.get("participant_mass")
+
+        fastest_frames_to_remove_percent = self.kinematics.get("fastest_frames_to_remove_percent")
+        close_to_zero_speed = self.kinematics.get("close_to_zero_speed_m")
+        large_hip_knee_angles = self.kinematics.get("large_hip_knee_angles")
+        trimmed_extrema_percent = self.kinematics.get("trimmed_extrema_percent")
 
         augmenterDir = os.path.dirname(utilsDataman.__file__)
-        augmenterModelName = 'LSTM'
-        augmenter_model = 'v0.3'
+        augmenterModelName = "LSTM"
+        augmenter_model = "v0.3"
         offset = True
 
-        # Apply all trc files
-        all_trc_files = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if '_LSTM' not in f]
-        trc_no_filtering = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if
-                            '_LSTM' not in f and 'filt' not in f]
-        trc_filtering = [f for f in glob.glob(os.path.join(pathInputTRCFile, '*.trc')) if '_LSTM' not in f and 'filt' in f]
+        # Determine which TRC files to augment
+        all_trc_files = [
+            f for f in glob.glob(os.path.join(pathInputTRCFile, "*.trc")) if "_LSTM" not in f
+        ]
+        trc_no_filtering = [
+            f for f in all_trc_files if "filt" not in os.path.basename(f)
+        ]
+        trc_filtering = [
+            f for f in all_trc_files if "filt" in os.path.basename(f)
+        ]
 
         if len(all_trc_files) == 0:
-            raise ValueError('No trc files found.')
+            raise ValueError("No TRC files found.")
+
         if len(trc_filtering) > 0:
             trc_files = trc_filtering
         else:
             trc_files = trc_no_filtering
-        sorted(trc_files, key=natural_sort_key)
+        trc_files = sorted(trc_files, key=natural_sort_key)
 
-        if subject_height is None or subject_height == 0:
-            subject_height = [default_height] * len(trc_files)
-            logging.warning(f"No subject height found in Config.toml. Using default height of {default_height}m.")
-
-        if subject_mass is None or subject_mass == 0:
-            subject_mass = [70] * len(trc_files)
-            logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
-
-        return trc_files, fastest_frames_to_remove_percent, close_to_zero_speed, large_hip_knee_angles, trimmed_extrema_percent, default_height, augmenter_model, augmenterDir, augmenterModelName, pathInputTRCFile, pathOutputTRCFile, make_c3d, offset
+        return (
+            subject_height,
+            subject_mass,
+            trc_files,
+            fastest_frames_to_remove_percent,
+            close_to_zero_speed,
+            large_hip_knee_angles,
+            trimmed_extrema_percent,
+            augmenter_model,
+            augmenterDir,
+            augmenterModelName,
+            pathInputTRCFile,
+            pathOutputTRCFile,
+            make_c3d,
+            offset,
+        )
 
     def get_triangulation_params(self):
-        # Read config_dict
-        project_dir = self.get('project').get('project_dir')
-        # if batch
-        session_dir = self.session_dir
-        # if single trial
-        session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-        multi_person = self.get('project').get('multi_person')
-        frame_range = self.get('project').get('frame_range')
-        likelihood_threshold = self.get('triangulation').get('likelihood_threshold_triangulation')
-        interpolation_kind = self.get('triangulation').get('interpolation')
-        interp_gap_smaller_than = self.get('triangulation').get('interp_if_gap_smaller_than')
-        fill_large_gaps_with = self.get('triangulation').get('fill_large_gaps_with')
-        show_interp_indices = self.get('triangulation').get('show_interp_indices')
-        undistort_points = self.get('triangulation').get('undistort_points')
-        make_c3d = self.get('triangulation').get('make_c3d')
-        
+        '''
+        Returns parameters needed for triangulation.
+        '''
+
+        multi_person = self.project.get("multi_person")
+        likelihood_threshold = self.triangulation.get("likelihood_threshold_triangulation")
+        interpolation_kind = self.triangulation.get("interpolation")
+        interp_gap_smaller_than = self.triangulation.get("interp_if_gap_smaller_than")
+        fill_large_gaps_with = self.triangulation.get("fill_large_gaps_with")
+        show_interp_indices = self.triangulation.get("show_interp_indices")
+        undistort_points = self.triangulation.get("undistort_points")
+        make_c3d = self.triangulation.get("make_c3d")
+
         try:
-            calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
+            calib_file = glob.glob(os.path.join(self.calib_dir, "*.toml"))[0]
         except:
-            raise Exception(f'No .toml calibration direcctory found.')
-        try:
-            calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
-        except:
-            raise Exception(f'No .toml calibration file found in the {calib_dir}.')
-        pose_dir = os.path.join(project_dir, 'pose')
-        poseSync_dir = os.path.join(project_dir, 'pose-sync')
-        poseTracked_dir = os.path.join(project_dir, 'pose-associated')
-        error_threshold_triangulation = self.get('triangulation').get('reproj_error_threshold_triangulation')
-                
+            raise Exception(f"No .toml calibration file found in {self.calib_dir}.")
+
+        pose_dir = os.path.join(self.project_dir, "pose")
+        poseSync_dir = os.path.join(self.project_dir, "pose-sync")
+        poseTracked_dir = os.path.join(self.project_dir, "pose-associated")
+        error_threshold_triangulation = self.triangulation.get("reproj_error_threshold_triangulation")
+
         # Retrieve keypoints from model
         model = self.pose_model.load_model_instance()
 
-        return calib_file, model, pose_dir, poseSync_dir, poseTracked_dir, multi_person, frame_range, likelihood_threshold, interpolation_kind, interp_gap_smaller_than, fill_large_gaps_with, show_interp_indices, undistort_points, make_c3d, error_threshold_triangulation
+        return (
+            calib_file,
+            model,
+            pose_dir,
+            poseSync_dir,
+            poseTracked_dir,
+            multi_person,
+            likelihood_threshold,
+            interpolation_kind,
+            interp_gap_smaller_than,
+            fill_large_gaps_with,
+            show_interp_indices,
+            undistort_points,
+            make_c3d,
+            error_threshold_triangulation,
+        )
 
     def get_triangulation_from_best_cameras_params(self):
-        error_threshold_triangulation = self.get('triangulation').get('reproj_error_threshold_triangulation')
-        min_cameras_for_triangulation = self.get('triangulation').get('min_cameras_for_triangulation')
-        handle_LR_swap = self.get('triangulation').get('handle_LR_swap')
+        '''
+        Returns a tuple of parameters used for triangulation from the best cameras only.
+        '''
+        error_threshold_triangulation = self.triangulation.get("reproj_error_threshold_triangulation")
+        min_cameras_for_triangulation = self.triangulation.get("min_cameras_for_triangulation")
+        handle_LR_swap = self.triangulation.get("handle_LR_swap")
+        undistort_points = self.triangulation.get("undistort_points")
 
-        undistort_points = self.get('triangulation').get('undistort_points')
-
-        logging.info(f'Limb swapping was {"handled" if handle_LR_swap else "not handled"}.')
-        logging.info(f'Lens distortions were {"taken into account" if undistort_points else "not taken into account"}.')
+        logging.info(f"Limb swapping was {'handled' if handle_LR_swap else 'not handled'}.")
+        logging.info(f"Lens distortions were {'accounted for' if undistort_points else 'not accounted for'}.")
 
         return error_threshold_triangulation, min_cameras_for_triangulation, handle_LR_swap, undistort_points
-    
+
     def get_synchronization_params(self):
-        # Get parameters from Config.toml
-        project_dir = self.get('project').get('project_dir')
-        pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
-        pose_model = self.get('pose').get('pose_model')
-        # multi_person = config_dict.get('project').get('multi_person')
-        fps =  self.get('project').get('frame_rate')
-        frame_range = self.get('project').get('frame_range')
-        display_sync_plots = self.get('synchronization').get('display_sync_plots')
-        keypoints_to_consider = self.get('synchronization').get('keypoints_to_consider')
-        approx_time_maxspeed = self.get('synchronization').get('approx_time_maxspeed') 
-        time_range_around_maxspeed = self.get('synchronization').get('time_range_around_maxspeed')
-        synchronization_gui = self.get('synchronization').get('synchronization_gui')
+        """
+        Returns parameters for synchronization.
+        """
+        pose_dir = os.path.realpath(os.path.join(self.project_dir, "pose"))
+        fps = self.project.get("frame_rate")
+        display_sync_plots = self.synchronization.get("display_sync_plots")
+        keypoints_to_consider = self.synchronization.get("keypoints_to_consider")
+        approx_time_maxspeed = self.synchronization.get("approx_time_maxspeed")
+        time_range_around_maxspeed = self.synchronization.get("time_range_around_maxspeed")
+        synchronization_gui = self.synchronization.get("synchronization_gui")
 
-        likelihood_threshold = self.get('synchronization').get('likelihood_threshold')
-        filter_cutoff = int(self.get('synchronization').get('filter_cutoff'))
-        filter_order = int(self.get('synchronization').get('filter_order'))
+        likelihood_threshold = self.synchronization.get("likelihood_threshold")
+        filter_cutoff = int(self.synchronization.get("filter_cutoff", 0))
+        filter_order = int(self.synchronization.get("filter_order", 0))
 
-        # Determine frame rate
-        video_dir = os.path.join(project_dir, 'videos')
-        vid_img_extension = self['pose']['vid_img_extension']
+        # Determine frame rate from the first video if set to 'auto'
+        video_dir = os.path.join(self.project_dir, "videos")
+        vid_img_extension = self.pose_conf.get("vid_img_extension", "")
+        vid_or_img_files = glob.glob(os.path.join(video_dir, "*" + vid_img_extension))
 
-        vid_or_img_files = glob.glob(os.path.join(video_dir, '*' + vid_img_extension))
-        if not vid_or_img_files: # video_files is then img_dirs
-            image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
+        # If not video, check inside subdirectories
+        if not vid_or_img_files:
+            image_folders = [
+                f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))
+            ]
             for image_folder in image_folders:
-                vid_or_img_files.append(glob.glob(os.path.join(video_dir, image_folder, '*'+vid_img_extension)))
+                vid_or_img_files.extend(glob.glob(os.path.join(video_dir, image_folder, "*" + vid_img_extension)))
 
-        if fps == 'auto': 
+        if fps == "auto":
             try:
                 cap = cv2.VideoCapture(vid_or_img_files[0])
                 cap.read()
-                if cap.read()[0] == False:
-                    raise
+                if cap.read()[0] is False:
+                    raise ValueError("Could not read frame.")
                 fps = round(cap.get(cv2.CAP_PROP_FPS))
             except:
-                fps = 60  
-        lag_range = time_range_around_maxspeed*fps # frames
+                fps = 60
+
+        lag_range = time_range_around_maxspeed * fps
 
         # Retrieve keypoints from model
         model = self.pose_model.load_model_instance()
 
-        return pose_dir, fps, frame_range, display_sync_plots, keypoints_to_consider, approx_time_maxspeed, time_range_around_maxspeed, synchronization_gui, likelihood_threshold, filter_cutoff, filter_order, lag_range, model, vid_or_img_files
+        return (
+            pose_dir,
+            fps,
+            display_sync_plots,
+            keypoints_to_consider,
+            approx_time_maxspeed,
+            time_range_around_maxspeed,
+            synchronization_gui,
+            likelihood_threshold,
+            filter_cutoff,
+            filter_order,
+            lag_range,
+            model,
+            vid_or_img_files,
+        )
 
     def get_make_trc_params(self, f_range, id_person):
-        # Read config_dict
-        project_dir = self.get('project').get('project_dir')
-        multi_person = self.get('project').get('multi_person')
-        if multi_person:
-            seq_name = f'{os.path.basename(os.path.realpath(project_dir))}_P{id_person+1}'
-        else:
-            seq_name = f'{os.path.basename(os.path.realpath(project_dir))}'
-        pose3d_dir = os.path.join(project_dir, 'pose-3d')
+        '''
+        Returns the paths and info necessary to create a TRC file.
+        '''
+        multi_person = self.project.get("multi_person", False)
 
-        # Get frame_rate
-        video_dir = os.path.join(project_dir, 'videos')
-        vid_img_extension = self['pose']['vid_img_extension']
-        video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-        frame_rate = self.get('project').get('frame_rate')
-        if frame_rate == 'auto': 
+        if multi_person:
+            seq_name = f"{os.path.basename(os.path.realpath(self.project_dir))}_P{id_person+1}"
+        else:
+            seq_name = f"{os.path.basename(os.path.realpath(self.project_dir))}"
+
+        pose3d_dir = os.path.join(self.project_dir, "pose-3d")
+
+        # Determine frame rate
+        video_dir = os.path.join(self.project_dir, "videos")
+        vid_img_extension = self.pose_conf.get("vid_img_extension", "")
+        video_files = glob.glob(os.path.join(video_dir, "*" + vid_img_extension))
+        frame_rate = self._config.get("project", {}).get("frame_rate")
+        if frame_rate == "auto":
             try:
                 cap = cv2.VideoCapture(video_files[0])
                 cap.read()
-                if cap.read()[0] == False:
-                    raise
+                if cap.read()[0] is False:
+                    raise ValueError("Could not read frame.")
                 frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
             except:
                 frame_rate = 60
 
-        if not os.path.exists(pose3d_dir): os.mkdir(pose3d_dir)
-        
-        trc_f = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
-        
+        if not os.path.exists(pose3d_dir):
+            os.mkdir(pose3d_dir)
+
+        trc_f = f"{seq_name}_{f_range[0]}-{f_range[1]}.trc"
         trc_path = os.path.realpath(os.path.join(pose3d_dir, trc_f))
 
         return trc_path, trc_f, frame_rate
-    
-    def get_pose_estimation_params(self, f_range, id_person):
-        project_dir = self['project']['project_dir']
-        # if batch
-        session_dir = os.path.realpath(os.path.join(project_dir, '..'))
-        # if single trial
-        session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-        frame_range = self.get('project').get('frame_range')
-        multi_person = self.get('project').get('multi_person')
-        video_dir = os.path.join(project_dir, 'videos')
-        pose_dir = os.path.join(project_dir, 'pose')
 
-        mode = self['pose']['mode'] # lightweight, balanced, performance
-        vid_img_extension = self['pose']['vid_img_extension']
-        
-        output_format = self['pose']['output_format']
-        save_video = True if 'to_video' in self['pose']['save_video'] else False
-        save_images = True if 'to_images' in self['pose']['save_video'] else False
-        display_detection = self['pose']['display_detection']
-        overwrite_pose = self['pose']['overwrite_pose']
-        det_frequency = self['pose']['det_frequency']
-        tracking_mode = self.get('pose').get('tracking_mode')
-        deepsort_params = self.get('pose').get('deepsort_params')
+    def get_pose_estimation_params(self):
+        '''
+        Returns the parameters required for pose estimation.
+        '''
+        multi_person = self.project.get("multi_person")
+        video_dir = os.path.join(self.project_dir, "videos")
+        pose_dir = os.path.join(self.project_dir, "pose")
 
-        backend = self['pose']['backend']
-        device = self['pose']['device']
+        mode = self.pose.get("mode")  # e.g. lightweight, balanced, performance
+        vid_img_extension = self.pose.get("vid_img_extension")
+        output_format = self.pose.get("output_format")
+        save_video = "to_video" in self.pose.get("save_video", [])
+        save_images = "to_images" in self.pose.get("save_video", [])
+        display_detection = self.pose.get("display_detection")
+        overwrite_pose = self.pose.get("overwrite_pose")
+        det_frequency = self.pose.get("det_frequency")
+        tracking_mode = self.pose.get("tracking_mode")
+        deepsort_params = self.pose.get("deepsort_params")
+
+        backend = self.pose.get("backend")
+        device = self.pose.get("device")
 
         # Determine frame rate
-        video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-        frame_rate = self.get('project').get('frame_rate')
-        if frame_rate == 'auto': 
+        video_files = glob.glob(os.path.join(video_dir, "*" + vid_img_extension))
+        frame_rate = self.project.get("frame_rate")
+        if frame_rate == "auto":
             try:
                 cap = cv2.VideoCapture(video_files[0])
                 if not cap.isOpened():
-                    raise FileNotFoundError(f'Error: Could not open {video_files[0]}. Check that the file exists.')
+                    raise FileNotFoundError(
+                        f"Error: Could not open {video_files[0]}. Check that the file exists."
+                    )
                 frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
                 if frame_rate == 0:
                     frame_rate = 30
-                    logging.warning(f'Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps.')
+                    logging.warning(
+                        f"Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps."
+                    )
             except:
                 frame_rate = 30
 
-        
-        # Set detection frequency
-        if det_frequency>1:
-            logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points.')
-        elif det_frequency==1:
-            logging.info(f'Inference run on every single frame.')
+        if det_frequency > 1:
+            logging.info(
+                f"Inference is only run every {det_frequency} frames. In-between frames, pose estimation tracks previously detected points."
+            )
+        elif det_frequency == 1:
+            logging.info("Inference is run on every single frame.")
         else:
-            raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
-        
-        # Estimate pose
-        pose_listdirs_names = next(os.walk(pose_dir))[1]
-        os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
+            raise ValueError(
+                f"Invalid det_frequency: {det_frequency}. Must be an integer >= 1."
+            )
+
+        # Example usage check
+        try:
+            pose_listdirs_names = next(os.walk(pose_dir))[1]
+            _ = os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
+        except StopIteration:
+            pass
+
         if not overwrite_pose:
-            logging.info('Skipping pose estimation as it has already been done. Set overwrite_pose to true in Config.toml if you want to run it again.')
+            logging.info(
+                "Skipping pose estimation since it was already done. "
+                "Set 'overwrite_pose' to true in Config.toml to run again."
+            )
         else:
-            logging.info('Overwriting previous pose estimation. Set overwrite_pose to false in Config.toml if you want to keep the previous results.')
-            raise
+            logging.info(
+                "Overwriting previous pose estimation. "
+                "Set 'overwrite_pose' to false in Config.toml to keep the previous results."
+            )
+            raise  # Intentionally raise to demonstrate logic flow
 
-        return frame_rate, mode, output_format, save_video, save_images, display_detection, multi_person, det_frequency, frame_range, video_dir, vid_img_extension, det_frequency, tracking_mode, deepsort_params, backend, device
-
+        return (
+            frame_rate,
+            mode,
+            output_format,
+            save_video,
+            save_images,
+            display_detection,
+            multi_person,
+            det_frequency,
+            video_dir,
+            vid_img_extension,
+            det_frequency,
+            tracking_mode,
+            deepsort_params,
+            backend,
+            device,
+        )
 
     def get_person_association_params(self):
-        # Read config_dict
-        project_dir = self.get('project').get('project_dir')
-        # if single trial=
-        multi_person = self.get('project').get('multi_person')
-        tracked_keypoint = self.get('personAssociation').get('single_person').get('tracked_keypoint')
-        min_cameras_for_triangulation = self.get('triangulation').get('min_cameras_for_triangulation')
-        reconstruction_error_threshold = self.get('personAssociation').get('multi_person').get('reconstruction_error_threshold')
-        min_affinity = self.get('personAssociation').get('multi_person').get('min_affinity')
-        frame_range = self.get('project').get('frame_range')
-        undistort_points = self.get('triangulation').get('undistort_points')
-        error_threshold_tracking = self.get('personAssociation').get('single_person').get('reproj_error_threshold_association')
-        likelihood_threshold_association = self.get('personAssociation').get('likelihood_threshold_association')
+        '''
+        Returns parameters for person association (single or multi-person).
+        '''
+        project_dir = self.project_dir
+        multi_person = self.project.get("multi_person")
+
+        min_cameras_for_triangulation = self.triangulation.get("min_cameras_for_triangulation")
+        undistort_points = self.triangulation.get("undistort_points")
+
+        tracked_keypoint = self.personAssociation.get("single_person", {}).get("tracked_keypoint")
+        reconstruction_error_threshold = self.personAssociation.get("multi_person", {}).get("reconstruction_error_threshold")
+        min_affinity = self.personAssociation.get("multi_person", {}).get("min_affinity")
+        error_threshold_tracking = self.personAssociation.get("single_person", {}).get("reproj_error_threshold_association")
+        likelihood_threshold_association = self.personAssociation.get("likelihood_threshold_association")
+
         # Retrieve keypoints from model
         model = self.pose_model.load_model_instance()
 
         try:
-            calib_dir = [os.path.join(self.session_dir, c) for c in os.listdir(self.session_dir) if os.path.isdir(os.path.join(self.session_dir, c)) and  'calib' in c.lower()][0]
+            calib_dir = [
+                os.path.join(self.session_dir, c)
+                for c in os.listdir(self.session_dir)
+                if os.path.isdir(os.path.join(self.session_dir, c)) and "calib" in c.lower()
+            ][0]
         except:
-            raise Exception(f'No .toml calibration direcctory found.')
-        try:
-            calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
-        except:
-            raise Exception(f'No .toml calibration file found in the {calib_dir}.')
-        pose_dir = os.path.join(project_dir, 'pose')
-        poseSync_dir = os.path.join(project_dir, 'pose-sync')
-        poseTracked_dir = os.path.join(project_dir, 'pose-associated')
+            raise Exception("No calibration directory found.")
 
-        return project_dir, self.session_dir, calib_file, model, pose_dir, poseSync_dir, poseTracked_dir, multi_person, frame_range, reconstruction_error_threshold, min_affinity, tracked_keypoint, min_cameras_for_triangulation, error_threshold_tracking, likelihood_threshold_association, undistort_points
+        try:
+            calib_file = glob.glob(os.path.join(calib_dir, "*.toml"))[0]
+        except:
+            raise Exception(f"No .toml calibration file found in {calib_dir}.")
+
+        pose_dir = os.path.join(project_dir, "pose")
+        poseSync_dir = os.path.join(project_dir, "pose-sync")
+        poseTracked_dir = os.path.join(project_dir, "pose-associated")
+
+        return (
+            project_dir,
+            self.session_dir,
+            calib_file,
+            model,
+            pose_dir,
+            poseSync_dir,
+            poseTracked_dir,
+            multi_person,
+            reconstruction_error_threshold,
+            min_affinity,
+            tracked_keypoint,
+            min_cameras_for_triangulation,
+            error_threshold_tracking,
+            likelihood_threshold_association,
+            undistort_points,
+        )
+
+
 class Config:
     def __init__(self, config_input=None):
-        """
-        Initialise la configuration principale.
-        
-        Paramètres :
-          - config_input : soit un dictionnaire de configuration,
-                           soit le chemin vers le dossier contenant les fichiers Config.toml.
-                           Si None, le dossier courant est utilisé.
-        """
+        '''
+        Initializes the main configuration.
+
+        Arguments:
+          - config_input: Either a configuration dictionary,
+                          or the path to the folder containing Config.toml files.
+                          If None, the current folder is used.
+        '''
         self.config_input = config_input
         self.level, self.config_dicts = self._read_config_files(config_input)
         self.session_dir = self._determine_session_dir()
@@ -674,19 +924,22 @@ class Config:
             if "Config.toml" in files
         ]
         if not len_paths:
-            raise FileNotFoundError("Vous devez avoir un fichier Config.toml dans chaque dossier trial ou racine.")
+            raise FileNotFoundError("You must have a Config.toml file in each trial folder or root folder.")
         level = max(len_paths) - min(len_paths) + 1
         return level
 
     def _read_config_files(self, config_input):
         if isinstance(config_input, dict):
+            # Single config dictionary
             level = 2
             config_dicts = [config_input]
             if config_dicts[0].get("project", {}).get("project_dir") is None:
-                raise ValueError('Veuillez spécifier le répertoire du projet dans la configuration.')
+                raise ValueError("Please specify the project directory in the configuration.")
         else:
+            # config_input is a folder path or None
             config_dir = "." if config_input is None else config_input
             level = self._determine_level(config_dir)
+
             if level == 1:
                 try:
                     session_config = toml.load(os.path.join(config_dir, "..", "Config.toml"))
@@ -696,6 +949,7 @@ class Config:
                     session_config = toml.load(os.path.join(config_dir, "Config.toml"))
                 session_config.get("project", {}).update({"project_dir": config_dir})
                 config_dicts = [session_config]
+
             elif level == 2:
                 session_config = toml.load(os.path.join(config_dir, "Config.toml"))
                 config_dicts = []
@@ -704,13 +958,14 @@ class Config:
                         trial_config = toml.load(os.path.join(root, "Config.toml"))
                         temp = deepcopy(session_config)
                         temp = self._recursive_update(temp, trial_config)
-                        temp.get("project", {}).update({
-                            "project_dir": os.path.join(config_dir, os.path.relpath(root))
-                        })
-                        if not os.path.basename(root) in temp.get("project", {}).get("exclude_from_batch", []):
+                        temp.get("project", {}).update(
+                            {"project_dir": os.path.join(config_dir, os.path.relpath(root))}
+                        )
+                        if os.path.basename(root) not in temp.get("project", {}).get("exclude_from_batch", []):
                             config_dicts.append(temp)
             else:
-                raise ValueError("Niveau de configuration non supporté.")
+                raise ValueError("Unsupported configuration level.")
+
         return level, config_dicts
 
     def _determine_session_dir(self):
@@ -732,5 +987,7 @@ class Config:
             return os.path.realpath(os.getcwd())
 
     def __repr__(self):
-        return (f"Config(level={self.level}, nb_configs={len(self.config_dicts)}, "
-                f"session_dir='{self.session_dir}', use_custom_logging={self.use_custom_logging})")
+        return (
+            f"Config(level={self.level}, nb_configs={len(self.config_dicts)}, "
+            f"session_dir='{self.session_dir}', use_custom_logging={self.use_custom_logging})"
+        )

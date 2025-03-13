@@ -41,17 +41,14 @@ from scipy import signal
 from scipy import interpolate
 import json
 import os
-import glob
 import fnmatch
 import re
 import shutil
 from anytree import RenderTree
-from anytree.importer import DictImporter
 from matplotlib.widgets import TextBox, Button
 import logging
 
 from Pose2Sim.common import sort_stringlist_by_last_number, bounding_boxes
-from Pose2Sim.skeletons import *
 
 
 ## AUTHORSHIP INFORMATION

@@ -34,7 +34,6 @@ OUTPUTS:
 
 ## INIT
 import os
-import glob
 import fnmatch
 import re
 import numpy as np
@@ -49,9 +48,11 @@ from collections import Counter
 from anytree import RenderTree
 import logging
 
-from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
-    reprojection, euclidean_distance, sort_people_sports2d, \
+from Pose2Sim.common import (
+    retrieve_calib_params, computeP, weighted_triangulation,
+    reprojection, euclidean_distance, sort_people_sports2d,
     sort_stringlist_by_last_number, zup2yup, convert_to_c3d
+)
 from Pose2Sim.skeletons import *
 
 
