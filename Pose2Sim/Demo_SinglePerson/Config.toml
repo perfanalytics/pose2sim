@@ -25,41 +25,41 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 [[subjects]]
 id = 1
-height = auto
+height = "auto"
 mass = 70
 
 [[subjects]]
 id = 2
-height = auto
+height = "auto"
 mass = 55
 
 [[sources]]
 name = "image1"
-path = "/images_video1/"
+path = "images_video1/"
 extension = ".png"
 frame_rate = 60
 frame_range = []
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
 time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
-calib_intrinsic = "intrinsics/int_cam01_img/"
-calib_extrinsic = "extrinsincs/ext_cam01_img/"
+calib_intrinsics = "intrinsics/int_cam01_img/"
+calib_extrinsics = "extrinsincs/ext_cam01_img/"
 
 [[sources]]
 name = "video2"
-path = "/video2.mp4"
-frame_rate = auto
+path = "videos/cam02.mp4"
+frame_rate = "auto"
 frame_range = []
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
 time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
-calib_intrinsic = "intrinsics/int_cam02_img/"
-calib_extrinsic = "extrinsincs/ext_cam02_img/"
+calib_intrinsics = "intrinsics/int_cam02_img/"
+calib_extrinsics = "extrinsincs/ext_cam02_img/"
 
 [[sources]]
 name = "webcam3"
 path = 1 # webcam id
-frame_rate = auto
-calib_intrinsic = "intrinsics/int_cam03_img/"
-calib_extrinsic = "live"
+frame_rate = "auto"
+calib_intrinsics = "intrinsics/int_cam03_img/"
+calib_extrinsics = "live"
 
 ## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
@@ -138,7 +138,7 @@ filter_order = 4
 calibration_type = 'convert' # 'convert' or 'calculate'
 
    [calibration.convert]
-   convert_from = 'Calib.qca' # 'caliscope', 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
+   convert_from = 'Calib.qca.txt' # 'caliscope', 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
       [calibration.convert.caliscope]  # No parameter needed
       [calibration.convert.qualisys]
       binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2

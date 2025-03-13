@@ -21,6 +21,7 @@ import cv2
 import sys
 from pathlib import Path
 from copy import deepcopy
+import numpy as np
 
 from Pose2Sim.model import PoseModel
 from Pose2Sim.common import natural_sort_key
@@ -47,32 +48,40 @@ class SubConfig:
         subjects_data_list = self._config.get("subjects", [])
         subjects_list = []
         for sub_data in subjects_data_list:
-            subject_obj = Subject(sub_data)
+            subject_obj = Subject(self, sub_data)
             subjects_list.append(subject_obj)
         return subjects_list
     
     def sources(self):
-        """
-        Construit une liste d'objets Source à partir de la config TOML.
-        """
         sources_data_list = self._config.get("sources", [])
         sources_list = []
         for src_data in sources_data_list:
-            path_str = src_data.get("path", "")
-
-            if os.path.isdir(path_str):
-                source_obj =  ImageSource(self, src_data)
-
-            elif os.path.isfile(path_str):
-                source_obj =  VideoSource(self, src_data)
-
+            path_val = src_data.get("path", "")
+            if isinstance(path_val, int):
+                source_obj = WebcamSource(self, src_data)
             else:
-                try:
-                    int(path_str)
-                    source_obj =  WebcamSource(self, src_data)
-                except ValueError:
-                    raise ValueError(f"Unable to determine source type for path='{path_str}'. Not a numeric index, not a folder, not a file.")
-        sources_list.append(source_obj)
+                path_str = str(path_val)
+                abs_path = os.path.abspath(path_str)
+
+                if os.path.isdir(abs_path):
+                    source_obj = ImageSource(self, src_data)
+
+                elif os.path.isfile(abs_path):
+                    source_obj = VideoSource(self, src_data)
+
+                elif path_str.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
+                    logging.error(f"Video file '{path_str}' not found.")
+                    raise FileNotFoundError(f"Video file '{path_str}' not found.")
+
+                elif path_str.endswith(("/", "\\")):
+                    logging.error(f"Folder '{path_str}' not found.")
+                    raise FileNotFoundError(f"Folder '{path_str}' not found.")
+                
+                else:
+                    logging.error(f"Unable to create a source from '{path_str}'.")
+                    raise FileNotFoundError(f"Unable to create a source from '{path_str}'.")
+
+            sources_list.append(source_obj)
         return sources_list
 
     @property
@@ -110,10 +119,6 @@ class SubConfig:
     @property
     def calculate_extrinsics(self):
         return self.calibration.get("calculate", {}).get("extrinsics", {}).get("calculate_extrinsics")
-
-    @property
-    def extrinsics_dir(self):
-        return os.path.join(self.calib_dir, "extrinsics")
     
     @property
     def extract_every_N_sec(self):
@@ -134,40 +139,6 @@ class SubConfig:
     @property
     def intrinsics_square_size(self):
         return self.calibration.get("calculate", {}).get("intrinsics", {}).get("intrinsics_square_size") / 1000.0
-    
-    @property
-    def img_vid_files_list(self):
-        '''
-        Returns all parameters needed for intrinsics calibration.
-
-        Raises an exception if the 'intrinsics' folder is missing or has no files
-        matching the specified extension.
-        '''
-        try:
-            intrinsics_cam_listdirs_names = next(os.walk(os.path.join(self.calib_dir, "intrinsics")))[1]
-        except StopIteration:
-            logging.exception(f"Error: No {os.path.join(self.calib_dir, 'intrinsics')} folder found.")
-            raise Exception(f"Error: No {os.path.join(self.calib_dir, 'intrinsics')} folder found.")
-
-        intrinsics_extension = self.calibration.get("calculate", {}).get("intrinsics", {}).get("intrinsics_extension")
-
-        img_vid_files_list = []
-        for cam in intrinsics_cam_listdirs_names:
-            img_vid_files = glob.glob(
-                os.path.join(self.calib_dir, "intrinsics", cam, f"*.{intrinsics_extension}")
-            )
-            img_vid_files_list.append((cam, img_vid_files))
-            if len(img_vid_files) == 0:
-                logging.exception(
-                    f"The folder {os.path.join(self.calib_dir, 'intrinsics', cam)} "
-                    f"does not exist or has no files with extension .{intrinsics_extension}."
-                )
-                raise ValueError(
-                    f"The folder {os.path.join(self.calib_dir, 'intrinsics', cam)} "
-                    f"does not contain any .{intrinsics_extension} files."
-                )
-
-        return img_vid_files_list
     
     @property
     def calib_output_path(self):
@@ -263,6 +234,24 @@ class SubConfig:
         pose2sim_path = Path(sys.modules["Pose2Sim"].__file__).resolve().parent
         return pose2sim_path / "OpenSim_Setup"
 
+    def calibrate_sources(self):
+        calib = self.calib_file
+        if calib == None:
+            raise FileNotFoundError("No calibration file found.")
+        calib_data = toml.load(calib)
+        for source in self.sources:
+            if source.name in calib_data:
+                data = calib_data[source.name]
+                source.ret = 0.0
+                source.S = data['size']
+                source.K = np.array(data['matrix'])
+                source.D = data['distortions']
+                source.R = [0.0, 0.0, 0.0]
+                source.T = [0.0, 0.0, 0.0]
+            else :
+                logging.exception(f"The source {source.name} does not already have a calibration config.")
+                raise ValueError(f"The source {source.name} does not already have a calibration config.")
+
     def get_calibration_params(self):
         '''
         Extracts and returns calibration parameters from the configuration.
@@ -311,47 +300,50 @@ class SubConfig:
                 logging.info("\n--> No conversion required for Caliscope, AniPose, or FreeMocap. Calibration will be ignored.\n")
                 return None
             else:
-                raise NameError(f"File extension of {filename} not supported for conversion.")
+                raise NameError(f"File {filename} not supported for conversion.")
 
             calib_output_path = os.path.join(self.calib_dir, f"Calib_{convert_filetype}.toml")
             calib_type = f"{calib_type}_{convert_filetype}"
             args_calib = [self, convert_path, binning_factor]
 
         elif calib_type == "calculate":
+            for source in self.sources:
+                source.extrinsics_files = source.get_calib_files(source.calib_extrinsics, self.extrinsics_extension)
+                source.intrinsics_files = source.get_calib_files(source.calib_intrinsics, self.intrinsics_extension)
             calib_output_path = os.path.join(self.calib_dir, f"Calib_{self.extrinsics_method}.toml")
             args_calib = self
 
         else:
             logging.info("Invalid calibration_type in Config.toml")
+            return ValueError("Invalid calibration_type in Config.toml")
+
+        return calib_type, args_calib, calib_output_path
+
+    @property
+    def calib_file(self):
+        calib_file = glob.glob(os.path.join(self.calib_dir, "Calib*.toml"))
+        if len(calib_file) == 0:
+            logging.error("No calibration file found.")
             return None
+        if len(calib_file) > 1:
+            logging.error("Multiple calibration files found.")
+            raise ValueError("Multiple calibration files found.")
+        return calib_file[0]
 
-        return calib_output_path, calib_type, args_calib
-
-    def get_calib_calc_params(self):
-        '''
-        Extracts the parameters required for calibration (calculate) from the [calibration][calculate] section.
-
-        Returns a tuple:
-          - calculate_extrinsics (bool)
-          - use_existing_intrinsics (bool)
-          - calib_file (str or None)
-          - extrinsics_dir (str)
-        '''
+    @property
+    def overwrite_intrinsics(self):
         overwrite_intrinsics = self.calibration.get("calculate", {}).get("intrinsics", {}).get("overwrite_intrinsics", False)
 
-        # Look for an existing calibration file
-        calib_file_list = glob.glob(os.path.join(self.calib_dir, "Calib*.toml"))
-        use_existing_intrinsics = not overwrite_intrinsics and bool(calib_file_list)
-        calib_file = calib_file_list[0] if use_existing_intrinsics else None
+        use_existing_intrinsics = not overwrite_intrinsics and bool(self.calib_file)
 
         if use_existing_intrinsics:
-            logging.info(f"\nPreexisting calibration file found: '{calib_file}'.")
+            logging.info(f"\nPreexisting calibration file found: '{self.calib_file}'.")
             logging.info(
                 "\nRetrieving intrinsic parameters from file. "
                 'Set "overwrite_intrinsics" to true in Config.toml to recalculate them.'
             )
 
-        return use_existing_intrinsics, calib_file
+        return use_existing_intrinsics
 
     @property 
     def intrinsics_extension(self):
@@ -583,11 +575,6 @@ class SubConfig:
         undistort_points = self.triangulation.get("undistort_points")
         make_c3d = self.triangulation.get("make_c3d")
 
-        try:
-            calib_file = glob.glob(os.path.join(self.calib_dir, "*.toml"))[0]
-        except:
-            raise Exception(f"No .toml calibration file found in {self.calib_dir}.")
-
         pose_dir = os.path.join(self.project_dir, "pose")
         poseSync_dir = os.path.join(self.project_dir, "pose-sync")
         poseTracked_dir = os.path.join(self.project_dir, "pose-associated")
@@ -597,7 +584,6 @@ class SubConfig:
         model = self.pose_model.load_model_instance()
 
         return (
-            calib_file,
             model,
             pose_dir,
             poseSync_dir,
@@ -840,11 +826,6 @@ class SubConfig:
         except:
             raise Exception("No calibration directory found.")
 
-        try:
-            calib_file = glob.glob(os.path.join(calib_dir, "*.toml"))[0]
-        except:
-            raise Exception(f"No .toml calibration file found in {calib_dir}.")
-
         pose_dir = os.path.join(project_dir, "pose")
         poseSync_dir = os.path.join(project_dir, "pose-sync")
         poseTracked_dir = os.path.join(project_dir, "pose-associated")
@@ -852,7 +833,6 @@ class SubConfig:
         return (
             project_dir,
             self.session_dir,
-            calib_file,
             model,
             pose_dir,
             poseSync_dir,

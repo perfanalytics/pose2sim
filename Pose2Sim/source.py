@@ -15,37 +15,40 @@ import glob
 import cv2
 import logging
 
-from Pose2Sim.config import SubConfig
 
 class BaseSource(abc.ABC):
-    def __init__(self, config: SubConfig, data: dict):
+    def __init__(self, config, data: dict):
         self.config = config
+        self.data = data
         self.name = data.get("name")
-        self.frame_rate = data.get("frame_rate", "auto")
+        self.frame_rate = data.get("frame_rate")
 
-        self.extrinsic_files = self.get_calib_files(config.calib_dir, "calib_extrinsic", config.extrinsic_extension)
-        self.intrinsic_files = self.get_calib_files(config.calib_dir, "calib_intrinsic", config.intrinsic_extension)
+        self.extrinsics_files = {}
+        self.intrinsics_files = {}
+
+        self.calib_intrinsics = data.get("calib_intrinsics")
+        self.calib_extrinsics = data.get("calib_extrinsics")
 
         self.ret, self.C, self.S, self.D, self.K, self.R, self.T = [], [], [], [], [], [], []
 
-    def get_calib_files(self, calib_dir, key, extension):
-        # Construction du chemin du dossier
-        folder = os.path.join(calib_dir, self.data.get(key))
-        
+
+    def get_calib_files(self, key, extension):
+        folder = os.path.join(self.config.calib_dir, self.data.get(key))
+
         if not os.path.isdir(folder):
             logging.error(f"The folder '{folder}' does not exist.")
             raise ValueError(f"The folder '{folder}' does not exist.")
-        
+
         files = glob.glob(os.path.join(folder, f"*{extension}"))
         if not files:
             logging.exception(f"The folder {folder} does not contain any {extension} files.")
             raise ValueError(f"The folder {folder} does not contain any {extension} files.")
-        
+
         return files
 
 
     def extract_frames(self, calib_type='intrinsic'):
-        files = self.intrinsic_files if calib_type == 'intrinsic' else self.extrinsic_files
+        files = self.intrinsics_files if calib_type == 'intrinsic' else self.extrinsics_files
 
         video_path = files[0]
 
@@ -58,9 +61,9 @@ class BaseSource(abc.ABC):
         if new_files and not self.config.overwrite_extraction:
             logging.info("Frames have already been extracted and overwrite_extraction is False.")
             if calib_type == 'intrinsic':
-                self.intrinsic_files = new_files
+                self.intrinsics_files = new_files
             else:
-                self.extrinsic_files = new_files
+                self.extrinsics_files = new_files
             return
 
         try:
@@ -94,9 +97,9 @@ class BaseSource(abc.ABC):
         new_files = glob.glob(pattern)
         new_files.sort()
         if calib_type == 'intrinsic':
-            self.intrinsic_files = new_files
+            self.intrinsics_files = new_files
         else:
-            self.extrinsic_files = new_files
+            self.extrinsics_files = new_files
 
     @abc.abstractmethod
     def determine_frame_rate(self):
@@ -106,46 +109,33 @@ class WebcamSource(BaseSource):
     def __init__(self, subconfig, data: dict):
         super().__init__(subconfig, data)
         self.camera_index = data.get("path", 0)
-        self.frame_rate = self.determine_frame_rate()
 
     def determine_frame_rate(self):
-        if self.frame_rate_config != "auto":
+        if self.frame_rate_config == "auto":
+            return None
+        else:
             return self.frame_rate_config
-        return 30
 
 class VideoSource(BaseSource):
     def __init__(self, subconfig, data: dict):
         super().__init__(subconfig, data)
         self.video_path = data.get("path")
-        self.frame_rate = self.determine_frame_rate()
 
     def determine_frame_rate(self):
-        if self.frame_rate_config != "auto":
-            return self.frame_rate_config
-
-        if os.path.isfile(self.video_path):
-            cap = cv2.VideoCapture(self.video_path)
-            if cap.isOpened():
-                fps = cap.get(cv2.CAP_PROP_FPS)
-                return round(fps) if fps > 0 else 30
+        if self.frame_rate != "auto":
+            return None
         else:
-            video_files = glob.glob(os.path.join(self.video_path, "*.mp4"))
-            if video_files:
-                cap = cv2.VideoCapture(video_files[0])
-                if cap.isOpened():
-                    fps = cap.get(cv2.CAP_PROP_FPS)
-                    return round(fps) if fps > 0 else 30
-        return 30
+            return self.frame_rate
 
 class ImageSource(BaseSource):
     def __init__(self, subconfig, data: dict):
         super().__init__(subconfig, data)
         self.image_dir = data.get("path")
         self.image_extension = data.get("extension", "*.png")
-        self.frame_rate = self.determine_frame_rate()
 
     def determine_frame_rate(self):
-        if self.frame_rate_config != "auto":
-            return self.frame_rate_config
-        return 10
+        if self.frame_rate == "auto":
+            return 60
+        else:
+            return self.frame_rate
 

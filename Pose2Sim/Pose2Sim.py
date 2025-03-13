@@ -44,9 +44,9 @@ Pose2Sim.kinematics()
 
 import os
 import time
-import logging
+import logging, logging.handlers
 from datetime import datetime
-from config import Config
+from Pose2Sim.config import Config
 
 # AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"

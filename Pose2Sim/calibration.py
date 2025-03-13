@@ -38,9 +38,6 @@ import numpy as np
 import pandas as pd
 os.environ["OPENCV_LOG_LEVEL"]="FATAL"
 import cv2
-import glob
-import toml
-import re
 from lxml import etree
 import warnings
 import matplotlib.pyplot as plt
@@ -433,20 +430,7 @@ def calib_calc_fun(config):
 
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
     if use_existing_intrinsics:
-        calib_data = toml.load(calib_file)
-        for source in config.sources:
-            if source.name in calib_data:
-                data = calib_data[source.name]
-                source.ret = 0.0
-                source.S = data['size']
-                source.K = np.array(data['matrix'])
-                source.D = data['distortions']
-                source.R = [0.0, 0.0, 0.0]
-                source.T = [0.0, 0.0, 0.0]
-            else :
-                logging.exception(f"The source {source.name} does not already have a intrinsics config.")
-                raise ValueError(f"The source {source.name} does not already have a intrinsics config.")
-
+        config.calibrate_sources()
     
     # calculate intrinsics otherwise
     else:
@@ -1013,7 +997,7 @@ def trc_write(object_coords_3d, trc_path):
     return trc_path
 
 
-def toml_write(config, calib_path):
+def toml_write(config, calib_output_path):
     '''
     Writes calibration parameters to a .toml file
 
@@ -1030,7 +1014,7 @@ def toml_write(config, calib_path):
     - a .toml file cameras calibrations
     '''
 
-    with open(calib_path, 'w+') as cal_f:
+    with open(calib_output_path, 'w+') as cal_f:
         for source in config.sources:
             cam = f'[{source.name}]\n'
             name = f'name = "{source.name}"\n'
@@ -1043,7 +1027,6 @@ def toml_write(config, calib_path):
             cal_f.write(cam + name + size + mat + dist + rot + tran + fish)
         meta = '[metadata]\nadjusted = false\nerror = 0.0\n'
         cal_f.write(meta)
-
 
 
 def recap_calibrate(config, calib_full_type):
@@ -1090,7 +1073,7 @@ def calibrate_cams_all(config):
     '''
 
     # Read config_dict
-    calib_output_path, calib_type, args_calib = config.get_calibration_params()
+    calib_type, args_calib, calib_output_path = config.get_calibration_params()
 
     # Map calib function
     calib_mapping = {
@@ -1108,9 +1091,9 @@ def calibrate_cams_all(config):
     calib_fun(*args_calib)
 
     # Write calibration file
-    toml_write(calib_output_path)
+    toml_write(config, calib_output_path)
 
     # Recap message
-    recap_calibrate(calib_output_path, calib_type)
-
+    recap_calibrate(config, calib_type)
+    
     logging.info(f'Calibration file is stored at {calib_output_path}.')
