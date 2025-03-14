@@ -35,7 +35,7 @@ mass = 55
 
 [[sources]]
 name = "image1"
-path = "images_video1/"
+path = "videos/cam01.mp4"
 extension = ".png"
 frame_rate = 60
 frame_range = []

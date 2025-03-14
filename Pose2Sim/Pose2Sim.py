@@ -90,12 +90,10 @@ class Pose2SimPipeline:
 
         sub_config = self.config.sub_configs[0]
 
-        calib_dir = sub_config.calib_dir
-
         logging.info("\n---------------------------------------------------------------------")
         logging.info("Camera calibration")
         logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info(f"Calibration directory: {calib_dir}")
+        logging.info(f"Calibration directory: {sub_config.calib_dir}")
         logging.info("---------------------------------------------------------------------\n")
 
         start = time.time()

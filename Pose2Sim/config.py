@@ -19,15 +19,17 @@ import logging
 import toml
 import cv2
 import sys
+import pandas as pd
 from pathlib import Path
 from copy import deepcopy
 import numpy as np
 
 from Pose2Sim.model import PoseModel
-from Pose2Sim.common import natural_sort_key
+from Pose2Sim.common import natural_sort_key, zup2yup
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.source import WebcamSource, ImageSource, VideoSource
 from Pose2Sim.subject import Subject
+from Pose2Sim.calibration import QcaCalibration, OptitrackCalibration, ViconCalibration, EasyMocapCalibration, BiocvCalibration, OpencapCalibration, CheckerboardCalibration
 
 
 class SubConfig:
@@ -246,7 +248,25 @@ class SubConfig:
                 source.R = [0.0, 0.0, 0.0]
                 source.T = [0.0, 0.0, 0.0]
             else :
-                logging.info(f"The source {source.name} does not already have a calibration config.")
+                logging.info(f"[{source.name}] No existing calibration found.")
+
+    @property
+    def object_coords_3d(self):
+        if self.extrinsics_method in {'board', 'scene'}:
+            # Define 3D object points
+            if self.extrinsics_method == 'board':
+                object_coords_3d = np.zeros((self.extrinsics_corners_nb[0] * self.extrinsics_corners_nb[1], 3), np.float32)
+                object_coords_3d[:, :2] = np.mgrid[0:self.extrinsics_corners_nb[0], 0:self.extrinsics_corners_nb[1]].T.reshape(-1, 2)
+                object_coords_3d[:, :2] = object_coords_3d[:, 0:2] * self.extrinsics_square_size
+                return object_coords_3d
+            elif self.extrinsics_method == 'scene':
+                return object_coords_3d
+
+            elif self.extrinsics_method == 'keypoints':
+                raise NotImplementedError('This has not been integrated yet.')
+
+        else:
+            raise ValueError('Wrong value for extrinsics_method')
 
     def get_calibration_params(self):
         '''
@@ -262,6 +282,8 @@ class SubConfig:
         calib_type = self.calibration.get("calibration_type")
         overwrite_intrinsics = self.calibration.get("calculate", {}).get("intrinsics", {}).get("overwrite_intrinsics", False)
         overwrite_extrinsics = True
+
+        convert_path = None
 
         if calib_type == "convert":
             convert_path = self.calibration.get("convert", {}).get("convert_from")
@@ -282,70 +304,64 @@ class SubConfig:
         else:
             data = {}
 
+        extrinsinc = False
         for source in self.sources:
-            if not overwrite_intrinsics and source.S and source.D and source.K:
+            if not overwrite_intrinsics and len(source.S) != 0 and len(source.D) != 0 and len(source.K) != 0:
                 logging.info(
-                    f"[{source.name} - intrinsic] Preexisting intrinsic calibration found in '{self.calib_file}'."
+                    f"[{source.name} - intrinsic] Intrinsic calibration loaded from '{os.path.relpath(self.calib_file)}'."
                 )
                 logging.info(
                     'To recalculate, set "overwrite_intrinsics" to true in Config.toml.'
                 )
             else:
                 if calib_type == "convert":
-                    source.intrinsics_files = filename
+                    source.intrinsics_files = convert_path
                 elif calib_type == "calculate":
                     source.intrinsics_files = source.get_calib_files(source.calib_intrinsics, self.intrinsics_extension, "intrinsics")
 
-            if not overwrite_extrinsics and source.R and source.T:
+            if not overwrite_extrinsics and len(source.R) != 0 and len(source.T) != 0:
                 logging.info(
-                    f"[{source.name} - entrinsic] Preexisting extrinsic calibration found in '{self.calib_file}'."
+                    f"[{source.name} - entrinsic] Extrinsic calibration loaded from '{os.path.relpath(self.calib_file)}'."
                 )
                 logging.info(
                     'To recalculate, set "overwrite_extrinsics" to true in Config.toml.'
                 )
             else:
+                extrinsinc = True
                 if calib_type == "convert":
-                    source.extrinsics_files = filename
+                    source.extrinsics_files = convert_path
                 elif calib_type == "calculate":
                     source.extrinsics_files = source.get_calib_files(source.calib_extrinsics, self.extrinsics_extension, "extrinsics")
 
         if calib_type == "convert":
             if filename.endswith(".qca.txt"):
-                convert_filetype = "qualisys"
-                binning_factor = self.calibration.get("convert", {}).get("qualisys", {}).get("binning_factor", 1)
+                calibration = QcaCalibration(self, self.calibration.get("convert", {}).get("qualisys", {}).get("binning_factor", 1))
             elif filename.endswith(".xcp"):
-                convert_filetype = "vicon"
-                binning_factor = 1
+                calibration = ViconCalibration(self, 1)
             elif filename.endswith(".pickle"):
-                convert_filetype = "opencap"
-                binning_factor = 1
+                calibration = OpencapCalibration(self, 1)
             elif filename.endswith(".yml"):
-                convert_filetype = "easymocap"
-                binning_factor = 1
+                calibration = EasyMocapCalibration(self, 1)
             elif filename.endswith(".calib"):
-                convert_filetype = "biocv"
-                binning_factor = 1
+                calibration = BiocvCalibration(self, 1)
             elif filename.endswith(".csv"):
-                convert_filetype = "optitrack"
-                binning_factor = 1
+                calibration = OptitrackCalibration(self, 1)
             elif any(filename.endswith(ext) for ext in [".anipose", ".freemocap", ".caliscope"]):
                 logging.info("\n--> No conversion required for Caliscope, AniPose, or FreeMocap. Calibration will be ignored.\n")
                 return None
             else:
                 raise NameError(f"File {filename} not supported for conversion.")
 
-            calib_type = f"{calib_type}_{convert_filetype}"
-            args_calib = [self, convert_path, binning_factor]
-
         elif calib_type == "calculate":
-            args_calib = [self]
+            if extrinsinc:
+                trc_write(self.object_coords_3d, self.calib_output_path)
+            calibration = CheckerboardCalibration(self, None)
 
         else:
             logging.info("Invalid calibration_type in Config.toml")
             return ValueError("Invalid calibration_type in Config.toml")
 
-
-        return calib_type, args_calib, data
+        return data, calibration, convert_path
 
     @property
     def calib_file(self):
@@ -960,3 +976,41 @@ class Config:
             f"Config(level={self.level}, nb_configs={len(self.config_dicts)}, "
             f"session_dir='{self.session_dir}', use_custom_logging={self.use_custom_logging})"
         )
+    
+def trc_write(object_coords_3d, trc_path):
+    '''
+    Make Opensim compatible trc file from a dataframe with 3D coordinates
+
+    INPUT:
+    - object_coords_3d: list of 3D point lists
+    - trc_path: output path of the trc file
+
+    OUTPUT:
+    - trc file with 2 frames of the same 3D points
+    '''
+
+    #Header
+    DataRate = CameraRate = OrigDataRate = 1
+    NumFrames = 2
+    NumMarkers = len(object_coords_3d)
+    keypoints_names = np.arange(NumMarkers)
+    header_trc = ['PathFileType\t4\t(X/Y/Z)\t' + os.path.basename(trc_path), 
+            'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames', 
+            '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, NumFrames])),
+            'Frame#\tTime\t' + '\t\t\t'.join(str(k) for k in keypoints_names) + '\t\t',
+            '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(NumMarkers)])]
+    
+    # Zup to Yup coordinate system
+    object_coords_3d = pd.DataFrame([np.array(object_coords_3d).flatten(), np.array(object_coords_3d).flatten()])
+    object_coords_3d = zup2yup(object_coords_3d)
+    
+    #Add Frame# and Time columns
+    object_coords_3d.index = np.array(range(0, NumFrames)) + 1
+    object_coords_3d.insert(0, 't', object_coords_3d.index / DataRate)
+
+    #Write file
+    with open(trc_path, 'w') as trc_o:
+        [trc_o.write(line+'\n') for line in header_trc]
+        object_coords_3d.to_csv(trc_o, sep='\t', index=True, header=None, lineterminator='\n')
+
+    return trc_path
