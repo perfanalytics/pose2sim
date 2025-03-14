@@ -32,8 +32,8 @@ class BaseSource(abc.ABC):
         self.ret, self.C, self.S, self.D, self.K, self.R, self.T = [], [], [], [], [], [], []
 
 
-    def get_calib_files(self, key, extension):
-        folder = os.path.join(self.config.calib_dir, self.data.get(key))
+    def get_calib_files(self, folder, extension):
+        folder = os.path.join(self.config.calib_dir, folder)
 
         if not os.path.isdir(folder):
             logging.error(f"The folder '{folder}' does not exist.")
@@ -76,8 +76,8 @@ class BaseSource(abc.ABC):
         
         fps = cap.get(cv2.CAP_PROP_FPS)
         if fps == 0:
-            logging.error("FPS is 0, cannot extract frames.")
             cap.release()
+            logging.error("FPS is 0, cannot extract frames.")
             raise ValueError("FPS is 0, cannot extract frames.")
         fps = round(fps)
 

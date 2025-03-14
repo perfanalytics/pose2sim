@@ -29,7 +29,7 @@ OUTPUTS:
 
 
 ## INIT
-from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort_key, zup2yup
+from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, zup2yup
 
 import os
 import toml
@@ -88,13 +88,14 @@ def calib_qca_fun(config, file_to_convert_path, binning_factor=1):
     
     # Camera name
     for i, tag in enumerate(camera_tags):
-        ret_value = float(tag.attrib.get('avg-residual'))
         name = tag.attrib.get('serial')
 
         source = next((s for s in config.sources if s.name == name), None)
         if source is None:
             logging.warning(f"No source found for config: '{name}'.")
             continue
+
+        source.ret = float(tag.attrib.get('avg-residual'))
 
         video_res = tag.attrib.get('video_resolution')
 
@@ -104,31 +105,25 @@ def calib_qca_fun(config, file_to_convert_path, binning_factor=1):
         fov_tag = fov_tags[i]
         w = (float(fov_tag.attrib.get('right')) - float(fov_tag.attrib.get('left')) + 1) / binning_factor / (1080 / res_value)
         h = (float(fov_tag.attrib.get('bottom')) - float(fov_tag.attrib.get('top')) + 1) / binning_factor / (1080 / res_value)
-        S_value = [w, h]
+        source.S = np.array([w, h], dtype=np.float32)
 
-        # Intrinsic parameters: distorsion and intrinsic matrix
-        intrinsic_tag = intrinsic_tags[i]
-        k1 = float(intrinsic_tag.get('radialDistortion1')) / 64 / binning_factor
-        k2 = float(intrinsic_tag.get('radialDistortion2')) / 64 / binning_factor
-        p1 = float(intrinsic_tag.get('tangentalDistortion1')) / 64 / binning_factor
-        p2 = float(intrinsic_tag.get('tangentalDistortion2')) / 64 / binning_factor
-        D_value = np.array([k1, k2, p1, p2])
-        
+        # Intrinsic parameters: distortion and intrinsic matrix
         fu = float(intrinsic_tag.get('focalLengthU')) / 64 / binning_factor / (1080 / res_value)
         fv = float(intrinsic_tag.get('focalLengthV')) / 64 / binning_factor / (1080 / res_value)
         left_val = float(fov_tag.attrib.get('left'))
         top_val = float(fov_tag.attrib.get('top'))
         cu = (float(intrinsic_tag.get('centerPointU')) / 64 / binning_factor - left_val) / (1080 / res_value)
         cv = (float(intrinsic_tag.get('centerPointV')) / 64 / binning_factor - top_val) / (1080 / res_value)
-        K_value = np.array([fu, 0., cu, 0., fv, cv, 0., 0., 1.]).reshape(3, 3)
+        source.K = np.array([fu, 0., cu, 0., fv, cv, 0., 0., 1.], dtype=np.float32).reshape(3, 3)
+
+        intrinsic_tag = intrinsic_tags[i]
+        k1 = float(intrinsic_tag.get('radialDistortion1')) / 64 / binning_factor
+        k2 = float(intrinsic_tag.get('radialDistortion2')) / 64 / binning_factor
+        p1 = float(intrinsic_tag.get('tangentalDistortion1')) / 64 / binning_factor
+        p2 = float(intrinsic_tag.get('tangentalDistortion2')) / 64 / binning_factor
+        source.D = np.array([k1, k2, p1, p2], dtype=np.float32)
 
         # Extrinsic parameters: rotation matrix and translation vector
-        transform_tag = transform_tags[i]
-        tx = float(transform_tag.get('x')) / 1000
-        ty = float(transform_tag.get('y')) / 1000
-        tz = float(transform_tag.get('z')) / 1000
-        T_value = np.array([tx, ty, tz])
-        
         r11 = float(transform_tag.get('r11'))
         r12 = float(transform_tag.get('r12'))
         r13 = float(transform_tag.get('r13'))
@@ -138,19 +133,18 @@ def calib_qca_fun(config, file_to_convert_path, binning_factor=1):
         r31 = float(transform_tag.get('r31'))
         r32 = float(transform_tag.get('r32'))
         r33 = float(transform_tag.get('r33'))
-        R_value = np.array([r11, r12, r13, r21, r22, r23, r31, r32, r33]).reshape(3, 3).T
+        R_value = np.array([r11, r12, r13, r21, r22, r23, r31, r32, r33], dtype=np.float32).reshape(3, 3).T
+
+        transform_tag = transform_tags[i]
+        tx = float(transform_tag.get('x')) / 1000
+        ty = float(transform_tag.get('y')) / 1000
+        tz = float(transform_tag.get('z')) / 1000
+        T_value = np.array([tx, ty, tz], dtype=np.float32)
 
         r_transf, t_transf = world_to_camera_persp(R_value, T_value)
         r_transf, t_transf = rotate_cam(r_transf, t_transf, ang_x=np.pi, ang_y=0, ang_z=0)
-        r_final = np.array(cv2.Rodrigues(r_transf)[0]).flatten()
-        t_final = t_transf
-
-        source.ret = ret_value
-        source.S = S_value
-        source.D = D_value
-        source.K = K_value
-        source.R = r_final
-        source.T = t_final
+        source.R = cv2.Rodrigues(r_transf.astype(np.float32))[0].flatten()
+        source.T = t_transf.astype(np.float32)
 
 
 def calib_optitrack_fun(config, file_to_convert_path, binning_factor=1):
@@ -212,18 +206,18 @@ def calib_vicon_fun(config, file_to_convert_path, binning_factor=1):
         source.S = [float(t) for t in cam_elem.attrib.get('SENSOR_SIZE').split()]
         
         # Intrinsic parameters: distorsion and intrinsic matrix
-        try:
-            dist = keyframe.attrib.get('VICON_RADIAL2').split()[3:5]
-        except Exception:
-            dist = keyframe.attrib.get('VICON_RADIAL').split()
-        source.D = [float(d) for d in dist] + [0.0, 0.0]
-        
         fu = float(keyframe.attrib.get('FOCAL_LENGTH'))
         pixel_aspect = float(cam_elem.attrib.get('PIXEL_ASPECT_RATIO'))
         fv = fu / pixel_aspect
         cam_center = keyframe.attrib.get('PRINCIPAL_POINT').split()
         cu, cv = [float(c) for c in cam_center]
         source.K = np.array([fu, 0., cu, 0., fv, cv, 0., 0., 1.]).reshape(3, 3)
+
+        try:
+            dist = keyframe.attrib.get('VICON_RADIAL2').split()[3:5]
+        except Exception:
+            dist = keyframe.attrib.get('VICON_RADIAL').split()
+        source.D = [float(d) for d in dist] + [0.0, 0.0]
         
         # Extrinsic parameters: rotation matrix and translation vector
         rot = keyframe.attrib.get('ORIENTATION').split()
@@ -258,10 +252,10 @@ def read_intrinsic_yml(config, intrinsic_path):
             logging.warning(f"No source found for config: '{name}'.")
             continue
 
-        K_mat = intrinsic_yml.getNode(f'K_{name}').mat()
-        source.K = K_mat
-        source.D = intrinsic_yml.getNode(f'dist_{name}').mat().flatten()[:-1]
-        source.S = [K_mat[0, 2] * 2, K_mat[1, 2] * 2]
+    K_mat = intrinsic_yml.getNode(f'K_{name}').mat().astype(float)
+    source.S = [float(K_mat[0, 2]) * 2, float(K_mat[1, 2]) * 2]
+    source.K = K_mat
+    source.D = intrinsic_yml.getNode(f'dist_{name}').mat().astype(float).flatten()[:-1]
 
 
 def read_extrinsic_yml(config, extrinsic_path):
@@ -282,8 +276,8 @@ def read_extrinsic_yml(config, extrinsic_path):
             logging.warning(f"No source found for config: '{name}'.")
             continue
 
-        source.R = extrinsic_yml.getNode(f'R_{name}').mat().flatten()
-        source.T = extrinsic_yml.getNode(f'T_{name}').mat().flatten()
+        source.R = extrinsic_yml.getNode(f'R_{name}').mat().astype(float).flatten()
+        source.T = extrinsic_yml.getNode(f'T_{name}').mat().astype(float).flatten()
         source.ret = np.nan
 
 
@@ -341,14 +335,13 @@ def calib_biocv_fun(config, files_to_convert_paths, binning_factor=1):
                 logging.warning(f".")
                 continue
 
-            source.ret = np.nan
-            source.S = [int(calib_data[0]), int(calib_data[1])]
-            source.D = [float(d) for d in calib_data[-2].split(' ')[:4]]
-            source.K = np.array([k.strip().split(' ') for k in calib_data[2:5]], np.float32)
-            
-            RT = np.array([k.strip().split(' ') for k in calib_data[6:9]], np.float32)
-            source.R = cv2.Rodrigues(RT[:, :3])[0].squeeze()
-            source.T = RT[:, 3] / 1000
+            source.S = [float(calib_data[0]), float(calib_data[1])]
+            source.K = np.array([list(map(float, k.strip().split(' '))) for k in calib_data[2:5]], dtype=np.float32)
+            source.D = np.array([float(d) for d in calib_data[-2].split(' ')[:4]], dtype=np.float32)
+
+            RT = np.array([list(map(float, k.strip().split(' '))) for k in calib_data[6:9]], dtype=np.float32)
+            source.R = cv2.Rodrigues(RT[:, :3])[0].squeeze().astype(np.float32)
+            source.T = (RT[:, 3] / 1000).astype(np.float32)
 
 
 
@@ -387,12 +380,12 @@ def calib_opencap_fun(config, files_to_convert_paths, binning_factor=1):
                 continue
 
             source.ret = np.nan
-            source.S = list(calib_data['imageSize'].squeeze()[::-1])
-            source.D = list(calib_data['distortion'][0][:-1])
-            source.K = calib_data['intrinsicMat']
+            source.S = list(map(float, calib_data['imageSize'].squeeze()[::-1]))
+            source.D = list(map(float, calib_data['distortion'][0][:-1]))
+            source.K = calib_data['intrinsicMat'].astype(np.float32)
 
-            R_cam = calib_data['rotation']
-            T_cam = calib_data['translation'].squeeze()
+            R_cam = calib_data['rotation'].astype(np.float32)
+            T_cam = calib_data['translation'].squeeze().astype(np.float32)
 
             # Rotate cameras by Pi/2 around x in world frame -> could have just switched some columns in matrix
             # camera frame to world frame
@@ -401,10 +394,11 @@ def calib_opencap_fun(config, files_to_convert_paths, binning_factor=1):
             R_w_90, T_w_90 = rotate_cam(R_w, T_w, ang_x=-np.pi/2, ang_y=0, ang_z=np.pi)
             # world frame to camera frame
             R_c_90, T_c_90 = world_to_camera_persp(R_w_90, T_w_90)
+
             # store in R and T
-            source.R = cv2.Rodrigues(R_c_90)[0].squeeze()
-            source.T = T_cam / 1000
-    
+            source.R = cv2.Rodrigues(R_c_90.astype(np.float32))[0].squeeze()
+            source.T = (T_cam / 1000).astype(np.float32)
+
 
 def calib_calc_fun(config):
     '''
@@ -427,10 +421,8 @@ def calib_calc_fun(config):
     - T: extrinsic translation: list of arrays of floats
     '''
 
-    use_existing_intrinsics, calib_file = config.get_calib_calc_params()
-
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
-    if use_existing_intrinsics:
+    if config.use_existing_intrinsics:
         config.calibrate_sources()
     
     # calculate intrinsics otherwise
@@ -495,10 +487,10 @@ def calibrate_intrinsics(config):
                                     None, None, flags=(cv2.CALIB_FIX_K3+cv2.CALIB_USE_LU))# + cv2.CALIB_FIX_PRINCIPAL_POINT))
         h, w = [np.float32(i) for i in img.shape[:-1]]
         source.ret = ret_cam
-        source.S = [w, h]
-        source.K = dist[0]
-        source.D = mtx
-        
+        source.S = [float(w), float(h)]
+        source.K = np.array(dist[0], dtype=np.float32)
+        source.D = np.array(mtx, dtype=np.float32)
+
         logging.info(f'Intrinsics error: {np.around(ret_cam, decimals=3)} px for each cameras.')
 
 
@@ -554,9 +546,10 @@ def calibrate_extrinsics(config):
 
             # Calculate extrinsics
             mtx, dist = np.array(source.K), np.array(source.D)
-            _, r, t = cv2.solvePnP(np.array(objp)*1000, imgp, mtx, dist)
-            r, t = r.flatten(), t.flatten()
-            t /= 1000 
+            _, r, t = cv2.solvePnP(np.array(objp, dtype=np.float32) * 1000, imgp, np.array(mtx, dtype=np.float32), np.array(dist, dtype=np.float32))
+
+            source.R = r.flatten().astype(np.float32)
+            source.T = (t.flatten() / 1000).astype(np.float32)
 
             # Projection of object points to image plane
             # # Former way, distortions used to be ignored
@@ -592,8 +585,6 @@ def calibrate_extrinsics(config):
             imgp_to_objreproj_dist = [euclidean_distance(proj_obj[n], imgp[n]) for n in range(len(proj_obj))]
             rms_px = np.sqrt(np.sum([d**2 for d in imgp_to_objreproj_dist]))
             source.ret = rms_px
-            source.R = r
-            source.T = t
 
     elif config.extrinsics_method == 'keypoints':
         raise NotImplementedError('This has not been integrated yet.')
@@ -1021,21 +1012,28 @@ def toml_write(config, calib_output_path):
         data = {}
 
     for source in config.sources:
-        if not source.K or not source.D or not source.R or not source.T or not source.S:
+        if len(source.K) == 0 and len(source.D) == 0 and len(source.R) == 0 and len(source.T) == 0 and len(source.S) == 0:
             logging.warning(f"The source '{source.name}' has not been calibrated")
     
         else:
             data[source.name] = {
                 "name": source.name,
-                "size": [source.S[0], source.S[1]],
+                "size": [float(source.S[0]), float(source.S[1])],
                 "matrix": [
-                    [source.K[0,0], 0.0,        source.K[0,2]],
-                    [0.0,         source.K[1,1], source.K[1,2]],
-                    [0.0,         0.0,         1.0]
+                    [float(source.K[0, 0]), 0.0,                float(source.K[0, 2])],
+                    [0.0,                   float(source.K[1, 1]), float(source.K[1, 2])],
+                    [0.0,                   0.0,                1.0]
                 ],
-                "distortions": [source.D[0], source.D[1], source.D[2], source.D[3]],
-                "rotation": [source.R[0], source.R[1], source.R[2]],
-                "translation": [source.T[0], source.T[1], source.T[2]],
+                "distortions": [
+                    float(source.D[0]), float(source.D[1]),
+                    float(source.D[2]), float(source.D[3])
+                ],
+                "rotation": [
+                    float(source.R[0]), float(source.R[1]), float(source.R[2])
+                ],
+                "translation": [
+                    float(source.T[0]), float(source.T[1]), float(source.T[2])
+                ],
                 "fisheye": False
             }
     
@@ -1057,7 +1055,7 @@ def recap_calibrate(config, calib_full_type):
     '''
 
     for source in config.sources:
-        if not source.K or not source.D or not source.R or not source.T or not source.S:
+        if len(source.K) != 0 and len(source.D) != 0 and len(source.R) != 0 and len(source.T) != 0 and len(source.S) != 0:
             r_trans, t_trans = world_to_camera_persp(source.R, source.T)
             source.R = np.array(cv2.Rodrigues(r_trans)[0]).flatten()
             source.T = np.array(t_trans)
