@@ -107,10 +107,6 @@ class SubConfig:
             raise FileNotFoundError("No calibration folder found in the project directory.")
 
     @property
-    def object_coords_3d(self):
-        return self.calibration.get("calculate", {}).get("extrinsics", {}).get("object_coords_3d", {})
-
-    @property
     def extrinsics_corners_nb(self):
         return self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("extrinsics_corners_nb")
 
@@ -141,10 +137,6 @@ class SubConfig:
     @property
     def intrinsics_square_size(self):
         return self.calibration.get("calculate", {}).get("intrinsics", {}).get("intrinsics_square_size") / 1000.0
-    
-    @property
-    def calib_output_path(self):
-        return os.path.join(self.calib_dir, "Object_points.trc")
 
     @property
     def logging(self):
@@ -252,6 +244,7 @@ class SubConfig:
 
     @property
     def object_coords_3d(self):
+        object_coords_3d = self.calibration.get("calculate", {}).get("extrinsics", {}).get("object_coords_3d", {})
         if self.extrinsics_method in {'board', 'scene'}:
             # Define 3D object points
             if self.extrinsics_method == 'board':
@@ -354,7 +347,7 @@ class SubConfig:
 
         elif calib_type == "calculate":
             if extrinsinc:
-                trc_write(self.object_coords_3d, self.calib_output_path)
+                trc_write(self.object_coords_3d, os.path.join(self.calib_dir, f'Object_points.trc'))
             calibration = CheckerboardCalibration(self, None)
 
         else:
@@ -377,7 +370,7 @@ class SubConfig:
 
     @property 
     def intrinsics_extension(self):
-        return self.calibration.get("calculate", {}).get("intrinsics_extension")
+        return self.calibration.get("calculate", {}).get("intrinsics", {}).get("intrinsics_extension")
 
     @property 
     def extrinsics_method(self):

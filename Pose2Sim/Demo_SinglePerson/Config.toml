@@ -42,7 +42,7 @@ frame_range = []
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
 time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
 calib_intrinsics = "intrinsics/int_cam01_img/"
-calib_extrinsics = "extrinsincs/ext_cam01_img/"
+calib_extrinsics = "extrinsics/ext_cam01_img/"
 
 [[sources]]
 name = "cam02"
@@ -52,7 +52,7 @@ frame_range = []
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
 time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
 calib_intrinsics = "intrinsics/int_cam02_img/"
-calib_extrinsics = "extrinsincs/ext_cam02_img/"
+calib_extrinsics = "extrinsics/ext_cam02_img/"
 
 [[sources]]
 name = "cam03"

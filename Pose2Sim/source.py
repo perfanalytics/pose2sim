@@ -32,18 +32,18 @@ class BaseSource(abc.ABC):
         self.ret, self.ret_int, self.C, self.S, self.D, self.K, self.R, self.T = [], [], [], [], [], [], [], []
 
     def get_calib_files(self, folder, extension, calibration_name):
-        if not os.path.isdir(folder):
+        if not os.path.isdir(os.path.join(self.config.calib_dir, folder)):
             logging.warning(
                 f"[{self.name} - {calibration_name}] Calibration skipped: The specified folder does not exist -> '{folder}'"
             )
-            return None
+            return {}
 
-        files = glob.glob(os.path.join(folder, f"*{extension}"))
+        files = glob.glob(os.path.join(self.config.calib_dir, folder, f"*{extension}"))
         if not files:
             logging.warning(
                 f"[{self.name} - {calibration_name}] Calibration skipped: No files with the extension '{extension}' found in folder '{folder}'."
             )
-            return None
+            return {}
 
         return files
 
@@ -108,10 +108,13 @@ class BaseSource(abc.ABC):
 
             self.ret_int_px = np.around(np.array(self.ret_int), decimals=3)
             self.ret_px = np.around(np.array(self.ret), decimals=3)
-            self.ret_mm = np.around(self.ret_px * Dm * 1000 / f_px, decimals=3)
-
-            logging.info(f"[{self.name} - intrinsic] Intrinsic error: {self.ret_int_px} px.")
-            logging.info(f"[{self.name} - extrinsic] Residual (RMS) calibration error: {self.ret_px} px, which corresponds to {self.ret_mm} mm.")
+            
+            if len(self.reret_int_px) != 0:
+                self.ret_int_mm = np.around(self.ret_px * Dm * 1000 / f_px, decimals=3)
+                logging.info(f"[{self.name} - intrinsic] Intrinsic error: {self.ret_int_px} px,  which corresponds to {self.ret_int_mm} mm.")
+            if len(self.ret_px) != 0:
+                self.ret_mm = np.around(self.ret_px * Dm * 1000 / f_px, decimals=3)
+                logging.info(f"[{self.name} - extrinsic] Residual (RMS) calibration error: {self.ret_px} px, which corresponds to {self.ret_mm} mm.")
 
     @abc.abstractmethod
     def determine_frame_rate(self):

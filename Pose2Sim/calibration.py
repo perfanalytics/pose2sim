@@ -367,7 +367,7 @@ class CheckerboardCalibration(Calibration):
                 imgpoints = []  # 2D points in image plane
                 logging.info(f'Intrinsic calibration for {source.name}:')
                 source.extract_frames('intrinsic')
-                for img_path in source.intrinsic_files[0]:
+                for img_path in source.intrinsics_files:
                     imgp_confirmed, objp_confirmed = findCorners(img_path, self.config.intrinsics_corners_nb, objp=objp, show=self.config.show_detection_intrinsics)
                     if isinstance(imgp_confirmed, np.ndarray):
                         imgpoints.append(imgp_confirmed)
