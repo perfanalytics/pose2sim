@@ -32,6 +32,7 @@ OUTPUTS:
 from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort_key, zup2yup
 
 import os
+import toml
 import logging
 import pickle
 import numpy as np
@@ -92,7 +93,7 @@ def calib_qca_fun(config, file_to_convert_path, binning_factor=1):
 
         source = next((s for s in config.sources if s.name == name), None)
         if source is None:
-            logging.warning(f"No source found for {name}.")
+            logging.warning(f"No source found for config: '{name}'.")
             continue
 
         video_res = tag.attrib.get('video_resolution')
@@ -201,7 +202,7 @@ def calib_vicon_fun(config, file_to_convert_path, binning_factor=1):
         name = cam_elem.attrib.get('DEVICEID')
         source = next((s for s in config.sources if s.name == name), None)
         if source is None:
-            logging.warning(f"No source found for {name}.")
+            logging.warning(f"No source found for config: '{name}'.")
             continue
         
         keyframe = cam_elem.findall('KeyFrames/KeyFrame')[0]
@@ -254,7 +255,7 @@ def read_intrinsic_yml(config, intrinsic_path):
         name = intrinsic_yml.getNode('names').at(i).string()
         source = next((s for s in config.sources if s.name == name), None)
         if source is None:
-            logging.warning(f"No source found for {name}.")
+            logging.warning(f"No source found for config: '{name}'.")
             continue
 
         K_mat = intrinsic_yml.getNode(f'K_{name}').mat()
@@ -278,7 +279,7 @@ def read_extrinsic_yml(config, extrinsic_path):
         
         source = next((s for s in config.sources if s.name == name), None)
         if source is None:
-            logging.warning(f"No source found for {name}.")
+            logging.warning(f"No source found for config: '{name}'.")
             continue
 
         source.R = extrinsic_yml.getNode(f'R_{name}').mat().flatten()
@@ -333,11 +334,11 @@ def calib_biocv_fun(config, files_to_convert_paths, binning_factor=1):
         with open(f_path) as f:
             calib_data = f.read().split('\n')
             
-            cam_name = f'cam_{str(i).zfill(2)}'
+            name = f'cam_{str(i).zfill(2)}'
 
-            source = next((s for s in config.sources if s.name == cam_name), None)
+            source = next((s for s in config.sources if s.name == name), None)
             if source is None:
-                logging.warning(f"No source found for {cam_name}.")
+                logging.warning(f".")
                 continue
 
             source.ret = np.nan
@@ -378,11 +379,11 @@ def calib_opencap_fun(config, files_to_convert_paths, binning_factor=1):
     for i, f_path in enumerate(files_to_convert_paths):
         with open(f_path, 'rb') as f_pickle:
             calib_data = pickle.load(f_pickle)
-            cam_name = f'cam_{str(i).zfill(2)}'
+            name = f'cam_{str(i).zfill(2)}'
 
-            source = next((s for s in config.sources if s.name == cam_name), None)
+            source = next((s for s in config.sources if s.name == name), None)
             if source is None:
-                logging.warning(f"No source found for {cam_name}.")
+                logging.warning(f"No source found for config: '{name}'.")
                 continue
 
             source.ret = np.nan
@@ -1014,19 +1015,37 @@ def toml_write(config, calib_output_path):
     - a .toml file cameras calibrations
     '''
 
-    with open(calib_output_path, 'w+') as cal_f:
-        for source in config.sources:
-            cam = f'[{source.name}]\n'
-            name = f'name = "{source.name}"\n'
-            size = f'size = [ {source.S[0]}, {source.S[1]}]\n'
-            mat = f'matrix = [ [ {source.K[0,0]}, 0.0, {source.K[0,2]}], [ 0.0, {source.K[1,1]}, {source.K[1,2]}], [ 0.0, 0.0, 1.0]]\n'
-            dist = f'distortions = [ {source.D[0]}, {source.D[1]}, {source.D[2]}, {source.D[3]}]\n'
-            rot = f'rotation = [ {source.R[0]}, {source.R[1]}, {source.R[2]}]\n'
-            tran = f'translation = [ {source.T[0]}, {source.T[1]}, {source.T[2]}]\n'
-            fish = f'fisheye = false\n\n'
-            cal_f.write(cam + name + size + mat + dist + rot + tran + fish)
-        meta = '[metadata]\nadjusted = false\nerror = 0.0\n'
-        cal_f.write(meta)
+    if config.calib_file != None:
+        data = toml.load(calib_output_path)
+    else:
+        data = {}
+
+    for source in config.sources:
+        if not source.K or not source.D or not source.R or not source.T or not source.S:
+            logging.warning(f"The source '{source.name}' has not been calibrated")
+    
+        else:
+            data[source.name] = {
+                "name": source.name,
+                "size": [source.S[0], source.S[1]],
+                "matrix": [
+                    [source.K[0,0], 0.0,        source.K[0,2]],
+                    [0.0,         source.K[1,1], source.K[1,2]],
+                    [0.0,         0.0,         1.0]
+                ],
+                "distortions": [source.D[0], source.D[1], source.D[2], source.D[3]],
+                "rotation": [source.R[0], source.R[1], source.R[2]],
+                "translation": [source.T[0], source.T[1], source.T[2]],
+                "fisheye": False
+            }
+    
+    data["metadata"] = {
+        "adjusted": False,
+        "error": 0.0
+    }
+    
+    with open(calib_output_path, 'w') as f:
+        toml.dump(data, f)
 
 
 def recap_calibrate(config, calib_full_type):
@@ -1038,19 +1057,20 @@ def recap_calibrate(config, calib_full_type):
     '''
 
     for source in config.sources:
-        r_trans, t_trans = world_to_camera_persp(source.R, source.T)
-        source.R = np.array(cv2.Rodrigues(r_trans)[0]).flatten()
-        source.T = np.array(t_trans)
-        
-        f_px = source.K[0, 0]
-        Dm = euclidean_distance(source.T, [0, 0, 0])
-        
-        if calib_full_type in ['convert_qualisys', 'convert_vicon', 'convert_opencap', 'convert_biocv']:
-            source.ret_mm = np.around(source.ret, decimals=3)
-            source.ret_px = np.around(source.ret / (Dm * 1000) * f_px, decimals=3)
-        elif calib_full_type == 'calculate':
-            source.ret_px = np.around(source.ret, decimals=3)
-            source.ret_mm = np.around(source.ret * Dm * 1000 / f_px, decimals=3)
+        if not source.K or not source.D or not source.R or not source.T or not source.S:
+            r_trans, t_trans = world_to_camera_persp(source.R, source.T)
+            source.R = np.array(cv2.Rodrigues(r_trans)[0]).flatten()
+            source.T = np.array(t_trans)
+            
+            f_px = source.K[0, 0]
+            Dm = euclidean_distance(source.T, [0, 0, 0])
+            
+            if calib_full_type in ['convert_qualisys', 'convert_vicon', 'convert_opencap', 'convert_biocv']:
+                source.ret_mm = np.around(source.ret, decimals=3)
+                source.ret_px = np.around(source.ret / (Dm * 1000) * f_px, decimals=3)
+            elif calib_full_type == 'calculate':
+                source.ret_px = np.around(source.ret, decimals=3)
+                source.ret_mm = np.around(source.ret * Dm * 1000 / f_px, decimals=3)
 
     ret_px_list = [s.ret_px for s in config.sources if hasattr(s, 'ret_px')]
     ret_mm_list = [s.ret_mm for s in config.sources if hasattr(s, 'ret_mm')]
