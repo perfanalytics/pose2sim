@@ -95,56 +95,59 @@ def calib_qca_fun(config, file_to_convert_path, binning_factor=1):
             logging.warning(f"No source found for config: '{name}'.")
             continue
 
-        source.ret = float(tag.attrib.get('avg-residual'))
-
-        video_res = tag.attrib.get('video_resolution')
-
-        res_value = int(video_res[:-1]) if video_res is not None else 1080
-
         # Image size
-        fov_tag = fov_tags[i]
-        w = (float(fov_tag.attrib.get('right')) - float(fov_tag.attrib.get('left')) + 1) / binning_factor / (1080 / res_value)
-        h = (float(fov_tag.attrib.get('bottom')) - float(fov_tag.attrib.get('top')) + 1) / binning_factor / (1080 / res_value)
-        source.S = np.array([w, h], dtype=np.float32)
+        if source.intrinsics_files != None:
+            source.ret = float(tag.attrib.get('avg-residual'))
 
-        # Intrinsic parameters: distortion and intrinsic matrix
-        fu = float(intrinsic_tag.get('focalLengthU')) / 64 / binning_factor / (1080 / res_value)
-        fv = float(intrinsic_tag.get('focalLengthV')) / 64 / binning_factor / (1080 / res_value)
-        left_val = float(fov_tag.attrib.get('left'))
-        top_val = float(fov_tag.attrib.get('top'))
-        cu = (float(intrinsic_tag.get('centerPointU')) / 64 / binning_factor - left_val) / (1080 / res_value)
-        cv = (float(intrinsic_tag.get('centerPointV')) / 64 / binning_factor - top_val) / (1080 / res_value)
-        source.K = np.array([fu, 0., cu, 0., fv, cv, 0., 0., 1.], dtype=np.float32).reshape(3, 3)
+            video_res = tag.attrib.get('video_resolution')
+            res_value = int(video_res[:-1]) if video_res is not None else 1080
 
-        intrinsic_tag = intrinsic_tags[i]
-        k1 = float(intrinsic_tag.get('radialDistortion1')) / 64 / binning_factor
-        k2 = float(intrinsic_tag.get('radialDistortion2')) / 64 / binning_factor
-        p1 = float(intrinsic_tag.get('tangentalDistortion1')) / 64 / binning_factor
-        p2 = float(intrinsic_tag.get('tangentalDistortion2')) / 64 / binning_factor
-        source.D = np.array([k1, k2, p1, p2], dtype=np.float32)
+            fov_tag = fov_tags[i]
+            w = (float(fov_tag.attrib.get('right')) - float(fov_tag.attrib.get('left')) + 1) / binning_factor / (1080 / res_value)
+            h = (float(fov_tag.attrib.get('bottom')) - float(fov_tag.attrib.get('top')) + 1) / binning_factor / (1080 / res_value)
+            source.S = np.array([w, h], dtype=np.float32)
+
+            intrinsic_tag = intrinsic_tags[i]
+
+            # Intrinsic parameters: distortion and intrinsic matrix
+            fu = float(intrinsic_tag.get('focalLengthU')) / 64 / binning_factor / (1080 / res_value)
+            fv = float(intrinsic_tag.get('focalLengthV')) / 64 / binning_factor / (1080 / res_value)
+            left_val = float(fov_tag.attrib.get('left'))
+            top_val = float(fov_tag.attrib.get('top'))
+            cu = (float(intrinsic_tag.get('centerPointU')) / 64 / binning_factor - left_val) / (1080 / res_value)
+            cv = (float(intrinsic_tag.get('centerPointV')) / 64 / binning_factor - top_val) / (1080 / res_value)
+            source.K = np.array([fu, 0., cu, 0., fv, cv, 0., 0., 1.], dtype=np.float32).reshape(3, 3)
+
+            k1 = float(intrinsic_tag.get('radialDistortion1')) / 64 / binning_factor
+            k2 = float(intrinsic_tag.get('radialDistortion2')) / 64 / binning_factor
+            p1 = float(intrinsic_tag.get('tangentalDistortion1')) / 64 / binning_factor
+            p2 = float(intrinsic_tag.get('tangentalDistortion2')) / 64 / binning_factor
+            source.D = np.array([k1, k2, p1, p2], dtype=np.float32)
 
         # Extrinsic parameters: rotation matrix and translation vector
-        r11 = float(transform_tag.get('r11'))
-        r12 = float(transform_tag.get('r12'))
-        r13 = float(transform_tag.get('r13'))
-        r21 = float(transform_tag.get('r21'))
-        r22 = float(transform_tag.get('r22'))
-        r23 = float(transform_tag.get('r23'))
-        r31 = float(transform_tag.get('r31'))
-        r32 = float(transform_tag.get('r32'))
-        r33 = float(transform_tag.get('r33'))
-        R_value = np.array([r11, r12, r13, r21, r22, r23, r31, r32, r33], dtype=np.float32).reshape(3, 3).T
+        if source.extrinsics_files != None:
+            transform_tag = transform_tags[i]
 
-        transform_tag = transform_tags[i]
-        tx = float(transform_tag.get('x')) / 1000
-        ty = float(transform_tag.get('y')) / 1000
-        tz = float(transform_tag.get('z')) / 1000
-        T_value = np.array([tx, ty, tz], dtype=np.float32)
+            r11 = float(transform_tag.get('r11'))
+            r12 = float(transform_tag.get('r12'))
+            r13 = float(transform_tag.get('r13'))
+            r21 = float(transform_tag.get('r21'))
+            r22 = float(transform_tag.get('r22'))
+            r23 = float(transform_tag.get('r23'))
+            r31 = float(transform_tag.get('r31'))
+            r32 = float(transform_tag.get('r32'))
+            r33 = float(transform_tag.get('r33'))
+            R_value = np.array([r11, r12, r13, r21, r22, r23, r31, r32, r33], dtype=np.float32).reshape(3, 3).T
 
-        r_transf, t_transf = world_to_camera_persp(R_value, T_value)
-        r_transf, t_transf = rotate_cam(r_transf, t_transf, ang_x=np.pi, ang_y=0, ang_z=0)
-        source.R = cv2.Rodrigues(r_transf.astype(np.float32))[0].flatten()
-        source.T = t_transf.astype(np.float32)
+            tx = float(transform_tag.get('x')) / 1000
+            ty = float(transform_tag.get('y')) / 1000
+            tz = float(transform_tag.get('z')) / 1000
+            T_value = np.array([tx, ty, tz], dtype=np.float32)
+
+            r_transf, t_transf = world_to_camera_persp(R_value, T_value)
+            r_transf, t_transf = rotate_cam(r_transf, t_transf, ang_x=np.pi, ang_y=0, ang_z=0)
+            source.R = cv2.Rodrigues(r_transf.astype(np.float32))[0].flatten()
+            source.T = t_transf.astype(np.float32)
 
 
 def calib_optitrack_fun(config, file_to_convert_path, binning_factor=1):
@@ -201,35 +204,37 @@ def calib_vicon_fun(config, file_to_convert_path, binning_factor=1):
         
         keyframe = cam_elem.findall('KeyFrames/KeyFrame')[0]
         
-        source.ret = float(keyframe.attrib.get('WORLD_ERROR'))
-        
-        source.S = [float(t) for t in cam_elem.attrib.get('SENSOR_SIZE').split()]
-        
         # Intrinsic parameters: distorsion and intrinsic matrix
-        fu = float(keyframe.attrib.get('FOCAL_LENGTH'))
-        pixel_aspect = float(cam_elem.attrib.get('PIXEL_ASPECT_RATIO'))
-        fv = fu / pixel_aspect
-        cam_center = keyframe.attrib.get('PRINCIPAL_POINT').split()
-        cu, cv = [float(c) for c in cam_center]
-        source.K = np.array([fu, 0., cu, 0., fv, cv, 0., 0., 1.]).reshape(3, 3)
+        if source.intrinsics_files != None:
+            source.ret = float(keyframe.attrib.get('WORLD_ERROR'))
+            
+            source.S = [float(t) for t in cam_elem.attrib.get('SENSOR_SIZE').split()]
+            
+            fu = float(keyframe.attrib.get('FOCAL_LENGTH'))
+            pixel_aspect = float(cam_elem.attrib.get('PIXEL_ASPECT_RATIO'))
+            fv = fu / pixel_aspect
+            cam_center = keyframe.attrib.get('PRINCIPAL_POINT').split()
+            cu, cv = [float(c) for c in cam_center]
+            source.K = np.array([fu, 0., cu, 0., fv, cv, 0., 0., 1.]).reshape(3, 3)
 
-        try:
-            dist = keyframe.attrib.get('VICON_RADIAL2').split()[3:5]
-        except Exception:
-            dist = keyframe.attrib.get('VICON_RADIAL').split()
-        source.D = [float(d) for d in dist] + [0.0, 0.0]
+            try:
+                dist = keyframe.attrib.get('VICON_RADIAL2').split()[3:5]
+            except Exception:
+                dist = keyframe.attrib.get('VICON_RADIAL').split()
+            source.D = [float(d) for d in dist] + [0.0, 0.0]
         
         # Extrinsic parameters: rotation matrix and translation vector
-        rot = keyframe.attrib.get('ORIENTATION').split()
-        R_quat = [float(r) for r in rot]
-        r_orig = quat2mat(R_quat, scalar_idx=3)
+        if source.extrinsics_files != None:
+            rot = keyframe.attrib.get('ORIENTATION').split()
+            R_quat = [float(r) for r in rot]
+            r_orig = quat2mat(R_quat, scalar_idx=3)
 
-        t_orig = [float(t) for t in keyframe.attrib.get('POSITION').split()]
-        
-        r_trans, t_trans = world_to_camera_persp(r_orig, t_orig)
-        
-        source.R = np.array(cv2.Rodrigues(r_trans)[0]).flatten()
-        source.T = np.array(t_trans)
+            t_orig = [float(t) for t in keyframe.attrib.get('POSITION').split()]
+            
+            r_trans, t_trans = world_to_camera_persp(r_orig, t_orig)
+            
+            source.R = np.array(cv2.Rodrigues(r_trans)[0]).flatten()
+            source.T = np.array(t_trans)
 
 
 def read_intrinsic_yml(config, intrinsic_path):
@@ -252,10 +257,11 @@ def read_intrinsic_yml(config, intrinsic_path):
             logging.warning(f"No source found for config: '{name}'.")
             continue
 
-    K_mat = intrinsic_yml.getNode(f'K_{name}').mat().astype(float)
-    source.S = [float(K_mat[0, 2]) * 2, float(K_mat[1, 2]) * 2]
-    source.K = K_mat
-    source.D = intrinsic_yml.getNode(f'dist_{name}').mat().astype(float).flatten()[:-1]
+    if source.intrinsics_files != None:
+        K_mat = intrinsic_yml.getNode(f'K_{name}').mat().astype(float)
+        source.S = [float(K_mat[0, 2]) * 2, float(K_mat[1, 2]) * 2]
+        source.K = K_mat
+        source.D = intrinsic_yml.getNode(f'dist_{name}').mat().astype(float).flatten()[:-1]
 
 
 def read_extrinsic_yml(config, extrinsic_path):
@@ -276,6 +282,7 @@ def read_extrinsic_yml(config, extrinsic_path):
             logging.warning(f"No source found for config: '{name}'.")
             continue
 
+    if source.extrinsics_files != None:
         source.R = extrinsic_yml.getNode(f'R_{name}').mat().astype(float).flatten()
         source.T = extrinsic_yml.getNode(f'T_{name}').mat().astype(float).flatten()
         source.ret = np.nan
@@ -332,16 +339,18 @@ def calib_biocv_fun(config, files_to_convert_paths, binning_factor=1):
 
             source = next((s for s in config.sources if s.name == name), None)
             if source is None:
-                logging.warning(f".")
+                logging.warning(f"No source found for config: '{name}'.")
                 continue
 
-            source.S = [float(calib_data[0]), float(calib_data[1])]
-            source.K = np.array([list(map(float, k.strip().split(' '))) for k in calib_data[2:5]], dtype=np.float32)
-            source.D = np.array([float(d) for d in calib_data[-2].split(' ')[:4]], dtype=np.float32)
+            if source.intrinsics_files != None:
+                source.S = [float(calib_data[0]), float(calib_data[1])]
+                source.K = np.array([list(map(float, k.strip().split(' '))) for k in calib_data[2:5]], dtype=np.float32)
+                source.D = np.array([float(d) for d in calib_data[-2].split(' ')[:4]], dtype=np.float32)
 
-            RT = np.array([list(map(float, k.strip().split(' '))) for k in calib_data[6:9]], dtype=np.float32)
-            source.R = cv2.Rodrigues(RT[:, :3])[0].squeeze().astype(np.float32)
-            source.T = (RT[:, 3] / 1000).astype(np.float32)
+            if source.extrinsics_files != None:
+                RT = np.array([list(map(float, k.strip().split(' '))) for k in calib_data[6:9]], dtype=np.float32)
+                source.R = cv2.Rodrigues(RT[:, :3])[0].squeeze().astype(np.float32)
+                source.T = (RT[:, 3] / 1000).astype(np.float32)
 
 
 
@@ -379,25 +388,27 @@ def calib_opencap_fun(config, files_to_convert_paths, binning_factor=1):
                 logging.warning(f"No source found for config: '{name}'.")
                 continue
 
-            source.ret = np.nan
-            source.S = list(map(float, calib_data['imageSize'].squeeze()[::-1]))
-            source.D = list(map(float, calib_data['distortion'][0][:-1]))
-            source.K = calib_data['intrinsicMat'].astype(np.float32)
+            if source.intrinsics_files != None:
+                source.ret = np.nan
+                source.S = list(map(float, calib_data['imageSize'].squeeze()[::-1]))
+                source.D = list(map(float, calib_data['distortion'][0][:-1]))
+                source.K = calib_data['intrinsicMat'].astype(np.float32)
 
-            R_cam = calib_data['rotation'].astype(np.float32)
-            T_cam = calib_data['translation'].squeeze().astype(np.float32)
+            if source.extrinsics_files != None:
+                R_cam = calib_data['rotation'].astype(np.float32)
+                T_cam = calib_data['translation'].squeeze().astype(np.float32)
 
-            # Rotate cameras by Pi/2 around x in world frame -> could have just switched some columns in matrix
-            # camera frame to world frame
-            R_w, T_w = world_to_camera_persp(R_cam, T_cam)
-            # x_rotate -Pi/2 and z_rotate Pi
-            R_w_90, T_w_90 = rotate_cam(R_w, T_w, ang_x=-np.pi/2, ang_y=0, ang_z=np.pi)
-            # world frame to camera frame
-            R_c_90, T_c_90 = world_to_camera_persp(R_w_90, T_w_90)
+                # Rotate cameras by Pi/2 around x in world frame -> could have just switched some columns in matrix
+                # camera frame to world frame
+                R_w, T_w = world_to_camera_persp(R_cam, T_cam)
+                # x_rotate -Pi/2 and z_rotate Pi
+                R_w_90, T_w_90 = rotate_cam(R_w, T_w, ang_x=-np.pi/2, ang_y=0, ang_z=np.pi)
+                # world frame to camera frame
+                R_c_90, T_c_90 = world_to_camera_persp(R_w_90, T_w_90)
 
-            # store in R and T
-            source.R = cv2.Rodrigues(R_c_90.astype(np.float32))[0].squeeze()
-            source.T = (T_cam / 1000).astype(np.float32)
+                # store in R and T
+                source.R = cv2.Rodrigues(R_c_90.astype(np.float32))[0].squeeze()
+                source.T = (T_cam / 1000).astype(np.float32)
 
 
 def calib_calc_fun(config):
@@ -421,21 +432,8 @@ def calib_calc_fun(config):
     - T: extrinsic translation: list of arrays of floats
     '''
 
-    # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
-    if config.use_existing_intrinsics:
-        config.calibrate_sources()
-    
-    # calculate intrinsics otherwise
-    else:
-        logging.info(f'\nCalculating intrinsic parameters...')
-        calibrate_intrinsics(config)
-
-    # calculate extrinsics
-    if config.calculate_extrinsics:
-        logging.info(f'\nCalculating extrinsic parameters...')
-        calibrate_extrinsics(config)
-    else:
-        logging.info(f'\nExtrinsic parameters won\'t be calculated. Set "calculate_extrinsics" to true in Config.toml to calculate them.')
+    calibrate_intrinsics(config)
+    calibrate_extrinsics(config)
 
 
 def calibrate_intrinsics(config):
@@ -454,44 +452,45 @@ def calibrate_intrinsics(config):
     '''
 
     for source in config.sources:
-        # Prepare object points
-        objp = np.zeros((config.intrinsics_corners_nb[0]*config.intrinsics_corners_nb[1],3), np.float32) 
-        objp[:,:2] = np.mgrid[0:config.intrinsics_corners_nb[0],0:config.intrinsics_corners_nb[1]].T.reshape(-1,2)
-        objp[:,:2] = objp[:,0:2]*config.intrinsics_square_size
-        objpoints = [] # 3d points in world space
-        imgpoints = [] # 2d points in image plane
+        if source.intrinsics_files != None:
+            # Prepare object points
+            objp = np.zeros((config.intrinsics_corners_nb[0]*config.intrinsics_corners_nb[1],3), np.float32) 
+            objp[:,:2] = np.mgrid[0:config.intrinsics_corners_nb[0],0:config.intrinsics_corners_nb[1]].T.reshape(-1,2)
+            objp[:,:2] = objp[:,0:2]*config.intrinsics_square_size
+            objpoints = [] # 3d points in world space
+            imgpoints = [] # 2d points in image plane
 
-        logging.info(f'\nCamera {source.name}:')
+            logging.info(f'\nCamera {source.name}:')
 
-        # extract frames from video if video
-        source.extract_frames('intrinsic')
+            # extract frames from video if video
+            source.extract_frames('intrinsic')
 
-        # find corners
-        for img_path in source.intrinsic_files[0]:
-            imgp_confirmed, objp_confirmed = findCorners(img_path, config.intrinsics_corners_nb, objp=objp, show=config.show_detection_intrinsics)
-            if config.show_detection_intrinsics == True:
-                if isinstance(imgp_confirmed, np.ndarray):
-                    imgpoints.append(imgp_confirmed)
-                    objpoints.append(objp_confirmed)
-            else:
-                if isinstance(imgp_confirmed, np.ndarray):
-                    imgpoints.append(imgp_confirmed)
-                    objpoints.append(objp)
-        if len(imgpoints) < 10:
-            logging.info(f'Corners were detected only on {len(imgpoints)} images for camera {source.name}. Calibration of intrinsic parameters may not be accurate with fewer than 10 good images of the board.')
+            # find corners
+            for img_path in source.intrinsic_files[0]:
+                imgp_confirmed, objp_confirmed = findCorners(img_path, config.intrinsics_corners_nb, objp=objp, show=config.show_detection_intrinsics)
+                if config.show_detection_intrinsics == True:
+                    if isinstance(imgp_confirmed, np.ndarray):
+                        imgpoints.append(imgp_confirmed)
+                        objpoints.append(objp_confirmed)
+                else:
+                    if isinstance(imgp_confirmed, np.ndarray):
+                        imgpoints.append(imgp_confirmed)
+                        objpoints.append(objp)
+            if len(imgpoints) < 10:
+                logging.info(f'Corners were detected only on {len(imgpoints)} images for camera {source.name}. Calibration of intrinsic parameters may not be accurate with fewer than 10 good images of the board.')
 
-        # calculate intrinsics
-        img = cv2.imread(str(img_path))
-        objpoints = np.array(objpoints)
-        ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
-                                    None, None, flags=(cv2.CALIB_FIX_K3+cv2.CALIB_USE_LU))# + cv2.CALIB_FIX_PRINCIPAL_POINT))
-        h, w = [np.float32(i) for i in img.shape[:-1]]
-        source.ret = ret_cam
-        source.S = [float(w), float(h)]
-        source.K = np.array(dist[0], dtype=np.float32)
-        source.D = np.array(mtx, dtype=np.float32)
+            # calculate intrinsics
+            img = cv2.imread(str(img_path))
+            objpoints = np.array(objpoints)
+            ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
+                                        None, None, flags=(cv2.CALIB_FIX_K3+cv2.CALIB_USE_LU))# + cv2.CALIB_FIX_PRINCIPAL_POINT))
+            h, w = [np.float32(i) for i in img.shape[:-1]]
+            source.ret = ret_cam
+            source.S = [float(w), float(h)]
+            source.K = np.array(dist[0], dtype=np.float32)
+            source.D = np.array(mtx, dtype=np.float32)
 
-        logging.info(f'Intrinsics error: {np.around(ret_cam, decimals=3)} px for each cameras.')
+            logging.info(f'Intrinsics error: {np.around(ret_cam, decimals=3)} px for each cameras.')
 
 
 def calibrate_extrinsics(config):
@@ -524,67 +523,68 @@ def calibrate_extrinsics(config):
         trc_write(object_coords_3d, config.calib_output_path)
 
         for source in config.sources:
-            logging.info(f'\nCamera {source.name}:')
-            
-            # Read images or video
-            source.extract_frames('extrinsic')
+            if source.extrinsics_files != None:
+                logging.info(f'\nCamera {source.name}:')
+                
+                # Read images or video
+                source.extract_frames('extrinsic')
 
-            # Find corners or label by hand
-            if config.extrinsics_method == 'board':
-                imgp, objp = findCorners(source.extrinsic_files[0], extrinsics_corners_nb, objp=object_coords_3d, show=config.show_reprojection_error)
-                if len(imgp) == 0:
-                    logging.exception('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
-                    raise ValueError('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
+                # Find corners or label by hand
+                if config.extrinsics_method == 'board':
+                    imgp, objp = findCorners(source.extrinsic_files[0], extrinsics_corners_nb, objp=object_coords_3d, show=config.show_reprojection_error)
+                    if len(imgp) == 0:
+                        logging.exception('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
+                        raise ValueError('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
 
-            elif config.extrinsics_method == 'scene':
-                imgp, objp = imgp_objp_visualizer_clicker(source.extrinsic_files[0], imgp, objp=object_coords_3d)
-                if len(imgp) == 0:
-                    logging.exception('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
-                    raise ValueError('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
-                if len(objp) < 10:
-                    logging.info(f'Only {len(objp)} reference points for camera {source.name}. Calibration of extrinsic parameters may not be accurate with fewer than 10 reference points, as spread out in the captured volume as possible.')
+                elif config.extrinsics_method == 'scene':
+                    imgp, objp = imgp_objp_visualizer_clicker(source.extrinsic_files[0], imgp, objp=object_coords_3d)
+                    if len(imgp) == 0:
+                        logging.exception('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
+                        raise ValueError('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
+                    if len(objp) < 10:
+                        logging.info(f'Only {len(objp)} reference points for camera {source.name}. Calibration of extrinsic parameters may not be accurate with fewer than 10 reference points, as spread out in the captured volume as possible.')
 
-            # Calculate extrinsics
-            mtx, dist = np.array(source.K), np.array(source.D)
-            _, r, t = cv2.solvePnP(np.array(objp, dtype=np.float32) * 1000, imgp, np.array(mtx, dtype=np.float32), np.array(dist, dtype=np.float32))
+                # Calculate extrinsics
+                mtx, dist = np.array(source.K), np.array(source.D)
+                _, r, t = cv2.solvePnP(np.array(objp, dtype=np.float32) * 1000, imgp, np.array(mtx, dtype=np.float32), np.array(dist, dtype=np.float32))
 
-            source.R = r.flatten().astype(np.float32)
-            source.T = (t.flatten() / 1000).astype(np.float32)
+                source.R = r.flatten().astype(np.float32)
+                source.T = (t.flatten() / 1000).astype(np.float32)
 
-            # Projection of object points to image plane
-            # # Former way, distortions used to be ignored
-            # Kh_cam = np.block([mtx, np.zeros(3).reshape(3,1)])
-            # r_mat, _ = cv2.Rodrigues(r)
-            # H_cam = np.block([[r_mat,t.reshape(3,1)], [np.zeros(3), 1 ]])
-            # P_cam = Kh_cam @ H_cam
-            # proj_obj = [ ( P_cam[0] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)),  P_cam[1] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)) ) for o in objp]
-            proj_obj = np.squeeze(cv2.projectPoints(objp,r,t,mtx,dist)[0])
+                # Projection of object points to image plane
+                # # Former way, distortions used to be ignored
+                # Kh_cam = np.block([mtx, np.zeros(3).reshape(3,1)])
+                # r_mat, _ = cv2.Rodrigues(r)
+                # H_cam = np.block([[r_mat,t.reshape(3,1)], [np.zeros(3), 1 ]])
+                # P_cam = Kh_cam @ H_cam
+                # proj_obj = [ ( P_cam[0] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)),  P_cam[1] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)) ) for o in objp]
+                proj_obj = np.squeeze(cv2.projectPoints(objp,r,t,mtx,dist)[0])
 
-            # Check calibration results
-            if config.show_reprojection_error:
-                # Reopen image, otherwise 2 sets of text are overlaid
-                img = cv2.imread(source.extrinsic_files[0])
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                # Check calibration results
+                if config.show_reprojection_error:
+                    # Reopen image, otherwise 2 sets of text are overlaid
+                    img = cv2.imread(source.extrinsic_files[0])
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-                for o in proj_obj:
-                    cv2.circle(img, (int(o[0]), int(o[1])), 8, (0,0,255), -1) 
-                for i in imgp:
-                    cv2.drawMarker(img, (int(i[0][0]), int(i[0][1])), (0,255,0), cv2.MARKER_CROSS, 15, 2)
-                cv2.putText(img, 'Verify calibration results, then close window.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
-                cv2.putText(img, 'Verify calibration results, then close window.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA) 
-                cv2.drawMarker(img, (20,40), (0,255,0), cv2.MARKER_CROSS, 15, 2)
-                cv2.putText(img, '    Clicked points', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
-                cv2.putText(img, '    Clicked points', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
-                cv2.circle(img, (20,60), 8, (0,0,255), -1)    
-                cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
-                cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
-                im_pil = Image.fromarray(img)
-                im_pil.show(title = os.path.basename(source.extrinsic_files[0]))
+                    for o in proj_obj:
+                        cv2.circle(img, (int(o[0]), int(o[1])), 8, (0,0,255), -1) 
+                    for i in imgp:
+                        cv2.drawMarker(img, (int(i[0][0]), int(i[0][1])), (0,255,0), cv2.MARKER_CROSS, 15, 2)
+                    cv2.putText(img, 'Verify calibration results, then close window.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
+                    cv2.putText(img, 'Verify calibration results, then close window.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA) 
+                    cv2.drawMarker(img, (20,40), (0,255,0), cv2.MARKER_CROSS, 15, 2)
+                    cv2.putText(img, '    Clicked points', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
+                    cv2.putText(img, '    Clicked points', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
+                    cv2.circle(img, (20,60), 8, (0,0,255), -1)    
+                    cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
+                    cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
+                    im_pil = Image.fromarray(img)
+                    im_pil.show(title = os.path.basename(source.extrinsic_files[0]))
 
-            # Calculate reprojection error
-            imgp_to_objreproj_dist = [euclidean_distance(proj_obj[n], imgp[n]) for n in range(len(proj_obj))]
-            rms_px = np.sqrt(np.sum([d**2 for d in imgp_to_objreproj_dist]))
-            source.ret = rms_px
+                # Calculate reprojection error
+                imgp_to_objreproj_dist = [euclidean_distance(proj_obj[n], imgp[n]) for n in range(len(proj_obj))]
+                rms_px = np.sqrt(np.sum([d**2 for d in imgp_to_objreproj_dist]))
+                source.ret = rms_px
 
     elif config.extrinsics_method == 'keypoints':
         raise NotImplementedError('This has not been integrated yet.')
@@ -989,7 +989,7 @@ def trc_write(object_coords_3d, trc_path):
     return trc_path
 
 
-def toml_write(config, calib_output_path):
+def toml_write(config, data, calib_type):
     '''
     Writes calibration parameters to a .toml file
 
@@ -1005,17 +1005,13 @@ def toml_write(config, calib_output_path):
     OUTPUTS:
     - a .toml file cameras calibrations
     '''
-
-    if config.calib_file != None:
-        data = toml.load(calib_output_path)
-    else:
-        data = {}
-
     for source in config.sources:
-        if len(source.K) == 0 and len(source.D) == 0 and len(source.R) == 0 and len(source.T) == 0 and len(source.S) == 0:
+        if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0 and len(source.R) == 0 and len(source.T) == 0:
             logging.warning(f"The source '{source.name}' has not been calibrated")
     
         else:
+            source.calculate_calibration_residuals(calib_type)
+
             data[source.name] = {
                 "name": source.name,
                 "size": [float(source.S[0]), float(source.S[1])],
@@ -1042,38 +1038,8 @@ def toml_write(config, calib_output_path):
         "error": 0.0
     }
     
-    with open(calib_output_path, 'w') as f:
+    with open(config.calib_output_path, 'w') as f:
         toml.dump(data, f)
-
-
-def recap_calibrate(config, calib_full_type):
-    '''
-    Print a log message giving calibration results. Also stored in User/logs.txt.
-
-    OUTPUT:
-    - Message in console
-    '''
-
-    for source in config.sources:
-        if len(source.K) != 0 and len(source.D) != 0 and len(source.R) != 0 and len(source.T) != 0 and len(source.S) != 0:
-            r_trans, t_trans = world_to_camera_persp(source.R, source.T)
-            source.R = np.array(cv2.Rodrigues(r_trans)[0]).flatten()
-            source.T = np.array(t_trans)
-            
-            f_px = source.K[0, 0]
-            Dm = euclidean_distance(source.T, [0, 0, 0])
-            
-            if calib_full_type in ['convert_qualisys', 'convert_vicon', 'convert_opencap', 'convert_biocv']:
-                source.ret_mm = np.around(source.ret, decimals=3)
-                source.ret_px = np.around(source.ret / (Dm * 1000) * f_px, decimals=3)
-            elif calib_full_type == 'calculate':
-                source.ret_px = np.around(source.ret, decimals=3)
-                source.ret_mm = np.around(source.ret * Dm * 1000 / f_px, decimals=3)
-
-    ret_px_list = [s.ret_px for s in config.sources if hasattr(s, 'ret_px')]
-    ret_mm_list = [s.ret_mm for s in config.sources if hasattr(s, 'ret_mm')]
-
-    logging.info(f'\n--> Residual (RMS) calibration errors for each camera are respectively {ret_px_list} px, \nwhich corresponds to {ret_mm_list} mm.\n')
 
 
 def calibrate_cams_all(config):
@@ -1091,7 +1057,7 @@ def calibrate_cams_all(config):
     '''
 
     # Read config_dict
-    calib_type, args_calib, calib_output_path = config.get_calibration_params()
+    calib_type, args_calib, data = config.get_calibration_params()
 
     # Map calib function
     calib_mapping = {
@@ -1109,9 +1075,6 @@ def calibrate_cams_all(config):
     calib_fun(*args_calib)
 
     # Write calibration file
-    toml_write(config, calib_output_path)
-
-    # Recap message
-    recap_calibrate(config, calib_type)
+    toml_write(config, data, calib_type)
     
-    logging.info(f'Calibration file is stored at {calib_output_path}.')
+    logging.info(f'Calibration file is stored at {config.calib_output_path}.')

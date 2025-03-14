@@ -14,6 +14,9 @@ import os
 import glob
 import cv2
 import logging
+import numpy as np
+
+from Pose2Sim.common import world_to_camera_persp, euclidean_distance
 
 
 class BaseSource(abc.ABC):
@@ -32,17 +35,19 @@ class BaseSource(abc.ABC):
         self.ret, self.C, self.S, self.D, self.K, self.R, self.T = [], [], [], [], [], [], []
 
 
-    def get_calib_files(self, folder, extension):
-        folder = os.path.join(self.config.calib_dir, folder)
-
+    def get_calib_files(self, folder, extension, calibration_name):
         if not os.path.isdir(folder):
-            logging.error(f"The folder '{folder}' does not exist.")
-            raise ValueError(f"The folder '{folder}' does not exist.")
+            logging.warning(
+                f"[{self.name} - {calibration_name}] Calibration skipped: The specified folder does not exist -> '{folder}'"
+            )
+            return None
 
         files = glob.glob(os.path.join(folder, f"*{extension}"))
         if not files:
-            logging.exception(f"The folder {folder} does not contain any {extension} files.")
-            raise ValueError(f"The folder {folder} does not contain any {extension} files.")
+            logging.warning(
+                f"[{self.name} - {calibration_name}] Calibration skipped: No files with the extension '{extension}' found in folder '{folder}'."
+            )
+            return None
 
         return files
 
@@ -100,6 +105,114 @@ class BaseSource(abc.ABC):
             self.intrinsics_files = new_files
         else:
             self.extrinsics_files = new_files
+
+class BaseSource(abc.ABC):
+    def __init__(self, config, data: dict):
+        self.config = config
+        self.data = data
+        self.name = data.get("name")
+        self.frame_rate = data.get("frame_rate")
+
+        self.extrinsics_files = {}
+        self.intrinsics_files = {}
+
+        self.calib_intrinsics = data.get("calib_intrinsics")
+        self.calib_extrinsics = data.get("calib_extrinsics")
+
+        self.ret, self.C, self.S, self.D, self.K, self.R, self.T = [], [], [], [], [], [], []
+
+    def get_calib_files(self, folder, extension, calibration_name):
+        if not os.path.isdir(folder):
+            logging.warning(
+                f"[{self.name} - {calibration_name}] Calibration skipped: The specified folder does not exist -> '{folder}'"
+            )
+            return None
+
+        files = glob.glob(os.path.join(folder, f"*{extension}"))
+        if not files:
+            logging.warning(
+                f"[{self.name} - {calibration_name}] Calibration skipped: No files with the extension '{extension}' found in folder '{folder}'."
+            )
+            return None
+
+        return files
+
+    def extract_frames(self, calib_type='intrinsic'):
+        files = self.intrinsics_files if calib_type == 'intrinsic' else self.extrinsics_files
+
+        video_path = files[0]
+
+        directory = os.path.dirname(video_path)
+        base_name = os.path.splitext(os.path.basename(video_path))[0]
+        pattern = os.path.join(directory, base_name + '_*.png')
+
+        new_files = glob.glob(pattern)
+        new_files.sort()
+        if new_files and not self.config.overwrite_extraction:
+            logging.info("Frames have already been extracted and overwrite_extraction is False.")
+            if calib_type == 'intrinsic':
+                self.intrinsics_files = new_files
+            else:
+                self.extrinsics_files = new_files
+            return
+
+        try:
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                raise Exception("Video capture could not be opened.")
+        except Exception as e:
+            logging.error(f"Failed to open video capture for {video_path}. Error: {e}")
+            raise ValueError(f"The file {video_path} does not appear to be a valid video.")
+        
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps == 0:
+            cap.release()
+            logging.error("FPS is 0, cannot extract frames.")
+            raise ValueError("FPS is 0, cannot extract frames.")
+        fps = round(fps)
+
+        frame_nb = 0
+        logging.info("Extracting frames...")
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            # Extract one frame every (fps * extract_every_N_sec) frames.
+            if frame_nb % (fps * self.config.extract_every_N_sec) == 0:
+                img_path = os.path.join(directory, base_name + '_' + str(frame_nb).zfill(5) + '.png')
+                cv2.imwrite(img_path, frame)
+            frame_nb += 1
+        cap.release()
+
+        new_files = glob.glob(pattern)
+        new_files.sort()
+        if calib_type == 'intrinsic':
+            self.intrinsics_files = new_files
+        else:
+            self.extrinsics_files = new_files
+
+    @abc.abstractmethod
+    def determine_frame_rate(self):
+        pass
+
+    def calculate_calibration_residuals(self, calib_type):
+        if len(self.S) != 0 and len(self.D) != 0 and len(self.K) != 0 and len(self.R) != 0 and len(self.T) != 0:
+            # r_trans, t_trans = world_to_camera_persp(self.R, self.T)
+            # self.R = np.array(cv2.Rodrigues(r_trans)[0]).flatten()
+            # self.T = np.array(t_trans)
+
+            f_px = self.K[0, 0]
+            Dm = euclidean_distance(self.T, [0, 0, 0])
+
+            if calib_type in ['convert_qualisys', 'convert_vicon', 'convert_opencap', 'convert_biocv']:
+                self.ret_mm = np.around(self.ret, decimals=3)
+                self.ret_px = np.around(self.ret / (Dm * 1000) * f_px, decimals=3)
+            elif calib_type in ['calculate']:
+                self.ret_px = np.around(self.ret, decimals=3)
+                self.ret_mm = np.around(self.ret * Dm * 1000 / f_px, decimals=3)
+
+            logging.info(f"Residual (RMS) calibration errors for camera {self.name}: {self.ret_px} px, which corresponds to {self.ret_mm} mm.")
+
 
     @abc.abstractmethod
     def determine_frame_rate(self):

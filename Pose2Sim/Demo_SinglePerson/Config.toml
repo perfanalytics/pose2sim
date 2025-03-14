@@ -45,7 +45,7 @@ calib_intrinsics = "intrinsics/int_cam01_img/"
 calib_extrinsics = "extrinsincs/ext_cam01_img/"
 
 [[sources]]
-name = "video2"
+name = "cam02"
 path = "videos/cam02.mp4"
 frame_rate = "auto"
 frame_range = []
@@ -55,7 +55,7 @@ calib_intrinsics = "intrinsics/int_cam02_img/"
 calib_extrinsics = "extrinsincs/ext_cam02_img/"
 
 [[sources]]
-name = "webcam3"
+name = "cam03"
 path = 1 # webcam id
 frame_rate = "auto"
 calib_intrinsics = "intrinsics/int_cam03_img/"

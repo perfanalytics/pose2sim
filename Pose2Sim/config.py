@@ -235,10 +235,7 @@ class SubConfig:
         return pose2sim_path / "OpenSim_Setup"
 
     def calibrate_sources(self):
-        calib = self.calib_file
-        if calib == None:
-            raise FileNotFoundError("No calibration file found.")
-        calib_data = toml.load(calib)
+        calib_data = toml.load(self.calib_file)
         for source in self.sources:
             if source.name in calib_data:
                 data = calib_data[source.name]
@@ -249,8 +246,7 @@ class SubConfig:
                 source.R = [0.0, 0.0, 0.0]
                 source.T = [0.0, 0.0, 0.0]
             else :
-                logging.exception(f"The source {source.name} does not already have a calibration config.")
-                raise ValueError(f"The source {source.name} does not already have a calibration config.")
+                logging.info(f"The source {source.name} does not already have a calibration config.")
 
     def get_calibration_params(self):
         '''
@@ -264,6 +260,8 @@ class SubConfig:
         In case of error (unknown calibration type or missing file), raises an exception.
         '''
         calib_type = self.calibration.get("calibration_type")
+        overwrite_intrinsics = self.calibration.get("calculate", {}).get("intrinsics", {}).get("overwrite_intrinsics", False)
+        overwrite_extrinsics = True
 
         if calib_type == "convert":
             convert_path = self.calibration.get("convert", {}).get("convert_from")
@@ -275,9 +273,43 @@ class SubConfig:
 
             if not os.path.exists(convert_path):
                 raise NameError(f"File {convert_path} not found in {self.calib_dir}.")
-
+            
             filename = os.path.basename(convert_path).lower()
 
+        if self.calib_file:
+            self.calibrate_sources()
+            data = toml.load(self.calib_output_path)
+        else:
+            data = {}
+
+        for source in self.sources:
+            if not overwrite_intrinsics and source.S and source.D and source.K:
+                logging.info(
+                    f"[{source.name} - intrinsic] Preexisting intrinsic calibration found in '{self.calib_file}'."
+                )
+                logging.info(
+                    'To recalculate, set "overwrite_intrinsics" to true in Config.toml.'
+                )
+            else:
+                if calib_type == "convert":
+                    source.intrinsics_files = filename
+                elif calib_type == "calculate":
+                    source.intrinsics_files = source.get_calib_files(source.calib_intrinsics, self.intrinsics_extension, "intrinsics")
+
+            if not overwrite_extrinsics and source.R and source.T:
+                logging.info(
+                    f"[{source.name} - entrinsic] Preexisting extrinsic calibration found in '{self.calib_file}'."
+                )
+                logging.info(
+                    'To recalculate, set "overwrite_extrinsics" to true in Config.toml.'
+                )
+            else:
+                if calib_type == "convert":
+                    source.extrinsics_files = filename
+                elif calib_type == "calculate":
+                    source.extrinsics_files = source.get_calib_files(source.calib_extrinsics, self.extrinsics_extension, "extrinsics")
+
+        if calib_type == "convert":
             if filename.endswith(".qca.txt"):
                 convert_filetype = "qualisys"
                 binning_factor = self.calibration.get("convert", {}).get("qualisys", {}).get("binning_factor", 1)
@@ -302,48 +334,30 @@ class SubConfig:
             else:
                 raise NameError(f"File {filename} not supported for conversion.")
 
-            calib_output_path = os.path.join(self.calib_dir, f"Calib_{convert_filetype}.toml")
             calib_type = f"{calib_type}_{convert_filetype}"
             args_calib = [self, convert_path, binning_factor]
 
         elif calib_type == "calculate":
-            for source in self.sources:
-                source.extrinsics_files = source.get_calib_files(source.calib_extrinsics, self.extrinsics_extension)
-                source.intrinsics_files = source.get_calib_files(source.calib_intrinsics, self.intrinsics_extension)
-            calib_output_path = os.path.join(self.calib_dir, f"Calib_{self.extrinsics_method}.toml")
-            args_calib = self
+            args_calib = [self]
 
         else:
             logging.info("Invalid calibration_type in Config.toml")
             return ValueError("Invalid calibration_type in Config.toml")
 
-        return calib_type, args_calib, calib_output_path
+
+        return calib_type, args_calib, data
 
     @property
     def calib_file(self):
-        calib_file = glob.glob(os.path.join(self.calib_dir, "Calib*.toml"))
+        calib_file = glob.glob(os.path.join(self.calib_dir, "Calib.toml"))
         if len(calib_file) == 0:
-            logging.error("No calibration file found.")
+            logging.info("No existing calibration file found.")
             return None
-        if len(calib_file) > 1:
-            logging.error("Multiple calibration files found.")
-            raise ValueError("Multiple calibration files found.")
         return calib_file[0]
-
-    @property
-    def overwrite_intrinsics(self):
-        overwrite_intrinsics = self.calibration.get("calculate", {}).get("intrinsics", {}).get("overwrite_intrinsics", False)
-
-        use_existing_intrinsics = not overwrite_intrinsics and bool(self.calib_file)
-
-        if use_existing_intrinsics:
-            logging.info(f"\nPreexisting calibration file found: '{self.calib_file}'.")
-            logging.info(
-                "\nRetrieving intrinsic parameters from file. "
-                'Set "overwrite_intrinsics" to true in Config.toml to recalculate them.'
-            )
-
-        return use_existing_intrinsics
+    
+    @property 
+    def calib_output_path(self):
+        return os.path.join(self.calib_dir, f"Calib.toml")
 
     @property 
     def intrinsics_extension(self):
