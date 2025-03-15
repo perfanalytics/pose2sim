@@ -23,8 +23,11 @@ import pandas as pd
 from pathlib import Path
 from copy import deepcopy
 import numpy as np
+import re
+import json
+import ast
 
-from Pose2Sim.model import PoseModel
+from Pose2Sim.model import PoseModel, PoseModelEnum
 from Pose2Sim.common import natural_sort_key, zup2yup
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.source import WebcamSource, ImageSource, VideoSource
@@ -42,6 +45,25 @@ class SubConfig:
         self.session_dir = session_dir
         self.subjects = self.subjects()
         self.sources = self.sources()
+        self.pose_model = self.pose_model()
+
+    def pose_model(self):
+        mapping = {
+            'BODY_WITH_FEET': 'HALPE_26',
+            'WHOLE_BODY_WRIST': 'COCO_133_WRIST',
+            'WHOLE_BODY': 'COCO_133',
+            'BODY': 'COCO_17',
+            'HAND': 'HAND_21',
+            'FACE': 'FACE_106',
+            'ANIMAL': 'ANIMAL2D_17',
+        }
+        key = self.pose.get("pose_model").upper()
+        if key in mapping:
+            key = mapping[key]
+        try:
+            return PoseModelEnum[key]
+        except KeyError:
+            raise ValueError(f"{self.pose.get("pose_model")}")
 
     def subjects(self):
         """
@@ -214,13 +236,6 @@ class SubConfig:
         return self._config.get("pose", {})
 
     @property
-    def pose_model(self):
-        '''
-        Returns the PoseModel object initialized from the configuration.
-        '''
-        return PoseModel.from_config(self.pose.get("pose_model"))
-
-    @property
     def osim_setup_dir(self):
         '''
         Returns the path to the 'OpenSim_Setup' directory within the Pose2Sim package.
@@ -390,6 +405,18 @@ class SubConfig:
         else:
             return self.calibration.get("calculate", {}).get("extrinsics", {}).get("scene", {}).get("show_reprojection_error")
 
+    @property 
+    def backend(self):
+        self.pose.get('backend')
+
+    @property 
+    def device(self):
+        self.pose.get('device')
+
+    @property 
+    def frame_rate(self):
+        return self._config.get("project", {}).get("frame_rate")
+
     def get_filtering_params(self):
         '''
         Returns parameters related to data filtering, such as input TRC paths,
@@ -403,23 +430,12 @@ class SubConfig:
         video_dir = os.path.join(self.project_dir, "videos")
         vid_img_extension = self.pose_conf.get("vid_img_extension")
         video_files = glob.glob(os.path.join(video_dir, "*" + vid_img_extension))
-        frame_rate = self._config.get("project", {}).get("frame_rate")
-
-        if frame_rate == "auto":
-            try:
-                cap = cv2.VideoCapture(video_files[0])
-                cap.read()
-                if cap.read()[0] is False:
-                    raise ValueError("Could not read frame.")
-                frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
-            except:
-                frame_rate = 60
 
         trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, "*.trc")) if "filt" not in file]
         trc_f_out = [f"{os.path.basename(t).split('.')[0]}_filt_{filter_type}.trc" for t in trc_path_in]
         trc_path_out = [os.path.join(pose3d_dir, t) for t in trc_f_out]
 
-        return trc_path_in, trc_path_out, filter_type, frame_rate, display_figures, make_c3d
+        return trc_path_in, trc_path_out, filter_type, display_figures, make_c3d
 
     def get_kinematics_params(self):
         '''
@@ -602,12 +618,8 @@ class SubConfig:
         poseSync_dir = os.path.join(self.project_dir, "pose-sync")
         poseTracked_dir = os.path.join(self.project_dir, "pose-associated")
         error_threshold_triangulation = self.triangulation.get("reproj_error_threshold_triangulation")
-
-        # Retrieve keypoints from model
-        model = self.pose_model.load_model_instance()
-
+    
         return (
-            model,
             pose_dir,
             poseSync_dir,
             poseTracked_dir,
@@ -736,90 +748,80 @@ class SubConfig:
         '''
         Returns the parameters required for pose estimation.
         '''
-        multi_person = self.project.get("multi_person")
-        video_dir = os.path.join(self.project_dir, "videos")
-        pose_dir = os.path.join(self.project_dir, "pose")
+        # Read config
+        pose_dir = os.path.join(self.project_dir, 'pose')
+        overwrite_pose = self.pose.get('overwrite_pose')
+        
+        for source in self.sources:
+            if not isinstance(source, WebcamSource):
+                if os.path.exists(os.path.join(pose_dir, source.name)) and not overwrite_pose:
+                    logging.info(f'[{source.name} - pose estimation] Skipping as it has already been done.'
+                                'To recalculate, set overwrite_pose to true in Config.toml.')
+                    return
+                elif os.path.exists(os.path.join(pose_dir, source.name)) and overwrite_pose:
+                    logging.info(f'[{source.name} - pose estimation] Overwriting estimation results.')
 
-        mode = self.pose.get("mode")  # e.g. lightweight, balanced, performance
-        vid_img_extension = self.pose.get("vid_img_extension")
-        output_format = self.pose.get("output_format")
-        save_video = "to_video" in self.pose.get("save_video", [])
-        save_images = "to_images" in self.pose.get("save_video", [])
-        display_detection = self.pose.get("display_detection")
-        overwrite_pose = self.pose.get("overwrite_pose")
-        det_frequency = self.pose.get("det_frequency")
-        tracking_mode = self.pose.get("tracking_mode")
-        deepsort_params = self.pose.get("deepsort_params")
+        display_detection = self.pose.get('display_detection')
+        capture_mode = self.pose.get('capture_mode', 'continuous')
+        save_files = self.pose.get('save_video', [])
+        save_images = ('to_images' in save_files)
+        save_video = ('to_video' in save_files)
+        combined_frames = self.pose.get('combined_frames')
+        multi_workers = self.pose.get('multi_workers')
+        multi_person = self.project.get('multi_person')
+        output_format = self.project.get('output_format', 'openpose')
+        webcam_recording = self.pose.get('webcam_recording')
+        tracking_mode = self.pose.get('tracking_mode')
+        deepsort_params = self.pose.get('deepsort_params')
+        
+        det_frequency = self.pose.get('det_frequency')
 
-        backend = self.pose.get("backend")
-        device = self.pose.get("device")
-
-        # Determine frame rate
-        video_files = glob.glob(os.path.join(video_dir, "*" + vid_img_extension))
-        frame_rate = self.project.get("frame_rate")
-        if frame_rate == "auto":
-            try:
-                cap = cv2.VideoCapture(video_files[0])
-                if not cap.isOpened():
-                    raise FileNotFoundError(
-                        f"Error: Could not open {video_files[0]}. Check that the file exists."
-                    )
-                frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
-                if frame_rate == 0:
-                    frame_rate = 30
-                    logging.warning(
-                        f"Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps."
-                    )
-            except:
-                frame_rate = 30
-
-        if det_frequency > 1:
-            logging.info(
-                f"Inference is only run every {det_frequency} frames. In-between frames, pose estimation tracks previously detected points."
-            )
-        elif det_frequency == 1:
-            logging.info("Inference is run on every single frame.")
-        else:
-            raise ValueError(
-                f"Invalid det_frequency: {det_frequency}. Must be an integer >= 1."
-            )
-
-        # Example usage check
-        try:
-            pose_listdirs_names = next(os.walk(pose_dir))[1]
-            _ = os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
-        except StopIteration:
-            pass
-
-        if not overwrite_pose:
-            logging.info(
-                "Skipping pose estimation since it was already done. "
-                "Set 'overwrite_pose' to true in Config.toml to run again."
-            )
-        else:
-            logging.info(
-                "Overwriting previous pose estimation. "
-                "Set 'overwrite_pose' to false in Config.toml to keep the previous results."
-            )
-            raise  # Intentionally raise to demonstrate logic flow
+        frame_rate = 999
+        for source in self.sources:
+            frame_rate = min(source.frame_rate, frame_rate)
 
         return (
             frame_rate,
-            mode,
             output_format,
             save_video,
             save_images,
             display_detection,
             multi_person,
             det_frequency,
-            video_dir,
-            vid_img_extension,
+            capture_mode,
+            combined_frames,
+            multi_workers,
+            webcam_recording,
             det_frequency,
             tracking_mode,
             deepsort_params,
-            backend,
-            device,
         )
+
+    def get_custom_model_params(self):
+        try:
+            mode = ast.literal_eval(mode)
+        except:  # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+            mode = mode.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/', ':/').replace('":"\\', ':\\')
+            mode = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', mode)  # changes "[640", "640]" to [640,640]
+            mode = json.loads(mode)
+        det_class = mode.get('det_class')
+        det = mode.get('det_model')
+        det_input_size = mode.get('det_input_size')
+        pose_class = mode.get('pose_class')
+        pose = mode.get('pose_model')
+        pose_input_size = mode.get('pose_input_size')
+        
+        return det_class, det, det_input_size, pose_class, pose, pose_input_size
+    
+    def get_deepsort_params(self):
+        try:
+            deepsort_params = ast.literal_eval(deepsort_params)
+        except:  # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+            deepsort_params = deepsort_params.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/', ':/').replace('":"\\', ':\\')
+            deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params)  # changes "[640", "640]" to [640,640]
+            deepsort_params = json.loads(deepsort_params)
+        
+        return deepsort_params
 
     def get_person_association_params(self):
         '''
@@ -837,9 +839,6 @@ class SubConfig:
         error_threshold_tracking = self.personAssociation.get("single_person", {}).get("reproj_error_threshold_association")
         likelihood_threshold_association = self.personAssociation.get("likelihood_threshold_association")
 
-        # Retrieve keypoints from model
-        model = self.pose_model.load_model_instance()
-
         try:
             calib_dir = [
                 os.path.join(self.session_dir, c)
@@ -856,7 +855,6 @@ class SubConfig:
         return (
             project_dir,
             self.session_dir,
-            model,
             pose_dir,
             poseSync_dir,
             poseTracked_dir,

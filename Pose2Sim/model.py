@@ -1,11 +1,12 @@
-import logging
 from enum import Enum
-from rtmlib import BodyWithFeet, Wholebody, Body, Hand
+from functools import partial
+import logging
 from anytree.importer import DictImporter
 
+from rtmlib import BodyWithFeet, Wholebody, Body, Hand, Custom
 from Pose2Sim.skeletons import HALPE_26, COCO_133_WRIST, COCO_133, COCO_17, HAND_21, FACE_106, ANIMAL2D_17, BODY_25B, BODY_25, BODY_135, BLAZEPOSE, HALPE_68, HALPE_136, COCO, MPII
 
-class PoseModel(Enum):
+class PoseModelEnum(Enum):
     BODY_25B       = ('Markers_Body25b.xml',      'Scaling_Setup_Pose2Sim_Body25b.xml',      'IK_Setup_Pose2Sim_Body25b.xml')
     BODY_25        = ('Markers_Body25.xml',       'Scaling_Setup_Pose2Sim_Body25.xml',       'IK_Setup_Pose2Sim_Body25.xml')
     BODY_135       = ('Markers_Body135.xml',      'Scaling_Setup_Pose2Sim_Body135.xml',      'IK_Setup_Pose2Sim_Body135.xml')
@@ -22,38 +23,12 @@ class PoseModel(Enum):
         self.marker_file = marker_file
         self.scaling_file = scaling_file
         self.ik_file = ik_file
-
-    @classmethod
-    def from_config(cls, pose_model_str: str) -> "PoseModel":
-        """
-        Transforme la chaîne de config en valeur canonique de l’énumération.
-        Par exemple :
-          - "BODY_WITH_FEET"  → "HALPE_26"
-          - "WHOLE_BODY_WRIST" → "COCO_133_WRIST"
-          - "WHOLE_BODY"      → "COCO_133"
-          - "BODY"            → "COCO_17"
-        """
-        mapping = {
-            'BODY_WITH_FEET': 'HALPE_26',
-            'WHOLE_BODY_WRIST': 'COCO_133_WRIST',
-            'WHOLE_BODY': 'COCO_133',
-            'BODY': 'COCO_17',
-            'HAND': 'HAND_21',
-            'FACE': 'FACE_106',
-            'ANIMAL': 'ANIMAL2D_17',
-        }
-        key = pose_model_str.upper()
-        if key in mapping:
-            key = mapping[key]
-        try:
-            return cls[key]
-        except KeyError:
-            raise ValueError(f'{pose_model_str}')
+        self.model_class = self.get_model_class()
+        self.skeleton = self.get_skeleton()
 
     def get_model_class(self):
         """
         Renvoie la classe associée au modèle de pose.
-        Les classes (BodyWithFeet, Wholebody, Body, Hand, etc.) doivent être importées.
         """
         if self.name == 'HALPE_26':
             logging.info("Using HALPE_26 model (body and feet) for pose estimation.")
@@ -79,8 +54,7 @@ class PoseModel(Enum):
 
     def get_skeleton(self):
         """
-        Renvoie le squelette (l'arbre des keypoints) associé au modèle.
-        Plutôt que d'utiliser eval(), on définit une correspondance explicite.
+        Renvoie le squelette associé au modèle.
         """
         mapping = {
             'BODY_25B':      BODY_25B,
@@ -96,30 +70,100 @@ class PoseModel(Enum):
             'HAND_21':       HAND_21,
             'FACE_106':      FACE_106,
             'ANIMAL2D_17':   ANIMAL2D_17,
-            'COCO':   COCO,
-            'MPII':   MPII,
+            'COCO':          COCO,
+            'MPII':          MPII,
         }
         try:
             return mapping[self.name]
         except KeyError:
             raise ValueError(f"Aucun squelette défini pour le modèle {self.name}.")
 
+
+# Classe wrapper qui encapsule une instance de l'énumération
+class PoseModel:
+    def __init__(self, config, pose_model):
+        self.pose_model = pose_model
+        self.config = config
+
+        self.mode = config.pose.get('mode')
+        self.backend = None
+        self.device = None
+        self.det_input_size = None
+
+    @classmethod
     def load_model_instance(self):
-        """
-        Tente de charger l'instance du modèle.
-        On récupère la classe associée et le squelette correspondant
-        à l'aide de get_model_class() et get_skeleton().
-        En cas d'échec, on essaie avec DictImporter.
-        """
-        model_class = self.get_model_class()
+
+        self.backend, self.device = init_backend_device(self.config.backend, self.config.device)
+
+        model_class = self.pose_model.model_class
+
+        self.det_input_size = model_class.MODE[self.config.mode]['det_input_size']
+        # Correction de la condition (ajout de deux-points et utilisation de "not in")
+        if self.config.mode not in ['lightweight', 'balanced', 'performance']:
+            if model_class is None:
+                try:
+                    det_class, det, self.det_input_size, pose_class, pose, pose_input_size = self.config.get_custom_model_params()
+                    model_class = partial(Custom,
+                                          det_class=det_class, det=det, det_input_size=self.det_input_size,
+                                          pose_class=pose_class, pose=pose, pose_input_size=pose_input_size,
+                                          backend=self.backend, device=self.device)
+                except Exception:
+                    raise NameError(f"Model {self.name} not found in rtmlib nor in Config.toml")
+            else:
+                raise NameError("Invalid mode. Must be 'lightweight', 'balanced', 'performance', or a dictionary of parameters defined in Config.toml.")
+
         try:
-            skeleton = self.get_skeleton()
-            return model_class, skeleton
+            skeleton = self.pose_model.skeleton
         except Exception:
             try:
-                pose_instance = DictImporter().import_(self.name)
-                if pose_instance.id == 'None':
-                    pose_instance.id = None
-                return model_class, pose_instance
+                skeleton = DictImporter().import_(self.name)
+                if skeleton.id == 'None':
+                    skeleton.id = None
             except Exception:
-                raise NameError(f"{self.name} not found in skeletons.py nor in Config.toml")
+                raise NameError(f"Skeleton {self.name} not found in skeletons.py nor in Config.toml")
+
+        logging.info(f'\nPose tracking set up for "{self.name}" model.')
+        logging.info(f'Mode: {self.config.mode}.')
+        return model_class, skeleton
+
+
+def init_backend_device(backend, device):
+    '''
+    Set up the backend and device for the pose tracker based on the availability of hardware acceleration.
+    TensorRT is not supported by RTMLib yet: https://github.com/Tau-J/rtmlib/issues/12
+
+    If device and backend are not specified, they are automatically set up in the following order of priority:
+    1. GPU with CUDA and ONNXRuntime backend (if CUDAExecutionProvider is available)
+    2. GPU with ROCm and ONNXRuntime backend (if ROCMExecutionProvider is available, for AMD GPUs)
+    3. GPU with MPS or CoreML and ONNXRuntime backend (for macOS systems)
+    4. CPU with OpenVINO backend (default fallback)
+    '''
+
+    if device == 'auto' or backend == 'auto':
+        if device != 'auto' or backend != 'auto':
+            logging.warning("If you set device or backend to 'auto', you must set the other to 'auto' as well. Both device and backend will be determined automatically.")
+
+        try:
+            import torch # type: ignore
+            import onnxruntime as ort # type: ignore
+            if torch.cuda.is_available() and 'CUDAExecutionProvider' in ort.get_available_providers():
+                logging.info("Valid CUDA installation found: using ONNXRuntime backend with GPU.")
+                return 'onnxruntime', 'cuda'
+            elif torch.cuda.is_available() and 'ROCMExecutionProvider' in ort.get_available_providers():
+                logging.info("Valid ROCM installation found: using ONNXRuntime backend with GPU.")
+                return 'onnxruntime', 'rocm'
+            else:
+                raise
+        except:
+            try:
+                import onnxruntime as ort # type: ignore
+                if ('MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers()):
+                    logging.info("Valid MPS installation found: using ONNXRuntime backend with GPU.")
+                    return 'onnxruntime', 'mps'
+                else:
+                    raise
+            except:
+                logging.info("No valid CUDA installation found: using OpenVINO backend with CPU.")
+                return 'openvino', 'cpu'
+    else:
+        return backend.lower(), device.lower()

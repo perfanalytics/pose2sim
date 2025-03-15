@@ -21,7 +21,7 @@ class BaseSource(abc.ABC):
         self.config = config
         self.data = data
         self.name = data.get("name")
-        self.frame_rate = data.get("frame_rate")
+        self.frame_rate_config = data.get("frame_rate")
 
         self.extrinsics_files = {}
         self.intrinsics_files = {}
@@ -123,7 +123,8 @@ class WebcamSource(BaseSource):
         super().__init__(subconfig, data)
         self.camera_index = data.get("path", 0)
 
-    def determine_frame_rate(self):
+    @property
+    def frame_rate(self):
         if self.frame_rate_config == "auto":
             return None
         else:
@@ -134,11 +135,12 @@ class VideoSource(BaseSource):
         super().__init__(subconfig, data)
         self.video_path = data.get("path")
 
-    def determine_frame_rate(self):
-        if self.frame_rate != "auto":
+    @property
+    def frame_rate(self):
+        if self.frame_rate_config != "auto":
             return None
         else:
-            return self.frame_rate
+            return self.frame_rate_config
 
 class ImageSource(BaseSource):
     def __init__(self, subconfig, data: dict):
@@ -146,9 +148,10 @@ class ImageSource(BaseSource):
         self.image_dir = data.get("path")
         self.image_extension = data.get("extension", "*.png")
 
-    def determine_frame_rate(self):
-        if self.frame_rate == "auto":
+    @property
+    def frame_rate(self):
+        if self.frame_rate_config == "auto":
             return 60
         else:
-            return self.frame_rate
+            return self.frame_rate_config
 
