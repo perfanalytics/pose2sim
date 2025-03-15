@@ -12,7 +12,7 @@ dist/
 **/*.c3d
 **/*.json
 
-**/Calib_qualisys.toml
+**/Calib.toml
 **/pose-3d/
 **/pose/
 **/pose-sync/
