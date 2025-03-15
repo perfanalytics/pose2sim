@@ -29,7 +29,7 @@ from Pose2Sim.common import natural_sort_key, zup2yup
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.source import WebcamSource, ImageSource, VideoSource
 from Pose2Sim.subject import Subject
-from Pose2Sim.calibration import QcaCalibration, OptitrackCalibration, ViconCalibration, EasyMocapCalibration, BiocvCalibration, OpencapCalibration, CheckerboardCalibration
+from Pose2Sim.calibration import QcaCalibration, OptitrackCalibration, ViconCalibration, EasyMocapCalibration, BiocvCalibration, OpencapCalibration, PointCalibration
 
 
 class SubConfig:
@@ -348,7 +348,7 @@ class SubConfig:
         elif calib_type == "calculate":
             if extrinsinc:
                 trc_write(self.object_coords_3d, os.path.join(self.calib_dir, f'Object_points.trc'))
-            calibration = CheckerboardCalibration(self, None)
+            calibration = PointCalibration(self, None)
 
         else:
             logging.info("Invalid calibration_type in Config.toml")

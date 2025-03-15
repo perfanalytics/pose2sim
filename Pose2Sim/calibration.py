@@ -102,7 +102,6 @@ class QcaCalibration(Calibration):
 
             # Intrinsic calibration block
             if len(source.intrinsics_files) != 0:
-                # The intrinsic residual error is taken from the config file attribute.
                 source.ret_int = float(tag.attrib.get('avg-residual'))
                 video_res = tag.attrib.get('video_resolution')
                 res_value = int(video_res[:-1]) if video_res is not None else 1080
@@ -131,8 +130,8 @@ class QcaCalibration(Calibration):
                 # Warn if intrinsic calibration has not been performed.
                 if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
                     logging.warning(f"You should not calibrate the extrinsics of {source.name} without first calibrating the intrinsics.")
-                # For extrinsics, the residual error is not provided by the file so we set it empty.
-                source.ret = []
+
+                source.ret = None
                 transform_tag = transform_tags[i]
                 r11 = float(transform_tag.get('r11'))
                 r12 = float(transform_tag.get('r12'))
@@ -192,8 +191,7 @@ class ViconCalibration(Calibration):
             
             # Intrinsic calibration block
             if len(source.intrinsics_files) != 0:
-                # Use intrinsic residual error provided by the config file.
-                source.ret_int = keyframe.attrib.get('WORLD_ERROR')
+                source.ret_int = float(keyframe.attrib.get('WORLD_ERROR'))
                 source.S = [float(t) for t in cam_elem.attrib.get('SENSOR_SIZE').split()]
                 fu = float(keyframe.attrib.get('FOCAL_LENGTH'))
                 pixel_aspect = float(cam_elem.attrib.get('PIXEL_ASPECT_RATIO'))
@@ -214,7 +212,8 @@ class ViconCalibration(Calibration):
             if len(source.extrinsics_files) != 0:
                 if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
                     logging.warning(f"You should not calibrate the extrinsics of {source.name} without first calibrating the intrinsics.")
-                source.ret = []
+
+                source.ret = None
                 rot = keyframe.attrib.get('ORIENTATION').split()
                 R_quat = [float(r) for r in rot]
                 r_orig = quat2mat(R_quat, scalar_idx=3)
@@ -244,7 +243,7 @@ class EasyMocapCalibration(Calibration):
                 continue
             if len(source.intrinsics_files) != 0:
                 K_mat = intrinsic_yml.getNode(f'K_{name}').mat()
-                source.ret_int = []  # No intrinsic error provided in the file
+                source.ret_int = None
                 source.S = [K_mat[0, 2] * 2, K_mat[1, 2] * 2]
                 source.K = K_mat
                 source.D = intrinsic_yml.getNode(f'dist_{name}').mat().flatten()[:-1]
@@ -264,9 +263,9 @@ class EasyMocapCalibration(Calibration):
                 if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
                     logging.warning(f"You should not calibrate the extrinsics of {source.name} without first calibrating the intrinsics.")
 
+                source.ret = None
                 source.R = extrinsic_yml.getNode(f'R_{name}').mat().flatten()
                 source.T = extrinsic_yml.getNode(f'T_{name}').mat().flatten()
-                source.ret = []
 
 
 class BiocvCalibration(Calibration):
@@ -288,7 +287,7 @@ class BiocvCalibration(Calibration):
                 logging.warning(f"No source linked to config name: '{name}'.")
                 continue
             if len(source.intrinsics_files) != 0:
-                source.ret_int = []  # No intrinsic error provided
+                source.ret_int = None
                 source.S = [float(calib_data[0]), float(calib_data[1])]
                 source.K = np.array([
                     list(map(float, calib_data[2].split())),
@@ -301,7 +300,8 @@ class BiocvCalibration(Calibration):
             if len(source.extrinsics_files) != 0:
                 if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
                     logging.warning(f"You should not calibrate the extrinsics of {source.name} without first calibrating the intrinsics.")
-                source.ret = []
+
+                source.ret = None
                 RT = np.array([list(map(float, line.split())) for line in calib_data[6:9]])
                 source.R = cv2.Rodrigues(RT[:, :3])[0].squeeze()
                 source.T = RT[:, 3] / 1000
@@ -326,7 +326,7 @@ class OpencapCalibration(Calibration):
                 logging.warning(f"No source linked to config name: '{name}'.")
                 continue
             if len(source.intrinsics_files) != 0:
-                source.ret_int = []  # No intrinsic error provided
+                source.ret_int = None
                 source.S = list(map(float, calib_data['imageSize'].squeeze()[:-1]))
                 source.D = list(map(float, calib_data['distortion'][0][:-1]))
                 source.K = calib_data['intrinsicMat']
@@ -335,7 +335,8 @@ class OpencapCalibration(Calibration):
             if len(source.extrinsics_files) != 0:
                 if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
                     logging.warning(f"You should not calibrate the extrinsics of {source.name} without first calibrating the intrinsics.")
-                source.ret = []
+
+                source.ret = None
                 R_cam = calib_data['rotation']
                 T_cam = calib_data['translation'].squeeze()
                 # Convert from world frame to camera frame
@@ -348,24 +349,24 @@ class OpencapCalibration(Calibration):
                 source.T = T_cam / 1000
 
 
-class CheckerboardCalibration(Calibration):
+class PointCalibration(Calibration):
     """
-    Calibrates intrinsic and extrinsic parameters using images or videos of a checkerboard.
+    Calibrates intrinsic and extrinsic parameters using images or videos.
     
-    For intrinsic calibration, this class detects the board corners, computes the intrinsic matrix,
-    distortion parameters, and the intrinsic residual error. For extrinsic calibration, it either
-    uses board detection or manual clicking to compute the camera pose and then calculates the reprojection error.
+    For intrinsic calibration, computes the intrinsic matrix,
+    distortion parameters, and the intrinsic residual error. For extrinsic calibration,
+    compute the camera pose and then calculates the reprojection error.
     """
     def calibrate(self, files_to_convert_paths):
         for source in self.config.sources:
             # Intrinsic calibration block (using a checkerboard)
             if len(source.intrinsics_files) != 0:
+                logging.info(f'Intrinsic calibration for {source.name}:')
                 objp = np.zeros((self.config.intrinsics_corners_nb[0] * self.config.intrinsics_corners_nb[1], 3), np.float32)
                 objp[:, :2] = np.mgrid[0:self.config.intrinsics_corners_nb[0], 0:self.config.intrinsics_corners_nb[1]].T.reshape(-1, 2)
                 objp[:, :2] *= self.config.intrinsics_square_size
                 objpoints = []  # 3D points in world space
                 imgpoints = []  # 2D points in image plane
-                logging.info(f'Intrinsic calibration for {source.name}:')
                 source.extract_frames('intrinsic')
                 for img_path in source.intrinsics_files:
                     imgp_confirmed, objp_confirmed = findCorners(img_path, self.config.intrinsics_corners_nb, objp=objp, show=self.config.show_detection_intrinsics)
@@ -377,11 +378,11 @@ class CheckerboardCalibration(Calibration):
                 img = cv2.imread(str(img_path))
                 objpoints = np.array(objpoints)
                 ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
-                    objpoints, imgpoints, img.shape[1:-1], None, None,
+                    objpoints, imgpoints, img.shape[1::-1], None, None,
                     flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_USE_LU)
                 )
                 h, w = img.shape[:2]
-                source.ret_int = ret_cam  # Intrinsic reprojection error in pixels
+                source.ret_int = ret_cam
                 source.S = [w, h]
                 source.K = dist[0]
                 source.D = mtx
@@ -390,18 +391,19 @@ class CheckerboardCalibration(Calibration):
         
             # Extrinsic calibration block
             if len(source.extrinsics_files) != 0:
+                print(source.extrinsics_files)
                 if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
                     logging.warning(f"Cannot calibrate extrinsics for {source.name} without first calibrating intrinsics.")
                     raise ValueError(f"Cannot calibrate extrinsics for {source.name} without first calibrating intrinsics.")
-                logging.info(f'Extrinsic calibration for {source.name}.')
+                logging.info(f'Extrinsic calibration for {source.name}:')
                 source.extract_frames('extrinsic')
                 if self.config.extrinsics_method == 'board':
-                    imgp, objp = findCorners(source.extrinsic_files[0], self.config.extrinsics_corners_nb, objp=self.config.object_coords_3d, show=self.config.show_reprojection_error)
+                    imgp, objp = findCorners(source.extrinsics_files[0], self.config.extrinsics_corners_nb, objp=self.config.object_coords_3d, show=self.config.show_reprojection_error)
                     if len(imgp) == 0:
                         logging.exception('No corners detected. Use "scene" method or verify detection settings.')
                         raise ValueError('No corners detected.')
                 elif self.config.extrinsics_method == 'scene':
-                    imgp, objp = imgp_objp_visualizer_clicker(source.extrinsic_files[0], None, objp=self.config.object_coords_3d)
+                    imgp, objp = imgp_objp_visualizer_clicker(img, imgp=[], objp=self.config.object_coords_3d, img_path=source.extrinsics_files[0])
                     if len(imgp) == 0:
                         logging.exception('No points clicked (or fewer than required).')
                         raise ValueError('No points clicked (or fewer than required).')
@@ -494,7 +496,7 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
                     cv2.putText(img, str(i+1), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .8, (255, 255, 255), 7) 
                     cv2.putText(img, str(i+1), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .8, (0,0,0), 2) 
             
-            return imgp_objp_visualizer_clicker(img_path, imgp=imgp, objp=objp)
+            return imgp_objp_visualizer_clicker(img, imgp=imgp, objp=objp, img_path=img_path)
         else:
             return imgp
             
@@ -504,14 +506,14 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
         if show:
             # Visualizer and key press event handler
             logging.info(f'{os.path.basename(img_path)}: Corners not found: please label them by hand.')
-            return imgp_objp_visualizer_clicker(img_path, imgp=[], objp=objp)
+            return imgp_objp_visualizer_clicker(img, imgp=[], objp=objp, img_path=img_path)
         else:
             logging.info(f'{os.path.basename(img_path)}: Corners not found. To label them by hand, set "show_detection_intrinsics" to true in the Config.toml file.')
             return []
 
 
 ## TODO: NEED A REWORK !
-def imgp_objp_visualizer_clicker(img_path, imgp=[], objp=[]):
+def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     '''
     Shows image img. 
     If imgp is given, displays them in green
@@ -536,10 +538,10 @@ def imgp_objp_visualizer_clicker(img_path, imgp=[], objp=[]):
     OUTPUTS:
     - imgp_confirmed: image points that have been correctly identified. array of [[2d corner coordinates]]
     - only if objp!=[]: objp_confirmed: array of [3d corner coordinates]
-    '''                
-    img = cv2.imread(img_path)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    
+    '''
+    global old_image_path
+    old_image_path = img_path
+                                 
     def on_key(event):
         '''
         Handles key press events:
@@ -578,7 +580,12 @@ def imgp_objp_visualizer_clicker(img_path, imgp=[], objp=[]):
         if event.key == 'c':
             # TODO: RIGHT NOW, IF 'C' IS PRESSED ANOTHER TIME, OBJP_CONFIRMED AND IMGP_CONFIRMED ARE RESET TO []
             # We should reopen a figure without point on it
-            ax.imshow(img)
+            img_for_pointing = cv2.imread(old_image_path)
+            if img_for_pointing is None:
+                cap = cv2.VideoCapture(old_image_path)
+                ret, img_for_pointing = cap.read()
+            img_for_pointing = cv2.cvtColor(img_for_pointing, cv2.COLOR_BGR2RGB)
+            ax.imshow(img_for_pointing)
             # To update the image
             plt.draw()
 
@@ -799,9 +806,9 @@ def imgp_objp_visualizer_clicker(img_path, imgp=[], objp=[]):
     if 'imgp_confirmed' in globals() and 'objp_confirmed' in globals():
         return imgp_confirmed, objp_confirmed
     elif 'imgp_confirmed' in globals() and not 'objp_confirmed' in globals():
-        return imgp_confirmed
+        return imgp_confirmed, None
     else:
-        return
+        return None, None
 
 
 def toml_write(config, data, calibration):

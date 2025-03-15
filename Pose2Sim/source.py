@@ -29,7 +29,7 @@ class BaseSource(abc.ABC):
         self.calib_intrinsics = data.get("calib_intrinsics")
         self.calib_extrinsics = data.get("calib_extrinsics")
 
-        self.ret, self.ret_int, self.C, self.S, self.D, self.K, self.R, self.T = [], [], [], [], [], [], [], []
+        self.ret, self.ret_int, self.C, self.S, self.D, self.K, self.R, self.T = None, None, [], [], [], [], [], []
 
     def get_calib_files(self, folder, extension, calibration_name):
         if not os.path.isdir(os.path.join(self.config.calib_dir, folder)):
@@ -47,17 +47,24 @@ class BaseSource(abc.ABC):
 
         return files
 
-    def extract_frames(self, calib_type='intrinsic'):
+    def extract_frames(self, calib_type):
         files = self.intrinsics_files if calib_type == 'intrinsic' else self.extrinsics_files
+        folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
 
-        video_path = files[0]
+        try:
+            cap = cv2.VideoCapture(files[0])
+            if not cap.isOpened():
+                raise Exception("File could not be opened.")
 
-        directory = os.path.dirname(video_path)
-        base_name = os.path.splitext(os.path.basename(video_path))[0]
-        pattern = os.path.join(directory, base_name + '_*.png')
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            if frame_count == 1:
+                return
 
-        new_files = glob.glob(pattern)
-        new_files.sort()
+        except Exception as e:
+            logging.error(f"Files found in {folder} are not images or videos.")
+            raise ValueError(f"Files found in {folder} are not images or videos.")
+
+        new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
         if new_files and not self.config.overwrite_extraction:
             logging.info("Frames have already been extracted and overwrite_extraction is False.")
             if calib_type == 'intrinsic':
@@ -65,14 +72,6 @@ class BaseSource(abc.ABC):
             else:
                 self.extrinsics_files = new_files
             return
-
-        try:
-            cap = cv2.VideoCapture(video_path)
-            if not cap.isOpened():
-                raise Exception("Video capture could not be opened.")
-        except Exception as e:
-            logging.error(f"Failed to open video capture for {video_path}. Error: {e}")
-            raise ValueError(f"The file {video_path} does not appear to be a valid video.")
         
         fps = cap.get(cv2.CAP_PROP_FPS)
         if fps == 0:
@@ -89,12 +88,12 @@ class BaseSource(abc.ABC):
                 break
             # Extract one frame every (fps * extract_every_N_sec) frames.
             if frame_nb % (fps * self.config.extract_every_N_sec) == 0:
-                img_path = os.path.join(directory, base_name + '_' + str(frame_nb).zfill(5) + '.png')
+                img_path = os.path.join(folder, self.name + '_' + str(frame_nb).zfill(5) + '.png')
                 cv2.imwrite(img_path, frame)
             frame_nb += 1
         cap.release()
 
-        new_files = glob.glob(pattern)
+        new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
         new_files.sort()
         if calib_type == 'intrinsic':
             self.intrinsics_files = new_files
@@ -106,13 +105,12 @@ class BaseSource(abc.ABC):
             f_px = self.K[0, 0]
             Dm = np.linalg.norm(self.T)
 
-            self.ret_int_px = np.around(np.array(self.ret_int), decimals=3)
-            self.ret_px = np.around(np.array(self.ret), decimals=3)
-            
-            if len(self.reret_int_px) != 0:
-                self.ret_int_mm = np.around(self.ret_px * Dm * 1000 / f_px, decimals=3)
-                logging.info(f"[{self.name} - intrinsic] Intrinsic error: {self.ret_int_px} px,  which corresponds to {self.ret_int_mm} mm.")
-            if len(self.ret_px) != 0:
+            if self.ret_int is not None:
+                self.ret_int_px = np.around(np.array(self.ret_int), decimals=3)
+                self.ret_int_mm = np.around(self.ret_int_px * Dm * 1000 / f_px, decimals=3)
+                logging.info(f"[{self.name} - intrinsic] Intrinsic error: {self.ret_int_px} px, which corresponds to {self.ret_int_mm} mm.")
+            if self.ret is not None:
+                self.ret_px = np.around(np.array(self.ret), decimals=3)
                 self.ret_mm = np.around(self.ret_px * Dm * 1000 / f_px, decimals=3)
                 logging.info(f"[{self.name} - extrinsic] Residual (RMS) calibration error: {self.ret_px} px, which corresponds to {self.ret_mm} mm.")
 
