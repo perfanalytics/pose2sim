@@ -297,10 +297,15 @@ def handle_key_press(event, frame_textbox, search_around_frames, i, cap, ax_vide
         direction = -1
     elif event.key == 'right':
         direction = 1
+    
     if direction != 0:
         handle_frame_navigation(direction, frame_textbox, search_around_frames, i, cap, ax_video, frame_to_json,
                               pose_dir, json_dir_name, rects, annotations, bounding_boxes_list, fig,
                               time_range_around_maxspeed, fps, ui)
+    
+    # Call on_key for tab and enter key handling
+    elif event.key == 'tab' or event.key == 'enter':
+        on_key(event, ui, bounding_boxes_list)
 
 
 def handle_toggle_labels(keypoint_texts, containers, btn_toggle):
@@ -371,6 +376,19 @@ def on_hover(event, fig, rects, annotations, bounding_boxes_list, selected_idx_c
 
     if event.xdata is None or event.ydata is None:
         return
+    
+    # Access the figure and check if it has a key_press_event connection
+    # If we're in tab navigation, a previous tab press will have created 'temp_selected_box'
+    # attribute on one of the rectangle objects
+    has_temp_selection = False
+    for rect in rects:
+        if hasattr(rect, 'temp_selected_box') and rect.temp_selected_box:
+            has_temp_selection = True
+            break
+    
+    if has_temp_selection:
+        # We're in tab navigation mode, don't interfere with hover effects
+        return
 
     # First reset all boxes to default style
     for idx, (rect, annotation) in enumerate(zip(rects, annotations)):
@@ -438,31 +456,72 @@ def on_slider_change(val, fps, controls, fig, search_around_frames, cam_index, a
     fig.canvas.draw_idle()
 
 
-def on_key(event, ui, fps, cap, frame_to_json, pose_dir, json_dirs_names, i, search_around_frames, bounding_boxes_list):
+def on_key(event, ui, bounding_boxes_list):
     '''
     Handles keyboard navigation through video frames.
     
     INPUTS:
     - event: Matplotlib keyboard event object
     - ui: Dictionary containing all UI elements and state
-    - fps: Frames per second of the video
-    - cap: Video capture object
-    - frame_to_json: Mapping of frame numbers to JSON files
-    - pose_dir: Directory containing pose data
-    - json_dirs_names: List of JSON directory names
-    - i: Current camera index
-    - search_around_frames: Frame ranges to search around for each camera
     - bounding_boxes_list: List of bounding boxes for detected persons
     '''
 
-    if event.key == 'left':
-        handle_frame_navigation(-1, ui['controls']['main_time_textbox'], search_around_frames, i, cap, ui['ax_video'], frame_to_json,
-                              pose_dir, json_dirs_names[i], ui['containers']['rects'], ui['containers']['annotations'], bounding_boxes_list, ui['fig'],
-                              float(ui['controls']['time_RAM_textbox'].text), fps, ui)
-    elif event.key == 'right':
-        handle_frame_navigation(1, ui['controls']['main_time_textbox'], search_around_frames, i, cap, ui['ax_video'], frame_to_json,
-                              pose_dir, json_dirs_names[i], ui['containers']['rects'], ui['containers']['annotations'], bounding_boxes_list, ui['fig'],
-                              float(ui['controls']['time_RAM_textbox'].text), fps, ui)
+    if event.key == 'tab':
+        # Handle tab key to cycle through person IDs
+        # The -1 is used so that when tab is first pressed, we start at the currently selected ID
+        # Since we add +1 in the next line, (selected_idx - 1) + 1 = selected_idx
+        temp_idx = ui['containers'].get('temp_selected_idx', [ui['containers']['selected_idx'][0] - 1])[0]
+        # Get the next person ID (cyclic)
+        if len(bounding_boxes_list) > 0:
+            next_idx = (temp_idx + 1) % len(bounding_boxes_list)
+            
+            # Store the temporarily selected index
+            ui['containers']['temp_selected_idx'] = [next_idx]
+            
+            # Apply hover effect to the temporary selected box
+            if next_idx >= 0 and next_idx < len(ui['containers']['rects']):
+                # Reset ALL highlights to ensure no remnants remain
+                for rect, annot in zip(ui['containers']['rects'], ui['containers']['annotations']):
+                    reset_styles(rect, annot)
+                    # Clear temp_selected_box flag on all rectangles
+                    if hasattr(rect, 'temp_selected_box'):
+                        rect.temp_selected_box = False
+                
+                # Apply hover effect ONLY to the new temporary selected box
+                temp_rect = ui['containers']['rects'][next_idx]
+                temp_annot = ui['containers']['annotations'][next_idx]
+                highlight_hover_box(temp_rect, temp_annot)
+                # Set temp_selected_box flag on this rectangle
+                temp_rect.temp_selected_box = True
+                
+            ui['fig'].canvas.draw_idle()
+    
+    elif event.key == 'enter':
+        # Handle enter key to confirm the temporarily selected ID
+        if 'temp_selected_idx' in ui['containers'] and ui['containers']['temp_selected_idx'][0] >= 0:
+            # Update the selected index
+            ui['containers']['selected_idx'][0] = ui['containers']['temp_selected_idx'][0]
+            
+            # Update the person textbox
+            ui['controls']['person_textbox'].set_val(str(ui['containers']['selected_idx'][0]))
+            
+            # Reset all bounding box styles and clear temp_selected_box flag
+            for idx, (rect, annot) in enumerate(zip(ui['containers']['rects'], ui['containers']['annotations'])):
+                reset_styles(rect, annot)
+                # Clear temp_selected_box flag on all rectangles
+                if hasattr(rect, 'temp_selected_box'):
+                    rect.temp_selected_box = False
+            
+            # Highlight the selected box
+            if ui['containers']['selected_idx'][0] >= 0 and ui['containers']['selected_idx'][0] < len(ui['containers']['rects']):
+                selected_rect = ui['containers']['rects'][ui['containers']['selected_idx'][0]]
+                selected_annot = ui['containers']['annotations'][ui['containers']['selected_idx'][0]]
+                highlight_selected_box(selected_rect, selected_annot)
+                
+            # Clear the temporary selection
+            ui['containers']['temp_selected_idx'] = [ui['containers']['selected_idx'][0]]
+            
+            ui['fig'].canvas.draw_idle()
 
 
 ## UI Update Functions
@@ -953,7 +1012,8 @@ def person_ui(frame_rgb, cam_name, frame_number, search_around_frames, time_rang
         'rects': [],
         'annotations': [],
         'bounding_boxes_list': [],
-        'selected_idx': [0]
+        'selected_idx': [0],
+        'temp_selected_idx': [0]  # Initialize temp_selected_idx for tab navigation
     }
 
     # Create UI dictionary
