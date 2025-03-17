@@ -34,7 +34,7 @@ class WelcomeTab:
         # Language selection prompt
         lang_label = ctk.CTkLabel(
             self.frame, 
-            text="Select Language / Choisir la langue", 
+            text="Select Language", 
             font=("Helvetica", 20)
         )
         lang_label.pack(pady=(20, 30))
@@ -93,7 +93,7 @@ class WelcomeTab:
         # Title
         title_label = ctk.CTkLabel(
             self.frame, 
-            text=self.app.lang_manager.get_text("select the analysis mode"), 
+            text=self.app.lang_manager.get_text("Select the analysis mode"), 
             font=("Helvetica", 30, "bold")
         )
         title_label.pack(pady=(80, 40))
@@ -108,7 +108,7 @@ class WelcomeTab:
         
         ctk.CTkLabel(
             analysis_2d_card, 
-            text=self.app.lang_manager.get_text("2d analysis"), 
+            text=self.app.lang_manager.get_text("2D Analysis"), 
             font=("Helvetica", 22, "bold")
         ).pack(pady=(30, 20))
         
@@ -172,7 +172,7 @@ class WelcomeTab:
         # Title
         title_label = ctk.CTkLabel(
             self.frame, 
-            text=self.app.lang_manager.get_text("select the process mode"), 
+            text=self.app.lang_manager.get_text("Select the process mode"), 
             font=("Helvetica", 30, "bold")
         )
         title_label.pack(pady=(80, 40))
@@ -194,7 +194,7 @@ class WelcomeTab:
         
         ctk.CTkLabel(
             single_card, 
-            text=self.app.lang_manager.get_text("single_mode"), 
+            text=self.app.lang_manager.get_text("Single Trial"), 
             font=("Helvetica", 22, "bold")
         ).pack(pady=(30, 20))
         
@@ -207,7 +207,7 @@ class WelcomeTab:
         
         ctk.CTkButton(
             single_card,
-            text=self.app.lang_manager.get_text("select"),
+            text=self.app.lang_manager.get_text("Select"),
             width=200,
             height=40,
             font=("Helvetica", 14),
@@ -233,11 +233,11 @@ class WelcomeTab:
         
         ctk.CTkButton(
             batch_card,
-            text=self.app.lang_manager.get_text("select"),
+            text=self.app.lang_manager.get_text("Select"),
             width=200,
             height=40,
             font=("Helvetica", 14),
-            command=lambda: self.select_process_mode("batch")
+            command=lambda: self.select_process_mode("Batch")
         ).pack(pady=(0, 30))
     
     def select_process_mode(self, mode):
@@ -270,7 +270,7 @@ class WelcomeTab:
         
         ctk.CTkLabel(
             name_frame, 
-            text=self.app.lang_manager.get_text("enter participant or project name"), 
+            text=self.app.lang_manager.get_text("Enter a project name"), 
             font=("Helvetica", 16)
         ).pack(side="left", padx=10)
         

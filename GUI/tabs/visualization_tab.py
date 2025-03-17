@@ -179,13 +179,16 @@ class VisualizationTab:
         self.create_video_display()
     
     def create_marker_visualization(self):
-        """Create 3D marker visualization"""
+        """Create 3D marker visualization with Y-up orientation"""
         self.marker_fig = Figure(figsize=(8, 6), dpi=100)
         self.marker_ax = self.marker_fig.add_subplot(111, projection='3d')
         self.marker_ax.set_title('3D Marker Positions')
         self.marker_ax.set_xlabel('X')
-        self.marker_ax.set_ylabel('Y')
-        self.marker_ax.set_zlabel('Z')
+        self.marker_ax.set_ylabel('Y (Up)')  # Y is up
+        self.marker_ax.set_zlabel('Z (Depth)')  # Z is depth
+        
+        # Set initial view angle for Y-up system
+        self.marker_ax.view_init(elev=20, azim=-60)
         
         # Create canvas widget
         self.marker_canvas = FigureCanvasTkAgg(self.marker_fig, master=self.markers_tab)
@@ -214,7 +217,7 @@ class VisualizationTab:
             variable=self.show_labels_var,
             command=self.update_marker_visualization
         ).pack(side='left', padx=10)
-    
+        
     def create_video_display(self):
         """Create video display area"""
         # Frame for video display
@@ -688,7 +691,7 @@ class VisualizationTab:
             self.update_status(f"Error loading video: {str(e)}", "red")
     
     def update_marker_visualization(self):
-        """Update 3D marker visualization"""
+        """Update 3D marker visualization with Y-up coordinate system"""
         if not self.trc_data or self.current_frame >= len(self.trc_data['frames']):
             return
         
@@ -706,8 +709,9 @@ class VisualizationTab:
         for name, coords in markers.items():
             if not np.isnan(coords['x']) and not np.isnan(coords['y']) and not np.isnan(coords['z']):
                 xs.append(coords['x'])
-                ys.append(coords['y'])
-                zs.append(coords['z'])
+                # Swap Y and Z coordinates for Y-up system
+                ys.append(coords['z'])  # Y becomes Z (up)
+                zs.append(-coords['y'])  # Z becomes negative Y (depth)
                 names.append(name)
         
         # Plot markers
@@ -771,15 +775,18 @@ class VisualizationTab:
         self.marker_ax.set_ylim(y_center - max_range, y_center + max_range)
         self.marker_ax.set_zlim(z_center - max_range, z_center + max_range)
         
-        # Set labels
+        # Set labels and update view for Y-up system
         self.marker_ax.set_xlabel('X')
-        self.marker_ax.set_ylabel('Y')
-        self.marker_ax.set_zlabel('Z')
+        self.marker_ax.set_ylabel('Y (Up)')
+        self.marker_ax.set_zlabel('Z (Depth)')
         self.marker_ax.set_title(f'3D Markers - Frame {self.current_frame+1}')
+        
+        # Set initial view angle for Y-up system
+        self.marker_ax.view_init(elev=20, azim=-60)
         
         # Redraw
         self.marker_canvas.draw()
-    
+        
     def update_video_frame(self):
         """Update video display with current frame"""
         if self.video_cap is None:

@@ -19,6 +19,8 @@ from tabs.activation_tab import ActivationTab
 from tabs.advanced_tab import AdvancedTab
 from tabs.batch_tab import BatchTab
 from tabs.visualization_tab import VisualizationTab
+from tabs.tutorial_tab import TutorialTab
+from tabs.about_tab import AboutTab
 
 
 # Import config generator
@@ -36,6 +38,10 @@ class Pose2SimApp:
         self.process_mode = None  # Will be 'single' or 'batch'
         self.participant_name = None
         self.num_trials = 0  # For batch mode
+        
+        # Check tutorial status
+        self.tutorial_marker = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tutorial_completed")
+        self.tutorial_completed = os.path.exists(self.tutorial_marker)
         
         # Initialize language manager
         self.lang_manager = LanguageManager()
@@ -196,6 +202,7 @@ class Pose2SimApp:
         if self.analysis_mode == '3d':
             # 3D mode tabs
             tab_classes = [
+                ('tutorial', TutorialTab, "Tutorial", "📚"),
                 ('calibration', CalibrationTab, "Calibration", "📏"),
                 ('prepare_video', PrepareVideoTab, "Prepare Video", "🎥"),
                 ('pose_model', PoseModelTab, "Pose Estimation", "👤"),
@@ -209,13 +216,18 @@ class Pose2SimApp:
             
             # Add visualization tab
             tab_classes.append(('visualization', VisualizationTab, "Data Visualization", "📊"))
+            
+            # Add about tab at the end
+            tab_classes.append(('about', AboutTab, "About Us", "ℹ️"))
         else:
             # 2D mode tabs (simplified)
             tab_classes = [
+                ('tutorial', TutorialTab, "Tutorial", "📚"),
                 ('pose_model', PoseModelTab, "Pose Estimation", "👤"),
                 ('advanced', AdvancedTab, "Advanced Settings", "⚙️"),
                 ('activation', ActivationTab, "Activation", "▶️"),
-                ('visualization', VisualizationTab, "Data Visualization", "📊")
+                ('visualization', VisualizationTab, "Data Visualization", "📊"),
+                ('about', AboutTab, "About Us", "ℹ️")  # Add about tab at the end
             ]
         
         # Create tab instances and sidebar buttons
@@ -244,8 +256,14 @@ class Pose2SimApp:
             button.pack(pady=5, padx=10)
             self.tab_buttons[tab_id] = button
         
-        # Show first tab by default
-        first_tab_id = list(self.tabs.keys())[0]
+        # Show first tab by default - tutorial for first time users, otherwise first regular tab
+        if not self.tutorial_completed and 'tutorial' in self.tabs:
+            first_tab_id = 'tutorial'
+        else:
+            first_tab_id = list(self.tabs.keys())[0]
+            if first_tab_id == 'tutorial':  # Skip tutorial if it's the first tab but completed
+                first_tab_id = list(self.tabs.keys())[1] if len(self.tabs) > 1 else first_tab_id
+        
         self.show_tab(first_tab_id)
     
     def show_tab(self, tab_id):
