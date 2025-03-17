@@ -184,11 +184,11 @@ class VisualizationTab:
         self.marker_ax = self.marker_fig.add_subplot(111, projection='3d')
         self.marker_ax.set_title('3D Marker Positions')
         self.marker_ax.set_xlabel('X')
-        self.marker_ax.set_ylabel('Y (Up)')  # Y is up
-        self.marker_ax.set_zlabel('Z (Depth)')  # Z is depth
+        self.marker_ax.set_ylabel('Y (Up)')
+        self.marker_ax.set_zlabel('Z (Depth)')
         
-        # Set initial view angle for Y-up system
-        self.marker_ax.view_init(elev=20, azim=-60)
+        # Set initial view angle to match Image 1
+        self.marker_ax.view_init(elev=20, azim=-35)
         
         # Create canvas widget
         self.marker_canvas = FigureCanvasTkAgg(self.marker_fig, master=self.markers_tab)
@@ -218,6 +218,37 @@ class VisualizationTab:
             command=self.update_marker_visualization
         ).pack(side='left', padx=10)
         
+        # Add view angle controls
+        angle_frame = ctk.CTkFrame(self.marker_options_frame)
+        angle_frame.pack(side='right', padx=10)
+        
+        ctk.CTkLabel(angle_frame, text="Elev:").pack(side='left', padx=2)
+        self.elev_var = ctk.StringVar(value="20")
+        elev_entry = ctk.CTkEntry(angle_frame, width=40, textvariable=self.elev_var)
+        elev_entry.pack(side='left', padx=2)
+        
+        ctk.CTkLabel(angle_frame, text="Azim:").pack(side='left', padx=2)
+        self.azim_var = ctk.StringVar(value="-35")
+        azim_entry = ctk.CTkEntry(angle_frame, width=40, textvariable=self.azim_var)
+        azim_entry.pack(side='left', padx=2)
+        
+        ctk.CTkButton(
+            angle_frame,
+            text="Apply",
+            command=self.apply_view_angle,
+            width=60
+        ).pack(side='left', padx=2)
+    
+    def apply_view_angle(self):
+        """Apply the specified view angle"""
+        try:
+            elev = float(self.elev_var.get())
+            azim = float(self.azim_var.get())
+            self.marker_ax.view_init(elev=elev, azim=azim)
+            self.marker_canvas.draw()
+        except ValueError:
+            pass
+                            
     def create_video_display(self):
         """Create video display area"""
         # Frame for video display
@@ -702,16 +733,16 @@ class VisualizationTab:
         frame_data = self.trc_data['frames'][self.current_frame]
         markers = frame_data['markers']
         
-        # Prepare coordinates
+        # Prepare coordinates - SWAPPING Y AND Z CORRECTLY
         xs, ys, zs = [], [], []
         names = []
         
         for name, coords in markers.items():
             if not np.isnan(coords['x']) and not np.isnan(coords['y']) and not np.isnan(coords['z']):
-                xs.append(coords['x'])
-                # Swap Y and Z coordinates for Y-up system
-                ys.append(coords['z'])  # Y becomes Z (up)
-                zs.append(-coords['y'])  # Z becomes negative Y (depth)
+                # Correct mapping with Y and Z swapped
+                xs.append(coords['x'])     # X stays as X
+                ys.append(coords['z'])     # Z becomes Y (up)
+                zs.append(coords['y'])     # Y becomes Z (depth)
                 names.append(name)
         
         # Plot markers
@@ -775,18 +806,18 @@ class VisualizationTab:
         self.marker_ax.set_ylim(y_center - max_range, y_center + max_range)
         self.marker_ax.set_zlim(z_center - max_range, z_center + max_range)
         
-        # Set labels and update view for Y-up system
+        # Set labels
         self.marker_ax.set_xlabel('X')
         self.marker_ax.set_ylabel('Y (Up)')
         self.marker_ax.set_zlabel('Z (Depth)')
         self.marker_ax.set_title(f'3D Markers - Frame {self.current_frame+1}')
         
-        # Set initial view angle for Y-up system
-        self.marker_ax.view_init(elev=20, azim=-60)
+        # Set view angle to match Image 1
+        self.marker_ax.view_init(elev=20, azim=-35)
         
         # Redraw
         self.marker_canvas.draw()
-        
+                                
     def update_video_frame(self):
         """Update video display with current frame"""
         if self.video_cap is None:
