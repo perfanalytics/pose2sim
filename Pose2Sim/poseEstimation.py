@@ -520,6 +520,8 @@ class MediaSource(multiprocessing.Process):
         self.image_files = []
         self.stopped = False
 
+        self.source.create_output_folders()
+
     def run(self):
         try:
             # Open the specific source
@@ -529,7 +531,7 @@ class MediaSource(multiprocessing.Process):
                 if self.webcam_ready is not None:
                     self.webcam_ready[self.source['id']] = (self.cap is not None and self.cap.isOpened())
 
-                if self.webcam_recording and self.cap is not None and self.cap.isOpened() and self.output_raw_video_path:
+                if self.config.webcam_recording and self.cap is not None and self.cap.isOpened() and self.output_raw_video_path:
                     raw_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                     raw_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -735,52 +737,39 @@ def estimate_pose_all(config):
     - Optionally, videos and/or image files with the detected keypoints
     '''
 
+    frame_rate, dimensions = config.get_pose_estimation_params()
+
     deepsort_tracker = None
-    if tracking_mode == 'deepsort' and multi_person:
+    if config.tracking_mode == 'deepsort' and config.multi_person:
         deepsort_tracker = DeepSort(**config.get_deepsort_params())
 
     logging.info(f"Model input size: {config.pose_model.det_input_size[0]}x{config.pose_model.det_input_size[1]}")
 
-    # Handle frame_range
-    def parse_frame_ranges(frame_range):
-        if not frame_range:
-            return None
-        if len(frame_range) == 2 and all(isinstance(x, int) for x in frame_range):
-            start, end = frame_range
-            return set(range(start, end + 1))
-        return set(frame_range)
-
-    frame_range = None
-    if vid_img_extension != 'webcam':
-        frame_range = parse_frame_ranges(config_dict['project'].get('frame_range', []))
-
-    fw, fh = find_largest_frame_size(sources, vid_img_extension)
-
     num_sources = len(config.sources)
 
-    if fw >= fh:
+    if dimensions[0] >= dimensions[1]:
         mosaic_cols = math.ceil(math.sqrt(num_sources))
         mosaic_rows = math.ceil(num_sources / mosaic_cols)
     else:
         mosaic_rows = math.ceil(math.sqrt(num_sources))
         mosaic_cols = math.ceil(num_sources / mosaic_rows)
 
-    if combined_frames:
-        cell_w = frame_size[0] // mosaic_cols
-        cell_h = frame_size[1] // mosaic_rows
+    if config.combined_frames:
+        cell_w = config.pose_model.det_input_size[0] // mosaic_cols
+        cell_h = config.pose_model.det_input_size[1] // mosaic_rows
 
         logging.info(f"Combined frames: {mosaic_rows} rows & {mosaic_cols} cols")
         logging.info(f"Frame input size: {cell_w}x{cell_h}")
 
         frame_size = (cell_w, cell_h)
     else:
-        frame_size = frame_size
+        frame_size = config.pose_model.det_input_size
 
     mosaic_subinfo = {}
     for i, source in enumerate(config.sources):
         r = i // mosaic_cols
         c = i % mosaic_cols
-        if combined_frames:
+        if config.combined_frames:
             x_off = c * cell_w
             y_off = r * cell_h
             source.mosaic_subinfo = {"x_offset": x_off, "y_offset": y_off, "scaled_w": cell_w, "scaled_h": cell_h}
@@ -795,7 +784,7 @@ def estimate_pose_all(config):
 
     frame_buffer_count = 0
 
-    if not combined_frames:
+    if not config.combined_frames:
         frame_buffer_count = n_buffers_total
 
         logging.info(f"Allocating {frame_buffer_count} buffers.")
@@ -810,7 +799,7 @@ def estimate_pose_all(config):
 
     frame_queue = multiprocessing.Queue(maxsize=frame_buffer_count)
     pose_queue = multiprocessing.Queue()
-    if combined_frames:
+    if config.combined_frames:
         pose_queue = multiprocessing.Queue(maxsize=pose_buffer_count)
     result_queue = multiprocessing.Queue()
 
@@ -826,7 +815,7 @@ def estimate_pose_all(config):
     pose_buffers = {}
     available_pose_buffers = {}
 
-    if combined_frames:
+    if config.combined_frames:
         available_pose_buffers = multiprocessing.Queue()
         for i in range(pose_buffer_count):
             buf_name = f"pose_buffer_{i}"
@@ -849,12 +838,12 @@ def estimate_pose_all(config):
 
     active_sources = multiprocessing.Value('i', num_sources)
 
-    if combined_frames:
+    if config.combined_frames:
         initial_workers = max(1, cpu_count - num_sources - 3)
     else:
         initial_workers = max(1, cpu_count - num_sources - 2)
 
-    if not multi_workers:
+    if not config.multi_workers:
         initial_workers = 1
 
     logging.info(f"Starting {initial_workers} workers.")
@@ -863,21 +852,14 @@ def estimate_pose_all(config):
 
     def spawn_new_worker():
         worker = PoseEstimatorWorker(
-            queue=pose_queue if combined_frames else frame_queue,
+            config=config,
+            queue=pose_queue if config.combined_frames else frame_queue,
             result_queue=result_queue,
             shared_counts=shared_counts,
-            ModelClass=ModelClass,
-            det_frequency=det_frequency,
-            to_openpose=to_openpose,
-            backend=backend,
-            device=device,
-            buffers=pose_buffers if combined_frames else frame_buffers,
-            available_buffers=available_pose_buffers if combined_frames else available_frame_buffers,
+            buffers=pose_buffers if config.combined_frames else frame_buffers,
+            available_buffers=available_pose_buffers if config.combined_frames else available_frame_buffers,
             active_sources=active_sources,
-            combined_frames=combined_frames,
             tracker_ready_event=tracker_ready_event,
-            multi_person=multi_person,
-            tracking_mode=tracking_mode,
             deepsort_tracker=deepsort_tracker
         )
         worker.start()
@@ -892,78 +874,58 @@ def estimate_pose_all(config):
     command_queues = {}
 
     media_sources = []
-    for source in counfig.sources:
+    for source in config.sources:
         source.ended = False
         source.command_queues = manager.Queue()
-        source.output = create_output_folders(s['path'], pose_dir, save_images, webcam_recording)
 
         if isinstance(source, WebcamSource):
             source.ready = False
 
         ms = MediaSource(
-            source=s,
+            config=config,
+            source=source,
             frame_queue=frame_queue,
             frame_buffers=frame_buffers,
             shared_counts=shared_counts,
             frame_size=frame_size,
             frame_rate=frame_rate,
             active_sources=active_sources,
-            command_queue=command_queues[s['id']],
-            vid_img_extension=vid_img_extension,
-            frame_ranges=frame_range,
             webcam_ready=webcam_ready,
             source_ended=source_ended,
-            rotation=rotation,
-            webcam_recording=webcam_recording,
         )
         ms.start()
         media_sources.append(ms)
 
     result_processor = ResultQueueProcessor(
+        config=config,
         result_queue=result_queue,
-        pose_model=pose_model,
-        sources=sources,
         frame_buffers=frame_buffers,
         pose_buffers=pose_buffers,
         available_frame_buffers=available_frame_buffers,
         available_pose_buffers=available_pose_buffers,
-        vid_img_extension=vid_img_extension,
         source_outputs=source_outputs,
         shared_counts=shared_counts,
-        save_images=save_images,
-        save_video=save_video,
         frame_size=frame_size,
         frame_rate=frame_rate,
-        combined_frames=combined_frames,
-        multi_person=multi_person,
-        output_format=output_format,
-        display_detection=display_detection,
         mosaic_cols=mosaic_cols,
         mosaic_rows=mosaic_rows,
         mosaic_subinfo=mosaic_subinfo
     )
     result_processor.start()
 
-    if combined_frames:
+    if config.combined_frames:
         frame_processor = FrameQueueProcessor(
+            config=config,
             frame_queue=frame_queue,
             pose_queue=pose_queue,
-            sources=sources,
             frame_buffers=frame_buffers,
             pose_buffers=pose_buffers,
             available_frame_buffers=available_frame_buffers,
             available_pose_buffers=available_pose_buffers,
-            vid_img_extension=vid_img_extension,
             source_outputs=source_outputs,
             shared_counts=shared_counts,
-            save_images=save_images,
-            save_video=save_video,
             frame_size=frame_size,
             frame_rate=frame_rate,
-            combined_frames=combined_frames,
-            multi_person=multi_person,
-            output_format=output_format,
-            display_detection=display_detection,
             mosaic_cols=mosaic_cols,
             mosaic_rows=mosaic_rows,
             mosaic_subinfo=mosaic_subinfo
@@ -972,14 +934,12 @@ def estimate_pose_all(config):
 
     # Start capture coordinator
     capture_coordinator = CaptureCoordinator(
-        sources=sources,
+        config=config,
         command_queues=command_queues,
         available_frame_buffers=available_frame_buffers,
         shared_counts=shared_counts,
         source_ended=source_ended,
         webcam_ready=webcam_ready,
-        frame_rate=frame_rate if vid_img_extension == 'webcam' else 0,
-        mode=capture_mode,
         tracker_ready_event=tracker_ready_event
     )
     capture_coordinator.start()
@@ -1021,7 +981,7 @@ def estimate_pose_all(config):
     )
     bar_pos += 1
 
-    if combined_frames:
+    if config.combined_frames:
         pose_buffer_bar = tqdm(
             total=pose_buffer_count,
             desc='Pose Buffers Free',
@@ -1031,7 +991,7 @@ def estimate_pose_all(config):
         )
         bar_pos += 1
 
-    if multi_workers:
+    if config.multi_workers:
         worker_bar = tqdm(
             total=len(workers),
             desc='Active Workers',
@@ -1084,7 +1044,7 @@ def estimate_pose_all(config):
             frame_buffer_bar.n = available_frame_buffers.qsize()
             frame_buffer_bar.refresh()
 
-            if combined_frames:
+            if config.combined_frames:
                 pose_buffer_bar.n = available_pose_buffers.qsize()
                 pose_buffer_bar.refresh()
 
@@ -1098,7 +1058,7 @@ def estimate_pose_all(config):
 
             alive_workers = sum(w.is_alive() for w in workers)
 
-            if multi_workers:
+            if config.multi_workers:
                 worker_bar.n = alive_workers
                 worker_bar.refresh()
 
@@ -1158,7 +1118,7 @@ def estimate_pose_all(config):
             shm.close()
             shm.unlink()
 
-        if combined_frames:
+        if config.combined_frames:
             frame_processor.stop()
             frame_processor.join(timeout=2)
             if frame_processor.is_alive():
@@ -1172,16 +1132,16 @@ def estimate_pose_all(config):
         # Final bar updates
         frame_buffer_bar.n = available_frame_buffers.qsize()
         frame_buffer_bar.refresh()
-        if combined_frames:
+        if config.combined_frames:
             pose_buffer_bar.n = available_pose_buffers.qsize()
             pose_buffer_bar.refresh()
 
         for sid, pb in progress_bars.items():
             pb.close()
         frame_buffer_bar.close()
-        if combined_frames:
+        if config.combined_frames:
             pose_buffer_bar.close()
-        if multi_workers:
+        if config.multi_workers:
             worker_bar.close()
 
         logging.info("Pose estimation done. Exiting now.")

@@ -56,6 +56,8 @@ class PoseModelEnum(Enum):
         """
         Renvoie le squelette associé au modèle.
         """
+        if self.name == "LSTM":
+            return None
         mapping = {
             'BODY_25B':      BODY_25B,
             'BODY_25':       BODY_25,
@@ -76,19 +78,37 @@ class PoseModelEnum(Enum):
         try:
             return mapping[self.name]
         except KeyError:
-            raise ValueError(f"Aucun squelette défini pour le modèle {self.name}.")
+            raise ValueError(f"No skeleton associated with the model: {self.name}.")
 
 
-# Classe wrapper qui encapsule une instance de l'énumération
 class PoseModel:
     def __init__(self, config, pose_model):
-        self.pose_model = pose_model
+        self.pose_model = self.get_pose_model(pose_model)
         self.config = config
 
         self.mode = config.pose.get('mode')
         self.backend = None
         self.device = None
         self.det_input_size = None
+        self.output_format = config.pose.get('output_format')
+
+    def get_pose_model(self, pose_model):
+        mapping = {
+            'BODY_WITH_FEET': 'HALPE_26',
+            'WHOLE_BODY_WRIST': 'COCO_133_WRIST',
+            'WHOLE_BODY': 'COCO_133',
+            'BODY': 'COCO_17',
+            'HAND': 'HAND_21',
+            'FACE': 'FACE_106',
+            'ANIMAL': 'ANIMAL2D_17',
+        }
+        key = pose_model.upper()
+        if key in mapping:
+            key = mapping[key]
+        try:
+            return PoseModelEnum[key]
+        except KeyError:
+            raise ValueError(f"{pose_model}")
 
     @classmethod
     def load_model_instance(self):

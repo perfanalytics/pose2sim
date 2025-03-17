@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
 '''
 #########################################
 ## SOURCES                             ##
 #########################################
-
 '''
 
 import abc
@@ -15,30 +13,33 @@ import glob
 import cv2
 import logging
 import numpy as np
+from datetime import datetime
 
 class BaseSource(abc.ABC):
     def __init__(self, config, data: dict):
         self.config = config
         self.data = data
         self.name = data.get("name")
-        self.frame_rate_config = data.get("frame_rate")
+        self.rotation = data.get("rotation")
 
         self.extrinsics_files = {}
         self.intrinsics_files = {}
 
         self.calib_intrinsics = data.get("calib_intrinsics")
         self.calib_extrinsics = data.get("calib_extrinsics")
+        self.rotation = data.get("rotation")
 
         self.ret, self.ret_int, self.C, self.S, self.D, self.K, self.R, self.T = None, None, [], [], [], [], [], []
 
     def get_calib_files(self, folder, extension, calibration_name):
-        if not os.path.isdir(os.path.join(self.config.calib_dir, folder)):
+        calib_folder = os.path.join(self.config.calib_dir, folder)
+        if not os.path.isdir(calib_folder):
             logging.warning(
                 f"[{self.name} - {calibration_name}] Calibration skipped: The specified folder does not exist -> '{folder}'"
             )
             return {}
 
-        files = glob.glob(os.path.join(self.config.calib_dir, folder, f"*{extension}"))
+        files = glob.glob(os.path.join(calib_folder, f"*{extension}"))
         if not files:
             logging.warning(
                 f"[{self.name} - {calibration_name}] Calibration skipped: No files with the extension '{extension}' found in folder '{folder}'."
@@ -114,8 +115,40 @@ class BaseSource(abc.ABC):
                 self.ret_mm = np.around(self.ret_px * Dm * 1000 / f_px, decimals=3)
                 logging.info(f"[{self.name} - extrinsic] Residual (RMS) calibration error: {self.ret_px} px, which corresponds to {self.ret_mm} mm.")
 
+    def create_output_folders(self):
+
+        os.makedirs(self.config.pose_dir, exist_ok=True)
+
+        if isinstance(self, WebcamSource):
+            now = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_dir_name = f"{self.name}_{now}"
+        else:
+            output_dir_name = self.name
+            self.json_output_dir = os.path.join(self.config.pose_dir, f"{output_dir_name}_json")
+            os.makedirs(self.json_output_dir, exist_ok=True)
+
+        self.img_output_dir = None
+        if self.config.save_files[0]:
+            self.img_output_dir = os.path.join(self.config.pose_dir, f"{output_dir_name}_img")
+            os.makedirs(self.img_output_dir, exist_ok=True)
+
+        if self.config.save_files[1]:
+            self.output_video_path = os.path.join(self.config.pose_dir, f"{output_dir_name}_pose.avi")
+
+        self.output_record_path = None
+        if self.config.webcam_recording:
+            self.output_video_path = os.path.join(self.config.pose_dir, f"{output_dir_name}_record.avi")
+
+    @property
     @abc.abstractmethod
-    def determine_frame_rate(self):
+    def frame_rate(self):
+        """Retourne le frame rate de la source."""
+        pass
+
+    @property
+    @abc.abstractmethod
+    def dimensions(self):
+        """Retourne un tuple (largeur, hauteur) correspondant aux dimensions de l'image."""
         pass
 
 class WebcamSource(BaseSource):
@@ -125,10 +158,41 @@ class WebcamSource(BaseSource):
 
     @property
     def frame_rate(self):
-        if self.frame_rate_config == "auto":
-            return None
+        if self.config.frame_rate == "auto":
+            cap = cv2.VideoCapture(self.camera_index)
+            if not cap.isOpened():
+                logging.error(f"Unable to get the frame rate from {self.name}.")
+                return None
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            logging.info(f"[{self.name}] Frame rate: {fps}")
+            cap.release()
+            if fps > 0:
+                return round(fps)
+            else:
+                raise ValueError(f"[{self.name}] not able to get frame rate.")
         else:
-            return self.frame_rate_config
+            return self.config.frame_rate
+
+    @property
+    def dimensions(self):
+        cap = cv2.VideoCapture(self.camera_index)
+        if not cap.isOpened():
+            logging.error(f"Unable to get the dimensions from {self.name}.")
+            return None
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
+        
+        rotation = self.rotation if self.rotation is not None else 0
+        if rotation % 90 != 0:
+            logging.error(f"Rotation must be a multiple of 90. Got: {rotation}")
+            raise ValueError(f"Rotation must be a multiple of 90. Got: {rotation}")
+        
+        if (rotation % 180) == 90:
+            width, height = height, width
+        
+        logging.info(f"[{self.name}] Dimensions after rotation ({rotation}°): {width}x{height}")
+        return (width, height)
 
 class VideoSource(BaseSource):
     def __init__(self, subconfig, data: dict):
@@ -137,10 +201,37 @@ class VideoSource(BaseSource):
 
     @property
     def frame_rate(self):
-        if self.frame_rate_config != "auto":
-            return None
+        if self.config.frame_rate == "auto":
+            cap = cv2.VideoCapture(self.video_path)
+            if not cap.isOpened():
+                logging.error(f"Unable to get the frame rate from {self.name}.")
+                return None
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            logging.info(f"[{self.name}] Frame rate: {fps}")
+            cap.release()
+            return round(fps) if fps > 0 else None
         else:
-            return self.frame_rate_config
+            return self.config.frame_rate
+
+    @property
+    def dimensions(self):
+        cap = cv2.VideoCapture(self.video_path)
+        if not cap.isOpened():
+            logging.error(f"Unable to get the dimensions from {self.name}.")
+            return None
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
+
+        rotation = self.rotation if self.rotation is not None else 0
+        if rotation % 90 != 0:
+            logging.error(f"Rotation must be a multiple of 90. Got: {rotation}")
+            raise ValueError(f"Rotation must be a multiple of 90. Got: {rotation}")
+        if (rotation % 180) == 90:
+            width, height = height, width
+
+        logging.info(f"[{self.name}] Dimensions after rotation ({rotation}°): {width}x{height}")
+        return (width, height)
 
 class ImageSource(BaseSource):
     def __init__(self, subconfig, data: dict):
@@ -150,8 +241,30 @@ class ImageSource(BaseSource):
 
     @property
     def frame_rate(self):
-        if self.frame_rate_config == "auto":
-            return 60
+        if self.config.frame_rate == "auto":
+            logging.error(f"Frame rate is set to 'auto' but not possible on images.")
+            raise ValueError(f"Frame rate is set to 'auto' but not possible on images.")
         else:
-            return self.frame_rate_config
+            return self.config.frame_rate
 
+    @property
+    def dimensions(self):
+        image_files = glob.glob(os.path.join(self.image_dir, self.image_extension))
+        if not image_files:
+            logging.error(f"Unable to get images from {self.image_dir}.")
+            return None
+
+        if image_files[0] is None:
+            logging.error(f"Unable to read the image from {image_files[0]}.")
+            return None
+        height, width = image_files[0].shape[:2]
+
+        rotation = self.rotation if self.rotation is not None else 0
+        if rotation % 90 != 0:
+            logging.error(f"Rotation must be a multiple of 90. Got: {rotation}")
+            raise ValueError(f"Rotation must be a multiple of 90. Got: {rotation}")
+        if (rotation % 180) == 90:
+            width, height = height, width
+
+        logging.info(f"[{self.name}] Dimensions after rotation ({rotation}°): {width}x{height}")
+        return (width, height)

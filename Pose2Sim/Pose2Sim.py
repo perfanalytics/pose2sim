@@ -65,6 +65,8 @@ class Pose2SimPipeline:
         self.config = Config(config_input)
 
         if not self.config.use_custom_logging:
+            for handler in logging.root.handlers[:]:
+                logging.root.removeHandler(handler)
             logging.basicConfig(
                 format='%(message)s',
                 level=logging.INFO,

@@ -18,7 +18,7 @@
 
 
 [project]
-frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 30 fps if you work with images) 
+frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video and webcam (Don't work with images) 
 
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
@@ -36,8 +36,7 @@ mass = 55
 [[sources]]
 name = "image1"
 path = "videos/cam01.mp4"
-extension = ".png"
-frame_rate = 60
+rotation = 0
 frame_range = []
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
 time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
@@ -47,7 +46,7 @@ calib_extrinsics = "extrinsics/ext_cam01_img/"
 [[sources]]
 name = "cam02"
 path = "videos/cam02.mp4"
-frame_rate = "auto"
+rotation = 0
 frame_range = []
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
 time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
@@ -56,8 +55,8 @@ calib_extrinsics = "extrinsics/ext_cam02_img/"
 
 [[sources]]
 name = "cam03"
-path = 1 # webcam id
-frame_rate = "auto"
+path = 0 # webcam id
+rotation = 0
 calib_intrinsics = "intrinsics/int_cam03_img/"
 calib_extrinsics = "live"
 

@@ -27,7 +27,7 @@ import re
 import json
 import ast
 
-from Pose2Sim.model import PoseModel, PoseModelEnum
+from Pose2Sim.model import PoseModel
 from Pose2Sim.common import natural_sort_key, zup2yup
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.source import WebcamSource, ImageSource, VideoSource
@@ -45,25 +45,7 @@ class SubConfig:
         self.session_dir = session_dir
         self.subjects = self.subjects()
         self.sources = self.sources()
-        self.pose_model = self.pose_model()
-
-    def pose_model(self):
-        mapping = {
-            'BODY_WITH_FEET': 'HALPE_26',
-            'WHOLE_BODY_WRIST': 'COCO_133_WRIST',
-            'WHOLE_BODY': 'COCO_133',
-            'BODY': 'COCO_17',
-            'HAND': 'HAND_21',
-            'FACE': 'FACE_106',
-            'ANIMAL': 'ANIMAL2D_17',
-        }
-        key = self.pose.get("pose_model").upper()
-        if key in mapping:
-            key = mapping[key]
-        try:
-            return PoseModelEnum[key]
-        except KeyError:
-            raise ValueError(f"{self.pose.get("pose_model")}")
+        self.pose_model = PoseModel(self, self.pose.get("pose_model"))
 
     def subjects(self):
         """
@@ -415,7 +397,7 @@ class SubConfig:
 
     @property 
     def frame_rate(self):
-        return self._config.get("project", {}).get("frame_rate")
+        return self.project.get("frame_rate")
 
     def get_filtering_params(self):
         '''
@@ -743,59 +725,78 @@ class SubConfig:
         trc_path = os.path.realpath(os.path.join(pose3d_dir, trc_f))
 
         return trc_path, trc_f, frame_rate
+    
+    @property
+    def pose_dir(self):
+        return os.path.join(self.project_dir, 'pose')
+    
+    @property
+    def webcam_recording(self):
+        return self.pose.get('webcam_recording')
+    
+    @property
+    def save_files(self):
+        save_files = self.pose.get('save_video', [])
+        save_images = ('to_images' in save_files)
+        save_video = ('to_video' in save_files)
+        return save_video, save_images
+    
+    @property
+    def tracking_mode(self):
+        return self.pose.get('tracking_mode')
+    
+    @property
+    def multi_person(self):
+        return self.project.get('multi_person')
 
     def get_pose_estimation_params(self):
         '''
         Returns the parameters required for pose estimation.
         '''
         # Read config
-        pose_dir = os.path.join(self.project_dir, 'pose')
         overwrite_pose = self.pose.get('overwrite_pose')
         
         for source in self.sources:
             if not isinstance(source, WebcamSource):
-                if os.path.exists(os.path.join(pose_dir, source.name)) and not overwrite_pose:
+                if os.path.exists(os.path.join(self.pose_dir, source.name)) and not overwrite_pose:
                     logging.info(f'[{source.name} - pose estimation] Skipping as it has already been done.'
                                 'To recalculate, set overwrite_pose to true in Config.toml.')
                     return
-                elif os.path.exists(os.path.join(pose_dir, source.name)) and overwrite_pose:
+                elif os.path.exists(os.path.join(self.pose_dir, source.name)) and overwrite_pose:
                     logging.info(f'[{source.name} - pose estimation] Overwriting estimation results.')
 
-        display_detection = self.pose.get('display_detection')
-        capture_mode = self.pose.get('capture_mode', 'continuous')
-        save_files = self.pose.get('save_video', [])
-        save_images = ('to_images' in save_files)
-        save_video = ('to_video' in save_files)
-        combined_frames = self.pose.get('combined_frames')
-        multi_workers = self.pose.get('multi_workers')
-        multi_person = self.project.get('multi_person')
-        output_format = self.project.get('output_format', 'openpose')
-        webcam_recording = self.pose.get('webcam_recording')
-        tracking_mode = self.pose.get('tracking_mode')
-        deepsort_params = self.pose.get('deepsort_params')
-        
-        det_frequency = self.pose.get('det_frequency')
-
-        frame_rate = 999
+        frame_rate = 9999
         for source in self.sources:
             frame_rate = min(source.frame_rate, frame_rate)
 
+        max_width, max_height = 0, 0
+        for source in self.sources:
+            dimensions = source.dimensions
+            max_width = max(max_width, dimensions[0])
+            max_height = max(max_height, dimensions[1])
+        dimensions = (max_width, max_height)
+
         return (
             frame_rate,
-            output_format,
-            save_video,
-            save_images,
-            display_detection,
-            multi_person,
-            det_frequency,
-            capture_mode,
-            combined_frames,
-            multi_workers,
-            webcam_recording,
-            det_frequency,
-            tracking_mode,
-            deepsort_params,
+            dimensions,
         )
+    
+    @property 
+    def combined_frames(self):
+        return self.pose.get('combined_frames')
+
+    @property 
+    def multi_workers(self):
+        return self.pose.get('multi_workers')
+
+    @property 
+    def frame_range(self):
+        frame_range = self.project.get('frame_range')
+        if not frame_range:
+            return None
+        if len(frame_range) == 2 and all(isinstance(x, int) for x in frame_range):
+            return set(range(frame_range))
+        return set(frame_range)
 
     def get_custom_model_params(self):
         try:
@@ -882,7 +883,7 @@ class Config:
         self.config_input = config_input
         self.level, self.config_dicts = self._read_config_files(config_input)
         self.session_dir = self._determine_session_dir()
-        self.use_custom_logging = self.config_dicts[0].get("logging", {}).get("use_custom_logging", False)
+        self.use_custom_logging = self.config_dicts[0].get("logging", {}).get("use_custom_logging")
         self.sub_configs = [SubConfig(cfg, self.session_dir) for cfg in self.config_dicts]
 
     def _recursive_update(self, base, updates):
