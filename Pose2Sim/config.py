@@ -44,14 +44,14 @@ class SubConfig:
         self._config = config_dict
         self.session_dir = session_dir
         self.subjects = self.subjects()
-        self.sources = self.sources()
         self.pose_model = PoseModel(self, self.pose.get("pose_model"))
+        self.sources = self.sources()
 
     def subjects(self):
         """
         Construit une liste d'objets Subject à partir de la config TOML.
         """
-        subjects_data_list = self._config.get("subjects", [])
+        subjects_data_list = self._config.get("subjects")
         subjects_list = []
         for sub_data in subjects_data_list:
             subject_obj = Subject(self, sub_data)
@@ -59,21 +59,21 @@ class SubConfig:
         return subjects_list
     
     def sources(self):
-        sources_data_list = self._config.get("sources", [])
+        sources_data_list = self._config.get("sources")
         sources_list = []
         for src_data in sources_data_list:
-            path_val = src_data.get("path", "")
+            path_val = src_data.get("path")
             if isinstance(path_val, int):
-                source_obj = WebcamSource(self, src_data)
+                source_obj = WebcamSource(self, src_data, self.pose_model)
             else:
                 path_str = str(path_val)
                 abs_path = os.path.abspath(path_str)
 
                 if os.path.isdir(abs_path):
-                    source_obj = ImageSource(self, src_data)
+                    source_obj = ImageSource(self, src_data, self.pose_model)
 
                 elif os.path.isfile(abs_path):
-                    source_obj = VideoSource(self, src_data)
+                    source_obj = VideoSource(self, src_data, self.pose_model)
 
                 elif path_str.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
                     logging.error(f"Video file '{path_str}' not found.")
@@ -92,7 +92,11 @@ class SubConfig:
 
     @property
     def calibration(self):
-        return self._config.get("calibration", {})
+        return self._config.get("calibration")
+    
+    @property
+    def gray_capture(self):
+        return self.pose.get("gray_capture")
 
     @property
     def calib_dir(self):
@@ -112,19 +116,19 @@ class SubConfig:
 
     @property
     def extrinsics_corners_nb(self):
-        return self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("extrinsics_corners_nb")
+        return self.calibration.get("calculate").get("extrinsics").get("board").get("extrinsics_corners_nb")
 
     @property
     def extrinsics_square_size(self):
-        return self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("extrinsics_square_size") / 1000.0
+        return self.calibration.get("calculate").get("extrinsics").get("board").get("extrinsics_square_size") / 1000.0
 
     @property
     def calculate_extrinsics(self):
-        return self.calibration.get("calculate", {}).get("extrinsics", {}).get("calculate_extrinsics")
+        return self.calibration.get("calculate").get("extrinsics").get("calculate_extrinsics")
     
     @property
     def extract_every_N_sec(self):
-        return self.calibration.get("calculate", {}).get("intrinsics", {}).get("extract_every_N_sec")
+        return self.calibration.get("calculate").get("intrinsics").get("extract_every_N_sec")
 
     @property
     def overwrite_extraction(self):
@@ -132,27 +136,27 @@ class SubConfig:
 
     @property
     def show_detection_intrinsics(self):
-        return self.calibration.get("calculate", {}).get("intrinsics", {}).get("show_detection_intrinsics")
+        return self.calibration.get("calculate").get("intrinsics").get("show_detection_intrinsics")
 
     @property
     def intrinsics_corners_nb(self):
-        return self.calibration.get("calculate", {}).get("intrinsics", {}).get("intrinsics_corners_nb")
+        return self.calibration.get("calculate").get("intrinsics").get("intrinsics_corners_nb")
 
     @property
     def intrinsics_square_size(self):
-        return self.calibration.get("calculate", {}).get("intrinsics", {}).get("intrinsics_square_size") / 1000.0
+        return self.calibration.get("calculate").get("intrinsics").get("intrinsics_square_size") / 1000.0
 
     @property
     def logging(self):
-        return self._config.get("logging", {})
+        return self._config.get("logging")
 
     @property
     def filtering(self):
-        return self._config.get("filtering", {})
+        return self._config.get("filtering")
 
     @property
     def kinematics(self):
-        return self._config.get("kinematics", {})
+        return self._config.get("kinematics")
     
     @property
     def fastest_frames_to_remove_percent(self):
@@ -176,23 +180,23 @@ class SubConfig:
 
     @property
     def markerAugmentation(self):
-        return self._config.get("markerAugmentation", {})
+        return self._config.get("markerAugmentation")
 
     @property
     def triangulation(self):
-        return self._config.get("triangulation", {})
+        return self._config.get("triangulation")
 
     @property
     def synchronization(self):
-        return self._config.get("synchronization", {})
+        return self._config.get("synchronization")
 
     @property
     def personAssociation(self):
-        return self._config.get("personAssociation", {})
+        return self._config.get("personAssociation")
     
     @property
     def project(self):
-        return self._config.get("project", {})
+        return self._config.get("project")
 
     @property
     def project_dir(self):
@@ -215,7 +219,7 @@ class SubConfig:
 
     @property
     def pose(self):
-        return self._config.get("pose", {})
+        return self._config.get("pose")
 
     @property
     def osim_setup_dir(self):
@@ -241,7 +245,7 @@ class SubConfig:
 
     @property
     def object_coords_3d(self):
-        object_coords_3d = self.calibration.get("calculate", {}).get("extrinsics", {}).get("object_coords_3d", {})
+        object_coords_3d = self.calibration.get("calculate").get("extrinsics").get("object_coords_3d")
         if self.extrinsics_method in {'board', 'scene'}:
             # Define 3D object points
             if self.extrinsics_method == 'board':
@@ -270,13 +274,13 @@ class SubConfig:
         In case of error (unknown calibration type or missing file), raises an exception.
         '''
         calib_type = self.calibration.get("calibration_type")
-        overwrite_intrinsics = self.calibration.get("calculate", {}).get("intrinsics", {}).get("overwrite_intrinsics", False)
+        overwrite_intrinsics = self.calibration.get("calculate").get("intrinsics").get("overwrite_intrinsics", False)
         overwrite_extrinsics = True
 
         convert_path = None
 
         if calib_type == "convert":
-            convert_path = self.calibration.get("convert", {}).get("convert_from")
+            convert_path = self.calibration.get("convert").get("convert_from")
             if not convert_path:
                 raise NameError("Conversion file path not specified in configuration.")
 
@@ -367,33 +371,37 @@ class SubConfig:
 
     @property 
     def intrinsics_extension(self):
-        return self.calibration.get("calculate", {}).get("intrinsics", {}).get("intrinsics_extension")
+        return self.calibration.get("calculate").get("intrinsics").get("intrinsics_extension")
 
     @property 
     def extrinsics_method(self):
-        return self.calibration.get("calculate", {}).get("extrinsics", {}).get("extrinsics_method")
+        return self.calibration.get("calculate").get("extrinsics").get("extrinsics_method")
 
     @property 
     def extrinsics_extension(self):
         if self.extrinsics_method == "board":
-            return self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("extrinsics_extension")
+            return self.calibration.get("calculate").get("extrinsics").get("board").get("extrinsics_extension")
         else:
-            return self.calibration.get("calculate", {}).get("extrinsics", {}).get("scene", {}).get("extrinsics_extension")
+            return self.calibration.get("calculate").get("extrinsics").get("scene").get("extrinsics_extension")
 
     @property 
     def show_reprojection_error(self):
         if self.extrinsics_method == "board":
-            return self.calibration.get("calculate", {}).get("extrinsics", {}).get("board", {}).get("show_reprojection_error")
+            return self.calibration.get("calculate").get("extrinsics").get("board").get("show_reprojection_error")
         else:
-            return self.calibration.get("calculate", {}).get("extrinsics", {}).get("scene", {}).get("show_reprojection_error")
+            return self.calibration.get("calculate").get("extrinsics").get("scene").get("show_reprojection_error")
 
     @property 
     def backend(self):
-        self.pose.get('backend')
+        return self.pose.get('backend')
 
     @property 
     def device(self):
-        self.pose.get('device')
+        return self.pose.get('device')
+    
+    @property 
+    def mode(self):
+        return self.pose.get('mode')
 
     @property 
     def frame_rate(self):
@@ -736,7 +744,7 @@ class SubConfig:
     
     @property
     def save_files(self):
-        save_files = self.pose.get('save_video', [])
+        save_files = self.pose.get('save_video')
         save_images = ('to_images' in save_files)
         save_video = ('to_video' in save_files)
         return save_video, save_images
@@ -834,10 +842,10 @@ class SubConfig:
         min_cameras_for_triangulation = self.triangulation.get("min_cameras_for_triangulation")
         undistort_points = self.triangulation.get("undistort_points")
 
-        tracked_keypoint = self.personAssociation.get("single_person", {}).get("tracked_keypoint")
-        reconstruction_error_threshold = self.personAssociation.get("multi_person", {}).get("reconstruction_error_threshold")
-        min_affinity = self.personAssociation.get("multi_person", {}).get("min_affinity")
-        error_threshold_tracking = self.personAssociation.get("single_person", {}).get("reproj_error_threshold_association")
+        tracked_keypoint = self.personAssociation.get("single_person").get("tracked_keypoint")
+        reconstruction_error_threshold = self.personAssociation.get("multi_person").get("reconstruction_error_threshold")
+        min_affinity = self.personAssociation.get("multi_person").get("min_affinity")
+        error_threshold_tracking = self.personAssociation.get("single_person").get("reproj_error_threshold_association")
         likelihood_threshold_association = self.personAssociation.get("likelihood_threshold_association")
 
         try:
@@ -883,7 +891,7 @@ class Config:
         self.config_input = config_input
         self.level, self.config_dicts = self._read_config_files(config_input)
         self.session_dir = self._determine_session_dir()
-        self.use_custom_logging = self.config_dicts[0].get("logging", {}).get("use_custom_logging")
+        self.use_custom_logging = self.config_dicts[0].get("logging").get("use_custom_logging")
         self.sub_configs = [SubConfig(cfg, self.session_dir) for cfg in self.config_dicts]
 
     def _recursive_update(self, base, updates):
@@ -910,7 +918,7 @@ class Config:
             # Single config dictionary
             level = 2
             config_dicts = [config_input]
-            if config_dicts[0].get("project", {}).get("project_dir") is None:
+            if config_dicts[0].get("project").get("project_dir") is None:
                 raise ValueError("Please specify the project directory in the configuration.")
         else:
             # config_input is a folder path or None
@@ -924,7 +932,7 @@ class Config:
                     session_config = self._recursive_update(session_config, trial_config)
                 except Exception:
                     session_config = toml.load(os.path.join(config_dir, "Config.toml"))
-                session_config.get("project", {}).update({"project_dir": config_dir})
+                session_config.get("project").update({"project_dir": config_dir})
                 config_dicts = [session_config]
 
             elif level == 2:
@@ -938,7 +946,7 @@ class Config:
                         temp.get("project", {}).update(
                             {"project_dir": os.path.join(config_dir, os.path.relpath(root))}
                         )
-                        if os.path.basename(root) not in temp.get("project", {}).get("exclude_from_batch", []):
+                        if os.path.basename(root) not in temp.get("project").get("exclude_from_batch"):
                             config_dicts.append(temp)
             else:
                 raise ValueError("Unsupported configuration level.")

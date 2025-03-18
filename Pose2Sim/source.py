@@ -16,7 +16,8 @@ import numpy as np
 from datetime import datetime
 
 class BaseSource(abc.ABC):
-    def __init__(self, config, data: dict):
+    def __init__(self, config, data: dict, pose_model):
+        self.pose_model = pose_model
         self.config = config
         self.data = data
         self.name = data.get("name")
@@ -82,7 +83,7 @@ class BaseSource(abc.ABC):
         fps = round(fps)
 
         frame_nb = 0
-        logging.info("Extracting frames...")
+        logging.info(f"[{self.name}]Extracting frames")
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -152,51 +153,73 @@ class BaseSource(abc.ABC):
         pass
 
 class WebcamSource(BaseSource):
-    def __init__(self, subconfig, data: dict):
-        super().__init__(subconfig, data)
+    def __init__(self, subconfig, data: dict, pose_model):
+        super().__init__(subconfig, data, pose_model)
         self.camera_index = data.get("path", 0)
+
+    def _init_capture(self):
+        self.cap = cv2.VideoCapture(self.camera_index)
+        if not self.cap.isOpened():
+            logging.error(f"[{self.name}] Unable to open.")
+            raise ValueError(f"[{self.name}] Unable to open.")
+
+        det_width, det_height = self.pose_model.det_input_size
+
+        self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        logging.info(f"[{self.name}] Native resolution: {self.width}x{self.height}")
+
+        if self.width >= self.height:
+            scale = det_width / self.width
+            target_width = det_width
+            target_height = int(self.height * scale)
+        else:
+            scale = det_height / self.height
+            target_height = det_height
+            target_width = int(self.width * scale)
+
+        if self.width != target_width and self.height != target_height:
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, target_width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, target_height)
+
+            self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            logging.info(f"[{self.name}] Requested resolution: {target_width}x{target_height}, actual resolution: {self.width}x{self.height}")
+
+            if self.width != target_width or self.height != target_height:
+                logging.warning(f"[{self.name}] Did not accept the requested resolution of {self.width}x{self.height}")
+
+        if self.config.gray_capture:
+            self.cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
+
+        self.cap.set(cv2.CAP_PROP_FPS, 1000)
+        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
 
     @property
     def frame_rate(self):
         if self.config.frame_rate == "auto":
-            cap = cv2.VideoCapture(self.camera_index)
-            if not cap.isOpened():
-                logging.error(f"Unable to get the frame rate from {self.name}.")
-                return None
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            logging.info(f"[{self.name}] Frame rate: {fps}")
-            cap.release()
-            if fps > 0:
-                return round(fps)
-            else:
-                raise ValueError(f"[{self.name}] not able to get frame rate.")
+            self._init_capture()
+            logging.info(f"[{self.name}] Frame rate: {self.fps}")
+            return self.fps
         else:
             return self.config.frame_rate
 
     @property
     def dimensions(self):
-        cap = cv2.VideoCapture(self.camera_index)
-        if not cap.isOpened():
-            logging.error(f"Unable to get the dimensions from {self.name}.")
-            return None
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        cap.release()
-        
         rotation = self.rotation if self.rotation is not None else 0
         if rotation % 90 != 0:
             logging.error(f"Rotation must be a multiple of 90. Got: {rotation}")
             raise ValueError(f"Rotation must be a multiple of 90. Got: {rotation}")
         
         if (rotation % 180) == 90:
-            width, height = height, width
+            self.width, self.height = self.height, self.width
         
-        logging.info(f"[{self.name}] Dimensions after rotation ({rotation}°): {width}x{height}")
-        return (width, height)
+        logging.info(f"[{self.name}] Dimensions after rotation ({rotation}°): {self.width}x{self.height}")
+        return (self.width, self.height)
 
 class VideoSource(BaseSource):
-    def __init__(self, subconfig, data: dict):
-        super().__init__(subconfig, data)
+    def __init__(self, subconfig, data: dict, pose_model):
+        super().__init__(subconfig, data, pose_model)
         self.video_path = data.get("path")
 
     @property
@@ -234,8 +257,8 @@ class VideoSource(BaseSource):
         return (width, height)
 
 class ImageSource(BaseSource):
-    def __init__(self, subconfig, data: dict):
-        super().__init__(subconfig, data)
+    def __init__(self, subconfig, data: dict, pose_model):
+        super().__init__(subconfig, data, pose_model)
         self.image_dir = data.get("path")
         self.image_extension = data.get("extension", "*.png")
 

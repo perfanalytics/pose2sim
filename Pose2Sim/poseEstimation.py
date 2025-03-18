@@ -737,13 +737,13 @@ def estimate_pose_all(config):
     - Optionally, videos and/or image files with the detected keypoints
     '''
 
+    logging.info(f"Model input size: {config.pose_model.det_input_size[0]}x{config.pose_model.det_input_size[1]}")
+
     frame_rate, dimensions = config.get_pose_estimation_params()
 
     deepsort_tracker = None
     if config.tracking_mode == 'deepsort' and config.multi_person:
         deepsort_tracker = DeepSort(**config.get_deepsort_params())
-
-    logging.info(f"Model input size: {config.pose_model.det_input_size[0]}x{config.pose_model.det_input_size[1]}")
 
     num_sources = len(config.sources)
 

@@ -83,6 +83,7 @@ class PoseModelEnum(Enum):
 
 class PoseModel:
     def __init__(self, config, pose_model):
+        self.name = pose_model
         self.pose_model = self.get_pose_model(pose_model)
         self.config = config
 
@@ -91,6 +92,8 @@ class PoseModel:
         self.device = None
         self.det_input_size = None
         self.output_format = config.pose.get('output_format')
+
+        self.load_model_instance()
 
     def get_pose_model(self, pose_model):
         mapping = {
@@ -110,41 +113,31 @@ class PoseModel:
         except KeyError:
             raise ValueError(f"{pose_model}")
 
-    @classmethod
     def load_model_instance(self):
 
         self.backend, self.device = init_backend_device(self.config.backend, self.config.device)
 
-        model_class = self.pose_model.model_class
-
-        self.det_input_size = model_class.MODE[self.config.mode]['det_input_size']
-        # Correction de la condition (ajout de deux-points et utilisation de "not in")
-        if self.config.mode not in ['lightweight', 'balanced', 'performance']:
-            if model_class is None:
-                try:
-                    det_class, det, self.det_input_size, pose_class, pose, pose_input_size = self.config.get_custom_model_params()
-                    model_class = partial(Custom,
-                                          det_class=det_class, det=det, det_input_size=self.det_input_size,
-                                          pose_class=pose_class, pose=pose, pose_input_size=pose_input_size,
-                                          backend=self.backend, device=self.device)
-                except Exception:
-                    raise NameError(f"Model {self.name} not found in rtmlib nor in Config.toml")
-            else:
-                raise NameError("Invalid mode. Must be 'lightweight', 'balanced', 'performance', or a dictionary of parameters defined in Config.toml.")
-
-        try:
-            skeleton = self.pose_model.skeleton
-        except Exception:
+        self.det_input_size = self.pose_model.model_class.MODE[self.config.mode]['det_input_size']
+        if self.pose_model.model_class is None:
             try:
-                skeleton = DictImporter().import_(self.name)
-                if skeleton.id == 'None':
-                    skeleton.id = None
+                det_class, det, self.det_input_size, pose_class, pose, pose_input_size = self.config.get_custom_model_params()
+                self.pose_model.model_class = partial(Custom,
+                                        det_class=det_class, det=det, det_input_size=self.det_input_size,
+                                        pose_class=pose_class, pose=pose, pose_input_size=pose_input_size,
+                                        backend=self.backend, device=self.device)
+            except Exception:
+                raise NameError(f"{self.name} invalid mode. Must be 'lightweight', 'balanced', 'performance', or a dictionary of parameters defined in Config.toml.")
+
+        if self.pose_model.skeleton is None:
+            try:
+                self.pose_model.skeleton = DictImporter().import_(self.name)
+                if self.pose_model.skeletonton.id == 'None':
+                    self.pose_model.skeleton.id = None
             except Exception:
                 raise NameError(f"Skeleton {self.name} not found in skeletons.py nor in Config.toml")
 
         logging.info(f'\nPose tracking set up for "{self.name}" model.')
         logging.info(f'Mode: {self.config.mode}.')
-        return model_class, skeleton
 
 
 def init_backend_device(backend, device):
