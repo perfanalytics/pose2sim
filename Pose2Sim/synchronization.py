@@ -293,38 +293,101 @@ def handle_key_press(event, frame_textbox, search_around_frames, i, cap, ax_vide
     '''
 
     direction = 0
-    if event.key == 'left':
-        direction = -1
-    elif event.key == 'right':
+    if event.key == 'up':
         direction = 1
+    elif event.key == 'down':
+        direction = -1
     
     if direction != 0:
         handle_frame_navigation(direction, frame_textbox, search_around_frames, i, cap, ax_video, frame_to_json,
                               pose_dir, json_dir_name, rects, annotations, bounding_boxes_list, fig,
                               time_range_around_maxspeed, fps, ui)
-    
-    # Call on_key for tab and enter key handling
-    elif event.key == 'tab' or event.key == 'enter':
-        on_key(event, ui, bounding_boxes_list)
 
+    elif event.key == 'tab':
+        # Handle tab key to cycle through text boxes
+        textboxes = ['person_textbox', 'main_time_textbox', 'time_RAM_textbox']
+        
+        # Find current active textbox and determine next one
+        active_textbox = next((tb for tb in textboxes if tb in ui['controls'] and ui['controls'][tb].active), None)
+        next_idx = (textboxes.index(active_textbox) + 1) % len(textboxes) if active_textbox in textboxes else 0
+        next_textbox = textboxes[next_idx]
+        
+        # Deactivate all textboxes
+        for tb in textboxes:
+            if tb in ui['controls'] and tb != next_textbox:
+                prev_textbox = ui['controls'][tb]
+                prev_textbox.active = False
+                
+                # Make sure cursor is completely removed from previous textbox
+                if hasattr(prev_textbox, 'cursor_visible'):
+                    prev_textbox.cursor_visible = False
+                if hasattr(prev_textbox, 'cursor'):
+                    prev_textbox.cursor.set_visible(False)
+                if hasattr(prev_textbox, '_cursor'):
+                    prev_textbox._cursor.set_visible(False)
+                
+                # Reset the appearance of the previous textbox
+                if hasattr(prev_textbox, 'ax'):
+                    prev_textbox.ax.set_facecolor(prev_textbox.color)
+        
+        # Activate new textbox
+        textbox = ui['controls'][next_textbox]
+        textbox.active = True
+        textbox.ax.set_facecolor(textbox.hovercolor)
+        
+        # Setup textbox for editing
+        for attr, value in [('eventson', True), ('cursor_visible', True), 
+                           ('capturekeystrokes', True), ('cursor_index', len(textbox.text))]:
+            if hasattr(textbox, attr):
+                setattr(textbox, attr, value)
+                
+        # Special method calls
+        if hasattr(textbox, 'set_active'):
+            textbox.set_active(True)
+        if hasattr(textbox, 'begin_typing'):
+            textbox.begin_typing()
+            
+        # Refresh UI
+        textbox.set_val(textbox.text)
+        ui['fig'].canvas.draw_idle()
+        ui['fig'].canvas.flush_events()
 
-def handle_toggle_labels(keypoint_texts, containers, btn_toggle):
-    '''
-    Handle toggle labels button click.
-    
-    INPUTS:
-    - event: Matplotlib event object
-    - keypoint_texts: List of text objects for keypoint labels
-    - containers: Dictionary of container objects
-    - btn_toggle: Button object for toggling label visibility
-    '''
-
-    containers['show_labels'][0] = not containers['show_labels'][0]  # Toggle visibility state
-    for text in keypoint_texts:
-        text.set_visible(containers['show_labels'][0])
-    # Update button text
-    btn_toggle.label.set_text('Hide names' if containers['show_labels'][0] else 'Show names')
-    plt.draw()
+    elif event.key == 'enter':
+        # Check if any textbox is currently active/being edited
+        textboxes = ['person_textbox', 'main_time_textbox', 'time_RAM_textbox']
+        active_textbox = None
+        
+        for tb_name in textboxes:
+            if tb_name in ui['controls'] and ui['controls'][tb_name].active:
+                active_textbox = tb_name
+                break
+        
+        if active_textbox:
+            # If a textbox is active, confirm its value by triggering its on_submit callback
+            textbox = ui['controls'][active_textbox]
+            current_text = textbox.text
+            
+            # Deactivate the textbox
+            textbox.active = False
+            textbox.cursor_visible = False
+            if hasattr(textbox, 'cursor'):
+                textbox.cursor.set_visible(False)
+            if hasattr(textbox, '_cursor'):
+                textbox._cursor.set_visible(False)
+            
+            # Reset appearance
+            if hasattr(textbox, 'ax'):
+                textbox.ax.set_facecolor(textbox.color)
+            
+            # Trigger the on_submit callback manually
+            if hasattr(textbox, 'on_submit'):
+                textbox.on_submit(current_text)
+            
+            # Update UI
+            ui['fig'].canvas.draw_idle()
+        else:
+            # If no textbox is active, handle OK button (close UI)
+            handle_ok_button(ui)
 
 
 ## Highlighters
@@ -454,74 +517,6 @@ def on_slider_change(val, fps, controls, fig, search_around_frames, cam_index, a
         time_RAM = 0
     update_highlight(frame_number, time_RAM, fps, search_around_frames, cam_index, ax_slider, controls)
     fig.canvas.draw_idle()
-
-
-def on_key(event, ui, bounding_boxes_list):
-    '''
-    Handles keyboard navigation through video frames.
-    
-    INPUTS:
-    - event: Matplotlib keyboard event object
-    - ui: Dictionary containing all UI elements and state
-    - bounding_boxes_list: List of bounding boxes for detected persons
-    '''
-
-    if event.key == 'tab':
-        # Handle tab key to cycle through person IDs
-        # The -1 is used so that when tab is first pressed, we start at the currently selected ID
-        # Since we add +1 in the next line, (selected_idx - 1) + 1 = selected_idx
-        temp_idx = ui['containers'].get('temp_selected_idx', [ui['containers']['selected_idx'][0] - 1])[0]
-        # Get the next person ID (cyclic)
-        if len(bounding_boxes_list) > 0:
-            next_idx = (temp_idx + 1) % len(bounding_boxes_list)
-            
-            # Store the temporarily selected index
-            ui['containers']['temp_selected_idx'] = [next_idx]
-            
-            # Apply hover effect to the temporary selected box
-            if next_idx >= 0 and next_idx < len(ui['containers']['rects']):
-                # Reset ALL highlights to ensure no remnants remain
-                for rect, annot in zip(ui['containers']['rects'], ui['containers']['annotations']):
-                    reset_styles(rect, annot)
-                    # Clear temp_selected_box flag on all rectangles
-                    if hasattr(rect, 'temp_selected_box'):
-                        rect.temp_selected_box = False
-                
-                # Apply hover effect ONLY to the new temporary selected box
-                temp_rect = ui['containers']['rects'][next_idx]
-                temp_annot = ui['containers']['annotations'][next_idx]
-                highlight_hover_box(temp_rect, temp_annot)
-                # Set temp_selected_box flag on this rectangle
-                temp_rect.temp_selected_box = True
-                
-            ui['fig'].canvas.draw_idle()
-    
-    elif event.key == 'enter':
-        # Handle enter key to confirm the temporarily selected ID
-        if 'temp_selected_idx' in ui['containers'] and ui['containers']['temp_selected_idx'][0] >= 0:
-            # Update the selected index
-            ui['containers']['selected_idx'][0] = ui['containers']['temp_selected_idx'][0]
-            
-            # Update the person textbox
-            ui['controls']['person_textbox'].set_val(str(ui['containers']['selected_idx'][0]))
-            
-            # Reset all bounding box styles and clear temp_selected_box flag
-            for idx, (rect, annot) in enumerate(zip(ui['containers']['rects'], ui['containers']['annotations'])):
-                reset_styles(rect, annot)
-                # Clear temp_selected_box flag on all rectangles
-                if hasattr(rect, 'temp_selected_box'):
-                    rect.temp_selected_box = False
-            
-            # Highlight the selected box
-            if ui['containers']['selected_idx'][0] >= 0 and ui['containers']['selected_idx'][0] < len(ui['containers']['rects']):
-                selected_rect = ui['containers']['rects'][ui['containers']['selected_idx'][0]]
-                selected_annot = ui['containers']['annotations'][ui['containers']['selected_idx'][0]]
-                highlight_selected_box(selected_rect, selected_annot)
-                
-            # Clear the temporary selection
-            ui['containers']['temp_selected_idx'] = [ui['containers']['selected_idx'][0]]
-            
-            ui['fig'].canvas.draw_idle()
 
 
 ## UI Update Functions
