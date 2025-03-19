@@ -10,7 +10,7 @@ on:
       - 'README.md'
       - 'Content/**'
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "experimental" ]
 
 permissions:
   contents: read
