@@ -15,6 +15,7 @@ import toml
 import json
 import numpy as np
 import pandas as pd
+from scipy import interpolate
 import re
 import cv2
 import c3d
@@ -169,7 +170,31 @@ def read_trc(trc_path):
     except Exception as e:
         raise ValueError(f"Error reading TRC file at {trc_path}: {e}")
     
-    
+
+def extract_trc_data(trc_path):
+    '''
+    Extract marker names and coordinates from a trc file.
+
+    INPUTS:
+    - trc_path: Path to the trc file
+
+    OUTPUTS:
+    - marker_names: List of marker names
+    - marker_coords: Array of marker coordinates (n_frames, t+3*n_markers)
+    '''
+
+    # marker names
+    with open(trc_path, 'r') as file:
+        lines = file.readlines()
+        marker_names_line = lines[3]
+        marker_names = marker_names_line.strip().split('\t')[2::3]
+
+    # time and marker coordinates
+    trc_data_np = np.genfromtxt(trc_path, skip_header=5, delimiter = '\t')[:,1:] 
+
+    return marker_names, trc_data_np
+
+
 def common_items_in_list(list1, list2):
     '''
     Do two lists have any items in common at the same index?
@@ -676,30 +701,6 @@ def zup2yup(Q):
     return Q
     
 
-def extract_trc_data(trc_path):
-    '''
-    Extract marker names and coordinates from a trc file.
-
-    INPUTS:
-    - trc_path: Path to the trc file
-
-    OUTPUTS:
-    - marker_names: List of marker names
-    - marker_coords: Array of marker coordinates (n_frames, t+3*n_markers)
-    '''
-
-    # marker names
-    with open(trc_path, 'r') as file:
-        lines = file.readlines()
-        marker_names_line = lines[3]
-        marker_names = marker_names_line.strip().split('\t')[2::3]
-
-    # time and marker coordinates
-    trc_data_np = np.genfromtxt(trc_path, skip_header=5, delimiter = '\t')[:,1:] 
-
-    return marker_names, trc_data_np
-
-
 def create_c3d_file(c3d_path, marker_names, trc_data_np):
     '''
     Create a c3d file from the data extracted from a trc file.
@@ -752,6 +753,52 @@ def convert_to_c3d(trc_path):
     create_c3d_file(c3d_path, marker_names, trc_data_np)
 
     return c3d_path
+
+
+def interpolate_zeros_nans(col, *args):
+    '''
+    Interpolate missing points (of value zero),
+    unless more than N contiguous values are missing.
+
+    INPUTS:
+    - col: pandas column of coordinates
+    - args[0] = N: max number of contiguous bad values, above which they won't be interpolated
+    - args[1] = kind: 'linear', 'slinear', 'quadratic', 'cubic'. Default: 'cubic'
+
+    OUTPUT:
+    - col_interp: interpolated pandas column
+    '''
+
+    if len(args)==2:
+        N, kind = args
+    if len(args)==1:
+        N = np.inf
+        kind = args[0]
+    if not args:
+        N = np.inf
+    
+    # Interpolate nans
+    mask = ~(np.isnan(col) | col.eq(0)) # true where nans or zeros
+    idx_good = np.where(mask)[0]
+    if len(idx_good) <= 4:
+        return col
+    
+    if 'kind' not in locals(): # 'linear', 'slinear', 'quadratic', 'cubic'
+        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind="linear", bounds_error=False)
+    else:
+        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, fill_value='extrapolate', bounds_error=False)
+    col_interp = np.where(mask, col, f_interp(col.index)) #replace at false index with interpolated values
+    
+    # Reintroduce nans if length of sequence > N
+    idx_notgood = np.where(~mask)[0]
+    gaps = np.where(np.diff(idx_notgood) > 1)[0] + 1 # where the indices of true are not contiguous
+    sequences = np.split(idx_notgood, gaps)
+    if sequences[0].size>0:
+        for seq in sequences:
+            if len(seq) > N: # values to exclude from interpolation are set to false when they are too long 
+                col_interp[seq] = np.nan
+    
+    return col_interp
 
 
 def points_to_angles(points_list):
