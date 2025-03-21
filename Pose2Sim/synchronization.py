@@ -38,7 +38,6 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib import patheffects
 from scipy import signal
-from scipy import interpolate
 import json
 import os
 import fnmatch
@@ -48,7 +47,8 @@ from anytree import RenderTree
 from matplotlib.widgets import TextBox, Button
 import logging
 
-from Pose2Sim.common import sort_stringlist_by_last_number, bounding_boxes
+from Pose2Sim.common import sort_stringlist_by_last_number, bounding_boxes, interpolate_zeros_nans
+from Pose2Sim.skeletons import *
 
 
 ## AUTHORSHIP INFORMATION
@@ -1250,29 +1250,6 @@ def vert_speed(df, axis='y'):
     return df_vert_speed
 
 
-def interpolate_zeros_nans(col, kind):
-    '''
-    Interpolate missing points (of value nan)
-
-    INPUTS:
-    - col: pandas column of coordinates
-    - kind: 'linear', 'slinear', 'quadratic', 'cubic'. Default 'cubic'
-
-    OUTPUTS:
-    - col_interp: interpolated pandas column
-    '''
-    
-    mask = ~(np.isnan(col) | col.eq(0)) # true where nans or zeros
-    idx_good = np.where(mask)[0]
-    try: 
-        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, bounds_error=False)
-        col_interp = np.where(mask, col, f_interp(col.index))
-        return col_interp 
-    except:
-        # print('No good values to interpolate')
-        return col
-
-
 def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_name='0', cam_name='1'):
     '''
     Compute the time-lagged cross-correlation between two pandas series.
@@ -1465,7 +1442,7 @@ def synchronize_cams_all(config):
         df_coords.append(convert_json2pandas(json_files_range[i], likelihood_threshold=likelihood_threshold, keypoints_ids=keypoints_ids, synchronization_gui=synchronization_gui, selected_id=selected_id_list[i]))
         df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
         df_coords[i] = df_coords[i][kpt_id_in_df]
-        df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args = ['linear'])
+        df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args=['linear'])
         df_coords[i] = df_coords[i].bfill().ffill()
         if df_coords[i].shape[0] > padlen:
             df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0))
