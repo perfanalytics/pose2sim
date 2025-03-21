@@ -9,6 +9,8 @@
 [![status](https://joss.theoj.org/papers/a31cb207a180f7ac9838d049e3a0de26/status.svg)](https://joss.theoj.org/papers/a31cb207a180f7ac9838d049e3a0de26)
 [![DOI](https://zenodo.org/badge/501642916.svg)](https://zenodo.org/doi/10.5281/zenodo.10658947)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+\
+[![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
 
 
 # Pose2Sim
@@ -576,7 +578,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 ### Synchronization
 
-> _**2D points can be triangulated only if they represent the same body position across all cameras: therefore, views need to be synchronized.**_\
+> _**2D points can be triangulated only if they represent the same body position across all cameras: therefore, views need to be synchronized. This module helps you do it.**_\
 For each camera, the algorithm computes mean vertical speed for the chosen keypoints, and synchronizes by finding the time offset for which the correlation is highest.
 
 >***N.B.:** Skip this step if your cameras are natively synchronized.*
@@ -591,19 +593,18 @@ Pose2Sim.synchronization()
 
 <img src="Content/P2S_synchronization.png" width="760">
 
-In `multi_person` mode, a video will pop up to let the user choose on which person to synchronize.\
-<img src="Content/synchro_multi.jpg" width="380">
+<br> 
+
+You can choose the keypoints to synchronize on, the reference person, and the time when the vertical speed is the highest. You can either tune these parameters in the GUI (set `synchronization_gui = true`) or set them in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
+
+<img src="Content/synchro_multi.jpg" width="760">
 
 <img src="Content/synchro.jpg" width="760">
-
-If results are not satisfying, edit your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file:\
-All keypoints can be taken into account, or a subset of them.\
-The whole capture can be used for synchronization, or you can choose a time range when the participant is roughly horizontally static but with a clear vertical motion (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly). 
 
 *N.B.:* Works best when:
 - the participant does not move towards or away from the cameras
 - they perform a clear vertical movement
-- the capture lasts at least 5 seconds long, so that there is enough data to synchronize on
+- the capture lasts at least 5 seconds, so that there is enough data to synchronize on
 - the capture lasts a few minutes maximum, so that cameras are less likely to [drift with time](https://github.com/mprib/caliscope/discussions/496)
 
 *N.B.:* Alternatively, synchronize cameras using a flashlight, a clap, or a clear event. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors), or with their app (slightly less reliable).
