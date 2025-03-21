@@ -40,12 +40,10 @@ from matplotlib import patheffects
 from scipy import signal
 import json
 import os
-import glob
 import fnmatch
 import re
 import shutil
 from anytree import RenderTree
-from anytree.importer import DictImporter
 from matplotlib.widgets import TextBox, Button
 import logging
 
@@ -1304,7 +1302,7 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_name='0', c
     return offset, max_corr
 
 
-def synchronize_cams_all(config_dict):
+def synchronize_cams_all(config):
     '''
     Post-synchronize your cameras in case they are not natively synchronized.
 
@@ -1328,62 +1326,10 @@ def synchronize_cams_all(config_dict):
     OUTPUTS: 
     - synchronized json files for each camera
     '''
-    
-    # Get parameters from Config.toml
-    project_dir = config_dict.get('project').get('project_dir')
-    pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
-    pose_model = config_dict.get('pose').get('pose_model')
-    # multi_person = config_dict.get('project').get('multi_person')
-    fps =  config_dict.get('project').get('frame_rate')
-    frame_range = config_dict.get('project').get('frame_range')
-    display_sync_plots = config_dict.get('synchronization').get('display_sync_plots')
-    keypoints_to_consider = config_dict.get('synchronization').get('keypoints_to_consider')
-    approx_time_maxspeed = config_dict.get('synchronization').get('approx_time_maxspeed') 
-    time_range_around_maxspeed = config_dict.get('synchronization').get('time_range_around_maxspeed')
-    synchronization_gui = config_dict.get('synchronization').get('synchronization_gui')
 
-    likelihood_threshold = config_dict.get('synchronization').get('likelihood_threshold')
-    filter_cutoff = int(config_dict.get('synchronization').get('filter_cutoff'))
-    filter_order = int(config_dict.get('synchronization').get('filter_order'))
-
-    # Determine frame rate
-    video_dir = os.path.join(project_dir, 'videos')
-    vid_img_extension = config_dict['pose']['vid_img_extension']
-    vid_or_img_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-    if not vid_or_img_files: # video_files is then img_dirs
-        image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
-        for image_folder in image_folders:
-            vid_or_img_files.append(glob.glob(os.path.join(video_dir, image_folder, '*'+vid_img_extension)))
-
-    if fps == 'auto': 
-        try:
-            cap = cv2.VideoCapture(vid_or_img_files[0])
-            cap.read()
-            if cap.read()[0] == False:
-                raise
-            fps = round(cap.get(cv2.CAP_PROP_FPS))
-        except:
-            fps = 60  
-    lag_range = time_range_around_maxspeed*fps # frames
+    pose_dir, fps, frame_range, display_sync_plots, keypoints_to_consider, approx_time_maxspeed, time_range_around_maxspeed, synchronization_gui, likelihood_threshold, filter_cutoff, filter_order, lag_range, model, vid_or_img_files = config.get_synchhronization_parameters()
 
     # Retrieve keypoints from model
-    try: # from skeletons.py
-        if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
-        elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
-        elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
-        elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
-        elif pose_model.upper() == 'HAND': pose_model = 'HAND_21'
-        elif pose_model.upper() == 'FACE': pose_model = 'FACE_106'
-        elif pose_model.upper() == 'ANIMAL': pose_model = 'ANIMAL2D_17'
-        else: pass
-        model = eval(pose_model)
-    except:
-        try: # from Config.toml
-            model = DictImporter().import_(config_dict.get('pose').get(pose_model))
-            if model.id == 'None':
-                model.id = None
-        except:
-            raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
     keypoints_ids = [node.id for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
 

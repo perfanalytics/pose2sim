@@ -22,19 +22,15 @@ OUTPUT:
 
 
 ## INIT
-import os
-import glob
-import fnmatch
 import numpy as np
 import pandas as pd
-import cv2
 import matplotlib.pyplot as plt
 import logging
 
 from scipy import signal
 from scipy.ndimage import gaussian_filter1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
-from filterpy.kalman import KalmanFilter, rts_smoother
+from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
 from Pose2Sim.common import plotWindow
@@ -137,7 +133,7 @@ def kalman_filter(coords, frame_rate, measurement_noise, process_noise, nb_dimen
     return coords_filt
 
 
-def kalman_filter_1d(config_dict, frame_rate, col):
+def kalman_filter_1d(config, frame_rate, col):
     '''
     1D Kalman filter
     Deals with nans
@@ -152,8 +148,10 @@ def kalman_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    trustratio = int(config_dict.get('filtering').get('kalman').get('trust_ratio'))
-    smooth = int(config_dict.get('filtering').get('kalman').get('smooth'))
+    trustratio = config.kalman.trust_ratio
+    smooth = config.kalman.smooth
+    smooth_str = 'smoother' if smooth else 'filter'
+
     measurement_noise = 20
     process_noise = measurement_noise * trustratio
 
@@ -170,10 +168,12 @@ def kalman_filter_1d(config_dict, frame_rate, col):
         for seq_f in idx_sequences_to_filter:
             col_filtered[seq_f] = kalman_filter(col_filtered[seq_f], frame_rate, measurement_noise, process_noise, nb_dimensions=1, nb_derivatives=3, smooth=smooth).flatten()
 
+    logging.info(f'--> Filter type: Kalman {smooth_str}. Measurements trusted {smooth} times as much as previous data, assuming a constant acceleration process.')
+
     return col_filtered
 
 
-def butterworth_filter_1d(config_dict, frame_rate, col):
+def butterworth_filter_1d(config, frame_rate, col):
     '''
     1D Zero-phase Butterworth filter (dual pass)
     Deals with nans
@@ -188,9 +188,9 @@ def butterworth_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    type = 'low' #config_dict.get('filtering').get('butterworth').get('type')
-    order = int(config_dict.get('filtering').get('butterworth').get('order'))
-    cutoff = int(config_dict.get('filtering').get('butterworth').get('cut_off_frequency'))    
+    type = config.butterworth.type
+    order = config.butterworth.order
+    cutoff = config.butterworth.cut_off_frequency   
 
     b, a = signal.butter(order/2, cutoff/(frame_rate/2), type, analog = False) 
     padlen = 3 * max(len(a), len(b))
@@ -208,10 +208,12 @@ def butterworth_filter_1d(config_dict, frame_rate, col):
         for seq_f in idx_sequences_to_filter:
             col_filtered[seq_f] = signal.filtfilt(b, a, col_filtered[seq_f])
     
-    return col_filtered
+    logging.info(f'--> Filter type: Butterworth {type}-pass. Order {order}, Cut-off frequency {cutoff} Hz.')
     
+    return col_filtered
 
-def butterworth_on_speed_filter_1d(config_dict, frame_rate, col):
+
+def butterworth_on_speed_filter_1d(config, frame_rate, col):
     '''
     1D zero-phase Butterworth filter (dual pass) on derivative
 
@@ -223,9 +225,9 @@ def butterworth_on_speed_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    type = 'low' # config_dict.get('filtering').get('butterworth_on_speed').get('type')
-    order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
-    cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
+    type = config.butterworth_on_speed.type
+    order = config.butterworth_on_speed.order
+    cutoff = config.butterworth_on_speed.cut_off_frequency
 
     b, a = signal.butter(order/2, cutoff/(frame_rate/2), type, analog = False)
     padlen = 3 * max(len(a), len(b))
@@ -247,11 +249,13 @@ def butterworth_on_speed_filter_1d(config_dict, frame_rate, col):
         for seq_f in idx_sequences_to_filter:
             col_filtered_diff[seq_f] = signal.filtfilt(b, a, col_filtered_diff[seq_f])
     col_filtered = col_filtered_diff.cumsum() + col.iloc[0] # integrate filtered derivative
-    
+
+    logging.info(f'--> Filter type: Butterworth on speed {type}-pass. Order {order}, Cut-off frequency {cutoff} Hz.')
+
     return col_filtered
 
 
-def gaussian_filter_1d(config_dict, frame_rate, col):
+def gaussian_filter_1d(config, frame_rate, col):
     '''
     1D Gaussian filter
 
@@ -263,14 +267,16 @@ def gaussian_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    gaussian_filter_sigma_kernel = int(config_dict.get('filtering').get('gaussian').get('sigma_kernel'))
+    kernel = config.gaussian.sigma_kernel
 
-    col_filtered = gaussian_filter1d(col, gaussian_filter_sigma_kernel)
+    col_filtered = gaussian_filter1d(col, kernel)
+
+    logging.info(f'--> Filter type: Gaussian. Standard deviation kernel: {kernel}')
 
     return col_filtered
     
 
-def loess_filter_1d(config_dict, frame_rate, col):
+def loess_filter_1d(config, frame_rate, col):
     '''
     1D LOWESS filter (Locally Weighted Scatterplot Smoothing)
 
@@ -283,7 +289,7 @@ def loess_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    kernel = config_dict.get('filtering').get('LOESS').get('nb_values_used')
+    kernel = config.loess.nb_values_used
 
     col_filtered = col.copy()
     mask = np.isnan(col_filtered) 
@@ -297,10 +303,12 @@ def loess_filter_1d(config_dict, frame_rate, col):
         for seq_f in idx_sequences_to_filter:
             col_filtered[seq_f] = lowess(col_filtered[seq_f], seq_f, is_sorted=True, frac=kernel/len(seq_f), it=0)[:,1]
 
+    logging.info(f'--> Filter type: LOESS. Number of values used: {kernel}')
+
     return col_filtered
     
 
-def median_filter_1d(config_dict, frame_rate, col):
+def median_filter_1d(config, frame_rate, col):
     '''
     1D median filter
 
@@ -311,10 +319,12 @@ def median_filter_1d(config_dict, frame_rate, col):
     OUTPUT:
     - col_filtered: Filtered pandas dataframe column
     '''
+
+    kernel = config.median.kernel_size
     
-    median_filter_kernel_size = config_dict.get('filtering').get('median').get('kernel_size')
-    
-    col_filtered = signal.medfilt(col, kernel_size=median_filter_kernel_size)
+    col_filtered = signal.medfilt(col, kernel_size=kernel)
+
+    logging.info(f'--> Filter type: Median. Kernel size: {kernel}')
 
     return col_filtered
 
@@ -364,7 +374,7 @@ def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0
     pw.show()
 
 
-def filter1d(col, config_dict, filter_type, frame_rate):
+def filter1d(col, config, filter_type, frame_rate):
     '''
     Choose filter type and filter column
 
@@ -389,51 +399,12 @@ def filter1d(col, config_dict, filter_type, frame_rate):
     filter_fun = filter_mapping[filter_type]
     
     # Filter column
-    col_filtered = filter_fun(config_dict, frame_rate, col)
+    col_filtered = filter_fun(config, frame_rate, col)
 
     return col_filtered
 
 
-def recap_filter3d(config_dict, trc_path):
-    '''
-    Print a log message giving filtering parameters. Also stored in User/logs.txt.
-
-    OUTPUT:
-    - Message in console
-    '''
-
-    # Read Config
-    filter_type = config_dict.get('filtering').get('type')
-    kalman_filter_trustratio = int(config_dict.get('filtering').get('kalman').get('trust_ratio'))
-    kalman_filter_smooth = int(config_dict.get('filtering').get('kalman').get('smooth'))
-    kalman_filter_smooth_str = 'smoother' if kalman_filter_smooth else 'filter'
-    butterworth_filter_type = 'low' # config_dict.get('filtering').get('butterworth').get('type')
-    butterworth_filter_order = int(config_dict.get('filtering').get('butterworth').get('order'))
-    butterworth_filter_cutoff = int(config_dict.get('filtering').get('butterworth').get('cut_off_frequency'))
-    butter_speed_filter_type = 'low' # config_dict.get('filtering').get('butterworth_on_speed').get('type')
-    butter_speed_filter_order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
-    butter_speed_filter_cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
-    gaussian_filter_sigma_kernel = int(config_dict.get('filtering').get('gaussian').get('sigma_kernel'))
-    loess_filter_nb_values = config_dict.get('filtering').get('LOESS').get('nb_values_used')
-    median_filter_kernel_size = config_dict.get('filtering').get('median').get('kernel_size')
-    make_c3d = config_dict.get('filtering').get('make_c3d')
-    
-    # Recap
-    filter_mapping_recap = {
-        'kalman': f'--> Filter type: Kalman {kalman_filter_smooth_str}. Measurements trusted {kalman_filter_trustratio} times as much as previous data, assuming a constant acceleration process.', 
-        'butterworth': f'--> Filter type: Butterworth {butterworth_filter_type}-pass. Order {butterworth_filter_order}, Cut-off frequency {butterworth_filter_cutoff} Hz.', 
-        'butterworth_on_speed': f'--> Filter type: Butterworth on speed {butter_speed_filter_type}-pass. Order {butter_speed_filter_order}, Cut-off frequency {butter_speed_filter_cutoff} Hz.', 
-        'gaussian': f'--> Filter type: Gaussian. Standard deviation kernel: {gaussian_filter_sigma_kernel}', 
-        'LOESS': f'--> Filter type: LOESS. Number of values used: {loess_filter_nb_values}', 
-        'median': f'--> Filter type: Median. Kernel size: {median_filter_kernel_size}'
-    }
-    logging.info(filter_mapping_recap[filter_type])
-    logging.info(f'Filtered 3D coordinates are stored at {trc_path}.\n')
-    if make_c3d:
-        logging.info('All filtered trc files have been converted to c3d.')
-
-
-def filter_all(config_dict):
+def filter_all(config):
     '''
     Filter the 3D coordinates of the trc file.
     Displays filtered coordinates for checking.
@@ -446,33 +417,8 @@ def filter_all(config_dict):
     - a filtered trc file
     '''
 
-    # Read config_dict
-    project_dir = config_dict.get('project').get('project_dir')
-    pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    display_figures = config_dict.get('filtering').get('display_figures')
-    filter_type = config_dict.get('filtering').get('type')
-    make_c3d = config_dict.get('filtering').get('make_c3d')
+    trc_path_in, trc_path_out, filter_type, frame_rate, display_figures, make_c3d = config.get_filtering_params()
 
-    # Get frame_rate
-    video_dir = os.path.join(project_dir, 'videos')
-    vid_img_extension = config_dict['pose']['vid_img_extension']
-    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-    frame_rate = config_dict.get('project').get('frame_rate')
-    if frame_rate == 'auto': 
-        try:
-            cap = cv2.VideoCapture(video_files[0])
-            cap.read()
-            if cap.read()[0] == False:
-                raise
-            frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
-        except:
-            frame_rate = 60
-    
-    # Trc paths
-    trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in file]
-    trc_f_out = [f'{os.path.basename(t).split(".")[0]}_filt_{filter_type}.trc' for t in trc_path_in]
-    trc_path_out = [os.path.join(pose3d_dir, t) for t in trc_f_out]
-    
     for person_id, (t_in, t_out) in enumerate(zip(trc_path_in, trc_path_out)):
         # Read trc header
         with open(t_in, 'r') as trc_file:
@@ -484,7 +430,7 @@ def filter_all(config_dict):
         Q_coord = trc_df.drop(trc_df.columns[[0, 1, -1]], axis=1)
 
         # Filter coordinates
-        Q_filt = Q_coord.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
+        Q_filt = Q_coord.apply(filter1d, axis=0, args = [config, filter_type, frame_rate])
 
         # Display figures
         if display_figures:
@@ -499,12 +445,10 @@ def filter_all(config_dict):
             Q_filt.insert(1, 'Time', time_col)
             # Q_filt = Q_filt.fillna(' ')
             Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+  
+        logging.info(f'Filtered 3D coordinates are stored at {t_out}.\n')
 
         # Save c3d
         if make_c3d:
+            logging.info('All filtered trc files have been converted to c3d.')
             convert_to_c3d(t_out)
-
-        # Recap
-        recap_filter3d(config_dict, t_out)
-
-
