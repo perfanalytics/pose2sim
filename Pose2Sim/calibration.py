@@ -552,7 +552,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
     '''
 
     try:
-        intrinsics_cam_listdirs_names = next(os.walk(os.path.join(calib_dir, 'intrinsics')))[1]
+        intrinsics_cam_listdirs_names = sorted(next(os.walk(os.path.join(calib_dir, 'intrinsics')))[1])
     except StopIteration:
         logging.exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
         raise Exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
@@ -641,7 +641,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
     '''
 
     try:
-        extrinsics_cam_listdirs_names = next(os.walk(os.path.join(calib_dir, 'extrinsics')))[1]
+        extrinsics_cam_listdirs_names = sorted(next(os.walk(os.path.join(calib_dir, 'extrinsics')))[1])
     except StopIteration:
         logging.exception(f'Error: No {os.path.join(calib_dir, "extrinsics")} folder found.')
         raise Exception(f'Error: No {os.path.join(calib_dir, "extrinsics")} folder found.')
