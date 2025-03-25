@@ -17,8 +17,8 @@
     images.
     
     Usage: 
-    python -m json_display_with_img -j json_folder -i raw_img_folder
-    python -m json_display_with_img -j json_folder -i raw_img_folder -o output_img_folder -d True -s True
+    json_display_with_img -j json_folder -i raw_img_folder
+    json_display_with_img -j json_folder -i raw_img_folder -o output_img_folder -d True -s True
     from Pose2Sim.Utilities import json_display_with_img; json_display_with_img.json_display_with_img_func(json_folder=r'<json_folder>', raw_img_folder=r'<raw_img_folder>')
 '''
 
@@ -44,6 +44,18 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-j', '--json_folder', required = True, help='folder of json 2D coordinate files')
+    parser.add_argument('-i', '--raw_img_folder', required = True, help='folder of original images')
+    parser.add_argument('-o', '--output_img_folder', required=False, help='custom folder name for coordinates overlayed on images')
+    parser.add_argument('-d', '--display', default=True, required = False, help='display images with overlayed coordinates')
+    parser.add_argument('-s', '--save', default=False, required = False, help='save images with overlayed 2D coordinates')
+    
+    args = vars(parser.parse_args())
+    json_display_with_img_func(**args)
+
+    
 def json_display_with_img_func(**args):
     '''
     Displays json 2d detections overlayed on original raw images.
@@ -103,12 +115,4 @@ def json_display_with_img_func(**args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-j', '--json_folder', required = True, help='folder of json 2D coordinate files')
-    parser.add_argument('-i', '--raw_img_folder', required = True, help='folder of original images')
-    parser.add_argument('-o', '--output_img_folder', required=False, help='custom folder name for coordinates overlayed on images')
-    parser.add_argument('-d', '--display', default=True, required = False, help='display images with overlayed coordinates')
-    parser.add_argument('-s', '--save', default=False, required = False, help='save images with overlayed 2D coordinates')
-    
-    args = vars(parser.parse_args())
-    json_display_with_img_func(**args)
+    main()

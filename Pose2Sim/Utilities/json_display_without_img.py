@@ -14,8 +14,8 @@
     coordinates on the original images.
     
     Usage: 
-    python -m json_display_without_img -j json_folder -W 1920 -H 1080
-    python -m json_display_without_img -j json_folder -o output_img_folder -d True -s True -W 1920 -H 1080 --id_persons 1 2
+    json_display_without_img -j json_folder -W 1920 -H 1080
+    json_display_without_img -j json_folder -o output_img_folder -d True -s True -W 1920 -H 1080 --id_persons 1 2
     import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>', image_width=1920, image_height = 1080, id_persons=(1,2))
 '''
 
@@ -42,6 +42,21 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-j', '--json_folder', required = True, help='folder of json 2D coordinate files')
+    parser.add_argument('-i', '--id_persons', required = False, nargs="+", type=int, help='ids of the persons you want to display')
+    parser.add_argument('-W', '--image_width', required = False, type=int, help='image width')
+    parser.add_argument('-H', '--image_height', required = False, type=int, help='image height')
+    parser.add_argument('-f', '--frame_rate', required = False, type=float, help='frame rate')
+    parser.add_argument('-o', '--output_img_folder', required=False, help='custom folder name for coordinates overlayed on images')
+    parser.add_argument('-d', '--display', default=True, required = False, help='display images with overlayed coordinates')
+    parser.add_argument('-s', '--save', default=False, required = False, help='save images with overlayed 2D coordinates')
+    
+    args = vars(parser.parse_args())
+    json_display_without_img_func(**args)
+
+
 def sort_stringlist_by_last_number(string_list):
     '''
     Sort a list of strings based on the last number in the string.
@@ -75,8 +90,8 @@ def json_display_without_img_func(**args):
     coordinates on the original images.
     
     Usage: 
-    python -m json_display_without_img -j json_folder -W 1920 -H 1080
-    python -m json_display_without_img -j json_folder -o output_img_folder -d True -s True -W 1920 -H 1080 --id_persons 1 2
+    json_display_without_img -j json_folder -W 1920 -H 1080
+    json_display_without_img -j json_folder -o output_img_folder -d True -s True -W 1920 -H 1080 --id_persons 1 2
     import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>', image_width=1920, image_height = 1080, id_persons=(1,2))
     '''
 
@@ -166,15 +181,4 @@ def json_display_without_img_func(**args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-j', '--json_folder', required = True, help='folder of json 2D coordinate files')
-    parser.add_argument('-i', '--id_persons', required = False, nargs="+", type=int, help='ids of the persons you want to display')
-    parser.add_argument('-W', '--image_width', required = False, type=int, help='image width')
-    parser.add_argument('-H', '--image_height', required = False, type=int, help='image height')
-    parser.add_argument('-f', '--frame_rate', required = False, type=float, help='frame rate')
-    parser.add_argument('-o', '--output_img_folder', required=False, help='custom folder name for coordinates overlayed on images')
-    parser.add_argument('-d', '--display', default=True, required = False, help='display images with overlayed coordinates')
-    parser.add_argument('-s', '--save', default=False, required = False, help='save images with overlayed 2D coordinates')
-    
-    args = vars(parser.parse_args())
-    json_display_without_img_func(**args)
+    main()
