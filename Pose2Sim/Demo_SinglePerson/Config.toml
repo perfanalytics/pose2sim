@@ -18,24 +18,55 @@
 
 
 [project]
-multi_person = false # true for trials with multiple participants. If false, only the person with lowest reprojection error is analyzed.
-participant_height = 'auto' # 'auto', float (eg 1.72), or list of floats (eg [1.72, 1.40])  # meters  # Only used for marker augmentation 
-participant_mass = 70.0             # float (eg 70.0), or list of floats (eg [70.0, 63.5])  # kg      # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces rather than only kinematics 
+frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video and webcam (Don't work with images) 
 
-frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
-frame_range = [] # For example [10,300], or [] for all frames. 
+exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
+# e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
+
+[[subjects]]
+id = 1
+height = "auto"
+mass = 70
+
+[[subjects]]
+id = 2
+height = "auto"
+mass = 55
+
+[[sources]]
+name = "image1"
+path = "videos/cam01.mp4"
+rotation = 0
+frame_range = []
+approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
+time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
+calib_intrinsics = "intrinsics/int_cam01_img/"
+calib_extrinsics = "extrinsics/ext_cam01_img/"
+
+[[sources]]
+name = "cam02"
+path = "videos/cam02.mp4"
+rotation = 0
+frame_range = []
+approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
+time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
+calib_intrinsics = "intrinsics/int_cam02_img/"
+calib_extrinsics = "extrinsics/ext_cam02_img/"
+
+[[sources]]
+name = "cam03"
+path = 0 # webcam id
+rotation = 0
+calib_intrinsics = "intrinsics/int_cam03_img/"
+calib_extrinsics = "live"
+
 ## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
 ## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
 
-exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
-# e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
-
-
 [pose]
-vid_img_extension = 'mp4' # any video or image extension
-
+gray_capture = true
 pose_model = 'Body_with_feet'  #With RTMLib: 
                          # - Body_with_feet (default HALPE_26 model), 
                          # - Whole_body_wrist (COCO_133_WRIST: body + feet + 2 hand_points), 
@@ -97,9 +128,6 @@ synchronization_gui = false # true or false. If true, a player will popup and le
 display_sync_plots = true # true or false (lowercase)
 keypoints_to_consider = 'all' # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
-approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
-                           # [10.0, 2.0, 8.0, 11.0] list of times (seconds) if you want to specify the approximate time of a clear vertical event for each camera
-time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
 likelihood_threshold = 0.4 # Keypoints whose likelihood is below likelihood_threshold are filtered out
 filter_cutoff = 6 # time series are smoothed to get coherent time-lagged correlation
 filter_order = 4
@@ -110,7 +138,7 @@ filter_order = 4
 calibration_type = 'convert' # 'convert' or 'calculate'
 
    [calibration.convert]
-   convert_from = 'qualisys' # 'caliscope', 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
+   convert_from = 'Calib.qca.txt' # 'caliscope', 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
       [calibration.convert.caliscope]  # No parameter needed
       [calibration.convert.qualisys]
       binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
@@ -130,7 +158,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
       show_detection_intrinsics = true # true or false (lowercase)
       intrinsics_extension = 'jpg' # any video or image extension
       extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
-      intrinsics_corners_nb = [4,7] 
+      intrinsics_corners_nb = [4,7]
       intrinsics_square_size = 60 # mm
 
       # Camera placements, need to be done before every session
@@ -234,7 +262,7 @@ remove_individual_ik_setup = true # true or false (lowercase) # If true, the ind
 fastest_frames_to_remove_percent = 0.1 # Frames with high speed are considered as outliers
 close_to_zero_speed_m = 0.2 # Sum for all keypoints: about 50 px/frame or 0.2 m/frame
 large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
-trimmed_extrema_percent = 0.5 # Proportion of the most extreme segment values to remove before calculating their mean)
+trimmed_extrema_percent = 0.5 # Proportion of the most extreme segment values to remove before calculating their mean
 
 
 [logging]

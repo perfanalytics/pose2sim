@@ -502,6 +502,9 @@ def world_to_camera_persp(r, t):
     Qc = RQ+T --> Q = R-1.Qc - R-1.T
     '''
 
+    r = np.array(r)
+    t = np.array(t)
+
     r = r.T
     t = - r @ t 
 
