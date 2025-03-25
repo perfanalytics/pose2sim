@@ -11,7 +11,7 @@
     
     Usage: 
         from Pose2Sim.Utilities import trc_plot; trc_plot.trc_plot_func(r'<input_trc_file>')
-        OR python -m trc_plot -i input_trc_file
+        OR trc_plot -i input_trc_file
 '''
 
 
@@ -96,6 +96,14 @@ class plotWindow():
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input_file', required = True, help='trc input file')
+    args = vars(parser.parse_args())
+    
+    trc_plot_func(args)
+    
+
 def display_figures_fun(Q, time_col, keypoints_names):
     '''
     Displays filtered and unfiltered data for comparison
@@ -158,9 +166,4 @@ def trc_plot_func(*args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input_file', required = True, help='trc input file')
-    args = vars(parser.parse_args())
-    
-    trc_plot_func(args)
-    
+    main()

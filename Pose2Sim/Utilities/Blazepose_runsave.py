@@ -15,9 +15,9 @@
     You may also need to install tables: `pip install tables`
         
     Usage: 
-    python -m Blazepose_runsave -i input_file --display --save_images --save_video --to_csv --to_h5 --to_json --model_complexity 2 -o output_folder
-    OR python -m Blazepose_runsave -i input_file --display --to_json --save_images 
-    OR python -m Blazepose_runsave -i input_file -dJs
+    Blazepose_runsave -i input_file --display --save_images --save_video --to_csv --to_h5 --to_json --model_complexity 2 -o output_folder
+    OR Blazepose_runsave -i input_file --display --to_json --save_images 
+    OR Blazepose_runsave -i input_file -dJs
     OR from Pose2Sim.Utilities import Blazepose_runsave; Blazepose_runsave.blazepose_detec_func(input_file=r'input_file', save_images=True, to_json=True, model_complexity=2)
 '''
 
@@ -123,6 +123,22 @@ def save_to_json(kpt_list, output_folder, video_name):
             js_f.write(json.dumps(json_dict))
 
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input_file', required = True, help='input video file')
+    parser.add_argument('-d', '--display', action='store_true', help='display video with keypoints overlayed')
+    parser.add_argument('-s', '--save_images', action='store_true', help='save images with keypoints overlayed')
+    parser.add_argument('-v', '--save_video', action='store_true', help='save video with keypoints overlayed')
+    parser.add_argument('-c', '--to_csv', action='store_true', help='save coordinates to csv file')
+    parser.add_argument('-H', '--to_h5', action='store_true', help='save coordinates to h5 file')
+    parser.add_argument('-J', '--to_json', action='store_true', help='save coordinates to json files')
+    parser.add_argument('--model_complexity', type=int, default=2, help='model complexity (0, 1 or 2)')
+    parser.add_argument('-o', '--output_folder', required=False, help='output folder')
+    args = vars(parser.parse_args())
+    
+    blazepose_detec_func(**args)
+    
+
 def blazepose_detec_func(**args):
     '''
     Runs BlazePose (Mediapipe) on a video
@@ -133,9 +149,9 @@ def blazepose_detec_func(**args):
     You may also need to install tables: `pip install tables`
         
     Usage: 
-    python -m Blazepose_runsave -i input_file --display --save_images --save_video --to_csv --to_h5 --to_json --model_complexity 2 -o output_folder
-    OR python -m Blazepose_runsave -i input_file --display --to_json --save_images
-    OR python -m Blazepose_runsave -i input_file -dJs
+    Blazepose_runsave -i input_file --display --save_images --save_video --to_csv --to_h5 --to_json --model_complexity 2 -o output_folder
+    OR Blazepose_runsave -i input_file --display --to_json --save_images
+    OR Blazepose_runsave -i input_file -dJs
     OR from Pose2Sim.Utilities import Blazepose_runsave; Blazepose_runsave.blazepose_detec_func(input_file=r'input_file', save_images=True, to_json=True, model_complexity=2)
     '''
 
@@ -226,17 +242,4 @@ def blazepose_detec_func(**args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input_file', required = True, help='input video file')
-    parser.add_argument('-C', '--to_csv', required=False, action='store_true', help='save coordinates to csv')
-    parser.add_argument('-H', '--to_h5', required=False, action='store_true', help='save coordinates to h5')
-    parser.add_argument('-J', '--to_json', required=False, action='store_true', help='save coordinates to json')
-    parser.add_argument('-d', '--display', required = False, action='store_true', help='display images with overlayed coordinates')
-    parser.add_argument('-s', '--save_images', required = False, action='store_true', help='save images with overlayed coordinates')
-    parser.add_argument('-v', '--save_video', required = False, action='store_true', help='save video with overlayed coordinates')
-    parser.add_argument('-m', '--model_complexity', required = False, default = 2, help='model complexity. 0: fastest but less accurate, 2: most accurate but slowest')
-    parser.add_argument('-o', '--output_folder', required=False, help='output folder for coordinates and images')
-    
-    args = vars(parser.parse_args())
-    
-    blazepose_detec_func(**args)
+    main()

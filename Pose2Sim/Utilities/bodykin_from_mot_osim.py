@@ -20,8 +20,8 @@
     
     Usage: 
     from Pose2Sim.Utilities import bodykin_from_mot_osim; bodykin_from_mot_osim.bodykin_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_csv_file>')
-    python -m bodykin_from_mot_osim -m input_mot_file -o input_osim_file
-    python -m bodykin_from_mot_osim -m input_mot_file -o input_osim_file -c output_csv_file
+    bodykin_from_mot_osim -m input_mot_file -o input_osim_file
+    bodykin_from_mot_osim -m input_mot_file -o input_osim_file -c output_csv_file
 '''
 
 
@@ -44,6 +44,16 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-m', '--input_mot_file', required = True, help='input .mot file')
+    parser.add_argument('-o', '--input_osim_file', required = True, help='input .osim file')
+    parser.add_argument('-c', '--csv_output_file', required = False, help='output csv file')
+    args = vars(parser.parse_args())
+    
+    bodykin_from_mot_osim_func(args)
+
+
 def bodykin_from_mot_osim_func(*args):
     '''
     Build a csv file which stores locations and orientations of all bodies
@@ -54,8 +64,8 @@ def bodykin_from_mot_osim_func(*args):
     
     Usage: 
     from Pose2Sim.Utilities import bodykin_from_mot_osim; bodykin_from_mot_osim.bodykin_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_csv_file>')
-    python -m bodykin_from_mot_osim -m input_mot_file -o input_osim_file
-    python -m bodykin_from_mot_osim -m input_mot_file -o input_osim_file -t output_csv_file
+    bodykin_from_mot_osim -m input_mot_file -o input_osim_file
+    bodykin_from_mot_osim -m input_mot_file -o input_osim_file -t output_csv_file
     '''
     
     try:
@@ -163,12 +173,8 @@ def bodykin_from_mot_osim_func(*args):
     bodyHeader = 'times, ' + ''.join([f'{b}_x, {b}_y, {b}_z, {b}_rotx, {b}_roty, {b}_rotz, ' for b in bodyNames])[:-2]
     np.savetxt(os.path.splitext(output_csv_file)[0]+'.csv', loc_rot_frame_all_np, delimiter=',', header=bodyHeader)
     
+    print(f'CSV file generated at {os.path.splitext(output_csv_file)[0]+".csv"}.\n')
+    
     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--input_mot_file', required = True, help='input mot file')
-    parser.add_argument('-o', '--input_osim_file', required = True, help='input osim file')
-    parser.add_argument('-c', '--csv_output_file', required=False, help='csv output file')
-    args = vars(parser.parse_args())
-    
-    bodykin_from_mot_osim_func(args)
+    main()

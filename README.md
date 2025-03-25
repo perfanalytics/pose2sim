@@ -410,7 +410,7 @@ Pose2Sim.poseEstimation()
 1. Train your DeepLabCut model and run it on your images or videos (more instruction on their repository)
 2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)). Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json': 
    ``` cmd
-   python -m DLC_to_OpenPose -i input_h5_file
+   DLC_to_OpenPose -i input_h5_file
    ```
 3. Edit `pose.CUSTOM` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), and edit the node IDs so that they correspond to the column numbers of the 2D pose file, starting from zero. Make sure you also changed the `pose_model` and the `tracked_keypoint`.\
    You can visualize your skeleton's hierarchy by changing pose_model to CUSTOM and writing these lines: 
@@ -449,9 +449,9 @@ Make sure you modify the [Config.toml](https://github.com/perfanalytics/pose2sim
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 * Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
   ``` cmd
-  python -m Blazepose_runsave -i input_file -dJs
+  Blazepose_runsave -i input_file -dJs
   ```
-  Type in `python -m Blazepose_runsave -h` for explanation on parameters.
+  Type in `Blazepose_runsave -h` for explanation on parameters.
 * Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
 ### With AlphaPose *(legacy)*:
@@ -462,7 +462,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 * Install and run AlphaPose on your videos (more instruction on their repository)
 * Translate the AlphaPose single json file to OpenPose frame-by-frame files (with `AlphaPose_to_OpenPose.py` script, see [Utilities](#utilities)): 
    ``` cmd
-   python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
+   AlphaPose_to_OpenPose -i input_alphapose_json_file
    ```
 * Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 

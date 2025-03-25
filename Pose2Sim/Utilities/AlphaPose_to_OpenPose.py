@@ -10,8 +10,8 @@
     Converts AlphaPose single json file to OpenPose frame-by-frame files.
         
     Usage: 
-    python -m AlphaPose_to_OpenPose -i input_alphapose_json_file -o output_openpose_json_folder
-    OR python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
+    AlphaPose_to_OpenPose -i input_alphapose_json_file -o output_openpose_json_folder
+    OR AlphaPose_to_OpenPose -i input_alphapose_json_file
     OR from Pose2Sim.Utilities import AlphaPose_to_OpenPose; AlphaPose_to_OpenPose.AlphaPose_to_OpenPose_func(r'input_alphapose_json_file', r'output_openpose_json_folder')
 '''
 
@@ -34,13 +34,22 @@ __status__ = "Development"
 
 
 # FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input_alphapose_json_file', required = True, help='input AlphaPose single json file')
+    parser.add_argument('-o', '--output_openpose_json_folder', required = False, help='output folder for frame-by-frame OpenPose json files')
+    args = vars(parser.parse_args())
+    
+    AlphaPose_to_OpenPose_func(args)
+
+
 def AlphaPose_to_OpenPose_func(*args):
     '''
     Converts AlphaPose single json file to OpenPose frame-by-frame files.
         
     Usage: 
-    python -m AlphaPose_to_OpenPose -i input_alphapose_json_file -o output_openpose_json_folder
-    OR python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
+    AlphaPose_to_OpenPose -i input_alphapose_json_file -o output_openpose_json_folder
+    OR AlphaPose_to_OpenPose -i input_alphapose_json_file
     OR from Pose2Sim.Utilities import AlphaPose_to_OpenPose; AlphaPose_to_OpenPose.AlphaPose_to_OpenPose_func(r'input_alphapose_json_file', r'output_openpose_json_folder')
     '''
 
@@ -106,11 +115,8 @@ def AlphaPose_to_OpenPose_func(*args):
         with open(json_file, 'w') as js_f:
             js_f.write(json.dumps(json_dict))
 
+        print(f'OpenPose json files saved in {output_openpose_json_folder}')
+
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input_alphapose_json_file', required = True, help='input AlphaPose single json file')
-    parser.add_argument('-o', '--output_openpose_json_folder', required = False, help='output folder for frame-by-frame OpenPose json files')
-    args = vars(parser.parse_args())
-    
-    AlphaPose_to_OpenPose_func(args)
+    main()
