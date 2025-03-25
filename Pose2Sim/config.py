@@ -18,6 +18,7 @@ import glob
 import logging
 import toml
 import cv2
+import math
 import sys
 import pandas as pd
 from pathlib import Path
@@ -757,13 +758,10 @@ class SubConfig:
     def multi_person(self):
         return self.project.get('multi_person')
 
-    def get_pose_estimation_params(self):
-        '''
-        Returns the parameters required for pose estimation.
-        '''
+    def check_pose_estimation(self):
         # Read config
         overwrite_pose = self.pose.get('overwrite_pose')
-        
+
         for source in self.sources:
             if not isinstance(source, WebcamSource):
                 if os.path.exists(os.path.join(self.pose_dir, source.name)) and not overwrite_pose:
@@ -772,22 +770,51 @@ class SubConfig:
                     return
                 elif os.path.exists(os.path.join(self.pose_dir, source.name)) and overwrite_pose:
                     logging.info(f'[{source.name} - pose estimation] Overwriting estimation results.')
+    
+    def get_mosaic_params(self):
+        '''
+        Returns the parameters required for pose estimation.
+        '''
 
-        frame_rate = 9999
-        for source in self.sources:
-            frame_rate = min(source.frame_rate, frame_rate)
+        mosaic_rows = 0
+        mosaic_cols = 0
 
-        max_width, max_height = 0, 0
-        for source in self.sources:
-            dimensions = source.dimensions
-            max_width = max(max_width, dimensions[0])
-            max_height = max(max_height, dimensions[1])
-        dimensions = (max_width, max_height)
+        if self.combined_frames:
+            for source in self.sources:
+                dimensions = source.dimensions
+                max_width = max(max_width, dimensions[0])
+                max_height = max(max_height, dimensions[1])
+            if max_width >= max_height:
+                mosaic_cols = math.ceil(math.sqrt(len(self.sources)))
+                mosaic_rows = math.ceil(len(self.sources) / mosaic_cols)
+            else:
+                mosaic_rows = math.ceil(math.sqrt(len(self.sources)))
+                mosaic_cols = math.ceil(len(self.sources) / mosaic_rows)
+            cell_w = self.pose_model.det_input_size[0] // mosaic_cols
+            cell_h = self.pose_model.det_input_size[1] // mosaic_rows
 
-        return (
-            frame_rate,
-            dimensions,
-        )
+            logging.info(f"Combined frames: {mosaic_rows} rows & {mosaic_cols} cols")
+
+            for i, source in enumerate(self.sources):
+                r = i // mosaic_cols
+                c = i % mosaic_cols
+                x_off = c * cell_w
+                y_off = r * cell_h
+                source.x_offset = x_off
+                source.y_offset = y_off
+                source.scaled_w = cell_w
+                source.scaled_h = cell_h
+
+            frame_size = (cell_w, cell_h)
+        else:
+            frame_size = self.pose_model.det_input_size
+            logging.info(f"Frame input size: {frame_size[0]}x{frame_size[1]}")
+            source.x_offset = 0
+            source.y_offset = 0
+            source.scaled_w = frame_size[0]
+            source.scaled_h = frame_size[1]
+
+        return (mosaic_rows, mosaic_cols)
     
     @property 
     def combined_frames(self):
