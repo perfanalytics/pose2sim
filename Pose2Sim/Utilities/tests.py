@@ -34,6 +34,8 @@
     Not all possible configuration parameters are extensively tested.
     
     Usage: 
+    tests_pose2sim
+        OR
     cd Pose2Sim/Utilities
     python tests.py
         OR
@@ -42,6 +44,7 @@
 
 ## INIT
 import os
+import sys
 import toml
 from unittest.mock import patch
 import unittest
@@ -98,6 +101,9 @@ class TestWorkflow(unittest.TestCase):
             from Pose2Sim.Utilities.tests import TestWorkflow; TestWorkflow.test_workflow(mock_input='no')
             '''
 
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        os.chdir(root_dir)
+
         ###################
         # SINGLE-PERSON   #
         ###################
@@ -150,8 +156,8 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("project").update({"project_dir":project_dir})
         config_dict.get("pose").update({"pose_model":'Body'})
         config_dict.get("pose").update({"mode":"""{'pose_class':'RTMO', 
-                                                   'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.zip', 
-                                                   'pose_input_size':[640, 640]}"""})
+                                                'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.zip', 
+                                                'pose_input_size':[640, 640]}"""})
         config_dict.get("pose").update({"display_detection":False})
         config_dict.get("pose").update({"save_video":'none'})
         config_dict.get("synchronization").update({"display_sync_plots":False})
@@ -184,5 +190,17 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.runAll(do_synchronization=False)
 
 
+def main():
+    '''
+    Entry point for running Pose2Sim tests.
+    Can be called from command line or as a console script.
+    '''
+
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestWorkflow)
+    runner = unittest.TextTestRunner(verbosity=2, stream=sys.stdout, buffer=False)
+    result = runner.run(suite)
+    sys.exit(not result.wasSuccessful())
+
+
 if __name__ == '__main__':
-    unittest.main()
+    main()

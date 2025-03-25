@@ -10,8 +10,8 @@
     Undersample a trc file
     
     Usage: 
-    python -m trc_desample -i input_trc_file -f <output_frequency>
-    python -m trc_desample -i input_trc_file -f <output_frequency> -o output_trc_file
+    trc_desample -i input_trc_file -f <output_frequency>
+    trc_desample -i input_trc_file -f <output_frequency> -o output_trc_file
     from Pose2Sim.Utilities import trc_desample; trc_desample.trc_desample_func(r'input_trc_file', output_frequency, r'output_trc_file')
 '''
 
@@ -34,6 +34,16 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input_file', required = True, help='trc input file')
+    parser.add_argument('-f', '--output_frequency', required = True, help='required output frequency')
+    parser.add_argument('-o', '--output_file', required=False, help='trc desampled output file')
+    args = vars(parser.parse_args())
+    
+    trc_desample_func(args)
+
+
 def trc_desample_func(*args):
     '''
     Undersample a trc file
@@ -75,13 +85,9 @@ def trc_desample_func(*args):
     with open(trc_desampled_path, 'w') as trc_o:
         [trc_o.write(line) for line in header]
         Q.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+
+    print(f"trc file desampled at {f_out} fps: {trc_desampled_path}")
     
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input_file', required = True, help='trc input file')
-    parser.add_argument('-f', '--output_frequency', required = True, help='required output frequency')
-    parser.add_argument('-o', '--output_file', required=False, help='trc desampled output file')
-    args = vars(parser.parse_args())
-    
-    trc_desample_func(args)
+    main()

@@ -12,8 +12,8 @@
     
     Usage: 
     from Pose2Sim.Utilities import c3d_to_trc; c3d_to_trc.c3d_to_trc_func(r'<input_c3d_file>')
-    python -m c3d_to_trc -i input_c3d_file
-    python -m c3d_to_trc -i input_c3d_file -o output_c3d_file
+    c3d_to_trc -i input_c3d_file
+    c3d_to_trc -i input_c3d_file -o output_c3d_file
 '''
 
 
@@ -35,6 +35,15 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input', required = True, help='c3d input file')
+    parser.add_argument('-o', '--output', required=False, help='trc output file')
+    args = vars(parser.parse_args())
+    
+    c3d_to_trc_func(args)
+
+
 def c3d_to_trc_func(*args):
     '''
     Convert c3d to trc
@@ -123,9 +132,4 @@ def c3d_to_trc_func(*args):
     
     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', required = True, help='c3d input file name')
-    parser.add_argument('-o', '--output', required=False, help='trc output file name')
-    args = vars(parser.parse_args())
-    
-    c3d_to_trc_func(args)
+    main()

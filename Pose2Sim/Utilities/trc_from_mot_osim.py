@@ -13,8 +13,8 @@
     
     Usage: 
     from Pose2Sim.Utilities import trc_from_mot_osim; trc_from_mot_osim.trc_from_mot_osim_func(input_mot_file=r'<input_mot_file>', input_osim_file=r'<output_osim_file>', trc_output_file=r'<trc_output_file>', marker_list=['_rknee', 'r_hip'])
-    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file
-    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file -t trc_output_file -l r_knee r_hip 
+    trc_from_mot_osim -m input_mot_file -o input_osim_file
+    trc_from_mot_osim -m input_mot_file -o input_osim_file -t trc_output_file -l r_knee r_hip 
 '''
 
 
@@ -38,6 +38,17 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-m', '--input_mot_file', required = True, help='input mot file')
+    parser.add_argument('-o', '--input_osim_file', required = True, help='input osim file')
+    parser.add_argument('-t', '--trc_output_file', required=False, help='trc output file')
+    parser.add_argument('-l', '--marker_list', required=False, nargs='+', default=[], help='list of markers to include in the trc file. All if not specified')
+    args = vars(parser.parse_args())
+    
+    trc_from_mot_osim_func(**args)
+
+
 def get_marker_positions(motion_data, model, in_degrees=True, marker_list=[]):
     '''
     Get dataframe of marker positions
@@ -100,8 +111,8 @@ def trc_from_mot_osim_func(**args):
     
     Usage: 
     from Pose2Sim.Utilities import trc_from_mot_osim; trc_from_mot_osim.trc_from_mot_osim_func(input_mot_file=r'<input_mot_file>', input_osim_file=r'<output_osim_file>', trc_output_file=r'<trc_output_file>', marker_list=['_rknee', 'r_hip'])
-    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file
-    python -m trc_from_mot_osim -m input_mot_file -o input_osim_file -t trc_output_file -l r_knee r_hip 
+    trc_from_mot_osim -m input_mot_file -o input_osim_file
+    trc_from_mot_osim -m input_mot_file -o input_osim_file -t trc_output_file -l r_knee r_hip 
     '''
 
     motion_path = args.get('input_mot_file') # invoked with argparse
@@ -162,11 +173,4 @@ def trc_from_mot_osim_func(**args):
     
     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--input_mot_file', required = True, help='input mot file')
-    parser.add_argument('-o', '--input_osim_file', required = True, help='input osim file')
-    parser.add_argument('-t', '--trc_output_file', required=False, help='trc output file')
-    parser.add_argument('-l', '--marker_list', required=False, nargs='+', default=[], help='list of markers to include in the trc file. All if not specified')
-    args = vars(parser.parse_args())
-    
-    trc_from_mot_osim_func(**args)
+    main()
