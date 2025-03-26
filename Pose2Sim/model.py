@@ -84,7 +84,7 @@ class PoseModelEnum(Enum):
 class PoseModel:
     def __init__(self, config, pose_model):
         self.name = pose_model
-        self.pose_model = self.get_pose_model(pose_model)
+        self.pose_model_enum = self.get_pose_model(pose_model)
         self.config = config
 
         self.mode = config.pose.get('mode')
@@ -117,22 +117,22 @@ class PoseModel:
 
         self.backend, self.device = init_backend_device(self.config.backend, self.config.device)
 
-        self.det_input_size = self.pose_model.model_class.MODE[self.config.mode]['det_input_size']
-        if self.pose_model.model_class is None:
+        self.det_input_size = self.pose_model_enum.model_class.MODE[self.config.mode]['det_input_size']
+        if self.pose_model_enum.model_class is None:
             try:
                 det_class, det, self.det_input_size, pose_class, pose, pose_input_size = self.config.get_custom_model_params()
-                self.pose_model.model_class = partial(Custom,
+                self.pose_model_enum.model_class = partial(Custom,
                                         det_class=det_class, det=det, det_input_size=self.det_input_size,
                                         pose_class=pose_class, pose=pose, pose_input_size=pose_input_size,
                                         backend=self.backend, device=self.device)
             except Exception:
                 raise NameError(f"{self.name} invalid mode. Must be 'lightweight', 'balanced', 'performance', or a dictionary of parameters defined in Config.toml.")
 
-        if self.pose_model.skeleton is None:
+        if self.pose_model_enum.skeleton is None:
             try:
-                self.pose_model.skeleton = DictImporter().import_(self.name)
-                if self.pose_model.skeletonton.id == 'None':
-                    self.pose_model.skeleton.id = None
+                self.pose_model_enum.skeleton = DictImporter().import_(self.name)
+                if self.pose_model_enum.skeletonton.id == 'None':
+                    self.pose_model_enum.skeleton.id = None
             except Exception:
                 raise NameError(f"Skeleton {self.name} not found in skeletons.py nor in Config.toml")
 

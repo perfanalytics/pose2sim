@@ -36,8 +36,9 @@ mass = 55
 [[sources]]
 name = "image1"
 path = "videos/cam01.mp4"
+timestamp_path = "videos/cam01.txt"
+timestamp = "video/cam01_timestamps.csv"
 rotation = 0
-frame_range = []
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
 time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
 calib_intrinsics = "intrinsics/int_cam01_img/"
@@ -46,8 +47,8 @@ calib_extrinsics = "extrinsics/ext_cam01_img/"
 [[sources]]
 name = "cam02"
 path = "videos/cam02.mp4"
+timestamp_path = "videos/cam02.txt"
 rotation = 0
-frame_range = []
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
 time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
 calib_intrinsics = "intrinsics/int_cam02_img/"
@@ -55,10 +56,13 @@ calib_extrinsics = "extrinsics/ext_cam02_img/"
 
 [[sources]]
 name = "cam03"
-path = 0 # webcam id
+path = 1 # webcam id
 rotation = 0
 calib_intrinsics = "intrinsics/int_cam03_img/"
 calib_extrinsics = "live"
+backend = "MSMF"
+capture_codec = "MJPG"
+record_codec = "mp4v"
 
 ## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
@@ -66,7 +70,6 @@ calib_extrinsics = "live"
 ## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
 
 [pose]
-gray_capture = true
 pose_model = 'Body_with_feet'  #With RTMLib: 
                          # - Body_with_feet (default HALPE_26 model), 
                          # - Whole_body_wrist (COCO_133_WRIST: body + feet + 2 hand_points), 

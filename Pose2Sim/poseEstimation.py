@@ -34,17 +34,15 @@
 # INIT
 import os
 import time
-import math
-import glob
 import json
 import logging
 import queue
 import multiprocessing
 import psutil
 import cv2
+import uuid
 import numpy as np
 
-from datetime import datetime, timezone, timedelta
 from multiprocessing import shared_memory
 from tqdm import tqdm
 
@@ -53,7 +51,6 @@ from rtmlib import draw_skeleton
 from Pose2Sim.source import WebcamSource, ImageSource, VideoSource
 from deep_sort_realtime.deepsort_tracker import DeepSort
 from Pose2Sim.common import (
-    natural_sort_key,
     sort_people_sports2d,
     sort_people_deepsort,
     colors,
@@ -85,9 +82,12 @@ class PoseEstimatorWorker(multiprocessing.Process):
         self.prev_keypoints = {}
         self.prev_bboxes = {}
 
+        if self.config.tracking_mode == 'deepsort' and self.config.multi_person:
+            self.deepsort_tracker = DeepSort(**self.config.get_deepsort_params())
+
     def run(self):
-        model = self.ModelClass(mode=self.config.pose_model.mode,
-            to_openpose=self.to_openpose,
+        model = self.config.pose_model.pose_model_enum.model_class(mode=self.config.pose_model.mode,
+            to_openpose=self.config.pose_model.output_format,
             backend=self.config.pose_model.backend,
             device=self.config.pose_model.device)
 
@@ -100,8 +100,14 @@ class PoseEstimatorWorker(multiprocessing.Process):
         self.tracker_ready_event.set()
 
         while not self.stopped:
+            active_sources = 0
+            for source in self.config.sources:
+                if not source.ended:
+                    active_sources += 1
+                    break
+
             # If no new frames and no active sources remain, stop
-            if self.queue.empty() and self.active_sources.value == 0:
+            if self.queue.empty() and active_sources == 0:
                 logging.info("Stopping worker as no active sources or items are in the queue.")
                 self.stop()
                 break
@@ -169,6 +175,9 @@ class BaseSynchronizer:
 
         self.video_writers = {}
         self.stopped = False
+
+        if self.config.combined_frames:
+            self.mosaic_dimensions = self.config.check_pose_estimation()
 
     def get_frames_list(self):
         if not self.sync_data:
@@ -510,211 +519,6 @@ class CaptureCoordinator(multiprocessing.Process):
             self.command_queues[src['id']].put(None)
 
 
-class MediaSource(multiprocessing.Process):
-    def __init__(self, **kwargs):
-        super().__init__()
-        self.__dict__.update(kwargs)
-
-        self.frame_idx = 0
-        self.total_frames = 0
-        self.cap = None
-        self.image_files = []
-        self.stopped = False
-
-        self.source.create_output_folders()
-
-    def run(self):
-        try:
-            # Open the specific source
-            if self.source['type'] == 'webcam':
-                self.open_webcam()
-                self.shared_counts[self.source['id']]['total'].value = 0
-                if self.webcam_ready is not None:
-                    self.webcam_ready[self.source['id']] = (self.cap is not None and self.cap.isOpened())
-
-                if self.config.webcam_recording and self.cap is not None and self.cap.isOpened() and self.output_raw_video_path:
-                    raw_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                    raw_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                    self.raw_writer = cv2.VideoWriter(self.source_outputs[-1], fourcc, 30, (raw_width, raw_height))
-
-            elif self.source['type'] == 'video':
-                self.open_video()
-                self.start_timestamp = get_file_utc_timestamp(self.source['path'])
-                if self.frame_ranges:
-                    self.total_frames = len(self.frame_ranges)
-                else:
-                    self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                self.shared_counts[self.source['id']]['total'].value = self.total_frames
-
-            elif self.source['type'] == 'images':
-                self.load_images()
-                self.start_timestamp = get_file_utc_timestamp(self.image_files[0])
-                self.shared_counts[self.source['id']]['total'].value = self.total_frames
-
-            while not self.stopped:
-                try:
-                    cmd = self.command_queue.get(timeout=0.1)
-                except queue.Empty:
-                    continue
-
-                if cmd is None:
-                    break
-
-                if isinstance(cmd, tuple):
-                    if cmd[0] == "CAPTURE_FRAME":
-                        buffer_name = cmd[1]
-                        # Stop if we've reached total frames for video/images
-                        if self.source['type'] in ('video', 'images'):
-                            if self.frame_idx >= self.total_frames:
-                                self.stop()
-                                break
-
-                        # Read frame and send it
-                        frame, is_placeholder = self.read_frame()
-                        if frame is None:
-                            self.stop()
-                            break
-
-                        with self.shared_counts[self.source['id']]['processed'].get_lock():
-                            self.shared_counts[self.source['id']]['processed'].value += 1
-
-                        frame, transform_info = transform(frame, self.frame_size[0], self.frame_size[1], True, self.rotation)
-
-                        self.send_frame(frame, buffer_name, is_placeholder, transform_info)
-
-                    elif cmd[0] == "STOP_CAPTURE":
-                        self.stop()
-                        break
-                    else:
-                        pass
-
-            logging.info(f"MediaSource {self.source['id']} ended.")
-
-            with self.active_sources.get_lock():
-                self.active_sources.value -= 1
-
-            if self.source_ended is not None:
-                self.source_ended[self.source['id']] = True
-
-        except Exception as e:
-            logging.error(f"MediaSource {self.source['id']} error: {e}")
-            self.stop()
-            with self.active_sources.get_lock():
-                self.active_sources.value -= 1
-            if self.source_ended is not None:
-                self.source_ended[self.source['id']] = True
-
-    def open_webcam(self):
-        self.cap = cv2.VideoCapture(int(self.source['id']), cv2.CAP_DSHOW)
-
-        if not self.cap or not self.cap.isOpened():
-            logging.warning(f"Unable to open webcam {self.source['id']}.")
-            self.cap = None
-        else:
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_size[0])
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_size[1])
-            logging.info(f"Webcam {self.source['id']} ready.")
-        time.sleep(1)
-
-    def open_video(self):
-        self.cap = cv2.VideoCapture(self.source['path'])
-        if not self.cap.isOpened():
-            logging.error(f"Cannot open video file: {self.source['path']}")
-            self.stop()
-
-    def load_images(self):
-        pattern = os.path.join(self.source['path'], f"*{self.vid_img_extension}")
-        self.image_files = sorted(glob.glob(pattern), key=natural_sort_key)
-        self.total_frames = len(self.image_files)
-
-    def read_frame(self):
-        if self.source['type'] == 'video':
-            if not self.cap:
-                return None, False
-            if self.frame_ranges and self.frame_idx not in self.frame_ranges:
-                self.frame_idx += 1
-                return self.read_frame()
-
-            ret, frame = self.cap.read()
-            if not ret or frame is None:
-                logging.info(f"Video finished: {self.source['path']}")
-                self.stop()
-                return None, False
-
-            return frame, False
-
-        elif self.source['type'] == 'images':
-            if self.frame_idx < len(self.image_files):
-                frame = cv2.imread(self.image_files[self.frame_idx])
-                if frame is None:
-                    return None, False
-
-                self.frame_idx += 1
-                return frame, False
-            else:
-                self.stop()
-                return None, False
-
-        elif self.source['type'] == 'webcam':
-            if self.cap is None or not self.cap.isOpened():
-                if self.webcam_ready is not None:
-                    self.webcam_ready[self.source['id']] = False
-
-                self.open_webcam()
-
-                if self.cap is None or not self.cap.isOpened():
-                    placeholder_frame = np.zeros((self.frame_size[1], self.frame_size[0], 3), dtype=np.uint8)
-                    return placeholder_frame, True
-
-            ret, frame = self.cap.read()
-            if not ret or frame is None:
-                logging.warning(f"Failed to read from webcam {self.source['id']}. Reconnecting loop.")
-                self.cap.release()
-                self.cap = None
-                placeholder_frame = np.zeros((self.frame_size[1], self.frame_size[0], 3), dtype=np.uint8)
-                return placeholder_frame, True
-
-            if self.webcam_ready is not None:
-                self.webcam_ready[self.source['id']] = True
-
-            return frame, False
-
-        return None, False
-
-    def send_frame(self, frame, buffer_name, is_placeholder, transform_info):
-        shm = self.frame_buffers[buffer_name]
-        np_frame = np.ndarray(frame.shape, dtype=frame.dtype, buffer=shm.buf)
-        np_frame[:] = frame
-
-        if self.source['type'] in ('video', 'images'):
-            timestamp_str = get_frame_utc_timestamp(self.start_timestamp, self.frame_idx, self.frame_rate)
-        else:
-            timestamp_str = get_formatted_utc_timestamp()
-
-        item = (
-            buffer_name,
-            timestamp_str,
-            self.frame_idx,
-            frame.shape,
-            frame.dtype.str,
-            self.source['id'],
-            is_placeholder,
-            transform_info
-        )
-        self.frame_queue.put(item)
-
-        if not is_placeholder:
-            with self.shared_counts[self.source['id']]['queued'].get_lock():
-                self.shared_counts[self.source['id']]['queued'].value += 1
-            self.frame_idx += 1
-
-    def stop(self):
-        self.stopped = True
-        if self.cap:
-            self.cap.release()
-
-
 ## FUNCTIONS
 def estimate_pose_all(config):
     '''
@@ -737,60 +541,22 @@ def estimate_pose_all(config):
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
     - Optionally, videos and/or image files with the detected keypoints
     '''
+    config.check_pose_estimation()
+
+    config.get_mosaic_params()
 
     logging.info(f"Model input size: {config.pose_model.det_input_size[0]}x{config.pose_model.det_input_size[1]}")
 
-    frame_rate, dimensions = config.get_pose_estimation_params()
-
-    deepsort_tracker = None
-    if config.tracking_mode == 'deepsort' and config.multi_person:
-        deepsort_tracker = DeepSort(**config.get_deepsort_params())
-
-    num_sources = len(config.sources)
-
-    if dimensions[0] >= dimensions[1]:
-        mosaic_cols = math.ceil(math.sqrt(num_sources))
-        mosaic_rows = math.ceil(num_sources / mosaic_cols)
-    else:
-        mosaic_rows = math.ceil(math.sqrt(num_sources))
-        mosaic_cols = math.ceil(num_sources / mosaic_rows)
-
-    if config.combined_frames:
-        cell_w = config.pose_model.det_input_size[0] // mosaic_cols
-        cell_h = config.pose_model.det_input_size[1] // mosaic_rows
-
-        logging.info(f"Combined frames: {mosaic_rows} rows & {mosaic_cols} cols")
-        logging.info(f"Frame input size: {cell_w}x{cell_h}")
-
-        frame_size = (cell_w, cell_h)
-    else:
-        frame_size = config.pose_model.det_input_size
-
-    mosaic_subinfo = {}
-    for i, source in enumerate(config.sources):
-        r = i // mosaic_cols
-        c = i % mosaic_cols
-        if config.combined_frames:
-            x_off = c * cell_w
-            y_off = r * cell_h
-            source.mosaic_subinfo = {"x_offset": x_off, "y_offset": y_off, "scaled_w": cell_w, "scaled_h": cell_h}
-        else:
-            x_off = c * frame_size[0]
-            y_off = r * frame_size[1]
-            source.mosaic_subinfo = {"x_offset": x_off, "y_offset": y_off, "scaled_w": frame_size[0], "scaled_h": frame_size[1]}
-
     available_memory = psutil.virtual_memory().available
-    frame_bytes = frame_size[0] * frame_size[1] * 3
-    n_buffers_total = int((available_memory / 2) / (frame_bytes * (num_sources / (num_sources + 1))))
-
-    frame_buffer_count = 0
+    frame_bytes = config.pose_model.det_input_size[0] * config.pose_model.det_input_size[1] * 3
+    n_buffers_total = int((available_memory / 2) / (frame_bytes * (len(config.sources) / (len(config.sources) + 1))))
 
     if not config.combined_frames:
         frame_buffer_count = n_buffers_total
 
         logging.info(f"Allocating {frame_buffer_count} buffers.")
     else:
-        frame_buffer_count = num_sources * 3
+        frame_buffer_count = len(config.sources) * 3
 
         logging.info(f"Allocating {frame_buffer_count} frame buffers.")
 
@@ -804,45 +570,37 @@ def estimate_pose_all(config):
         pose_queue = multiprocessing.Queue(maxsize=pose_buffer_count)
     result_queue = multiprocessing.Queue()
 
+    shm_list = []
+
     frame_buffers = {}
-    available_frame_buffers = multiprocessing.Queue()
+    available_frame_buffers = multiprocessing.Queue(maxsize=frame_buffer_count)
 
     for i in range(frame_buffer_count):
-        buf_name = f"frame_{i}"
-        shm = shared_memory.SharedMemory(name=buf_name, create=True, size=frame_bytes)
-        frame_buffers[buf_name] = shm
-        available_frame_buffers.put(buf_name)
+        buf_uuid = str(uuid.uuid4())
+        shm = shared_memory.SharedMemory(create=True, size=frame_bytes)
+        frame_buffers[buf_uuid] = shm
+        available_frame_buffers.put(buf_uuid)
+        shm_list.append(shm)
 
     pose_buffers = {}
     available_pose_buffers = {}
 
     if config.combined_frames:
-        available_pose_buffers = multiprocessing.Queue()
+        available_pose_buffers = multiprocessing.Queue(maxsize=pose_buffer_count)
         for i in range(pose_buffer_count):
-            buf_name = f"pose_buffer_{i}"
-            shm = shared_memory.SharedMemory(name=buf_name, create=True, size=frame_bytes * num_sources)
-            pose_buffers[buf_name] = shm
-            available_pose_buffers.put(buf_name)
-
-    # Prepare per-source counters
-    source_outputs = {}
-    shared_counts = {}
-    for source in config.sources:
-        shared_counts[source.name] = {
-            'queued': multiprocessing.Value('i', 0),
-            'processed': multiprocessing.Value('i', 0),
-            'total': multiprocessing.Value('i', 0)
-        }
+            buf_uuid = str(uuid.uuid4())
+            shm = shared_memory.SharedMemory(create=True, size=frame_bytes * len(config.sources))
+            pose_buffers[buf_uuid] = shm
+            available_pose_buffers.put(buf_uuid)
+            shm_list.append(shm)
 
     # Decide how many workers to start
     cpu_count = multiprocessing.cpu_count()
 
-    active_sources = multiprocessing.Value('i', num_sources)
-
     if config.combined_frames:
-        initial_workers = max(1, cpu_count - num_sources - 3)
+        initial_workers = max(1, cpu_count - len(config.sources) - 3)
     else:
-        initial_workers = max(1, cpu_count - num_sources - 2)
+        initial_workers = max(1, cpu_count - len(config.sources) - 2)
 
     if not config.multi_workers:
         initial_workers = 1
@@ -856,46 +614,16 @@ def estimate_pose_all(config):
             config=config,
             queue=pose_queue if config.combined_frames else frame_queue,
             result_queue=result_queue,
-            shared_counts=shared_counts,
             buffers=pose_buffers if config.combined_frames else frame_buffers,
             available_buffers=available_pose_buffers if config.combined_frames else available_frame_buffers,
-            active_sources=active_sources,
             tracker_ready_event=tracker_ready_event,
-            deepsort_tracker=deepsort_tracker
         )
         worker.start()
         return worker
 
-
     workers = [spawn_new_worker() for _ in range(initial_workers)]
 
-    manager = multiprocessing.Manager()
-    webcam_ready = manager.dict()
-    source_ended = manager.dict()
     command_queues = {}
-
-    media_sources = []
-    for source in config.sources:
-        source.ended = False
-        source.command_queues = manager.Queue()
-
-        if isinstance(source, WebcamSource):
-            source.ready = False
-
-        ms = MediaSource(
-            config=config,
-            source=source,
-            frame_queue=frame_queue,
-            frame_buffers=frame_buffers,
-            shared_counts=shared_counts,
-            frame_size=frame_size,
-            frame_rate=frame_rate,
-            active_sources=active_sources,
-            webcam_ready=webcam_ready,
-            source_ended=source_ended,
-        )
-        ms.start()
-        media_sources.append(ms)
 
     result_processor = ResultQueueProcessor(
         config=config,
@@ -904,13 +632,6 @@ def estimate_pose_all(config):
         pose_buffers=pose_buffers,
         available_frame_buffers=available_frame_buffers,
         available_pose_buffers=available_pose_buffers,
-        source_outputs=source_outputs,
-        shared_counts=shared_counts,
-        frame_size=frame_size,
-        frame_rate=frame_rate,
-        mosaic_cols=mosaic_cols,
-        mosaic_rows=mosaic_rows,
-        mosaic_subinfo=mosaic_subinfo
     )
     result_processor.start()
 
@@ -923,13 +644,6 @@ def estimate_pose_all(config):
             pose_buffers=pose_buffers,
             available_frame_buffers=available_frame_buffers,
             available_pose_buffers=available_pose_buffers,
-            source_outputs=source_outputs,
-            shared_counts=shared_counts,
-            frame_size=frame_size,
-            frame_rate=frame_rate,
-            mosaic_cols=mosaic_cols,
-            mosaic_rows=mosaic_rows,
-            mosaic_subinfo=mosaic_subinfo
         )
         frame_processor.start()
 
@@ -938,39 +652,14 @@ def estimate_pose_all(config):
         config=config,
         command_queues=command_queues,
         available_frame_buffers=available_frame_buffers,
-        shared_counts=shared_counts,
-        source_ended=source_ended,
-        webcam_ready=webcam_ready,
         tracker_ready_event=tracker_ready_event
     )
     capture_coordinator.start()
 
-    # Setup progress bars
-    progress_bars = {}
-    bar_ended_state = {}
     bar_pos = 0
 
     for source in config.sources:
-        if isinstance(source, WebcamSource):
-            pb = tqdm(
-                total=0,
-                desc=f"\033[32mWebcam {sid} (not connected)\033[0m",
-                position=bar_pos,
-                leave=True,
-                bar_format="{desc}"
-            )
-            progress_bars[sid] = pb
-            bar_ended_state[sid] = False
-        else:
-            pb = tqdm(
-                total=0,
-                desc=f"\033[32mSource {sid}\033[0m",
-                position=bar_pos,
-                leave=True
-            )
-            progress_bars[sid] = pb
-            bar_ended_state[sid] = False
-
+        source.pb.position = bar_pos
         bar_pos += 1
 
     frame_buffer_bar = tqdm(
@@ -1006,42 +695,6 @@ def estimate_pose_all(config):
     try:
         while True:
             # Update progress bars
-            for source, pb in progress_bars.items():
-                cnts = shared_counts[sid]
-                pval = cnts['processed'].value
-                qval = cnts['queued'].value
-                tval = cnts['total'].value
-
-                if s_type == 'webcam':
-                    connected = webcam_ready[sid]
-                    if connected:
-                        pb.set_description_str(
-                            f"\033[32mWebcam {sid}\033[0m : {pval}/{qval} processed/read"
-                        )
-                    else:
-                        pb.set_description_str(
-                            f"\033[31mWebcam {sid} (not connected)\033[0m : {pval}/{qval}"
-                        )
-                    pb.refresh()
-
-                    if source_ended[sid] and not bar_ended_state[sid]:
-                        bar_ended_state[sid] = True
-                        pb.set_description_str(
-                            f"\033[31mWebcam {sid} (Ended)\033[0m : {pval}/{qval}"
-                        )
-                        pb.refresh()
-
-                else:
-                    if tval > 0:
-                        pb.total = tval
-                        pb.n = pval
-                        pb.refresh()
-
-                    if source_ended[sid] and not bar_ended_state[sid]:
-                        bar_ended_state[sid] = True
-                        pb.set_description_str(f"\033[31mSource {sid} (Ended)\033[0m")
-                        pb.refresh()
-
             frame_buffer_bar.n = available_frame_buffers.qsize()
             frame_buffer_bar.refresh()
 
@@ -1049,22 +702,13 @@ def estimate_pose_all(config):
                 pose_buffer_bar.n = available_pose_buffers.qsize()
                 pose_buffer_bar.refresh()
 
-            # Check if user closed the display
-            if result_processor and result_processor.stopped:
-                logging.info("\nUser closed display. Stopping all streams.")
-                capture_coordinator.stop()
-                for ms_proc in media_sources:
-                    ms_proc.stop()
-                break
-
             alive_workers = sum(w.is_alive() for w in workers)
 
             if config.multi_workers:
                 worker_bar.n = alive_workers
                 worker_bar.refresh()
 
-                # Possibly spawn new worker(s) if new sources ended
-                current_ended_count = sum(1 for s in sources if source_ended[s['id']])
+                current_ended_count = sum(1 for source in config.sources if source.ended)
                 ended_delta = current_ended_count - previous_ended_count
                 if ended_delta > 0:
                     for _ in range(ended_delta):
@@ -1075,18 +719,20 @@ def estimate_pose_all(config):
                     previous_ended_count = current_ended_count
 
             # If all sources ended, queue empty, and no alive workers => done
-            all_ended = all(source_ended[s['id']] for s in sources)
+            all_ended = all(source.ended for source in config.sources)
             if all_ended and frame_queue.empty() and pose_queue.empty() and alive_workers == 0:
                 logging.info("All sources ended, queues empty, and worker finished. Exiting loop.")
                 break
+
+            if cv2.waitKey(1) & 0xFF == ord(" "):
+                logging.info("Space bar pressed: stopping all sources.")
+                for source in config.sources:
+                    source.stop()
 
             time.sleep(0.05)
 
     except KeyboardInterrupt:
         logging.info("User interrupted pose estimation.")
-        capture_coordinator.stop()
-        for ms_proc in media_sources:
-            ms_proc.stop()
 
     finally:
         # Stop capture coordinator
@@ -1097,12 +743,7 @@ def estimate_pose_all(config):
 
         # Stop media sources
         for source in config.sources:
-            source.command_queue.put(None)
-
-        for ms in media_sources:
-            ms.join(timeout=2)
-            if ms.is_alive():
-                ms.terminate()
+            source.stop()
 
         # Stop workers
         for w in workers:
@@ -1112,10 +753,7 @@ def estimate_pose_all(config):
                 w.terminate()
 
         # Free shared memory
-        for shm in frame_buffers.values():
-            shm.close()
-            shm.unlink()
-        for shm in pose_buffers.values():
+        for shm in shm_list:
             shm.close()
             shm.unlink()
 
@@ -1130,15 +768,8 @@ def estimate_pose_all(config):
         if result_processor.is_alive():
             result_processor.terminate()
 
-        # Final bar updates
-        frame_buffer_bar.n = available_frame_buffers.qsize()
-        frame_buffer_bar.refresh()
-        if config.combined_frames:
-            pose_buffer_bar.n = available_pose_buffers.qsize()
-            pose_buffer_bar.refresh()
-
-        for sid, pb in progress_bars.items():
-            pb.close()
+        for source in config.sources:
+            source.pb.close()
         frame_buffer_bar.close()
         if config.combined_frames:
             pose_buffer_bar.close()
@@ -1148,43 +779,8 @@ def estimate_pose_all(config):
         logging.info("Pose estimation done. Exiting now.")
         logging.shutdown()
 
-        if display_detection:
+        if config.display_detection:
             cv2.destroyAllWindows()
-
-
-def transform(frame, desired_w, desired_h, full, rotation=0):
-    rotation = rotation % 360
-    if rotation == 90:
-        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
-    elif rotation == 180:
-        frame = cv2.rotate(frame, cv2.ROTATE_180)
-    elif rotation == 270:
-        frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
-
-    rotated_h, rotated_w = frame.shape[:2]
-
-    scale = min(desired_w / rotated_w, desired_h / rotated_h)
-    new_w = int(rotated_w * scale)
-    new_h = int(rotated_h * scale)
-    if scale != 0:
-        frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
-    if full:
-        canvas = np.zeros((desired_h, desired_w, 3), dtype=np.uint8)
-        x_offset = (desired_w - new_w) // 2
-        y_offset = (desired_h - new_h) // 2
-        canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = frame
-        bottom_left_offset_y = desired_h - (y_offset + new_h)
-        transform_info = {
-            'rotation': rotation,
-            'scale': scale,
-            'x_offset': x_offset,
-            'y_offset': bottom_left_offset_y,
-            'rotated_size': (rotated_w, rotated_h),
-            'canvas_size': (desired_w, desired_h)
-        }
-        return canvas, transform_info
-    else:
-        return frame, None
 
 
 def inverse_transform_keypoints(keypoints, transform_info):
@@ -1260,17 +856,3 @@ def save_keypoints_to_openpose(json_file_path, all_keypoints, all_scores):
     # Save JSON output for each frame
     with open(json_file_path, 'w') as outfile:
         json.dump(json_output, outfile)
-
-def get_formatted_utc_timestamp():
-    dt = datetime.now(timezone.utc)
-    return dt.strftime("%Y%m%dT%H%M%S") + f"{dt.microsecond:06d}"
-
-
-def get_file_utc_timestamp(file_path):
-    ts = os.path.getmtime(file_path)
-    return datetime.fromtimestamp(ts, timezone.utc).replace(tzinfo=timezone.utc)
-
-
-def get_frame_utc_timestamp(start_timestamp, frame_idx, fps):
-    frame_time = start_timestamp + timedelta(seconds=(frame_idx / fps))
-    return frame_time.strftime("%Y%m%dT%H%M%S") + f"{frame_time.microsecond:06d}"
