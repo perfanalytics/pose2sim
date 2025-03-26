@@ -48,7 +48,7 @@ from tqdm import tqdm
 
 from rtmlib import draw_skeleton
 
-from Pose2Sim.source import WebcamSource, ImageSource, VideoSource
+from Pose2Sim.source import FrameData
 from deep_sort_realtime.deepsort_tracker import DeepSort
 from Pose2Sim.common import (
     sort_people_sports2d,
@@ -73,11 +73,46 @@ __status__ = "Development"
 
 
 # CLASSES
+class BufferManager:
+    def __init__(self, count, buffer_size, progress_desc, bar_pos):
+        self.count = count
+        self.buffer_size = buffer_size
+        self.bar_pos = bar_pos
+
+        self.buffers = {}
+        self.available_buffers = multiprocessing.Queue(maxsize=count)
+        self.queue = multiprocessing.Queue(maxsize=count)
+
+        for _ in range(count):
+            buf_uuid = str(uuid.uuid4())
+            shm = shared_memory.SharedMemory(create=True, size=buffer_size)
+            self.buffers[buf_uuid] = shm
+            self.available_buffers.put(buf_uuid)
+
+        self.progress_bar = tqdm(
+            total=count,
+            desc=progress_desc,
+            position=bar_pos,
+            leave=True,
+            colour='blue'
+        )
+
+    def update_progress_bar(self):
+        self.progress_bar.n = self.available_buffers.qsize()
+        self.progress_bar.refresh()
+
+    def cleanup(self):
+        self.progress_bar.close()
+        for shm in self.buffers:
+            shm.close()
+            shm.unlink()
+
+
 class PoseEstimatorWorker(multiprocessing.Process):
     def __init__(self, **kwargs):
         super().__init__()
         self.__dict__.update(kwargs)
-        self.stopped = False
+        self.ended = True
         self.prev_keypoints = {}
         self.prev_bboxes = {}
 
@@ -98,68 +133,52 @@ class PoseEstimatorWorker(multiprocessing.Process):
 
         self.tracker_ready_event.set()
 
-        while not self.stopped:
-            active_sources = 0
-            for source in self.config.sources:
-                if not source.ended:
-                    active_sources += 1
-                    break
-
-            # If no new frames and no active sources remain, stop
-            if self.queue.empty() and active_sources == 0:
-                logging.info("Stopping worker as no active sources or items are in the queue.")
-                self.stop()
+        while not self.ended:
+            if all(source.ended for source in self.config.sources) and self.buffer_manager.queue.isEmpty():
+                self.ended = True
                 break
 
             try:
-                item = self.queue.get_nowait()
-                self.process_frame(item)
+                frame_data = self.buffer_manager.queue.get_nowait()
+                frame = np.ndarray(frame_data.shape, dtype=frame_data.dtype, buffer=self.buffers[buffer_name].buf)
+
+                if not frame_data.placeholder:
+                    if self.det_model is not None:
+                        if frame_data.idx % self.det_frequency == 0:
+                            bboxes = self.det_model(frame)
+                            if frame_data.source is not None:
+                                self.prev_bboxes[frame_data.source.name] = bboxes
+                            else:
+                                self.prev_bboxes = bboxes
+                        else:
+                            if frame_data.source is not None:
+                                bboxes = self.prev_bboxes.get(frame_data.source.name, None)
+                            else:
+                                bboxes = self.prev_bboxes
+                        frame_data.keypoints, frame_data.scores = self.pose_model(frame, bboxes=bboxes)
+                    else:  # rtmo
+                        frame_data.keypoints, frame_data.scores = self.pose_model(frame)
+
+                    if self.multi_person:
+                        if self.tracking_mode == 'deepsort':
+                            frame_data.keypoints, frame_data.scores = sort_people_deepsort(frame_data.keypoints, frame_data.scores, self.deepsort_tracker, frame, frame_data.idx)
+                        if self.tracking_mode == 'sports2d':
+                            if frame_data.source is not None:
+                                prev_kpts = self.prev_keypoints.get(frame_data.source.name, None)
+                                updated_prev, frame_data.keypoints, frame_data.scores = sort_people_sports2d(prev_kpts, frame_data.keypoints, frame_data.scores)
+                                self.prev_keypoints[frame_data.source.name] = updated_prev
+                            else:
+                                self.prev_keypoints, frame_data.keypoints, frame_data.scores = sort_people_sports2d(
+                                    self.prev_keypoints,
+                                    frame_data.keypoints,
+                                    frame_data.scores
+                                    )
+                else:
+                    frame_data.keypoints, frame_data.scores = None, None
+
+                self.result_queue.put(frame_data)
             except queue.Empty:
                 time.sleep(0.005)
-
-    def process_frame(self, item):
-        # Unpack frame info
-        buffer_name, timestamp, idx, frame_shape, frame_dtype, *others = item
-        # Convert shared memory to numpy
-        frame = np.ndarray(frame_shape, dtype=frame_dtype, buffer=self.buffers[buffer_name].buf)
-
-        if not others[1]:
-            if self.det_model is not None:
-                if idx % self.det_frequency == 0:
-                    bboxes = self.det_model(frame)
-                    if others[0] != -1:
-                        self.prev_bboxes[others[0]] = bboxes
-                    else:
-                        self.prev_bboxes = bboxes
-                else:
-                    if others[0] != -1:
-                        bboxes = self.prev_bboxes.get(others[0], None)
-                        keypoints, scores = self.pose_model(frame, bboxes=bboxes)
-                    else:
-                        bboxes = self.prev_bboxes
-                keypoints, scores = self.pose_model(frame, bboxes=bboxes)
-            else:  # rtmo
-                keypoints, scores = self.pose_model(frame)
-
-            if self.multi_person:
-                if self.tracking_mode == 'deepsort':
-                    keypoints, scores = sort_people_deepsort(keypoints, scores, self.deepsort_tracker, frame, idx)
-                if self.tracking_mode == 'sports2d':
-                    if others[0] is not None:
-                        prev_kpts = self.prev_keypoints.get(others[0], None)
-                        updated_prev, keypoints, scores = sort_people_sports2d(prev_kpts, keypoints, scores=scores)
-                        self.prev_keypoints[others[0]] = updated_prev
-                    else:
-                        self.prev_keypoints, keypoints, scores = sort_people_sports2d(
-                            self.prev_keypoints,
-                            keypoints,
-                            scores=scores
-                            )
-        else:
-            keypoints, scores = None, None
-
-        result = (buffer_name, timestamp, idx, frame_shape, frame_dtype, others[0], others[1], others[2], keypoints, scores)
-        self.result_queue.put(result)
 
     def stop(self):
         self.stopped = True
@@ -170,62 +189,48 @@ class BaseSynchronizer:
         self.__dict__.update(kwargs)
 
         self.sync_data = {}
-        self.placeholder_map = {}
+        self.ended = False
 
         self.video_writers = {}
-        self.stopped = False
-
-        if self.config.combined_frames:
-            self.mosaic_dimensions = self.config.check_pose_estimation()
 
     def get_frames_list(self):
-        if not self.sync_data:
-            return None
-
+        frames_list = []
         for idx in sorted(self.sync_data.keys()):
             group = self.sync_data[idx]
             if len(group) == len(self.sources):
                 complete_group = self.sync_data.pop(idx)
-                frames_list = []
                 for source in self.sources:
-                    sid = source['id']
-                    buffer_name, frame_shape, frame_dtype, keypoints, scores, is_placeholder, transform_info = (
-                        complete_group[sid]
-                    )
-                    frame = np.ndarray(
-                        frame_shape,
-                        dtype=np.dtype(frame_dtype),
-                        buffer=self.frame_buffers[buffer_name].buf,
-                    ).copy()
-                    self.available_frame_buffers.put(buffer_name)
-                    orig_w, orig_h = frame_shape[1], frame_shape[0]
-                    if is_placeholder:
-                        cv2.putText(frame, "Not connected", (50, 50),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 2)
-                    frames_list.append((frame, sid, orig_w, orig_h, transform_info, keypoints, scores))
+                    frame_data = (complete_group[source.name])
+                    frames_list.append(frame_data)
                 return frames_list
-        return None
 
     def build_mosaic(self, frames_list):
-        target_w, target_h = self.frame_size
-        mosaic = np.zeros((self.mosaic_rows * target_h, self.mosaic_cols * target_w, 3), dtype=np.uint8)
-        subinfo = {}
-        for frame_tuple in frames_list:
-            frame, *others = frame_tuple
-            info = self.mosaic_subinfo[others[0]]
-            x_off = info["x_offset"]
-            y_off = info["y_offset"]
-            mosaic[y_off:y_off+target_h, x_off:x_off+target_w] = frame
-            subinfo[others[0]] = {
-                "x_offset": x_off,
-                "y_offset": y_off,
-                "scaled_w": target_w,
-                "scaled_h": target_h,
-                "orig_w": others[1],
-                "orig_h": others[2],
-                "transform_info": others[3]
-            }
-        return mosaic, subinfo
+        mosaic = np.zeros(
+            (self.config.pose_model.det_input_size[0], self.config.pose_model.det_input_size[1], 3),
+            dtype=np.uint8
+        )
+        timestamps = []
+        idx = None
+
+        for frame_data in frames_list:
+            if not frame_data.placeholder:
+                timestamps.append(frame_data.timestamp)
+                idx = frame_data.idx
+                frame = np.ndarray(
+                    frame_data.shape,
+                    dtype=np.dtype(frame_data.dtype),
+                    buffer=self.frame_buffers[frame_data.buffer_name].buf,
+                ).copy()
+                self.available_frame_buffers.put(frame_data.buffer_name)
+
+                source = frame_data.source
+                mosaic[source.y_offset:source.y_offset + source.height,
+                    source.x_offset:source.x_offset + source.width] = frame
+
+        avg_timestamp = np.mean(timestamps)
+        mosaic_data = FrameData(None, avg_timestamp, idx)
+
+        return mosaic, mosaic_data
 
     def read_mosaic(self, mosaic_np, subinfo, keypoints, scores):
         frames = {}
@@ -277,27 +282,36 @@ class BaseSynchronizer:
 
 
 class FrameQueueProcessor(multiprocessing.Process, BaseSynchronizer):
-    def __init__(self, frame_queue, pose_queue, **kwargs):
+    def __init__(self, config, frame_buffer_manager, pose_buffer_manager):
         multiprocessing.Process.__init__(self)
-        BaseSynchronizer.__init__(self, **kwargs)
-        self.frame_queue = frame_queue
-        self.pose_queue = pose_queue
+        BaseSynchronizer.__init__(self)
+        self.config = config
+        self.frame_buffer_manager = frame_buffer_manager
+        self.pose_buffer_manager = pose_buffer_manager
+
+        self.mosaic_queue = multiprocessing.Queue()
 
     def run(self):
-        while not self.stopped:
-            try:
-                buffer_name, timestamp, idx, frame_shape, frame_dtype, sid, is_placeholder, _ = self.frame_queue.get_nowait()
-                if idx not in self.sync_data:
-                    self.sync_data[idx] = {}
-                self.sync_data[idx][sid] = (buffer_name, frame_shape, frame_dtype, None, None, is_placeholder, None)
+        while not self.ended:
+            if all(not sources.ended for sources in self.config.sources):
+                self.ended = True
+                break
 
-                if frames_list := self.get_frames_list():
-                    mosaic, subinfo = self.build_mosaic(frames_list)
-                    pose_buf_name = self.available_pose_buffers.get_nowait()
-                    np.ndarray(mosaic.shape, dtype=mosaic.dtype, buffer=self.pose_buffers[pose_buf_name].buf)[:] = mosaic
-                    self.pose_queue.put((pose_buf_name, timestamp, idx, mosaic.shape, mosaic.dtype.str, -1, False, subinfo))
-            except queue.Empty:
-                time.sleep(0.005)
+            frame_data = self.frame_queue.get_nowait()
+            if frame_data.idx not in self.sync_data:
+                self.sync_data[frame_data.idx] = {}
+            self.sync_data[frame_data.idx][frame_data.source.name] = (frame_data)
+
+            if frames_list := self.get_frames_list():
+                mosaic, mosaic_data = self.build_mosaic(frames_list)
+                mosaic_data.buffer_name = self.pose_buffer_manager.available_buffers.get_nowait()
+                mosaic_data.shape = mosaic.shape
+                mosaic_data.dtype = mosaic.dtype.str
+                shm = self.pose_buffer_manager.buffers[mosaic_data.buffer_name]
+                np_mosaic = np.ndarray(mosaic_data.shape, dtype=mosaic_data.dtype, buffer=shm.buf)
+                np_mosaic[:] = mosaic
+
+                self.mosaic_queue.put(mosaic_data)
 
 
 class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
@@ -421,24 +435,26 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
 
 
 class CaptureCoordinator(multiprocessing.Process):
-    def __init__(self, **kwargs):
+    def __init__(self, config, available_frame_buffers, tracker_ready_event):
         super().__init__()
-        self.__dict__.update(kwargs)
+        self.config = config
+        self.available_frame_buffers = available_frame_buffers
+        self.tracker_ready_event = tracker_ready_event
 
-        self.min_interval = 1.0 / self.frame_rate if self.frame_rate > 0 else 0.0
-        self.stopped = multiprocessing.Value('b', False)
+        self.interval = 1.0 / min(source.fps for source in config.sources)
+        self.ended = False
 
     def run(self):
         self.tracker_ready_event.wait()
         last_capture_time = time.time()
-        while not self.stopped.value:
-            if all(self.source_ended[s['id']] for s in self.sources):
+        while not self.ended:
+            if all(source.ended for source in self.config.sources):
+                self.ended = True
                 break
 
-            now = time.time()
-            elapsed = now - last_capture_time
-            if elapsed < self.min_interval:
-                time.sleep(self.min_interval - elapsed)
+            elapsed = time.time() - last_capture_time
+            if elapsed < self.interval:
+                time.sleep(self.interval - elapsed)
 
             def is_ready_source(s):
                 sid = s['id']
@@ -563,43 +579,18 @@ def estimate_pose_all(config):
 
         logging.info(f"Allocating {pose_buffer_count} pose buffers.")
 
-    frame_queue = multiprocessing.Queue(maxsize=frame_buffer_count)
-    pose_queue = multiprocessing.Queue()
-    if config.combined_frames:
-        pose_queue = multiprocessing.Queue(maxsize=pose_buffer_count)
     result_queue = multiprocessing.Queue()
-
-    shm_list = []
-
-    frame_buffers = {}
-    available_frame_buffers = multiprocessing.Queue(maxsize=frame_buffer_count)
-
-    for i in range(frame_buffer_count):
-        buf_uuid = str(uuid.uuid4())
-        shm = shared_memory.SharedMemory(create=True, size=frame_bytes)
-        frame_buffers[buf_uuid] = shm
-        available_frame_buffers.put(buf_uuid)
-        shm_list.append(shm)
-
-    pose_buffers = {}
-    available_pose_buffers = {}
-
+    frame_buffer_manager = BufferManager(frame_buffer_count, frame_bytes, "Frame Buffers Free")
+    pose_buffer_manager = None
     if config.combined_frames:
-        available_pose_buffers = multiprocessing.Queue(maxsize=pose_buffer_count)
-        for i in range(pose_buffer_count):
-            buf_uuid = str(uuid.uuid4())
-            shm = shared_memory.SharedMemory(create=True, size=frame_bytes * len(config.sources))
-            pose_buffers[buf_uuid] = shm
-            available_pose_buffers.put(buf_uuid)
-            shm_list.append(shm)
+        pose_buffer_manager = BufferManager(pose_buffer_count, frame_bytes * len(config.sources), "Pose Buffers Free")
 
     # Decide how many workers to start
     cpu_count = multiprocessing.cpu_count()
-
     if config.combined_frames:
-        initial_workers = max(1, cpu_count - len(config.sources) - 3)
+        initial_workers = max(1, cpu_count - len(config.sources) - 4)
     else:
-        initial_workers = max(1, cpu_count - len(config.sources) - 2)
+        initial_workers = max(1, cpu_count - len(config.sources) - 3)
 
     if not config.multi_workers:
         initial_workers = 1
@@ -611,10 +602,8 @@ def estimate_pose_all(config):
     def spawn_new_worker():
         worker = PoseEstimatorWorker(
             config=config,
-            queue=pose_queue if config.combined_frames else frame_queue,
+            buffer_manager=pose_buffer_manager if pose_buffer_manager else frame_buffer_manager,
             result_queue=result_queue,
-            buffers=pose_buffers if config.combined_frames else frame_buffers,
-            available_buffers=available_pose_buffers if config.combined_frames else available_frame_buffers,
             tracker_ready_event=tracker_ready_event,
         )
         worker.start()
@@ -622,35 +611,26 @@ def estimate_pose_all(config):
 
     workers = [spawn_new_worker() for _ in range(initial_workers)]
 
-    command_queues = {}
-
     result_processor = ResultQueueProcessor(
         config=config,
         result_queue=result_queue,
-        frame_buffers=frame_buffers,
-        pose_buffers=pose_buffers,
-        available_frame_buffers=available_frame_buffers,
-        available_pose_buffers=available_pose_buffers,
+        frame_buffer_manager=frame_buffer_manager,
+        pose_buffer_manager=pose_buffer_manager,
     )
     result_processor.start()
 
     if config.combined_frames:
         frame_processor = FrameQueueProcessor(
             config=config,
-            frame_queue=frame_queue,
-            pose_queue=pose_queue,
-            frame_buffers=frame_buffers,
-            pose_buffers=pose_buffers,
-            available_frame_buffers=available_frame_buffers,
-            available_pose_buffers=available_pose_buffers,
+            frame_buffer_manager=frame_buffer_manager,
+            pose_buffer_manager=pose_buffer_manager,
         )
         frame_processor.start()
 
     # Start capture coordinator
     capture_coordinator = CaptureCoordinator(
         config=config,
-        command_queues=command_queues,
-        available_frame_buffers=available_frame_buffers,
+        available_frame_buffers=frame_buffer_manager.available_buffers,
         tracker_ready_event=tracker_ready_event
     )
     capture_coordinator.start()
@@ -658,26 +638,13 @@ def estimate_pose_all(config):
     bar_pos = 0
 
     for source in config.sources:
-        source.pb.position = bar_pos
+        source.progress_bar.position = bar_pos
         bar_pos += 1
 
-    frame_buffer_bar = tqdm(
-        total=frame_buffer_count,
-        desc='Frame Buffers Free',
-        position=bar_pos,
-        leave=True,
-        colour='blue'
-    )
+    frame_buffer_manager.progress_bar.position = bar_pos
     bar_pos += 1
-
-    if config.combined_frames:
-        pose_buffer_bar = tqdm(
-            total=pose_buffer_count,
-            desc='Pose Buffers Free',
-            position=bar_pos,
-            leave=True,
-            colour='blue'
-        )
+    if pose_buffer_manager:
+        pose_buffer_manager.progress_bar.position = bar_pos
         bar_pos += 1
 
     if config.multi_workers:
@@ -693,15 +660,7 @@ def estimate_pose_all(config):
     previous_ended_count = 0
     try:
         while True:
-            # Update progress bars
-            frame_buffer_bar.n = available_frame_buffers.qsize()
-            frame_buffer_bar.refresh()
-
-            if config.combined_frames:
-                pose_buffer_bar.n = available_pose_buffers.qsize()
-                pose_buffer_bar.refresh()
-
-            alive_workers = sum(w.is_alive() for w in workers)
+            alive_workers = sum(not worker.ended for worker in workers)
 
             if config.multi_workers:
                 worker_bar.n = alive_workers
@@ -717,10 +676,7 @@ def estimate_pose_all(config):
                         worker_bar.total = len(workers)
                     previous_ended_count = current_ended_count
 
-            # If all sources ended, queue empty, and no alive workers => done
-            all_ended = all(source.ended for source in config.sources)
-            if all_ended and frame_queue.empty() and pose_queue.empty() and alive_workers == 0:
-                logging.info("All sources ended, queues empty, and worker finished. Exiting loop.")
+            if alive_workers == 0:
                 break
 
             if cv2.waitKey(1) & 0xFF == ord(" "):
@@ -743,6 +699,7 @@ def estimate_pose_all(config):
         # Stop media sources
         for source in config.sources:
             source.stop()
+            source.progress_bar.close()
 
         # Stop workers
         for w in workers:
@@ -752,9 +709,9 @@ def estimate_pose_all(config):
                 w.terminate()
 
         # Free shared memory
-        for shm in shm_list:
-            shm.close()
-            shm.unlink()
+        frame_buffer_manager.cleanup()
+        if pose_buffer_manager:
+            pose_buffer_manager.cleanup()
 
         if config.combined_frames:
             frame_processor.stop()
@@ -767,16 +724,8 @@ def estimate_pose_all(config):
         if result_processor.is_alive():
             result_processor.terminate()
 
-        for source in config.sources:
-            source.pb.close()
-        frame_buffer_bar.close()
-        if config.combined_frames:
-            pose_buffer_bar.close()
         if config.multi_workers:
             worker_bar.close()
-
-        logging.info("Pose estimation done. Exiting now.")
-        logging.shutdown()
 
         if config.display_detection:
             cv2.destroyAllWindows()

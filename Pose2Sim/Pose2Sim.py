@@ -44,7 +44,7 @@ Pose2Sim.kinematics()
 
 import os
 import time
-import logging, logging.handlers
+import logging
 from datetime import datetime
 from Pose2Sim.config import Config
 
@@ -71,10 +71,20 @@ class Pose2SimPipeline:
                 format='%(message)s',
                 level=logging.INFO,
                 handlers=[
-                    logging.handlers.TimedRotatingFileHandler(os.path.join(self.config.session_dir, 'logs.txt'), when='D', interval=7),
+                    logging.handlers.TimedRotatingFileHandler(
+                        os.path.join(self.config.session_dir, 'logs.txt'),
+                        when='D',
+                        interval=7
+                    ),
                     logging.StreamHandler()
                 ]
             )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        logging.shutdown()
 
     def _log_step_header(self, step_name, sub_config):
         project_dir = sub_config.project_dir
@@ -89,15 +99,12 @@ class Pose2SimPipeline:
 
     def calibration(self):
         from Pose2Sim.calibration import calibrate_cams_all
-
         sub_config = self.config.sub_configs[0]
-
         logging.info("\n---------------------------------------------------------------------")
         logging.info("Camera calibration")
         logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")
         logging.info(f"Calibration directory: {sub_config.calib_dir}")
         logging.info("---------------------------------------------------------------------\n")
-
         start = time.time()
         calibrate_cams_all(sub_config)
         elapsed = time.time() - start
@@ -170,120 +177,70 @@ class Pose2SimPipeline:
         logging.info("\n\n=====================================================================")
         logging.info("RUNNING ALL.")
         logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info(f"Project directory: {self.session_dir}\n")
+        logging.info(f"Project directory: {self.config.session_dir}\n")
         logging.info("=====================================================================\n")
 
         overall_start = time.time()
+        steps = [
+            (do_calibration, "Camera calibration", self.calibration),
+            (do_poseEstimation, "Pose estimation", self.poseEstimation),
+            (do_synchronization, "Camera synchronization", self.synchronization),
+            (do_personAssociation, "Associating persons", self.personAssociation),
+            (do_triangulation, "Triangulation", self.triangulation),
+            (do_filtering, "Filtering", self.filtering),
+            (do_markerAugmentation, "Marker augmentation", self.markerAugmentation),
+            (do_kinematics, "OpenSim processing", self.kinematics)
+        ]
+        for enabled, label, func in steps:
+            logging.info("\n\n=====================================================================")
+            if enabled:
+                logging.info(f"Running {label}...")
+                logging.info("=====================================================================")
+                start = time.time()
+                func()
+                elapsed = time.time() - start
+                logging.info(f'\n{label} took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
+            else:
+                logging.info(f"Skipping {label}.")
+                logging.info("=====================================================================")
 
-        if do_calibration:
-            logging.info("\n\n=====================================================================")
-            logging.info("Running calibration...")
-            logging.info("=====================================================================")
-            self.calibration()
-        else:
-            logging.info("\n\n=====================================================================")
-            logging.info("Skipping calibration.")
-            logging.info("=====================================================================")
-        if do_poseEstimation:
-            logging.info("\n\n=====================================================================")
-            logging.info("Running pose estimation...")
-            logging.info("=====================================================================")
-            self.poseEstimation()
-        else:
-            logging.info("\n\n=====================================================================")
-            logging.info("Skipping pose estimation.")
-            logging.info("=====================================================================")
-        if do_synchronization:
-            logging.info("\n\n=====================================================================")
-            logging.info("Running synchronization...")
-            logging.info("=====================================================================")
-            self.synchronization()
-        else:
-            logging.info("\n\n=====================================================================")
-            logging.info("Skipping synchronization.")
-            logging.info("=====================================================================")
-        if do_personAssociation:
-            logging.info("\n\n=====================================================================")
-            logging.info("Running person association...")
-            logging.info("=====================================================================")
-            self.personAssociation()
-        else:
-            logging.info("\n\n=====================================================================")
-            logging.info("Skipping person association.")
-            logging.info("=====================================================================")
-        if do_triangulation:
-            logging.info("\n\n=====================================================================")
-            logging.info("Running triangulation...")
-            logging.info("=====================================================================")
-            self.triangulation()
-        else:
-            logging.info("\n\n=====================================================================")
-            logging.info("Skipping triangulation.")
-            logging.info("=====================================================================")
-        if do_filtering:
-            logging.info("\n\n=====================================================================")
-            logging.info("Running filtering...")
-            logging.info("=====================================================================")
-            self.filtering()
-        else:
-            logging.info("\n\n=====================================================================")
-            logging.info("Skipping filtering.")
-            logging.info("=====================================================================")
-        if do_markerAugmentation:
-            logging.info("\n\n=====================================================================")
-            logging.info("Running marker augmentation.")
-            logging.info("=====================================================================")
-            self.markerAugmentation()
-        else:
-            logging.info("\n\n=====================================================================")
-            logging.info("Skipping marker augmentation.")
-            logging.info("\n\n=====================================================================")
-        if do_kinematics:
-            logging.info("\n\n=====================================================================")
-            logging.info("Running OpenSim processing.")
-            logging.info("=====================================================================")
-            self.kinematics()
-        else:
-            logging.info("\n\n=====================================================================")
-            logging.info("Skipping OpenSim processing.")
-            logging.info("\n\n=====================================================================")
         logging.info("Pose2Sim pipeline completed.")
         overall_elapsed = time.time() - overall_start
         logging.info(f'\nRUNNING ALL FUNCTIONS TOOK {time.strftime("%Hh%Mm%Ss", time.gmtime(overall_elapsed))}.\n')
 
-# FUNCTIONS
+
 def calibration(config=None):
-    pipeline = Pose2SimPipeline(config)
-    pipeline.calibration()
+    with Pose2SimPipeline(config) as pipeline:
+        pipeline.calibration()
 
 def poseEstimation(config=None):
-    pipeline = Pose2SimPipeline(config)
-    pipeline.poseEstimation()
+    with Pose2SimPipeline(config) as pipeline:
+        pipeline.poseEstimation()
 
 def synchronization(config=None):
-    pipeline = Pose2SimPipeline(config)
-    pipeline.synchronization()
+    with Pose2SimPipeline(config) as pipeline:
+        pipeline.synchronization()
 
 def personAssociation(config=None):
-    pipeline = Pose2SimPipeline(config)
-    pipeline.personAssociation()
+    with Pose2SimPipeline(config) as pipeline:
+        pipeline.personAssociation()
 
 def triangulation(config=None):
-    pipeline = Pose2SimPipeline(config)
-    pipeline.triangulation()
+    with Pose2SimPipeline(config) as pipeline:
+        pipeline.triangulation()
 
 def filtering(config=None):
-    pipeline = Pose2SimPipeline(config)
-    pipeline.filtering()
+    with Pose2SimPipeline(config) as pipeline:
+        pipeline.filtering()
 
 def markerAugmentation(config=None):
-    pipeline = Pose2SimPipeline(config)
-    pipeline.markerAugmentation()
+    with Pose2SimPipeline(config) as pipeline:
+        pipeline.markerAugmentation()
 
 def kinematics(config=None):
-    pipeline = Pose2SimPipeline(config)
-    pipeline.kinematics()
+    with Pose2SimPipeline(config) as pipeline:
+        pipeline.kinematics()
 
 def runAll(config=None, **kwargs):
-    pipeline = Pose2SimPipeline(config)
-    pipeline.runAll(**kwargs)
+    with Pose2SimPipeline(config) as pipeline:
+        pipeline.runAll(**kwargs)

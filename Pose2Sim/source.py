@@ -33,6 +33,9 @@ class FrameData:
     buffer_name: str = None
     shape: tuple = None
     dtype: str = None
+    placeholder: bool = False
+    keypoints: dict = None
+    scores: dict = None
 
 
 class BaseSource(abc.ABC):
@@ -62,6 +65,9 @@ class BaseSource(abc.ABC):
         self.desired_width = 0
         self.desired_height = 0
 
+        self.command_queue = multiprocessing.Queue()
+        self.frame_data = {}
+
         self.scale = 1
 
         self.create_output_folders()
@@ -78,7 +84,7 @@ class BaseSource(abc.ABC):
             frame, frame_data = self.read()
 
             try:
-                cmd = self.command_queue.get(timeout=0.1)
+                cmd = self.command_queue.get(block=False)
             except queue.Empty:
                 continue
 
@@ -90,13 +96,16 @@ class BaseSource(abc.ABC):
                 if cmd[0] == "CAPTURE_FRAME":
                     frame_data.buffer_name = cmd[1]
 
-                    shm = self.frame_buffers[frame_data.buffer_name]
-                    frame_data.shape = frame.shape
-                    frame_data.dtype = frame.dtype.str
-                    np_frame = np.ndarray(frame_data.shape, dtype=frame_data.dtype, buffer=shm.buf)
-                    np_frame[:] = frame
+                    if frame is None:
+                        frame_data.placeholder = True
+                    else:
+                        shm = self.frame_buffers[frame_data.buffer_name]
+                        frame_data.shape = frame.shape
+                        frame_data.dtype = frame.dtype.str
+                        np_frame = np.ndarray(frame_data.shape, dtype=frame_data.dtype, buffer=shm.buf)
+                        np_frame[:] = frame
 
-                    self.frame_queue.put(frame_data)
+                    self.frame_data = frame_data
 
                 elif cmd[0] == "STOP_CAPTURE":
                     self.stop()
@@ -104,9 +113,6 @@ class BaseSource(abc.ABC):
 
                 else:
                     pass
-
-        logging.info(f"[{self.name}] Capture loop ended.")
-
 
 
     def get_calib_files(self, folder, extension, calibration_name):
@@ -200,7 +206,7 @@ class WebcamSource(BaseSource):
         self.ready = False
         self.readed = 0
 
-        self.pb = tqdm(
+        self.progress_bar = tqdm(
             total=0,
             desc=f"\033[32{self.name} (not connected)\033[0m",
             position=0,
@@ -251,6 +257,21 @@ class WebcamSource(BaseSource):
         (cap, csvwriter) = init
         ret, frame = cap.read()
 
+        hardware_ts = cap.get(cv2.CAP_PROP_POS_MSEC)
+        if hardware_ts and hardware_ts > 0:
+            dt = datetime.fromtimestamp(hardware_ts / 1000.0, timezone.utc)
+        else:
+            dt = datetime.now(timezone.utc)
+        timestamp = dt.strftime("%Y%m%dT%H%M%S") + f"{dt.microsecond:06d}"
+
+        if not ret or frame is None:
+            if capture:
+                logging.error(f"[{self.name}] Unable to read the frame.")
+                return None, frame_data
+            pass
+
+        frame_data = FrameData(self, timestamp, self.idx)
+
         if self.rotation == 90:
             frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
         elif self.rotation == 180:
@@ -261,28 +282,17 @@ class WebcamSource(BaseSource):
         if self.scale != 1:
             frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
 
-        hardware_ts = cap.get(cv2.CAP_PROP_POS_MSEC)
-        if hardware_ts and hardware_ts > 0:
-            dt = datetime.fromtimestamp(hardware_ts / 1000.0, timezone.utc)
-            timestamp = dt.strftime("%Y%m%dT%H%M%S") + f"{dt.microsecond:06d}"
-        else:
-            dt = datetime.now(timezone.utc)
-            timestamp = dt.strftime("%Y%m%dT%H%M%S") + f"{dt.microsecond:06d}"
-
         if self.config.webcam_recording:
             self.readed += 1
             self.raw_writer.write(frame)
             csvwriter.writerow([self.readed, timestamp])
-        if capture:  
-            self.pb.set_description_str(
+
+        if capture:
+            self.progress_bar.set_description_str(
                 f"\033[32m{self.name}\033[0m : {self.processed}/{self.idx} processed/read"
             )
-            self.pb.refresh()
-            frame_data = FrameData(self, timestamp, self.idx)
+            self.progress_bar.refresh()
             self.idx += 1
-            if not ret or frame is None:
-                logging.error(f"[{self.name}] Unable to read the frame.")
-                return None, frame_data
             return frame, frame_data
 
     def frame_rate(self, cap):
@@ -297,16 +307,11 @@ class WebcamSource(BaseSource):
         self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        if self.width >= self.height:
-            scale = self.scaled_w / self.width
-            target_width = self.scaled_w
-            target_height = int(self.height * scale)
-        else:
-            scale = self.scaled_h / self.height
-            target_height = self.scaled_h
-            target_width = int(self.width * scale)
+        self.scale = min(self.desired_width / self.width, self.desired_height / self.height)
 
-        if self.width != target_width or self.height != target_height:
+        if self.scale != 1:
+            target_width = int(self.width * self.scale)
+            target_height = int(self.height * self.scale)
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, target_width)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, target_height)
             self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -318,9 +323,8 @@ class WebcamSource(BaseSource):
         if (self.rotation % 180) == 90:
             self.width, self.height = self.height, self.width
 
-        self.scale = min(self.desired_width / self.width, self.desired_height / self.height)
-        self.width = int(self.width * scale)
-        self.height = int(self.height * scale)
+        self.x_offset = self.x_offset + ((self.desired_width - self.width) // 2)
+        self.y_offset = self.y_offset + ((self.desired_height - self.width) // 2)
 
         logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.width}x{self.height}")
 
@@ -354,7 +358,7 @@ class WebcamSource(BaseSource):
                 else:
                     self.extrinsics_files = new_files
                 return
-            
+
             fps = cap.get(cv2.CAP_PROP_FPS)
             if fps == 0:
                 cap.release()
@@ -396,10 +400,10 @@ class WebcamSource(BaseSource):
     def stop(self):
         self.ended = True
         logging.info(f"[{self.name}] Stopped.")
-        self.pb.set_description_str(
+        self.progress_bar.set_description_str(
             f"\033[31m{self.name} (Ended)\033[0m : {self.processed}/{self.idx}"
         )
-        self.pb.refresh()
+        self.progress_bar.refresh()
 
 
 class VideoSource(BaseSource):
@@ -408,7 +412,7 @@ class VideoSource(BaseSource):
         self.video_path = data.get("path")
         self.timestamps = data.get("timestamps")
 
-        self.pb = tqdm(
+        self.progress_bar = tqdm(
             total=0,
             desc=f"\033[32m{self.name}\033[0m",
             position=0,
@@ -422,7 +426,7 @@ class VideoSource(BaseSource):
 
         cap.set(cv2.CAP_PROP_POS_FRAMES, self.config.frame_range[0])
 
-        self.pb.total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - self.config.frame_range[0]
+        self.progress_bar.total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - self.config.frame_range[0]
         self.idx = self.config.frame_range[0]
 
         self.dimensions(cap)
@@ -438,10 +442,23 @@ class VideoSource(BaseSource):
             if self.idx not in self.config.frame_ranges:
                 self.stop()
 
-            self.pb.n = self.idx
-            self.pb.refresh()
+            self.progress_bar.n = self.idx
+            self.progress_bar.refresh()
 
             ret, frame = cap.read()
+
+            if self.timestamps:
+                timestamp = self.timestamps[self.idx]
+            else:
+                frame_time = self.start_timestamp + timedelta(seconds=(self.idx  / self.fps))
+                timestamp = frame_time.strftime("%Y%m%dT%H%M%S") + f"{frame_time.microsecond:06d}"
+
+            frame_data = FrameData(self, timestamp, self.idx)
+            self.idx += 1
+            if not ret or frame is None:
+                logging.error(f"[{self.name}] Unable to read the image from {self.video_path} at frame {self.idx}.")
+                return None, frame_data
+
             if self.rotation == 90:
                 frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
             elif self.rotation == 180:
@@ -451,16 +468,7 @@ class VideoSource(BaseSource):
 
             if self.scale != 1:
                 frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
-            if self.timestamps:
-                timestamp = self.timestamps[self.idx]
-            else:
-                frame_time = self.start_timestamp + timedelta(seconds=(self.idx  / self.fps))
-                timestamp = frame_time.strftime("%Y%m%dT%H%M%S") + f"{frame_time.microsecond:06d}"
-            frame_data = FrameData(self, timestamp, self.idx)
-            self.idx += 1
-            if not ret or frame is None:
-                logging.error(f"[{self.name}] Unable to read the image from {self.image_files[0]}.")
-                return None, frame_data
+
             return frame, frame_data
 
     def frame_rate(self, cap):
@@ -474,16 +482,11 @@ class VideoSource(BaseSource):
         self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        if self.width >= self.height:
-            scale = self.scaled_w / self.width
-            target_width = self.scaled_w
-            target_height = int(self.height * scale)
-        else:
-            scale = self.scaled_h / self.height
-            target_height = self.scaled_h
-            target_width = int(self.width * scale)
+        self.scale = min(self.desired_width / self.width, self.desired_height / self.height)
 
-        if self.width != target_width or self.height != target_height:
+        if self.scale != 1:
+            target_width = int(self.width * self.scale)
+            target_height = int(self.height * self.scale)
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, target_width)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, target_height)
             self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -495,9 +498,8 @@ class VideoSource(BaseSource):
         if (self.rotation % 180) == 90:
             self.width, self.height = self.height, self.width
 
-        self.scale = min(self.desired_width / self.width, self.desired_height / self.height)
-        self.width = int(self.width * scale)
-        self.height = int(self.height * scale)
+        self.x_offset = self.x_offset + ((self.desired_width - self.width) // 2)
+        self.y_offset = self.y_offset + ((self.desired_height - self.width) // 2)
 
         logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.width}x{self.height}")
 
@@ -560,8 +562,8 @@ class VideoSource(BaseSource):
     def stop(self):
         self.ended = True
         logging.info(f"[{self.name}] Stopped.")
-        self.pb.set_description_str(f"\033[31m{self.name} (Ended)\033[0m")
-        self.pb.refresh()
+        self.progress_bar.set_description_str(f"\033[31m{self.name} (Ended)\033[0m")
+        self.progress_bar.refresh()
 
 
 class ImageSource(BaseSource):
@@ -572,7 +574,7 @@ class ImageSource(BaseSource):
         self.image_files = None
         self.timestamps = data.get("timestamps", None)
 
-        self.pb = tqdm(
+        self.progress_bar = tqdm(
             total=0,
             desc=f"\033[32m{self.name}\033[0m",
             position=0,
@@ -600,8 +602,8 @@ class ImageSource(BaseSource):
             if self.idx not in self.config.frame_ranges:
                 self.stop()
 
-            self.pb.n = self.idx
-            self.pb.refresh()
+            self.progress_bar.n = self.idx
+            self.progress_bar.refresh()
 
             path = self.image_files[self.idx]
             if self.timestamps:
@@ -611,6 +613,13 @@ class ImageSource(BaseSource):
                 timestamp = frame_time.strftime("%Y%m%dT%H%M%S") + f"{frame_time.microsecond:06d}"
 
             frame = cv2.imread(path)
+
+            frame_data = FrameData(self, timestamp, self.idx)
+            self.idx += 1
+            if frame is None:
+                logging.error(f"[{self.name}] Unable to read the image from {self.image_files[0]}.")
+                return None, frame_data
+
             if self.rotation == 90:
                 frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
             elif self.rotation == 180:
@@ -621,11 +630,6 @@ class ImageSource(BaseSource):
             if self.scale != 1:
                 frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
 
-            frame_data = FrameData(self, timestamp, self.idx)
-            self.idx += 1
-            if frame is None:
-                logging.error(f"[{self.name}] Unable to read the image from {self.image_files[0]}.")
-                return None, frame_data
             return frame, frame_data
 
     def frame_rate(self):
@@ -639,11 +643,11 @@ class ImageSource(BaseSource):
         if not self.image_files:
             logging.error(f"[{self.name}] Unable to get images from {self.image_dir}.")
             raise ValueError(f"[{self.name}] Unable to get images from {self.image_dir}.")
-        test_img = cv2.imread(self.image_files[0])
-        if test_img is None:
+        img = cv2.imread(self.image_files[0])
+        if img is None:
             logging.error(f"[{self.name}] Unable to read the image from {self.image_files[0]}.")
             raise ValueError(f"[{self.name}] Unable to read the image from {self.image_files[0]}.")
-        self.height, self.width = test_img.shape[:2]
+        self.height, self.width = img.shape[:2]
 
         if self.rotation % 90 != 0:
             logging.error(f"[{self.name}] Rotation must be multiple of 90.")
@@ -654,6 +658,9 @@ class ImageSource(BaseSource):
         self.scale = min(self.desired_width / self.width, self.desired_height / self.height)
         self.width = int(self.width * self.scale)
         self.height = int(self.height * self.scale)
+
+        self.x_offset = self.x_offset + ((self.desired_width - self.width) // 2)
+        self.y_offset = self.y_offset + ((self.desired_height - self.width) // 2)
 
         logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.width}x{self.height}")
 
@@ -716,5 +723,5 @@ class ImageSource(BaseSource):
     def stop(self):
         self.ended = True
         logging.info(f"[{self.name}] Stopped.")
-        self.pb.set_description_str(f"\033[31m{self.name} (Ended)\033[0m")
-        self.pb.refresh()
+        self.progress_bar.set_description_str(f"\033[31m{self.name} (Ended)\033[0m")
+        self.progress_bar.refresh()
