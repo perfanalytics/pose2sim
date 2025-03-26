@@ -36,7 +36,8 @@ __author__ = "Antoine Falisse, adapted by HunMin Kim and David Pagnon"
 __copyright__ = "Copyright 2022, OpenCap"
 __credits__ = ["Antoine Falisse", "HunMin Kim", "David Pagnon"]
 __license__ = "Apache-2.0 License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
