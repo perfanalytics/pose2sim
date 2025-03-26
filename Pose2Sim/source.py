@@ -19,8 +19,20 @@ import multiprocessing
 import queue
 import time
 
-from datetime import datetime
+from tqdm import tqdm
+from datetime import datetime, timezone, timedelta
 from Pose2Sim.common import natural_sort_key
+from dataclasses import dataclass
+
+
+@dataclass
+class FrameData:
+    source: dict
+    timestamp: float
+    idx: int
+    buffer_name: str = None
+    shape: tuple = None
+    dtype: str = None
 
 
 class BaseSource(abc.ABC):
@@ -45,24 +57,16 @@ class BaseSource(abc.ABC):
         self.processed = 0
         self.ended = False
 
+        self.x_offset = 0
+        self.y_offset = 0
+        self.desired_width = 0
+        self.desired_height = 0
+
+        self.scale = 1
+
         self.create_output_folders()
 
-    def start_in_process(self,
-                         frame_buffers,
-                         frame_queue,
-                         shared_counts,
-                         frame_size,
-                         rotation,
-                         command_queue,
-                         start_timestamp=None):
-        self.frame_buffers = frame_buffers
-        self.frame_queue = frame_queue
-        self.shared_counts = shared_counts
-        self.frame_size = frame_size
-        self.rotation = rotation
-        self.command_queue = command_queue
-        self.start_timestamp = start_timestamp if start_timestamp else time.time()
-
+    def start_in_process(self):
         self.init_capture()
 
         self.process = multiprocessing.Process(target=self._capture_loop)
@@ -70,6 +74,9 @@ class BaseSource(abc.ABC):
 
     def _capture_loop(self):
         while not self.ended:
+
+            frame, frame_data = self.read()
+
             try:
                 cmd = self.command_queue.get(timeout=0.1)
             except queue.Empty:
@@ -81,24 +88,15 @@ class BaseSource(abc.ABC):
 
             if isinstance(cmd, tuple):
                 if cmd[0] == "CAPTURE_FRAME":
-                    buffer_name = cmd[1]
+                    frame_data.buffer_name = cmd[1]
 
-                    frame, idx, is_placeholder = self.get_frame()
-                    if frame is None:
-                        self.stop()
-                        break
+                    shm = self.frame_buffers[frame_data.buffer_name]
+                    frame_data.shape = frame.shape
+                    frame_data.dtype = frame.dtype.str
+                    np_frame = np.ndarray(frame_data.shape, dtype=frame_data.dtype, buffer=shm.buf)
+                    np_frame[:] = frame
 
-                    if self.shared_counts and self.shared_counts[self.data['id']].get('processed'):
-                        with self.shared_counts[self.data['id']]['processed'].get_lock():
-                            self.shared_counts[self.data['id']]['processed'].value += 1
-
-                    frame, transform_info = transform(frame,
-                                                      self.frame_size[0],
-                                                      self.frame_size[1],
-                                                      True,
-                                                      self.rotation)
-
-                    self.send_frame(frame, idx, buffer_name, is_placeholder, transform_info)
+                    self.frame_queue.put(frame_data)
 
                 elif cmd[0] == "STOP_CAPTURE":
                     self.stop()
@@ -109,44 +107,7 @@ class BaseSource(abc.ABC):
 
         logging.info(f"[{self.name}] Capture loop ended.")
 
-    def get_frame(self):
-        frame, placeholder = self.read()
-        if frame is None:
-            return None, None, False
-        current_idx = self.idx
-        self.idx += 1
 
-        return frame, current_idx, placeholder
-
-    def send_frame(self, frame, idx, buffer_name, is_placeholder, transform_info):
-        shm = self.frame_buffers[buffer_name]
-        np_frame = np.ndarray(frame.shape, dtype=frame.dtype, buffer=shm.buf)
-        np_frame[:] = frame
-
-        if self.data.get('type') in ('video', 'images'):
-            timestamp_str = get_frame_utc_timestamp(self.start_timestamp, idx, self.frame_rate)
-        else:
-            timestamp_str = get_formatted_utc_timestamp()
-
-        item = (
-            buffer_name,
-            timestamp_str,
-            idx,
-            frame.shape,
-            frame.dtype.str,
-            self.data,
-            is_placeholder,
-            transform_info
-        )
-        self.frame_queue.put(item)
-
-        if not is_placeholder and self.shared_counts is not None:
-            with self.shared_counts[self.data['id']]['queued'].get_lock():
-                self.shared_counts[self.data['id']]['queued'].value += 1
-
-    def stop(self):
-        self.ended = True
-        logging.info(f"[{self.name}] Stopped.")
 
     def get_calib_files(self, folder, extension, calibration_name):
         calib_folder = os.path.join(self.config.calib_dir, folder)
@@ -164,59 +125,6 @@ class BaseSource(abc.ABC):
             return {}
 
         return files
-
-    def extract_frames(self, calib_type):
-        files = self.intrinsics_files if calib_type == 'intrinsic' else self.extrinsics_files
-        folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
-
-        try:
-            cap = cv2.VideoCapture(files[0])
-            if not cap.isOpened():
-                raise Exception("File could not be opened.")
-
-            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            if frame_count == 1:
-                return
-
-        except Exception as e:
-            logging.error(f"Files found in {folder} are not images or videos.")
-            raise ValueError(f"Files found in {folder} are not images or videos.")
-
-        new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
-        if new_files and not self.config.overwrite_extraction:
-            logging.info("Frames have already been extracted and overwrite_extraction is False.")
-            if calib_type == 'intrinsic':
-                self.intrinsics_files = new_files
-            else:
-                self.extrinsics_files = new_files
-            return
-        
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        if fps == 0:
-            cap.release()
-            logging.error("FPS is 0, cannot extract frames.")
-            raise ValueError("FPS is 0, cannot extract frames.")
-        fps = round(fps)
-
-        frame_nb = 0
-        logging.info(f"[{self.name}]Extracting frames")
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            # Extract one frame every (fps * extract_every_N_sec) frames.
-            if frame_nb % (fps * self.config.extract_every_N_sec) == 0:
-                img_path = os.path.join(folder, self.name + '_' + str(frame_nb).zfill(5) + '.png')
-                cv2.imwrite(img_path, frame)
-            frame_nb += 1
-        cap.release()
-
-        new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
-        new_files.sort()
-        if calib_type == 'intrinsic':
-            self.intrinsics_files = new_files
-        else:
-            self.extrinsics_files = new_files
 
     def calculate_calibration_residuals(self):
         if len(self.S) != 0 and len(self.D) != 0 and len(self.K) != 0 and len(self.R) != 0 and len(self.T) != 0:
@@ -237,7 +145,7 @@ class BaseSource(abc.ABC):
         os.makedirs(self.config.pose_dir, exist_ok=True)
 
         if isinstance(self, WebcamSource):
-            now = datetime.now().strftime("%Y%m%d_%H%M%S")
+            now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
             output_dir_name = f"{self.name}_{now}"
 
             if self.config.webcam_recording:
@@ -256,13 +164,11 @@ class BaseSource(abc.ABC):
 
         if self.config.save_files[1]:
             self.output_video_path = os.path.join(self.config.pose_dir, f"{output_dir_name}_pose.avi")
- 
-    @property
+
     @abc.abstractmethod
     def frame_rate(self):
         pass
 
-    @property
     @abc.abstractmethod
     def dimensions(self):
         pass
@@ -275,6 +181,14 @@ class BaseSource(abc.ABC):
     def read(self):
         pass
 
+    @abc.abstractmethod
+    def extract_frames(self):
+        pass
+
+    @abc.abstractmethod
+    def stop(self):
+        pass
+
 
 class WebcamSource(BaseSource):
     def __init__(self, subconfig, data, pose_model):
@@ -285,6 +199,14 @@ class WebcamSource(BaseSource):
         self.record_codec = data.get("record_codec", None)
         self.ready = False
         self.readed = 0
+
+        self.pb = tqdm(
+            total=0,
+            desc=f"\033[32{self.name} (not connected)\033[0m",
+            position=0,
+            leave=True,
+            bar_format="{desc}"
+        )
 
     def init_capture(self):
         backend_map = {
@@ -329,22 +251,39 @@ class WebcamSource(BaseSource):
         (cap, csvwriter) = init
         ret, frame = cap.read()
 
+        if self.rotation == 90:
+            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+        elif self.rotation == 180:
+            frame = cv2.rotate(frame, cv2.ROTATE_180)
+        elif self.rotation == 270:
+            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+        if self.scale != 1:
+            frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
+
         hardware_ts = cap.get(cv2.CAP_PROP_POS_MSEC)
         if hardware_ts and hardware_ts > 0:
-            timestamp = hardware_ts / 1000.0
+            dt = datetime.fromtimestamp(hardware_ts / 1000.0, timezone.utc)
+            timestamp = dt.strftime("%Y%m%dT%H%M%S") + f"{dt.microsecond:06d}"
         else:
-            timestamp = time.time()
+            dt = datetime.now(timezone.utc)
+            timestamp = dt.strftime("%Y%m%dT%H%M%S") + f"{dt.microsecond:06d}"
 
         if self.config.webcam_recording:
             self.readed += 1
             self.raw_writer.write(frame)
             csvwriter.writerow([self.readed, timestamp])
-        if capture:
+        if capture:  
+            self.pb.set_description_str(
+                f"\033[32m{self.name}\033[0m : {self.processed}/{self.idx} processed/read"
+            )
+            self.pb.refresh()
+            frame_data = FrameData(self, timestamp, self.idx)
             self.idx += 1
             if not ret or frame is None:
                 logging.error(f"[{self.name}] Unable to read the frame.")
-                return None, timestamp
-            return frame, timestamp
+                return None, frame_data
+            return frame, frame_data
 
     def frame_rate(self, cap):
         if self.config.frame_rate == "auto":
@@ -358,14 +297,13 @@ class WebcamSource(BaseSource):
         self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        det_width, det_height = self.pose_model.det_input_size
         if self.width >= self.height:
-            scale = det_width / self.width
-            target_width = det_width
+            scale = self.scaled_w / self.width
+            target_width = self.scaled_w
             target_height = int(self.height * scale)
         else:
-            scale = det_height / self.height
-            target_height = det_height
+            scale = self.scaled_h / self.height
+            target_height = self.scaled_h
             target_width = int(self.width * scale)
 
         if self.width != target_width or self.height != target_height:
@@ -380,7 +318,68 @@ class WebcamSource(BaseSource):
         if (self.rotation % 180) == 90:
             self.width, self.height = self.height, self.width
 
-        logging.info(f"[{self.name}] Dimensions after rotation ({self.rotation}°): {self.width}x{self.height}")
+        self.scale = min(self.desired_width / self.width, self.desired_height / self.height)
+        self.width = int(self.width * scale)
+        self.height = int(self.height * scale)
+
+        logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.width}x{self.height}")
+
+    def extract_frames(self, calib_type):
+        folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
+        if folder is "live":
+            #TODO: Extract frames from webcam
+            logging.error(f"[{self.name}] Live calibration not already implemented.")
+            raise ValueError(f"[{self.name}] Live calibration not already implemented.")
+        else :
+            files = self.intrinsics_files if calib_type == 'intrinsic' else self.extrinsics_files
+
+            try:
+                cap = cv2.VideoCapture(files[0])
+                if not cap.isOpened():
+                    raise Exception("File could not be opened.")
+
+                frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                if frame_count == 1:
+                    return
+
+            except Exception as e:
+                logging.error(f"Files found in {folder} are not images or videos.")
+                raise ValueError(f"Files found in {folder} are not images or videos.")
+
+            new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
+            if new_files and not self.config.overwrite_extraction:
+                logging.info("Frames have already been extracted and overwrite_extraction is False.")
+                if calib_type == 'intrinsic':
+                    self.intrinsics_files = new_files
+                else:
+                    self.extrinsics_files = new_files
+                return
+            
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            if fps == 0:
+                cap.release()
+                logging.error("FPS is 0, cannot extract frames.")
+                raise ValueError("FPS is 0, cannot extract frames.")
+            fps = round(fps)
+
+            frame_nb = 0
+            logging.info(f"[{self.name}]Extracting frames")
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                if frame_nb % (fps * self.config.extract_every_N_sec) == 0:
+                    img_path = os.path.join(folder, self.name + '_' + str(frame_nb).zfill(5) + '.png')
+                    cv2.imwrite(img_path, frame)
+                frame_nb += 1
+            cap.release()
+
+            new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
+            new_files.sort()
+            if calib_type == 'intrinsic':
+                self.intrinsics_files = new_files
+            else:
+                self.extrinsics_files = new_files
 
     def measure_actual_fps(self, cap, num_frames):
         for _ in range(10):
@@ -394,6 +393,14 @@ class WebcamSource(BaseSource):
         elapsed = time.time() - start_time
         return math.floor(frames_captured / elapsed)
 
+    def stop(self):
+        self.ended = True
+        logging.info(f"[{self.name}] Stopped.")
+        self.pb.set_description_str(
+            f"\033[31m{self.name} (Ended)\033[0m : {self.processed}/{self.idx}"
+        )
+        self.pb.refresh()
+
 
 class VideoSource(BaseSource):
     def __init__(self, subconfig, data, pose_model):
@@ -401,31 +408,60 @@ class VideoSource(BaseSource):
         self.video_path = data.get("path")
         self.timestamps = data.get("timestamps")
 
+        self.pb = tqdm(
+            total=0,
+            desc=f"\033[32m{self.name}\033[0m",
+            position=0,
+            leave=True
+        )
+
     def init_capture(self):
         cap = cv2.VideoCapture(self.video_path)
         if not self.cap.isOpened():
             raise ValueError(f"[{self.name}] Cannot open video file: {self.video_path}.")
 
         cap.set(cv2.CAP_PROP_POS_FRAMES, self.config.frame_range[0])
+
+        self.pb.total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - self.config.frame_range[0]
         self.idx = self.config.frame_range[0]
 
         self.dimensions(cap)
         self.frame_rate(cap)
 
+        ts = os.path.getmtime(self.video_path)
+        self.start_timestamp = datetime.fromtimestamp(ts, timezone.utc).replace(tzinfo=timezone.utc)
+
         return cap
 
     def read(self, cap, capture):
-        if capture:
+        if capture:           
+            if self.idx not in self.config.frame_ranges:
+                self.stop()
+
+            self.pb.n = self.idx
+            self.pb.refresh()
+
             ret, frame = cap.read()
+            if self.rotation == 90:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+            elif self.rotation == 180:
+                frame = cv2.rotate(frame, cv2.ROTATE_180)
+            elif self.rotation == 270:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+            if self.scale != 1:
+                frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
             if self.timestamps:
                 timestamp = self.timestamps[self.idx]
             else:
-                timestamp = self.start_time + (self.idx / self.fps)
+                frame_time = self.start_timestamp + timedelta(seconds=(self.idx  / self.fps))
+                timestamp = frame_time.strftime("%Y%m%dT%H%M%S") + f"{frame_time.microsecond:06d}"
+            frame_data = FrameData(self, timestamp, self.idx)
             self.idx += 1
             if not ret or frame is None:
                 logging.error(f"[{self.name}] Unable to read the image from {self.image_files[0]}.")
-                return None
-            return frame, timestamp
+                return None, frame_data
+            return frame, frame_data
 
     def frame_rate(self, cap):
         if self.config.frame_rate == "auto":
@@ -438,14 +474,13 @@ class VideoSource(BaseSource):
         self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        det_width, det_height = self.pose_model.det_input_size
         if self.width >= self.height:
-            scale = det_width / self.width
-            target_width = det_width
+            scale = self.scaled_w / self.width
+            target_width = self.scaled_w
             target_height = int(self.height * scale)
         else:
-            scale = det_height / self.height
-            target_height = det_height
+            scale = self.scaled_h / self.height
+            target_height = self.scaled_h
             target_width = int(self.width * scale)
 
         if self.width != target_width or self.height != target_height:
@@ -460,7 +495,73 @@ class VideoSource(BaseSource):
         if (self.rotation % 180) == 90:
             self.width, self.height = self.height, self.width
 
-        logging.info(f"[{self.name}] Dimensions after rotation ({self.rotation}°): {self.width}x{self.height}")
+        self.scale = min(self.desired_width / self.width, self.desired_height / self.height)
+        self.width = int(self.width * scale)
+        self.height = int(self.height * scale)
+
+        logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.width}x{self.height}")
+
+
+    def extract_frames(self, calib_type):
+        folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
+        if folder is "live":
+            logging.error(f"[{self.name}] Live calibration not available from a video source.")
+            raise ValueError(f"[{self.name}] Live calibration not available from a video source.")
+        files = self.intrinsics_files if calib_type == 'intrinsic' else self.extrinsics_files
+
+        try:
+            cap = cv2.VideoCapture(files[0])
+            if not cap.isOpened():
+                raise Exception("File could not be opened.")
+
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            if frame_count == 1:
+                return
+
+        except Exception as e:
+            logging.error(f"Files found in {folder} are not images or videos.")
+            raise ValueError(f"Files found in {folder} are not images or videos.")
+
+        new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
+        if new_files and not self.config.overwrite_extraction:
+            logging.info("Frames have already been extracted and overwrite_extraction is False.")
+            if calib_type == 'intrinsic':
+                self.intrinsics_files = new_files
+            else:
+                self.extrinsics_files = new_files
+            return
+        
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps == 0:
+            cap.release()
+            logging.error("FPS is 0, cannot extract frames.")
+            raise ValueError("FPS is 0, cannot extract frames.")
+        fps = round(fps)
+
+        frame_nb = 0
+        logging.info(f"[{self.name}]Extracting frames")
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if frame_nb % (fps * self.config.extract_every_N_sec) == 0:
+                img_path = os.path.join(folder, self.name + '_' + str(frame_nb).zfill(5) + '.png')
+                cv2.imwrite(img_path, frame)
+            frame_nb += 1
+        cap.release()
+
+        new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
+        new_files.sort()
+        if calib_type == 'intrinsic':
+            self.intrinsics_files = new_files
+        else:
+            self.extrinsics_files = new_files
+
+    def stop(self):
+        self.ended = True
+        logging.info(f"[{self.name}] Stopped.")
+        self.pb.set_description_str(f"\033[31m{self.name} (Ended)\033[0m")
+        self.pb.refresh()
 
 
 class ImageSource(BaseSource):
@@ -471,15 +572,26 @@ class ImageSource(BaseSource):
         self.image_files = None
         self.timestamps = data.get("timestamps", None)
 
+        self.pb = tqdm(
+            total=0,
+            desc=f"\033[32m{self.name}\033[0m",
+            position=0,
+            leave=True
+        )
+
     def init_capture(self):
         self.image_files = sorted(glob.glob(os.path.join(self.image_dir, self.image_extension)), key=natural_sort_key)
         if not self.image_files:
             logging.error(f"[{self.name}] No images found in {self.image_dir} with extension {self.image_extension}.")
             raise ValueError(f"[{self.name}] No images found in {self.image_dir} with extension {self.image_extension}.")
+        self.number_of_frames = len(self.image_files) - self.config.frame_range[0]
         self.idx = self.config.frame_range[0]
 
         self.dimensions()
         self.frame_rate()
+
+        ts = os.path.getmtime(self.video_path)
+        self.start_timestamp = datetime.fromtimestamp(ts, timezone.utc).replace(tzinfo=timezone.utc)
 
         return None
 
@@ -487,17 +599,34 @@ class ImageSource(BaseSource):
         if capture:
             if self.idx not in self.config.frame_ranges:
                 self.stop()
+
+            self.pb.n = self.idx
+            self.pb.refresh()
+
             path = self.image_files[self.idx]
             if self.timestamps:
                 timestamp = self.timestamps[self.idx]
             else:
-                timestamp = self.start_time + (self.idx / self.fps)
+                frame_time = self.start_timestamp + timedelta(seconds=(self.idx  / self.fps))
+                timestamp = frame_time.strftime("%Y%m%dT%H%M%S") + f"{frame_time.microsecond:06d}"
+
             frame = cv2.imread(path)
+            if self.rotation == 90:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+            elif self.rotation == 180:
+                frame = cv2.rotate(frame, cv2.ROTATE_180)
+            elif self.rotation == 270:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+            if self.scale != 1:
+                frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
+
+            frame_data = FrameData(self, timestamp, self.idx)
             self.idx += 1
             if frame is None:
                 logging.error(f"[{self.name}] Unable to read the image from {self.image_files[0]}.")
-                return None
-            return frame, timestamp
+                return None, frame_data
+            return frame, frame_data
 
     def frame_rate(self):
         if self.config.frame_rate == "auto":
@@ -516,10 +645,76 @@ class ImageSource(BaseSource):
             raise ValueError(f"[{self.name}] Unable to read the image from {self.image_files[0]}.")
         self.height, self.width = test_img.shape[:2]
 
-        rotation = self.rotation if self.rotation is not None else 0
-        if rotation % 90 != 0:
+        if self.rotation % 90 != 0:
             logging.error(f"[{self.name}] Rotation must be multiple of 90.")
             raise ValueError(f"[{self.name}] Rotation must be multiple of 90.")
-        if (rotation % 180) == 90:
+        if (self.rotation % 180) == 90:
             self.width, self.height = self.height, self.width
-        logging.info(f"[{self.name}] Dimensions after rotation ({rotation}°): {self.width}x{self.height}")
+
+        self.scale = min(self.desired_width / self.width, self.desired_height / self.height)
+        self.width = int(self.width * self.scale)
+        self.height = int(self.height * self.scale)
+
+        logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.width}x{self.height}")
+
+
+    def extract_frames(self, calib_type):
+        files = self.intrinsics_files if calib_type == 'intrinsic' else self.extrinsics_files
+        if folder is "live":
+            logging.error(f"[{self.name}] Live calibration not available from an image source.")
+            raise ValueError(f"[{self.name}] Live calibration not available from an image source.")
+        folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
+
+        try:
+            cap = cv2.VideoCapture(files[0])
+            if not cap.isOpened():
+                raise Exception("File could not be opened.")
+
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            if frame_count == 1:
+                return
+
+        except Exception as e:
+            logging.error(f"Files found in {folder} are not images or videos.")
+            raise ValueError(f"Files found in {folder} are not images or videos.")
+
+        new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
+        if new_files and not self.config.overwrite_extraction:
+            logging.info("Frames have already been extracted and overwrite_extraction is False.")
+            if calib_type == 'intrinsic':
+                self.intrinsics_files = new_files
+            else:
+                self.extrinsics_files = new_files
+            return
+        
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps == 0:
+            cap.release()
+            logging.error("FPS is 0, cannot extract frames.")
+            raise ValueError("FPS is 0, cannot extract frames.")
+        fps = round(fps)
+
+        frame_nb = 0
+        logging.info(f"[{self.name}]Extracting frames")
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if frame_nb % (fps * self.config.extract_every_N_sec) == 0:
+                img_path = os.path.join(folder, self.name + '_' + str(frame_nb).zfill(5) + '.png')
+                cv2.imwrite(img_path, frame)
+            frame_nb += 1
+        cap.release()
+
+        new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
+        new_files.sort()
+        if calib_type == 'intrinsic':
+            self.intrinsics_files = new_files
+        else:
+            self.extrinsics_files = new_files
+
+    def stop(self):
+        self.ended = True
+        logging.info(f"[{self.name}] Stopped.")
+        self.pb.set_description_str(f"\033[31m{self.name} (Ended)\033[0m")
+        self.pb.refresh()

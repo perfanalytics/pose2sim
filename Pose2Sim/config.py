@@ -312,7 +312,8 @@ class SubConfig:
                 if calib_type == "convert":
                     source.intrinsics_files = convert_path
                 elif calib_type == "calculate":
-                    source.intrinsics_files = source.get_calib_files(source.calib_intrinsics, self.intrinsics_extension, "intrinsics")
+                    if source.calib_intrinsics is not "live":
+                        source.intrinsics_files = source.get_calib_files(source.calib_intrinsics, self.intrinsics_extension, "intrinsics")
 
             if not overwrite_extrinsics and len(source.R) != 0 and len(source.T) != 0:
                 logging.info(
@@ -780,16 +781,8 @@ class SubConfig:
         mosaic_cols = 0
 
         if self.combined_frames:
-            for source in self.sources:
-                dimensions = source.dimensions
-                max_width = max(max_width, dimensions[0])
-                max_height = max(max_height, dimensions[1])
-            if max_width >= max_height:
-                mosaic_cols = math.ceil(math.sqrt(len(self.sources)))
-                mosaic_rows = math.ceil(len(self.sources) / mosaic_cols)
-            else:
-                mosaic_rows = math.ceil(math.sqrt(len(self.sources)))
-                mosaic_cols = math.ceil(len(self.sources) / mosaic_rows)
+            mosaic_cols = math.ceil(math.sqrt(len(self.sources)))
+            mosaic_rows = mosaic_cols
             cell_w = self.pose_model.det_input_size[0] // mosaic_cols
             cell_h = self.pose_model.det_input_size[1] // mosaic_rows
 
@@ -802,17 +795,15 @@ class SubConfig:
                 y_off = r * cell_h
                 source.x_offset = x_off
                 source.y_offset = y_off
-                source.scaled_w = cell_w
-                source.scaled_h = cell_h
+                source.desired_width = cell_w
+                source.desired_height = cell_h
 
             frame_size = (cell_w, cell_h)
         else:
             frame_size = self.pose_model.det_input_size
             logging.info(f"Frame input size: {frame_size[0]}x{frame_size[1]}")
-            source.x_offset = 0
-            source.y_offset = 0
-            source.scaled_w = frame_size[0]
-            source.scaled_h = frame_size[1]
+            source.desired_width = frame_size[0]
+            source.desired_height = frame_size[1]
 
         return (mosaic_rows, mosaic_cols)
     

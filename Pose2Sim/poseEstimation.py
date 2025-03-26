@@ -43,7 +43,6 @@ import cv2
 import uuid
 import numpy as np
 
-from datetime import datetime, timezone, timedelta
 from multiprocessing import shared_memory
 from tqdm import tqdm
 
@@ -519,72 +518,6 @@ class CaptureCoordinator(multiprocessing.Process):
             self.command_queues[src['id']].put(None)
 
 
-class MediaSource(multiprocessing.Process):
-    def __init__(self, **kwargs):
-        super().__init__()
-        self.__dict__.update(kwargs)
-
-    def run(self):
-        while not self.source.ended:
-            try:
-                cmd = self.command_queue.get(timeout=0.1)
-            except queue.Empty:
-                continue
-
-            if cmd is None:
-                break
-
-            if isinstance(cmd, tuple):
-                if cmd[0] == "CAPTURE_FRAME":
-                    buffer_name = cmd[1]
-
-                    # Read frame and send it
-                    frame, idx, is_placeholder = self.source.get_frame()
-                    if frame is None:
-                        self.stop()
-                        break
-
-                    with self.shared_counts[self.source['id']]['processed'].get_lock():
-                        self.shared_counts[self.source['id']]['processed'].value += 1
-
-                    frame, transform_info = transform(frame, self.frame_size[0], self.frame_size[1], True, self.rotation)
-
-                    self.send_frame(frame, idx, buffer_name, is_placeholder, transform_info)
-
-                elif cmd[0] == "STOP_CAPTURE":
-                    self.source.stop()
-                    break
-                else:
-                    pass
-
-    def send_frame(self, frame, idx, buffer_name, is_placeholder, transform_info):
-        shm = self.frame_buffers[buffer_name]
-        np_frame = np.ndarray(frame.shape, dtype=frame.dtype, buffer=shm.buf)
-        np_frame[:] = frame
-
-        if self.source['type'] in ('video', 'images'):
-            timestamp_str = get_frame_utc_timestamp(self.start_timestamp, self.frame_idx, self.frame_rate)
-        else:
-            timestamp_str = get_formatted_utc_timestamp()
-
-        item = (
-            buffer_name,
-            timestamp_str,
-            idx,
-            frame.shape,
-            frame.dtype.str,
-            self.source,
-            is_placeholder,
-            transform_info
-        )
-        self.frame_queue.put(item)
-
-        if not is_placeholder:
-            with self.shared_counts[self.source['id']]['queued'].get_lock():
-                self.shared_counts[self.source['id']]['queued'].value += 1
-            self.frame_idx += 1
-
-
 ## FUNCTIONS
 def estimate_pose_all(config):
     '''
@@ -608,6 +541,8 @@ def estimate_pose_all(config):
     - Optionally, videos and/or image files with the detected keypoints
     '''
     config.check_pose_estimation()
+
+    config.get_mosaic_params()
 
     logging.info(f"Model input size: {config.pose_model.det_input_size[0]}x{config.pose_model.det_input_size[1]}")
 
@@ -720,28 +655,10 @@ def estimate_pose_all(config):
     )
     capture_coordinator.start()
 
-    # Setup progress bars
-    progress_bars = {}
-    bar_ended_state = {}
     bar_pos = 0
 
     for source in config.sources:
-        if isinstance(source, WebcamSource):
-            source.pb = tqdm(
-                total=0,
-                desc=f"\033[32{source.name} (not connected)\033[0m",
-                position=bar_pos,
-                leave=True,
-                bar_format="{desc}"
-            )
-        else:
-            source.pb = tqdm(
-                total=0,
-                desc=f"\033[32m{source.name}\033[0m",
-                position=bar_pos,
-                leave=True
-            )
-
+        source.pb.position = bar_pos
         bar_pos += 1
 
     frame_buffer_bar = tqdm(
@@ -777,37 +694,6 @@ def estimate_pose_all(config):
     try:
         while True:
             # Update progress bars
-            for source in config.sources:
-                if isinstance(source, WebcamSource):
-                    connected = webcam_ready[sid]
-                    if connected:
-                        pb.set_description_str(
-                            f"\033[32mWebcam {sid}\033[0m : {pval}/{qval} processed/read"
-                        )
-                    else:
-                        pb.set_description_str(
-                            f"\033[31mWebcam {sid} (not connected)\033[0m : {pval}/{qval}"
-                        )
-                    pb.refresh()
-
-                    if source_ended[sid] and not bar_ended_state[sid]:
-                        bar_ended_state[sid] = True
-                        pb.set_description_str(
-                            f"\033[31mWebcam {sid} (Ended)\033[0m : {pval}/{qval}"
-                        )
-                        pb.refresh()
-
-                else:
-                    if tval > 0:
-                        pb.total = tval
-                        pb.n = pval
-                        pb.refresh()
-
-                    if source_ended[sid] and not bar_ended_state[sid]:
-                        bar_ended_state[sid] = True
-                        pb.set_description_str(f"\033[31mSource {sid} (Ended)\033[0m")
-                        pb.refresh()
-
             frame_buffer_bar.n = available_frame_buffers.qsize()
             frame_buffer_bar.refresh()
 
@@ -815,22 +701,13 @@ def estimate_pose_all(config):
                 pose_buffer_bar.n = available_pose_buffers.qsize()
                 pose_buffer_bar.refresh()
 
-            # Check if user closed the display
-            if result_processor and result_processor.stopped:
-                logging.info("\nUser closed display. Stopping all streams.")
-                capture_coordinator.stop()
-                for ms_proc in media_sources:
-                    ms_proc.stop()
-                break
-
             alive_workers = sum(w.is_alive() for w in workers)
 
             if config.multi_workers:
                 worker_bar.n = alive_workers
                 worker_bar.refresh()
 
-                # Possibly spawn new worker(s) if new sources ended
-                current_ended_count = sum(1 for s in sources if source_ended[s['id']])
+                current_ended_count = sum(1 for source in config.sources if source.ended)
                 ended_delta = current_ended_count - previous_ended_count
                 if ended_delta > 0:
                     for _ in range(ended_delta):
@@ -841,18 +718,20 @@ def estimate_pose_all(config):
                     previous_ended_count = current_ended_count
 
             # If all sources ended, queue empty, and no alive workers => done
-            all_ended = all(source_ended[s['id']] for s in sources)
+            all_ended = all(source.ended for source in config.sources)
             if all_ended and frame_queue.empty() and pose_queue.empty() and alive_workers == 0:
                 logging.info("All sources ended, queues empty, and worker finished. Exiting loop.")
                 break
+
+            if cv2.waitKey(1) & 0xFF == ord(" "):
+                logging.info("Space bar pressed: stopping all sources.")
+                for source in config.sources:
+                    source.stop()
 
             time.sleep(0.05)
 
     except KeyboardInterrupt:
         logging.info("User interrupted pose estimation.")
-        capture_coordinator.stop()
-        for ms_proc in media_sources:
-            ms_proc.stop()
 
     finally:
         # Stop capture coordinator
@@ -863,12 +742,7 @@ def estimate_pose_all(config):
 
         # Stop media sources
         for source in config.sources:
-            source.command_queue.put(None)
-
-        for ms in media_sources:
-            ms.join(timeout=2)
-            if ms.is_alive():
-                ms.terminate()
+            source.stop()
 
         # Stop workers
         for w in workers:
@@ -893,15 +767,8 @@ def estimate_pose_all(config):
         if result_processor.is_alive():
             result_processor.terminate()
 
-        # Final bar updates
-        frame_buffer_bar.n = available_frame_buffers.qsize()
-        frame_buffer_bar.refresh()
-        if config.combined_frames:
-            pose_buffer_bar.n = available_pose_buffers.qsize()
-            pose_buffer_bar.refresh()
-
-        for sid, pb in progress_bars.items():
-            pb.close()
+        for source in config.sources:
+            source.pb.close()
         frame_buffer_bar.close()
         if config.combined_frames:
             pose_buffer_bar.close()
@@ -913,41 +780,6 @@ def estimate_pose_all(config):
 
         if config.display_detection:
             cv2.destroyAllWindows()
-
-
-def transform(frame, desired_w, desired_h, full, rotation=0):
-    rotation = rotation % 360
-    if rotation == 90:
-        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
-    elif rotation == 180:
-        frame = cv2.rotate(frame, cv2.ROTATE_180)
-    elif rotation == 270:
-        frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
-
-    rotated_h, rotated_w = frame.shape[:2]
-
-    scale = min(desired_w / rotated_w, desired_h / rotated_h)
-    new_w = int(rotated_w * scale)
-    new_h = int(rotated_h * scale)
-    if scale != 0:
-        frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
-    if full:
-        canvas = np.zeros((desired_h, desired_w, 3), dtype=np.uint8)
-        x_offset = (desired_w - new_w) // 2
-        y_offset = (desired_h - new_h) // 2
-        canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = frame
-        bottom_left_offset_y = desired_h - (y_offset + new_h)
-        transform_info = {
-            'rotation': rotation,
-            'scale': scale,
-            'x_offset': x_offset,
-            'y_offset': bottom_left_offset_y,
-            'rotated_size': (rotated_w, rotated_h),
-            'canvas_size': (desired_w, desired_h)
-        }
-        return canvas, transform_info
-    else:
-        return frame, None
 
 
 def inverse_transform_keypoints(keypoints, transform_info):
@@ -1023,17 +855,3 @@ def save_keypoints_to_openpose(json_file_path, all_keypoints, all_scores):
     # Save JSON output for each frame
     with open(json_file_path, 'w') as outfile:
         json.dump(json_output, outfile)
-
-def get_formatted_utc_timestamp():
-    dt = datetime.now(timezone.utc)
-    return dt.strftime("%Y%m%dT%H%M%S") + f"{dt.microsecond:06d}"
-
-
-def get_file_utc_timestamp(file_path):
-    ts = os.path.getmtime(file_path)
-    return datetime.fromtimestamp(ts, timezone.utc).replace(tzinfo=timezone.utc)
-
-
-def get_frame_utc_timestamp(start_timestamp, frame_idx, fps):
-    frame_time = start_timestamp + timedelta(seconds=(frame_idx / fps))
-    return frame_time.strftime("%Y%m%dT%H%M%S") + f"{frame_time.microsecond:06d}"
