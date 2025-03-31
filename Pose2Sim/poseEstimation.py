@@ -75,25 +75,26 @@ __status__ = "Development"
 
 # CLASSES
 class BufferManager:
-    def __init__(self, count, buffer_size, progress_desc, bar_pos):
-        self.count = count
-        self.buffer_size = buffer_size
-        self.bar_pos = bar_pos
+    def __init__(self, config):
+        available_memory = psutil.virtual_memory().available
+        buffer_size = config.pose_model.det_input_size[0] * config.pose_model.det_input_size[1] * 3
+        self.buffers_count = min(int((available_memory / 2) / (buffer_size * (len(config.sources) / (len(config.sources) + 1)))), 10000)
+
+        logging.info(f"Allocating {self.buffers_count} buffers.")
 
         self.buffers = {}
-        self.available_buffers = multiprocessing.Queue(maxsize=count)
-        self.queue = multiprocessing.Queue(maxsize=count)
+        self.available_buffers = multiprocessing.Queue(maxsize=self.buffers_count)
 
-        for _ in range(count):
+        for _ in range(self.buffers_count):
             buf_uuid = str(uuid.uuid4())
-            shm = shared_memory.SharedMemory(create=True, size=buffer_size)
+            shm = shared_memory.SharedMemory(name=buf_uuid, create=True, size=buffer_size)
             self.buffers[buf_uuid] = shm
             self.available_buffers.put(buf_uuid)
 
         self.progress_bar = tqdm(
-            total=count,
-            desc=progress_desc,
-            position=bar_pos,
+            total=self.buffers_count,
+            desc="Buffers Free",
+            position=0,
             leave=True,
             colour='blue'
         )
@@ -110,9 +111,13 @@ class BufferManager:
 
 
 class PoseEstimatorWorker(multiprocessing.Process):
-    def __init__(self, **kwargs):
+    def __init__(self, config, input_queue, output_queue, tracker_ready_event):
         super().__init__()
-        self.__dict__.update(kwargs)
+        self.config = config
+        self.input_queue = input_queue
+        self.output_queue = output_queue
+        self.tracker_ready_event = tracker_ready_event
+
         self.ended = True
         self.prev_keypoints = {}
         self.prev_bboxes = {}
@@ -135,59 +140,59 @@ class PoseEstimatorWorker(multiprocessing.Process):
         self.tracker_ready_event.set()
 
         while not self.ended:
-            if all(source.ended for source in self.config.sources) and self.buffer_manager.queue.isEmpty():
+            if all(source.ended for source in self.config.sources) and self.input_queue.isEmpty():
                 self.ended = True
                 break
 
-            try:
-                frame_data = self.buffer_manager.queue.get_nowait()
-                frame = np.ndarray(frame_data.shape, dtype=frame_data.dtype, buffer=self.buffers[buffer_name].buf)
+            frame_data = self.input_queue.get()
+            frame = np.ndarray(frame_data.shape, dtype=frame_data.dtype, buffer=frame_data.buffer.buf)
+            if len(frame.shape) == 2:
+                frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
-                if not frame_data.placeholder:
-                    if self.det_model is not None:
-                        if frame_data.idx % self.det_frequency == 0:
-                            bboxes = self.det_model(frame)
-                            if frame_data.source is not None:
-                                self.prev_bboxes[frame_data.source.name] = bboxes
-                            else:
-                                self.prev_bboxes = bboxes
+            if not frame_data.placeholder:
+                if self.det_model is not None:
+                    if frame_data.idx % self.det_frequency == 0:
+                        bboxes = self.det_model(frame)
+                        if frame_data.source is not None:
+                            self.prev_bboxes[frame_data.source.name] = bboxes
                         else:
-                            if frame_data.source is not None:
-                                bboxes = self.prev_bboxes.get(frame_data.source.name, None)
-                            else:
-                                bboxes = self.prev_bboxes
-                        frame_data.keypoints, frame_data.scores = self.pose_model(frame, bboxes=bboxes)
-                    else:  # rtmo
-                        frame_data.keypoints, frame_data.scores = self.pose_model(frame)
+                            self.prev_bboxes = bboxes
+                    else:
+                        if frame_data.source is not None:
+                            bboxes = self.prev_bboxes.get(frame_data.source.name, None)
+                        else:
+                            bboxes = self.prev_bboxes
+                    frame_data.keypoints, frame_data.scores = self.pose_model(frame, bboxes=bboxes)
+                else:  # rtmo
+                    frame_data.keypoints, frame_data.scores = self.pose_model(frame)
 
-                    if self.multi_person:
-                        if self.tracking_mode == 'deepsort':
-                            frame_data.keypoints, frame_data.scores = sort_people_deepsort(frame_data.keypoints, frame_data.scores, self.deepsort_tracker, frame, frame_data.idx)
-                        if self.tracking_mode == 'sports2d':
-                            if frame_data.source is not None:
-                                prev_kpts = self.prev_keypoints.get(frame_data.source.name, None)
-                                updated_prev, frame_data.keypoints, frame_data.scores = sort_people_sports2d(prev_kpts, frame_data.keypoints, frame_data.scores)
-                                self.prev_keypoints[frame_data.source.name] = updated_prev
-                            else:
-                                self.prev_keypoints, frame_data.keypoints, frame_data.scores = sort_people_sports2d(
-                                    self.prev_keypoints,
-                                    frame_data.keypoints,
-                                    frame_data.scores
-                                    )
-                else:
-                    frame_data.keypoints, frame_data.scores = None, None
+                if self.multi_person:
+                    if self.tracking_mode == 'deepsort':
+                        frame_data.keypoints, frame_data.scores = sort_people_deepsort(frame_data.keypoints, frame_data.scores, self.deepsort_tracker, frame, frame_data.idx)
+                    if self.tracking_mode == 'sports2d':
+                        if frame_data.source is not None:
+                            prev_kpts = self.prev_keypoints.get(frame_data.source.name, None)
+                            updated_prev, frame_data.keypoints, frame_data.scores = sort_people_sports2d(prev_kpts, frame_data.keypoints, frame_data.scores)
+                            self.prev_keypoints[frame_data.source.name] = updated_prev
+                        else:
+                            self.prev_keypoints, frame_data.keypoints, frame_data.scores = sort_people_sports2d(
+                                self.prev_keypoints,
+                                frame_data.keypoints,
+                                frame_data.scores
+                                )
+            else:
+                frame_data.keypoints, frame_data.scores = None, None
 
-                self.result_queue.put(frame_data)
-            except queue.Empty:
-                time.sleep(0.005)
+            self.output_queue.put(frame_data)
 
     def stop(self):
         self.stopped = True
 
 
 class BaseSynchronizer:
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
+    def __init__(self, config, buffer_manager):
+        self.config = config
+        self.buffer_manager = buffer_manager
 
         self.sync_data = {}
         self.ended = False
@@ -220,9 +225,9 @@ class BaseSynchronizer:
                 frame = np.ndarray(
                     frame_data.shape,
                     dtype=np.dtype(frame_data.dtype),
-                    buffer=self.frame_buffers[frame_data.buffer_name].buf,
-                ).copy()
-                self.available_frame_buffers.put(frame_data.buffer_name)
+                    buffer=frame_data.buffer.buf,
+                )
+                self.buffer_manager.available_buffers.put(frame_data.buffer.name)
 
                 source = frame_data.source
                 mosaic[source.y_offset:source.y_offset + source.height,
@@ -279,55 +284,57 @@ class BaseSynchronizer:
         return frames, recovered_keypoints, recovered_scores
 
     def stop(self):
-        self.stopped = True
+        self.ended = True
 
 
-class FrameQueueProcessor(multiprocessing.Process, BaseSynchronizer):
-    def __init__(self, config, frame_buffer_manager, pose_buffer_manager):
+class InputQueueProcessor(multiprocessing.Process, BaseSynchronizer):
+    def __init__(self, config, input_queue, buffer_manager):
         multiprocessing.Process.__init__(self)
-        BaseSynchronizer.__init__(self)
-        self.config = config
-        self.frame_buffer_manager = frame_buffer_manager
-        self.pose_buffer_manager = pose_buffer_manager
-
-        self.mosaic_queue = multiprocessing.Queue()
+        BaseSynchronizer.__init__(self, config, buffer_manager)
+        self.input_queue = input_queue
 
     def run(self):
         while not self.ended:
             if all(not sources.ended for sources in self.config.sources):
-                self.ended = True
+                self.stop()
                 break
 
-            frame_data = self.frame_queue.get_nowait()
-            if frame_data.idx not in self.sync_data:
-                self.sync_data[frame_data.idx] = {}
-            self.sync_data[frame_data.idx][frame_data.source.name] = (frame_data)
+            if self.config.combined_frames:
+                for source in self.config.sources:
+                    frame_data = source.frame_queue.get()
+                    if frame_data.idx not in self.sync_data:
+                        self.sync_data[frame_data.idx] = {}
+                    self.sync_data[frame_data.idx][source.name] = (frame_data)
 
-            if frames_list := self.get_frames_list():
-                mosaic, mosaic_data = self.build_mosaic(frames_list)
-                mosaic_data.buffer_name = self.pose_buffer_manager.available_buffers.get_nowait()
-                mosaic_data.shape = mosaic.shape
-                mosaic_data.dtype = mosaic.dtype.str
-                shm = self.pose_buffer_manager.buffers[mosaic_data.buffer_name]
-                np_mosaic = np.ndarray(mosaic_data.shape, dtype=mosaic_data.dtype, buffer=shm.buf)
-                np_mosaic[:] = mosaic
+                if frames_list := self.get_frames_list():
+                    mosaic, mosaic_data = self.build_mosaic(frames_list)
+                    buffer = self.buffer_manager.available_buffers.get()
+                    shm = self.buffer_manager.buffers[buffer]
+                    mosaic_data.shape = mosaic.shape
+                    mosaic_data.dtype = mosaic.dtype.str
+                    mosaic_data.buffer = shm
+                    np_mosaic = np.ndarray(mosaic_data.shape, dtype=mosaic_data.dtype, buffer=shm.buf)
+                    np_mosaic[:] = mosaic
 
-                self.mosaic_queue.put(mosaic_data)
+                    self.input_queue.put(mosaic_data)
+            else:
+                for source in self.config.sources:
+                    self.input_queue.put(source.frame_queue.get())
 
 
-class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
-    def __init__(self, result_queue, pose_model, **kwargs):
+class OutputQueueProcessor(multiprocessing.Process, BaseSynchronizer):
+    def __init__(self, config, output_queue, buffer_manager, fps):
         multiprocessing.Process.__init__(self)
-        BaseSynchronizer.__init__(self, **kwargs)
-        self.result_queue = result_queue
-        self.pose_model = pose_model
+        BaseSynchronizer.__init__(self, config, buffer_manager)
+        self.output_queue = output_queue
+        self.fps = fps
 
     def run(self):
         self.init_video_writers()
 
-        while not self.stopped:
+        while not self.ended:
             try:
-                result_item = self.result_queue.get_nowait()
+                result_item = self.output_queue.get_nowait()
                 self.process_result_item(result_item)
             except queue.Empty:
                 time.sleep(0.005)
@@ -338,17 +345,8 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
 
     def init_video_writers(self):
         if self.save_video and self.source_outputs:
-            for s in self.sources:
-                sid = s['id']
-                out_dirs = self.source_outputs[sid]
-                output_video_path = out_dirs[-2]
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                self.video_writers[sid] = cv2.VideoWriter(
-                    output_video_path,
-                    fourcc,
-                    self.frame_rate,
-                    (self.frame_size[0], self.frame_size[1])
-                )
+            for source in self.config.sources:
+
 
     def process_result_item(self, result_item):
         buffer_name, timestamp, idx, frame_shape, frame_dtype, sid, is_placeholder, info, keypoints, scores = result_item
@@ -436,103 +434,47 @@ class ResultQueueProcessor(multiprocessing.Process, BaseSynchronizer):
 
 
 class CaptureCoordinator(multiprocessing.Process):
-    def __init__(self, config, available_frame_buffers, tracker_ready_event):
+    def __init__(self, config, buffer_manager, tracker_ready_event, fps):
         super().__init__()
         self.config = config
-        self.available_frame_buffers = available_frame_buffers
+        self.buffer_manager = buffer_manager
         self.tracker_ready_event = tracker_ready_event
 
-        self.interval = 1.0 / min(source.fps for source in config.sources)
+        self.interval = 1.0 / fps
         self.ended = False
 
     def run(self):
         self.tracker_ready_event.wait()
         last_capture_time = time.time()
+        for source in self.config.sources:
+            source.start_in_process()
+            source.capture_ready_event.wait()
         while not self.ended:
             if all(source.ended for source in self.config.sources):
-                self.ended = True
+                self.stop()
                 break
 
             elapsed = time.time() - last_capture_time
             if elapsed < self.interval:
                 time.sleep(self.interval - elapsed)
 
-            def is_ready_source(s):
-                sid = s['id']
-                if self.source_ended[sid]:
-                    return False
-                if s['type'] == 'webcam':
-                    return bool(self.webcam_ready[sid])
-                return True
+            if self.buffer_manager.available_buffers.qsize() == self.buffer_manager.buffers_count:
+                empty = True
 
-            ready_srcs = [s for s in self.sources if is_ready_source(s)]
-
-            if self.mode == 'continuous':
-                if self.available_frame_buffers.qsize() >= len(ready_srcs):
-                    buffs = [self.available_frame_buffers.get() for _ in ready_srcs]
-                    for i, src in enumerate(ready_srcs):
-                        sid = src['id']
-                        self.command_queues[sid].put(("CAPTURE_FRAME", buffs[i]))
+            if self.mode == 'continuous' or (self.mode == 'alternating' and empty):
+                if self.available_frame_buffers.qsize() >= len(self.config.sources):
+                    for source in self.config.sources:
+                        buffer = self.buffer_manager.available_buffers.get()
+                        shared_memory = self.buffer_manager.buffers[buffer]
+                        self.source.command_queues.put(("CAPTURE_FRAME", shared_memory))
                     last_capture_time = time.time()
                 else:
-                    time.sleep(0.005)
-
-            elif self.mode == 'alternating':
-                chunk = self.available_frame_buffers.qsize()
-                if chunk <= 0:
-                    time.sleep(0.005)
-                    continue
-
-                frames_sent = 0
-                src_index = 0
-                sources_requested = []
-
-                ready_count = len(ready_srcs)
-                while frames_sent < chunk and not all(self.source_ended[s['id']] for s in self.sources):
-                    if ready_count == 0:
-                        break
-                    src = ready_srcs[src_index]
-                    sid = src['id']
-                    buf_name = self.available_frame_buffers.get()
-                    self.command_queues[sid].put(("CAPTURE_FRAME", buf_name))
-                    sources_requested.append(sid)
-                    frames_sent += 1
-
-                    src_index = (src_index + 1) % ready_count
-
-                last_capture_time = time.time()
-                if frames_sent > 0:
-                    self.wait_until_processed(frames_sent, sources_requested)
-
-            else:
-                time.sleep(0.01)
-
-        self.stop()
-
-    def wait_until_processed(self, total_frames, sources_list):
-        needed_counts = {}
-        old_counts = {}
-
-        for sid in sources_list:
-            needed_counts[sid] = needed_counts.get(sid, 0) + 1
-
-        for sid in needed_counts.keys():
-            old_counts[sid] = self.shared_counts[sid]['processed'].value
-
-        while not self.stopped.value:
-            done = 0
-            for sid, needed_val in needed_counts.items():
-                current_processed = self.shared_counts[sid]['processed'].value
-                if current_processed >= old_counts[sid] + needed_val:
-                    done += needed_val
-            if done >= total_frames:
-                break
-            time.sleep(0.01)
+                    empty = False
 
     def stop(self):
-        self.stopped.value = True
-        for src in self.sources:
-            self.command_queues[src['id']].put(None)
+        self.ended = True
+        for source in self.config.sources:
+            self.source.command_queues.put(None)
 
 
 ## FUNCTIONS
@@ -563,76 +505,56 @@ def estimate_pose_all(config):
 
     logging.info(f"Model input size: {config.pose_model.det_input_size[0]}x{config.pose_model.det_input_size[1]}")
 
-    available_memory = psutil.virtual_memory().available
-    frame_bytes = config.pose_model.det_input_size[0] * config.pose_model.det_input_size[1] * 3
-    n_buffers_total = int((available_memory / 2) / (frame_bytes * (len(config.sources) / (len(config.sources) + 1))))
+    buffer_manager = BufferManager(config)
 
-    if not config.combined_frames:
-        frame_buffer_count = n_buffers_total
-
-        logging.info(f"Allocating {frame_buffer_count} buffers.")
-    else:
-        frame_buffer_count = len(config.sources) * 3
-
-        logging.info(f"Allocating {frame_buffer_count} frame buffers.")
-
-        pose_buffer_count = min(n_buffers_total - frame_buffer_count, 10000)
-
-        logging.info(f"Allocating {pose_buffer_count} pose buffers.")
-
-    result_queue = multiprocessing.Queue()
-    frame_buffer_manager = BufferManager(frame_buffer_count, frame_bytes, "Frame Buffers Free")
-    pose_buffer_manager = None
-    if config.combined_frames:
-        pose_buffer_manager = BufferManager(pose_buffer_count, frame_bytes * len(config.sources), "Pose Buffers Free")
+    input_queue = multiprocessing.Queue()
+    output_queue = multiprocessing.Queue()
 
     # Decide how many workers to start
     cpu_count = multiprocessing.cpu_count()
-    if config.combined_frames:
-        initial_workers = max(1, cpu_count - len(config.sources) - 4)
-    else:
-        initial_workers = max(1, cpu_count - len(config.sources) - 3)
+    initial_workers = 1
 
-    if not config.multi_workers:
-        initial_workers = 1
+    if config.multi_workers:
+        initial_workers = max(1, cpu_count - len(config.sources) - 4)
 
     logging.info(f"Starting {initial_workers} workers.")
 
     tracker_ready_event = multiprocessing.Event()
 
-    def spawn_new_worker():
+    fps = min(source.fps for source in config.sources)
+
+    def start_new_worker():
         worker = PoseEstimatorWorker(
             config=config,
-            buffer_manager=pose_buffer_manager if pose_buffer_manager else frame_buffer_manager,
-            result_queue=result_queue,
+            input_queue=input_queue,
+            output_queue=output_queue,
             tracker_ready_event=tracker_ready_event,
         )
         worker.start()
         return worker
 
-    workers = [spawn_new_worker() for _ in range(initial_workers)]
+    workers = [start_new_worker() for _ in range(initial_workers)]
 
-    result_processor = ResultQueueProcessor(
+    result_processor = OutputQueueProcessor(
         config=config,
-        result_queue=result_queue,
-        frame_buffer_manager=frame_buffer_manager,
-        pose_buffer_manager=pose_buffer_manager,
+        output_queue=output_queue,
+        buffer_manager=buffer_manager,
+        fps=fps,
     )
     result_processor.start()
 
-    if config.combined_frames:
-        frame_processor = FrameQueueProcessor(
-            config=config,
-            frame_buffer_manager=frame_buffer_manager,
-            pose_buffer_manager=pose_buffer_manager,
-        )
-        frame_processor.start()
+    frame_processor = InputQueueProcessor(
+        config=config,
+        input_queue=input_queue,
+        buffer_manager=buffer_manager,
+    )
+    frame_processor.start()
 
-    # Start capture coordinator
     capture_coordinator = CaptureCoordinator(
         config=config,
-        available_frame_buffers=frame_buffer_manager.available_buffers,
-        tracker_ready_event=tracker_ready_event
+        buffer_manager=buffer_manager,
+        tracker_ready_event=tracker_ready_event,
+        fps=fps,
     )
     capture_coordinator.start()
 
@@ -642,11 +564,8 @@ def estimate_pose_all(config):
         source.progress_bar.position = bar_pos
         bar_pos += 1
 
-    frame_buffer_manager.progress_bar.position = bar_pos
+    buffer_manager.progress_bar.position = bar_pos
     bar_pos += 1
-    if pose_buffer_manager:
-        pose_buffer_manager.progress_bar.position = bar_pos
-        bar_pos += 1
 
     if config.multi_workers:
         worker_bar = tqdm(
@@ -672,7 +591,7 @@ def estimate_pose_all(config):
                 if ended_delta > 0:
                     for _ in range(ended_delta):
                         logging.info("Spawning a new PoseEstimatorWorker.")
-                        new_w = spawn_new_worker()
+                        new_w = start_new_worker()
                         workers.append(new_w)
                         worker_bar.total = len(workers)
                     previous_ended_count = current_ended_count
@@ -710,9 +629,7 @@ def estimate_pose_all(config):
                 w.terminate()
 
         # Free shared memory
-        frame_buffer_manager.cleanup()
-        if pose_buffer_manager:
-            pose_buffer_manager.cleanup()
+        buffer_manager.cleanup()
 
         if config.combined_frames:
             frame_processor.stop()
@@ -805,3 +722,98 @@ def save_keypoints_to_openpose(json_file_path, all_keypoints, all_scores):
     # Save JSON output for each frame
     with open(json_file_path, 'w') as outfile:
         json.dump(json_output, outfile)
+
+
+def save_keypoints_to_deeplabcut(csv_file_path, all_keypoints, all_scores, timestamp):
+    """
+    Append keypoints and scores to a CSV file in the DeepLabCut format.
+    This function supports dynamically adding new persons if more are detected over time.
+    The CSV header is a MultiIndex for keypoint columns with a final timestamp column.
+    
+    INPUTS:
+    - csv_file_path: path to the CSV file (accumulated over time)
+    - all_keypoints: list of detected keypoints for each person (each person is a list of keypoints)
+    - all_scores: list of confidence scores for each keypoint for each person
+    - timestamp: timestamp of the frame (appended as the last column)
+    """
+    # Determine current detection dimensions
+    new_num_persons = len(all_keypoints)  # may be 0 if no detections
+    new_num_keypoints = len(all_keypoints[0]) if new_num_persons > 0 else 0
+
+    # Helper: Build a MultiIndex header given max persons and keypoints per person.
+    def build_multiindex(max_persons, num_keypoints):
+        cols = []
+        # Create keypoint columns for each person
+        for person_idx in range(1, max_persons+1):
+            for kp_idx in range(num_keypoints):
+                for coord in ["x", "y", "likelihood"]:
+                    cols.append(("deeplabcut", f"person_{person_idx}", f"part_{kp_idx}", coord))
+        # Append the timestamp column at the end.
+        cols.append(("timestamp", "", "", ""))
+        return pd.MultiIndex.from_tuples(cols, names=["scorer", "individual", "bodypart", "coord"])
+
+    # If the CSV file exists, read its header to determine the current dimensions.
+    if os.path.exists(csv_file_path):
+        try:
+            # Read existing CSV with a 4-level header.
+            existing_df = pd.read_csv(csv_file_path, header=[0,1,2,3])
+            existing_persons = set()
+            existing_keyparts = set()
+            for col in existing_df.columns:
+                if col[0] != "timestamp":
+                    existing_persons.add(col[1])
+                    existing_keyparts.add(col[2])
+            if existing_persons:
+                current_max_persons = max([int(p.split('_')[1]) for p in existing_persons])
+            else:
+                current_max_persons = 0
+            if existing_keyparts:
+                # Assumes keypoint parts are named as "part_0", "part_1", etc.
+                current_num_keypoints = max([int(part.split('_')[1]) for part in existing_keyparts]) + 1
+            else:
+                current_num_keypoints = 0
+        except Exception:
+            current_max_persons = 0
+            current_num_keypoints = 0
+    else:
+        current_max_persons = 0
+        current_num_keypoints = 0
+
+    # Determine updated dimensions: use the maximum of existing and current detection.
+    max_persons = max(current_max_persons, new_num_persons)
+    # For keypoints, if current detection provides any, use that; otherwise fall back on existing.
+    num_keypoints = new_num_keypoints if new_num_keypoints > 0 else current_num_keypoints
+
+    # Build the new header.
+    new_header = build_multiindex(max_persons, num_keypoints)
+
+    # If the file exists and the header dimensions have increased, update the entire CSV.
+    if os.path.exists(csv_file_path) and (max_persons > current_max_persons or num_keypoints > current_num_keypoints):
+        df_existing = pd.read_csv(csv_file_path, header=[0,1,2,3])
+        # Reindex to add new columns (filling with NaN).
+        df_existing = df_existing.reindex(columns=new_header)
+        df_existing.to_csv(csv_file_path, index=False)
+
+    # Build a new row that matches the header.
+    # For each person from 1 to max_persons, use detection data if available; otherwise fill with NaN.
+    row_data = []
+    for person_idx in range(1, max_persons+1):
+        if person_idx <= new_num_persons:
+            keypoints_person = all_keypoints[person_idx - 1]
+            scores_person = all_scores[person_idx - 1]
+            for kp_idx in range(num_keypoints):
+                if kp_idx < len(keypoints_person):
+                    kp = keypoints_person[kp_idx]
+                    score = scores_person[kp_idx]
+                    row_data.extend([kp[0].item(), kp[1].item(), score.item()])
+                else:
+                    row_data.extend([float('nan'), float('nan'), float('nan')])
+        else:
+            for kp_idx in range(num_keypoints):
+                row_data.extend([float('nan'), float('nan'), float('nan')])
+    # Append the timestamp at the end.
+    row_data.append(timestamp)
+
+    # Create a DataFrame for the new row and append it.
+    new_row_df = pd.DataFrame([row_data], columns=new_header)
+    new_row_df.to_csv(csv_file_path, mode='a', header=not os.path.exists(csv_file_path), index=False)

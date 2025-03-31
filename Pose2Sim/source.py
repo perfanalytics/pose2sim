@@ -23,6 +23,7 @@ from tqdm import tqdm
 from datetime import datetime, timezone, timedelta
 from Pose2Sim.common import natural_sort_key
 from dataclasses import dataclass
+from multiprocessing import shared_memory
 
 
 @dataclass
@@ -30,7 +31,7 @@ class FrameData:
     source: dict
     timestamp: float
     idx: int
-    buffer_name: str = None
+    buffer: shared_memory.SharedMemory = None
     shape: tuple = None
     dtype: str = None
     placeholder: bool = False
@@ -66,11 +67,13 @@ class BaseSource(abc.ABC):
         self.desired_height = 0
 
         self.command_queue = multiprocessing.Queue()
-        self.frame_data = {}
+        self.frame_queue = multiprocessing.Queue()
 
         self.scale = 1
 
         self.create_output_folders()
+
+        self.capture_ready_event = multiprocessing.Event()
 
     def start_in_process(self):
         self.init_capture()
@@ -79,6 +82,7 @@ class BaseSource(abc.ABC):
         self.process.start()
 
     def _capture_loop(self):
+        self.capture_ready_event.set()
         while not self.ended:
 
             frame, frame_data = self.read()
@@ -94,18 +98,18 @@ class BaseSource(abc.ABC):
 
             if isinstance(cmd, tuple):
                 if cmd[0] == "CAPTURE_FRAME":
-                    frame_data.buffer_name = cmd[1]
+                    shm = cmd[1]
 
                     if frame is None:
                         frame_data.placeholder = True
                     else:
-                        shm = self.frame_buffers[frame_data.buffer_name]
                         frame_data.shape = frame.shape
                         frame_data.dtype = frame.dtype.str
+                        frame_data.buffer = shm
                         np_frame = np.ndarray(frame_data.shape, dtype=frame_data.dtype, buffer=shm.buf)
                         np_frame[:] = frame
 
-                    self.frame_data = frame_data
+                    self.frame_queue.put(frame_data)
 
                 elif cmd[0] == "STOP_CAPTURE":
                     self.stop()
@@ -171,6 +175,16 @@ class BaseSource(abc.ABC):
         if self.config.save_files[1]:
             self.output_video_path = os.path.join(self.config.pose_dir, f"{output_dir_name}_pose.avi")
 
+    def init_output_video_writer(self, fps):
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        self.video_writer = cv2.VideoWriter(
+            self.output_video_path,
+            fourcc,
+            fps,
+            (self.width, self.height)
+        )
+
     @abc.abstractmethod
     def frame_rate(self):
         pass
@@ -203,7 +217,6 @@ class WebcamSource(BaseSource):
         self.backend = data.get("backend", None)
         self.capture_codec = data.get("capture_codec")
         self.record_codec = data.get("record_codec", None)
-        self.ready = False
         self.readed = 0
 
         self.progress_bar = tqdm(
@@ -304,29 +317,31 @@ class WebcamSource(BaseSource):
             self.fps = self.config.frame_rate
 
     def dimensions(self, cap):
-        self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        #TODO: Si on enregistre la vidéo il ne faut pas au préalable la redimensionner
+        self.native_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.native_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        self.scale = min(self.desired_width / self.width, self.desired_height / self.height)
+        self.scale = min(self.desired_width / self.native_width, self.desired_height / self.native_height)
 
-        if self.scale != 1:
-            target_width = int(self.width * self.scale)
-            target_height = int(self.height * self.scale)
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, target_width)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, target_height)
-            self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.target_width = int(self.native_width * self.scale)
+        self.target_height = int(self.native_height * self.scale)
+
+        if self.scale != 1 and self.config.webcam_recording:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.target_width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.target_height)
+            self.native_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.native_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
         if self.rotation % 90 != 0:
             logging.error(f"[{self.name}] Rotation must be multiple of 90.")
             raise ValueError(f"[{self.name}] Rotation must be multiple of 90.")
         if (self.rotation % 180) == 90:
-            self.width, self.height = self.height, self.width
+            self.target_width, self.target_height = self.target_height, self.target_width
 
-        self.x_offset = self.x_offset + ((self.desired_width - self.width) // 2)
-        self.y_offset = self.y_offset + ((self.desired_height - self.width) // 2)
+        self.x_offset = self.x_offset + ((self.desired_width - self.target_width) // 2)
+        self.y_offset = self.y_offset + ((self.desired_height - self.target_height) // 2)
 
-        logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.width}x{self.height}")
+        logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.target_width}x{self.target_height}")
 
     def extract_frames(self, calib_type):
         folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
