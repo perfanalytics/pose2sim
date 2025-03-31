@@ -1057,10 +1057,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 
 **Acknowledgements:**
 - Supervised my PhD: [@lreveret](https://github.com/lreveret) (INRIA, Université Grenoble Alpes), and [@mdomalai](https://github.com/mdomalai) (Université de Poitiers).
-- Provided the Demo data: [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
-- Tested the code and provided feedback: [@simonozan](https://github.com/simonozan), [@daeyongyang](https://github.com/daeyongyang), [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals)
-- Submitted various accepted pull requests: [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals), [@peterlololsss](https://github.com/peterlololsss)
-- Provided a code snippet for Optitrack calibration: [@claraaudap](https://github.com/claraaudap) (Université Bretagne Sud).
-- Issued MPP2SOS, a (non-free) Blender extension based on Pose2Sim: [@carlosedubarreto](https://github.com/carlosedubarreto)
-
+- Post-doc at the [University of Bath (UK)](https://www.bath.ac.uk/) and engineer at [ForceTeck](https://forceteck.com/).
+- Demo data from [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
+- Thanks to [all the contributors](https://github.com/perfanalytics/pose2sim/graphs/contributors), past and to come! Thanks to everyone who gave feedback and contributed to making this software better.
 
