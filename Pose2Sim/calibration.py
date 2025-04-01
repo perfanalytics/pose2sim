@@ -971,7 +971,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
         If right click, last point is removed
         '''
         
-        global imgp_confirmed, objp_confirmed, objp_confirmed_notok, scat, ax_3d, fig_3d, events, count, xydata
+        global imgp_confirmed, objp_confirmed, objp_confirmed_notok, events, count, xydata
         
         # Left click: Add clicked point to imgp_confirmed
         # Display it on image and on 3D plot
