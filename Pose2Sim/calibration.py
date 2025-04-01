@@ -550,7 +550,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
         Left click to add a point, 'H' to indicate it is not visible, right click to remove the last point.
         '''
 
-        global imgp_confirmed, objp_confirmed, objp_confirmed_notok, scat, ax_3d, fig_3d, events, count
+        global imgp_confirmed, objp_confirmed, objp_confirmed_notok, events, count
         
         if event.key == 'y':
             # If 'y', close all
