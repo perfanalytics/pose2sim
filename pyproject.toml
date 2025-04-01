@@ -1,3 +1,81 @@
-[build-system]
-requires = ["setuptools >= 42", "wheel"] # PEP 508 specs
-build-backend = "setuptools.build_meta"
+[project]
+name = "pose2sim"
+version = "0.10.16"
+authors = [
+    {name = "David Pagnon", email = "contact@david-pagnon.com"},
+]
+description = "Markerless kinematics with any cameras — From 2D Pose estimation to 3D OpenSim motion"
+readme = "README.md"
+requires-python = ">=3.9"
+keywords = ["markerless", "kinematics", "OpenPose", "OpenSim", "3D human pose", "biomechanics", "mocap", "blender", "motion capture"]
+license = {text = "BSD-3-Clause License"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+]
+urls = {Homepage = "https://github.com/perfanalytics/pose2sim", "Bug Tracker" = "https://github.com/perfanalytics/pose2sim/issues"}
+dependencies = [
+    "toml",
+    "numpy>=1.19",
+    "lxml==4.9.4",
+    "matplotlib",
+    "mpl_interactions",
+    "PyQt5",
+    "tqdm",
+    "anytree",
+    "pandas>=1.5",
+    "scipy",
+    "statsmodels",
+    "filterpy",
+    "ipython",
+    "c3d",
+    "tensorflow",
+    "rtmlib",
+    "openvino",
+    "opencv-python",
+    "deep-sort-realtime",
+]
+
+[tool.setuptools]
+packages = {find = {}}
+
+[tool.setuptools.package-data]
+"*" = ["OpenSim_Setup/**", "MarkerAugmenter/**", "Demo_SinglePerson/**", "Demo_SinglePerson/**/.*", "Demo_SinglePerson/**/**/.*", "Demo_SinglePerson/**/**/**/.*", "Demo_MultiPerson/**", "Demo_MultiPerson/**/.*", "Demo_Batch/**", "Demo_Batch/**/.*", "Demo_Batch/**/**/.*"]
+
+[project.scripts]
+AlphaPose_to_OpenPose = "Pose2Sim.Utilities.AlphaPose_to_OpenPose:main"
+Blazepose_runsave = "Pose2Sim.Utilities.Blazepose_runsave:main"
+bodykin_from_mot_osim = "Pose2Sim.Utilities.bodykin_from_mot_osim:main"
+c3d_to_trc = "Pose2Sim.Utilities.c3d_to_trc:main"
+calib_easymocap_to_toml = "Pose2Sim.Utilities.calib_easymocap_to_toml:main"
+calib_from_checkerboard = "Pose2Sim.Utilities.calib_from_checkerboard:main"
+calib_qca_to_toml = "Pose2Sim.Utilities.calib_qca_to_toml:main"
+calib_toml_to_easymocap = "Pose2Sim.Utilities.calib_toml_to_easymocap:main"
+calib_toml_to_opencap = "Pose2Sim.Utilities.calib_toml_to_opencap:main"
+calib_toml_to_qca = "Pose2Sim.Utilities.calib_toml_to_qca:main"
+DLC_to_OpenPose = "Pose2Sim.Utilities.DLC_to_OpenPose:main"
+json_display_with_img = "Pose2Sim.Utilities.json_display_with_img:main"
+json_display_without_img = "Pose2Sim.Utilities.json_display_without_img:main"
+MMPose_to_OpenPose = "Pose2Sim.Utilities.MMPose_to_OpenPose:main"
+reproj_from_trc_calib = "Pose2Sim.Utilities.reproj_from_trc_calib:main"
+trc_combine = "Pose2Sim.Utilities.trc_combine:main"
+trc_desample = "Pose2Sim.Utilities.trc_desample:main"
+trc_filter = "Pose2Sim.Utilities.trc_filter:main"
+trc_from_easymocap = "Pose2Sim.Utilities.trc_from_easymocap:main"
+trc_from_mot_osim = "Pose2Sim.Utilities.trc_from_mot_osim:main"
+trc_gaitevents = "Pose2Sim.Utilities.trc_gaitevents:main"
+trc_plot = "Pose2Sim.Utilities.trc_plot:main"
+trc_to_c3d = "Pose2Sim.Utilities.trc_to_c3d:main"
+trc_Zup_to_Yup = "Pose2Sim.Utilities.trc_Zup_to_Yup:main"
+
+tests_pose2sim = "Pose2Sim.Utilities.tests:main"
