@@ -540,7 +540,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     - imgp_confirmed: image points that have been correctly identified. array of [[2d corner coordinates]]
     - only if objp!=[]: objp_confirmed: array of [3d corner coordinates]
     '''
-    global old_image_path, scat, ax_3d, fig_3d
+    global old_image_path
     old_image_path = img_path
                                  
     def on_key(event):
