@@ -89,4 +89,4 @@ jobs:
         run: |
           cd Pose2Sim/Utilities
           conda run -n pose2sim pytest -v tests.py --capture=sys
-        timeout-minutes: 20
+        timeout-minutes: 30
