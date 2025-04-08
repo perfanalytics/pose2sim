@@ -119,6 +119,7 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("pose").update({"display_detection":False})
         config_dict.get("pose").update({"backend":'openvino'})
         config_dict.get("pose").update({"device":'cpu'})
+        config_dict.get("synchronization").update({"synchronization_gui":False})
         config_dict.get("synchronization").update({"display_sync_plots":False})
         config_dict.get("filtering").update({"display_figures":False})
 
@@ -161,6 +162,7 @@ class TestWorkflow(unittest.TestCase):
                                                 'pose_input_size':[640, 640]}"""})
         config_dict.get("pose").update({"display_detection":False})
         config_dict.get("pose").update({"save_video":'none'})
+        config_dict.get("synchronization").update({"synchronization_gui":False})
         config_dict.get("synchronization").update({"display_sync_plots":False})
         config_dict.get("filtering").update({"display_figures":False})
 
