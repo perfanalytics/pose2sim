@@ -75,10 +75,12 @@ class BaseSource(abc.ABC):
 
         self.capture_ready_event = multiprocessing.Event()
 
+        self.video_writer = None
+
     def start_in_process(self):
         self.init_capture()
 
-        self.process = multiprocessing.Process(target=self._capture_loop)
+        self.process = multiprocessing.Process(target=self._capture_loop, daemon=True)
         self.process.start()
 
     def _capture_loop(self):
@@ -164,8 +166,8 @@ class BaseSource(abc.ABC):
 
         else:
             output_dir_name = self.name
-            self.json_output_dir = os.path.join(self.config.pose_dir, f"{output_dir_name}_json")
-            os.makedirs(self.json_output_dir, exist_ok=True)
+            self.output_dir = os.path.join(self.config.pose_dir, f"{output_dir_name}_output")
+            os.makedirs(self.output_dir, exist_ok=True)
 
         self.img_output_dir = None
         if self.config.save_files[0]:
@@ -175,14 +177,13 @@ class BaseSource(abc.ABC):
         if self.config.save_files[1]:
             self.output_video_path = os.path.join(self.config.pose_dir, f"{output_dir_name}_pose.avi")
 
-    def init_output_video_writer(self, fps):
-
+    def intit_video_writer(self):
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         self.video_writer = cv2.VideoWriter(
             self.output_video_path,
             fourcc,
-            fps,
-            (self.width, self.height)
+            self.config.fps,
+            (self.desired_width, self.desired_height)
         )
 
     @abc.abstractmethod
@@ -261,7 +262,7 @@ class WebcamSource(BaseSource):
 
         if self.config.webcam_recording:
             record_fourcc = cv2.VideoWriter_fourcc(*self.record_codec)
-            self.raw_writer = cv2.VideoWriter(self.output_video_path, record_fourcc, self.fps, (self.width, self.height))
+            self.raw_writer = cv2.VideoWriter(self.output_video_path, record_fourcc, self.fps, (self.native_width, self.native_height))
 
         csvwriter = csv.writer(self.csv_file)
         return (cap, csvwriter)
@@ -293,7 +294,7 @@ class WebcamSource(BaseSource):
             frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
         if self.scale != 1:
-            frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
+            frame = cv2.resize(frame, (self.desired_width, self.desired_height), interpolation=cv2.INTER_AREA)
 
         if self.config.webcam_recording:
             self.readed += 1
@@ -317,7 +318,6 @@ class WebcamSource(BaseSource):
             self.fps = self.config.frame_rate
 
     def dimensions(self, cap):
-        #TODO: Si on enregistre la vidéo il ne faut pas au préalable la redimensionner
         self.native_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.native_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
@@ -331,6 +331,7 @@ class WebcamSource(BaseSource):
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.target_height)
             self.native_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             self.native_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.scale = min(self.desired_width / self.native_width, self.desired_height / self.native_height)
 
         if self.rotation % 90 != 0:
             logging.error(f"[{self.name}] Rotation must be multiple of 90.")
@@ -345,7 +346,7 @@ class WebcamSource(BaseSource):
 
     def extract_frames(self, calib_type):
         folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
-        if folder is "live":
+        if folder == "live":
             #TODO: Extract frames from webcam
             logging.error(f"[{self.name}] Live calibration not already implemented.")
             raise ValueError(f"[{self.name}] Live calibration not already implemented.")
@@ -419,7 +420,8 @@ class WebcamSource(BaseSource):
             f"\033[31m{self.name} (Ended)\033[0m : {self.processed}/{self.idx}"
         )
         self.progress_bar.refresh()
-
+        if self.video_writer:
+            self.video_writer.release()
 
 class VideoSource(BaseSource):
     def __init__(self, subconfig, data, pose_model):
@@ -494,34 +496,35 @@ class VideoSource(BaseSource):
             self.fps = self.config.frame_rate
 
     def dimensions(self, cap):
-        self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.native_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.native_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        self.scale = min(self.desired_width / self.width, self.desired_height / self.height)
+        self.scale = min(self.desired_width / self.native_width, self.desired_height / self.native_height)
+
+        self.target_width = int(self.native_width * self.scale)
+        self.target_height = int(self.native_height * self.scale)
 
         if self.scale != 1:
-            target_width = int(self.width * self.scale)
-            target_height = int(self.height * self.scale)
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, target_width)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, target_height)
-            self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.target_width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.target_height)
+            self.native_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.native_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.scale = min(self.desired_width / self.native_width, self.desired_height / self.native_height)
 
         if self.rotation % 90 != 0:
             logging.error(f"[{self.name}] Rotation must be multiple of 90.")
             raise ValueError(f"[{self.name}] Rotation must be multiple of 90.")
         if (self.rotation % 180) == 90:
-            self.width, self.height = self.height, self.width
+            self.target_width, self.target_height = self.target_height, self.target_width
 
-        self.x_offset = self.x_offset + ((self.desired_width - self.width) // 2)
-        self.y_offset = self.y_offset + ((self.desired_height - self.width) // 2)
+        self.x_offset = self.x_offset + ((self.desired_width - self.target_width) // 2)
+        self.y_offset = self.y_offset + ((self.desired_height - self.target_height) // 2)
 
-        logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.width}x{self.height}")
-
+        logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.target_width}x{self.target_height}")
 
     def extract_frames(self, calib_type):
         folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
-        if folder is "live":
+        if folder == "live":
             logging.error(f"[{self.name}] Live calibration not available from a video source.")
             raise ValueError(f"[{self.name}] Live calibration not available from a video source.")
         files = self.intrinsics_files if calib_type == 'intrinsic' else self.extrinsics_files
@@ -579,6 +582,8 @@ class VideoSource(BaseSource):
         logging.info(f"[{self.name}] Stopped.")
         self.progress_bar.set_description_str(f"\033[31m{self.name} (Ended)\033[0m")
         self.progress_bar.refresh()
+        if self.video_writer:
+            self.video_writer.release()
 
 
 class ImageSource(BaseSource):
@@ -662,27 +667,27 @@ class ImageSource(BaseSource):
         if img is None:
             logging.error(f"[{self.name}] Unable to read the image from {self.image_files[0]}.")
             raise ValueError(f"[{self.name}] Unable to read the image from {self.image_files[0]}.")
-        self.height, self.width = img.shape[:2]
+        self.native_height, self.native_width = img.shape[:2]
+
+        self.scale = min(self.desired_width / self.native_width, self.desired_height / self.native_height)
+
+        self.target_width = int(self.native_width * self.scale)
+        self.target_height = int(self.native_height * self.scale)
 
         if self.rotation % 90 != 0:
             logging.error(f"[{self.name}] Rotation must be multiple of 90.")
             raise ValueError(f"[{self.name}] Rotation must be multiple of 90.")
         if (self.rotation % 180) == 90:
-            self.width, self.height = self.height, self.width
+            self.target_width, self.target_height = self.target_height, self.target_width
 
-        self.scale = min(self.desired_width / self.width, self.desired_height / self.height)
-        self.width = int(self.width * self.scale)
-        self.height = int(self.height * self.scale)
+        self.x_offset = self.x_offset + ((self.desired_width - self.target_width) // 2)
+        self.y_offset = self.y_offset + ((self.desired_height - self.target_height) // 2)
 
-        self.x_offset = self.x_offset + ((self.desired_width - self.width) // 2)
-        self.y_offset = self.y_offset + ((self.desired_height - self.width) // 2)
-
-        logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.width}x{self.height}")
-
+        logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.target_width}x{self.target_height}")
 
     def extract_frames(self, calib_type):
         files = self.intrinsics_files if calib_type == 'intrinsic' else self.extrinsics_files
-        if folder is "live":
+        if folder == "live":
             logging.error(f"[{self.name}] Live calibration not available from an image source.")
             raise ValueError(f"[{self.name}] Live calibration not available from an image source.")
         folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
@@ -740,3 +745,5 @@ class ImageSource(BaseSource):
         logging.info(f"[{self.name}] Stopped.")
         self.progress_bar.set_description_str(f"\033[31m{self.name} (Ended)\033[0m")
         self.progress_bar.refresh()
+        if self.video_writer:
+            self.video_writer.release()

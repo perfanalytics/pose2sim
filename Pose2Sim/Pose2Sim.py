@@ -112,11 +112,12 @@ class Pose2SimPipeline:
         logging.info(f'\nCalibration took {elapsed:.2f} seconds.\n')
 
     def poseEstimation(self):
-        from Pose2Sim.poseEstimation import estimate_pose_all
+        from Pose2Sim.poseEstimation import PoseEstimationSession
         for sub_config in self.config.sub_configs:
             self._log_step_header("Pose estimation", sub_config)
             start = time.time()
-            estimate_pose_all(sub_config)
+            with PoseEstimationSession(sub_config) as session:
+                session.start()
             elapsed = time.time() - start
             logging.info(f'\nPose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 

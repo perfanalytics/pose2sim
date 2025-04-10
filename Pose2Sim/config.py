@@ -48,6 +48,8 @@ class SubConfig:
         self.pose_model = PoseModel(self, self.pose.get("pose_model"))
         self.sources = self.sources()
 
+        self.fps = None
+
     def subjects(self):
         """
         Construit une liste d'objets Subject à partir de la config TOML.
@@ -90,6 +92,10 @@ class SubConfig:
 
             sources_list.append(source_obj)
         return sources_list
+    
+    def set_fps(self, value):
+        self.fps = value
+        logging.info(f'[Pose estimation] capture frame rate set to: {self.fps}.')
 
     @property
     def calibration(self):
@@ -312,7 +318,7 @@ class SubConfig:
                 if calib_type == "convert":
                     source.intrinsics_files = convert_path
                 elif calib_type == "calculate":
-                    if source.calib_intrinsics is not "live":
+                    if source.calib_intrinsics != "live":
                         source.intrinsics_files = source.get_calib_files(source.calib_intrinsics, self.intrinsics_extension, "intrinsics")
 
             if not overwrite_extrinsics and len(source.R) != 0 and len(source.T) != 0:
@@ -802,8 +808,9 @@ class SubConfig:
         else:
             frame_size = self.pose_model.det_input_size
             logging.info(f"Frame input size: {frame_size[0]}x{frame_size[1]}")
-            source.desired_width = frame_size[0]
-            source.desired_height = frame_size[1]
+            for source in self.sources:
+                source.desired_width = frame_size[0]
+                source.desired_height = frame_size[1]
 
         return (mosaic_rows, mosaic_cols)
     

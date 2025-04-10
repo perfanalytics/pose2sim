@@ -91,20 +91,7 @@ class BufferManager:
             self.buffers[buf_uuid] = shm
             self.available_buffers.put(buf_uuid)
 
-        self.progress_bar = tqdm(
-            total=self.buffers_count,
-            desc="Buffers Free",
-            position=0,
-            leave=True,
-            colour='blue'
-        )
-
-    def update_progress_bar(self):
-        self.progress_bar.n = self.available_buffers.qsize()
-        self.progress_bar.refresh()
-
     def cleanup(self):
-        self.progress_bar.close()
         for shm in self.buffers:
             shm.close()
             shm.unlink()
@@ -112,7 +99,7 @@ class BufferManager:
 
 class PoseEstimatorWorker(multiprocessing.Process):
     def __init__(self, config, input_queue, output_queue, tracker_ready_event):
-        super().__init__()
+        super().__init__(daemon=True)
         self.config = config
         self.input_queue = input_queue
         self.output_queue = output_queue
@@ -210,79 +197,6 @@ class BaseSynchronizer:
                     frames_list.append(frame_data)
                 return frames_list
 
-    def build_mosaic(self, frames_list):
-        mosaic = np.zeros(
-            (self.config.pose_model.det_input_size[0], self.config.pose_model.det_input_size[1], 3),
-            dtype=np.uint8
-        )
-        timestamps = []
-        idx = None
-
-        for frame_data in frames_list:
-            if not frame_data.placeholder:
-                timestamps.append(frame_data.timestamp)
-                idx = frame_data.idx
-                frame = np.ndarray(
-                    frame_data.shape,
-                    dtype=np.dtype(frame_data.dtype),
-                    buffer=frame_data.buffer.buf,
-                )
-                self.buffer_manager.available_buffers.put(frame_data.buffer.name)
-
-                source = frame_data.source
-                mosaic[source.y_offset:source.y_offset + source.height,
-                    source.x_offset:source.x_offset + source.width] = frame
-
-        avg_timestamp = np.mean(timestamps)
-        mosaic_data = FrameData(None, avg_timestamp, idx)
-
-        return mosaic, mosaic_data
-
-    def read_mosaic(self, mosaic_np, subinfo, keypoints, scores):
-        frames = {}
-        recovered_keypoints = {}
-        recovered_scores = {}
-
-        for s in self.sources:
-            sid = s['id']
-            if sid not in subinfo:
-                continue
-            info = subinfo[sid]
-            x_off = info["x_offset"]
-            y_off = info["y_offset"]
-            sc_w = info["scaled_w"]
-            sc_h = info["scaled_h"]
-            orig_w = info["orig_w"]
-            orig_h = info["orig_h"]
-
-            frame_region = mosaic_np[y_off:y_off+sc_h, x_off:x_off+sc_w].copy()
-            frames[sid] = frame_region
-
-            rec_kpts = []
-            rec_scores = []
-            for p in range(len(keypoints)):
-                kp_person = keypoints[p]
-                sc_person = scores[p]
-
-                center_x = np.mean([x for (x, y) in kp_person])
-                center_y = np.mean([y for (x, y) in kp_person])
-
-                if x_off <= center_x <= x_off + sc_w and y_off <= center_y <= y_off + sc_h:
-                    local_kpts = []
-                    local_scores = []
-
-                    for (xk, yk), scv in zip(kp_person, sc_person):
-                        x_local = (xk - x_off) * (orig_w / float(sc_w))
-                        y_local = (yk - y_off) * (orig_h / float(sc_h))
-                        local_kpts.append([x_local, y_local])
-                        local_scores.append(scv)
-                    rec_kpts.append(np.array(local_kpts))
-                    rec_scores.append(np.array(local_scores))
-            recovered_keypoints[sid] = rec_kpts
-            recovered_scores[sid] = rec_scores
-
-        return frames, recovered_keypoints, recovered_scores
-
     def stop(self):
         self.ended = True
 
@@ -304,10 +218,33 @@ class InputQueueProcessor(multiprocessing.Process, BaseSynchronizer):
                     frame_data = source.frame_queue.get()
                     if frame_data.idx not in self.sync_data:
                         self.sync_data[frame_data.idx] = {}
-                    self.sync_data[frame_data.idx][source.name] = (frame_data)
+                    self.sync_data[frame_data.idx][frame_data.source.name] = frame_data
 
                 if frames_list := self.get_frames_list():
-                    mosaic, mosaic_data = self.build_mosaic(frames_list)
+                    mosaic = np.zeros(
+                        (self.config.pose_model.det_input_size[0], self.config.pose_model.det_input_size[1], 3),
+                        dtype=np.uint8
+                    )
+                    timestamps = []
+                    idx = None
+
+                    for frame_data in frames_list:
+                        if not frame_data.placeholder:
+                            timestamps.append(frame_data.timestamp)
+                            idx = frame_data.idx
+                            frame = np.ndarray(
+                                frame_data.shape,
+                                dtype=np.dtype(frame_data.dtype),
+                                buffer=frame_data.buffer.buf,
+                            )
+                            self.buffer_manager.available_buffers.put(frame_data.buffer.name)
+
+                            source = frame_data.source
+                            mosaic[source.y_offset:source.y_offset + source.height,
+                                source.x_offset:source.x_offset + source.width] = frame
+
+                    avg_timestamp = np.mean(timestamps)
+                    mosaic_data = FrameData(None, avg_timestamp, idx)
                     buffer = self.buffer_manager.available_buffers.get()
                     shm = self.buffer_manager.buffers[buffer]
                     mosaic_data.shape = mosaic.shape
@@ -323,70 +260,102 @@ class InputQueueProcessor(multiprocessing.Process, BaseSynchronizer):
 
 
 class OutputQueueProcessor(multiprocessing.Process, BaseSynchronizer):
-    def __init__(self, config, output_queue, buffer_manager, fps):
+    def __init__(self, config, output_queue, buffer_manager):
         multiprocessing.Process.__init__(self)
         BaseSynchronizer.__init__(self, config, buffer_manager)
         self.output_queue = output_queue
-        self.fps = fps
 
     def run(self):
-        self.init_video_writers()
+        if self.save_video and self.config.save_files[0]:
+            for source in self.config.sources:
+                source.intit_video_writer()
 
         while not self.ended:
             try:
-                result_item = self.output_queue.get_nowait()
-                self.process_result_item(result_item)
+                frame_data = self.output_queue.get()
+                self.process_result_item(frame_data)
             except queue.Empty:
                 time.sleep(0.005)
 
-        for vw in self.video_writers.values():
-            vw.release()
         cv2.destroyAllWindows()
 
-    def init_video_writers(self):
-        if self.save_video and self.source_outputs:
-            for source in self.config.sources:
-
-
-    def process_result_item(self, result_item):
-        buffer_name, timestamp, idx, frame_shape, frame_dtype, sid, is_placeholder, info, keypoints, scores = result_item
+    def process_result_item(self, frame_data):
         if self.combined_frames:
-            self.handle_combined_frames(buffer_name, frame_shape, frame_dtype, keypoints, scores, info, timestamp, idx)
+            self.handle_combined_frames(frame_data)
         else:
-            self.handle_individual_frames(buffer_name, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, timestamp, idx)
+            self.handle_individual_frames(frame_data)
 
-    def handle_combined_frames(self, buffer_name, frame_shape, frame_dtype, keypoints, scores, subinfo, timestamp, idx):
-        shm = self.pose_buffers[buffer_name]
-        mosaic = np.ndarray(frame_shape, dtype=frame_dtype, buffer=shm.buf)
+    def handle_combined_frames(self, mosaic_data):
+        mosaic = np.ndarray(
+            mosaic_data.shape,
+            dtype=np.dtype(mosaic_data.dtype),
+            buffer=mosaic_data.buffer.buf,
+        )
+        self.buffer_manager.available_buffers.put(mosaic_data.buffer.name)
 
         if self.save_images or self.save_video or self.display_detection:
-            mosaic = draw_skeleton(mosaic, keypoints, scores)
+            mosaic = draw_skeleton(mosaic, mosaic_data.keypoints, mosaic_data.scores)
             if self.display_detection:
                 self.show_mosaic(mosaic)
 
-        frames, recovered_keypoints, recovered_scores = self.read_mosaic(mosaic, subinfo, keypoints, scores)
-        self.available_pose_buffers.put(buffer_name)
+        for source in self.config.sources:
+            rec_kpts = []
+            rec_scores = []
 
-        for sid in frames:
-            trans_info = subinfo[sid].get("transform_info", None)
-            self.handle_output(sid, frames[sid], recovered_keypoints[sid], recovered_scores[sid], timestamp, idx, trans_info)
+            x0, y0 = source.x_offset, source.y_offset
+            x1, y1 = x0 + source.width, y0 + source.height
 
-    def handle_individual_frames(self, buffer_name, frame_shape, frame_dtype, sid, is_placeholder, keypoints, scores, timestamp, idx):
-        if idx not in self.sync_data:
-            self.sync_data[idx] = {}
-        self.sync_data[idx][sid] = (buffer_name, frame_shape, frame_dtype, keypoints, scores, is_placeholder, None)
-        frames_list = self.get_frames_list()
-        if frames_list:
-            annotated_frames = []
-            for (frame, sid, orig_w, orig_h, transform_info, *others) in frames_list:
-                if others[0] is not None:
-                    if self.save_images or self.save_video or self.display_detection:
-                        frame = draw_skeleton(frame, others[0], others[1])
-                    annotated_frames.append((frame, sid, orig_w, orig_h, transform_info))
-                    self.handle_output(sid, frame, others[0], others[1], timestamp, idx, transform_info)
+            for kp_person, sc_person in zip(mosaic_data.keypoints, mosaic_data.scores):
+                local_kpts = []
+                local_scores = []
 
+                for (xk, yk), scv in zip(kp_person, sc_person):
+                    if x0 <= xk <= x1 and y0 <= yk <= y1:
+                        local_kpts.append([xk - x0, yk - y0])
+                        local_scores.append(scv)
+
+                if local_kpts:
+                    rec_kpts.append(np.asarray(local_kpts, dtype=np.float32))
+                    rec_scores.append(np.asarray(local_scores, dtype=np.float32))
+
+            frame_data = FrameData(
+                source     = source,
+                timestamp  = mosaic_data.timestamp,
+                idx        = mosaic_data.idx,
+                keypoints  = rec_kpts,
+                scores     = rec_scores,
+            )
+
+            frame = mosaic[y0:y1, x0:x1]
+            self.handle_output(frame, frame_data)
+
+    def handle_individual_frames(self, frame_data):
+        if frame_data.idx not in self.sync_data:
+            self.sync_data[frame_data.idx] = {}
+        self.sync_data[frame_data.idx][frame_data.source.name] = frame_data
+        if frames_list := self.get_frames_list():
             if self.display_detection:
-                mosaic, _ = self.build_mosaic(annotated_frames)
+                mosaic = np.zeros(
+                    (self.config.pose_model.det_input_size[0], self.config.pose_model.det_input_size[1], 3),
+                    dtype=np.uint8
+                )
+            for frame_data in frames_list:
+                if not frame_data.placeholder:
+                    frame = np.ndarray(
+                        frame_data.shape,
+                        dtype=np.dtype(frame_data.dtype),
+                        buffer=frame_data.buffer.buf,
+                    )
+                    self.buffer_manager.available_buffers.put(frame_data.buffer.name)
+                    if self.config.save_files[0] or self.config.save_files[1] or self.config.display_detection:
+                        frame = draw_skeleton(frame, frame_data.keypoints, frame_data.scores)
+                    self.handle_output(frame, frame_data)
+                    if mosaic:
+                        source = frame_data.source
+                        mosaic[source.y_offset:source.y_offset + source.height,
+                            source.x_offset:source.x_offset + source.width] = frame
+
+            if mosaic:
                 self.show_mosaic(mosaic)
 
     def draw_skeleton(self, frame, keypoints, scores):
@@ -407,40 +376,32 @@ class OutputQueueProcessor(multiprocessing.Process, BaseSynchronizer):
             frame = draw_skel(frame, valid_X, valid_Y, self.pose_model)
             return frame
 
-    def show_mosaic(self, mosaic):   
-        desired_w, desired_h = 1280, 720
-        mosaic = transform(mosaic, desired_w, desired_h, False)[0]
+    def show_mosaic(self, mosaic):
         cv2.imshow("Display", mosaic)
         key = cv2.waitKey(1)
         if key in [ord('q'), 27]:
             logging.info("User closed display.")
             self.stop()
 
-    def handle_output(self, sid, frame, keypoints, scores, timestamp, idx, transform_info):
-        out_dirs = self.source_outputs[sid]
-        file_name = f"{out_dirs[0]}_{timestamp}_{idx:06d}"
+    def handle_output(self, frame, frame_data):
+        file_name = f"{frame_data.source.name}_{frame_data.timestamp}_{frame_data.idx:06d}"
 
-        # Save to json
-        if transform_info is not None:
-            keypoints = inverse_transform_keypoints(keypoints, transform_info)
         if 'openpose' in self.output_format:
-            json_path = os.path.join(out_dirs[2], f"{file_name}.json")
-            save_keypoints_to_openpose(json_path, keypoints, scores)
+            json_path = os.path.join(frame_data.source.output_dir, f"{file_name}.json")
+            save_keypoints_to_openpose(json_path, frame_data.keypoints, frame_data.scores)
         if self.save_images:
-            cv2.imwrite(os.path.join(out_dirs[1], f"{file_name}.jpg"), frame)
+            cv2.imwrite(os.path.join(frame_data.source.img_output_dir, f"{file_name}.jpg"), frame)
         if self.save_video:
-            if sid in self.video_writers:
-                self.video_writers[sid].write(frame)
+            frame_data.source.video_writer.write(frame)
 
 
 class CaptureCoordinator(multiprocessing.Process):
-    def __init__(self, config, buffer_manager, tracker_ready_event, fps):
+    def __init__(self, config, buffer_manager, tracker_ready_event):
         super().__init__()
         self.config = config
         self.buffer_manager = buffer_manager
         self.tracker_ready_event = tracker_ready_event
 
-        self.interval = 1.0 / fps
         self.ended = False
 
     def run(self):
@@ -449,6 +410,8 @@ class CaptureCoordinator(multiprocessing.Process):
         for source in self.config.sources:
             source.start_in_process()
             source.capture_ready_event.wait()
+        self.config.set_fps(min(source.fps for source in self.config.sources))
+        self.interval = 1.0 / self.config.fps
         while not self.ended:
             if all(source.ended for source in self.config.sources):
                 self.stop()
@@ -476,213 +439,154 @@ class CaptureCoordinator(multiprocessing.Process):
         for source in self.config.sources:
             self.source.command_queues.put(None)
 
+class PoseEstimationSession:
+    def __init__(self, config):
+        self.config = config
+        self.buffer_manager = BufferManager(config)
+        self.capture_coord = None
+        self.frame_proc = None
+        self.result_proc = None
+        self.workers = []
 
-## FUNCTIONS
-def estimate_pose_all(config):
-    '''
-    Estimate pose from webcams, video files, or a folder of images, and write the results to JSON files, videos, and/or images.
-    Results can optionally be displayed in real-time.
+    def __enter__(self):
+        self.start()
+        return self
 
-    Supported models: HALPE_26 (default, body and feet), COCO_133 (body, feet, hands), COCO_17 (body)
-    Supported modes: lightweight, balanced, performance (edit paths at rtmlib/tools/solutions if you need another detection or pose models)
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop()
 
-    Optionally gives consistent person ID across frames (slower but good for 2D analysis)
-    Optionally runs detection every n frames and in between tracks points (faster but less accurate).
+    def start(self):
+        self.config.check_pose_estimation()
+        self.config.get_mosaic_params()
 
-    If a valid CUDA installation is detected, uses the GPU with the ONNXRuntime backend. Otherwise, uses the CPU with the OpenVINO backend.
+        self._launch_processes()
 
-    INPUTS:
-    - videos or image folders from the video directory
-    - a Config.toml file
+        logging.info("PoseEstimationSession started.")
 
-    OUTPUTS:
-    - JSON files with the detected keypoints and confidence scores in the OpenPose format
-    - Optionally, videos and/or image files with the detected keypoints
-    '''
-    config.check_pose_estimation()
+    def _launch_processes(self):
 
-    config.get_mosaic_params()
-
-    logging.info(f"Model input size: {config.pose_model.det_input_size[0]}x{config.pose_model.det_input_size[1]}")
-
-    buffer_manager = BufferManager(config)
-
-    input_queue = multiprocessing.Queue()
-    output_queue = multiprocessing.Queue()
-
-    # Decide how many workers to start
-    cpu_count = multiprocessing.cpu_count()
-    initial_workers = 1
-
-    if config.multi_workers:
-        initial_workers = max(1, cpu_count - len(config.sources) - 4)
-
-    logging.info(f"Starting {initial_workers} workers.")
-
-    tracker_ready_event = multiprocessing.Event()
-
-    fps = min(source.fps for source in config.sources)
-
-    def start_new_worker():
-        worker = PoseEstimatorWorker(
-            config=config,
-            input_queue=input_queue,
-            output_queue=output_queue,
-            tracker_ready_event=tracker_ready_event,
+        tracker_ready = multiprocessing.Event()
+        self.capture_coord = CaptureCoordinator(
+            config=self.config,
+            buffer_manager=self.buffer_manager,
+            tracker_ready_event=tracker_ready,
         )
-        worker.start()
-        return worker
+        self.capture_coord.start()
 
-    workers = [start_new_worker() for _ in range(initial_workers)]
+        self.input_queue  = multiprocessing.Queue()
+        self.output_queue = multiprocessing.Queue()
 
-    result_processor = OutputQueueProcessor(
-        config=config,
-        output_queue=output_queue,
-        buffer_manager=buffer_manager,
-        fps=fps,
-    )
-    result_processor.start()
+        self.frame_proc = InputQueueProcessor(
+            config=self.config,
+            input_queue=self.input_queue,
+        )
+        self.result_proc = OutputQueueProcessor(
+            config=self.config,
+            output_queue=self.output_queue,
+        )
+        self.frame_proc.start()
+        self.result_proc.start()
 
-    frame_processor = InputQueueProcessor(
-        config=config,
-        input_queue=input_queue,
-        buffer_manager=buffer_manager,
-    )
-    frame_processor.start()
+        self._spawn_workers(tracker_ready)
 
-    capture_coordinator = CaptureCoordinator(
-        config=config,
-        buffer_manager=buffer_manager,
-        tracker_ready_event=tracker_ready_event,
-        fps=fps,
-    )
-    capture_coordinator.start()
+        self._init_progress_bars()
 
-    bar_pos = 0
+    def _spawn_workers(self, tracker_ready):
+        cpu = multiprocessing.cpu_count()
+        n_workers = max(1, cpu - len(self.config.sources) - 4)
+        logging.info(f"Starting {n_workers} workers.")
 
-    for source in config.sources:
-        source.progress_bar.position = bar_pos
-        bar_pos += 1
+        def new_worker():
+            w = PoseEstimatorWorker(
+                cfg_path=self.config,
+                input_queue=self.input_queue,
+                output_queue=self.output_queue,
+                tracker_ready_event=tracker_ready,
+            )
+            w.start()
+            return w
 
-    buffer_manager.progress_bar.position = bar_pos
-    bar_pos += 1
+        self.workers = [new_worker() for _ in range(n_workers)]
 
-    if config.multi_workers:
-        worker_bar = tqdm(
-            total=len(workers),
-            desc='Active Workers',
-            position=bar_pos,
-            leave=True,
-            colour='blue'
+    def _init_progress_bars(self):
+        self.bars = {}
+        bar_pos = 0
+        for src in self.config.sources:
+            src.progress_bar.position = bar_pos
+            bar_pos += 1
+
+        self.bars["buffers"] = tqdm(
+            total=self.buffer_manager.buffers_count,
+            desc="Buffers Free", position=bar_pos, leave=True
         )
         bar_pos += 1
 
-    previous_ended_count = 0
-    try:
-        while True:
-            alive_workers = sum(not worker.ended for worker in workers)
+        self.bars["workers"] = tqdm(
+            total=len(self.workers),
+            desc="Active Workers", position=bar_pos, leave=True
+        )
 
-            if config.multi_workers:
-                worker_bar.n = alive_workers
-                worker_bar.refresh()
+    def run(self):
+        try:
+            prev_ended = 0
+            while not self._stop_event.is_set():
+                # Maj barres
+                self.bars["buffers"].n = self.buffer_manager.available_buffers.qsize()
+                self.bars["buffers"].refresh()
 
-                current_ended_count = sum(1 for source in config.sources if source.ended)
-                ended_delta = current_ended_count - previous_ended_count
-                if ended_delta > 0:
-                    for _ in range(ended_delta):
-                        logging.info("Spawning a new PoseEstimatorWorker.")
-                        new_w = start_new_worker()
-                        workers.append(new_w)
-                        worker_bar.total = len(workers)
-                    previous_ended_count = current_ended_count
+                alive = sum(not w.ended for w in self.workers)
+                self.bars["workers"].n = alive
+                self.bars["workers"].refresh()
 
-            if alive_workers == 0:
-                break
+                if alive == 0:
+                    break
 
-            if cv2.waitKey(1) & 0xFF == ord(" "):
-                logging.info("Space bar pressed: stopping all sources.")
-                for source in config.sources:
-                    source.stop()
+                if cv2.waitKey(1) & 0xFF == ord(" "):
+                    logging.info("Space bar pressed: stopping sources.")
+                    for s in self.config.sources:
+                        s.stop()
 
-            time.sleep(0.05)
+                time.sleep(0.05)
 
-    except KeyboardInterrupt:
-        logging.info("User interrupted pose estimation.")
+        except (KeyboardInterrupt, SystemExit):
+            logging.info("User interrupted pose estimation.")
+        finally:
+            self.stop()
 
-    finally:
-        # Stop capture coordinator
-        capture_coordinator.stop()
-        capture_coordinator.join()
-        if capture_coordinator.is_alive():
-            capture_coordinator.terminate()
+    def stop(self):
+        if self._stop_event.is_set():
+            return
+        self._stop_event.set()
 
-        # Stop media sources
-        for source in config.sources:
-            source.stop()
-            source.progress_bar.close()
+        if self.capture_coord:
+            self.capture_coord.stop()
+            self.capture_coord.join(timeout=2)
 
-        # Stop workers
-        for w in workers:
+        for s in getattr(self.config, "sources", []):
+            s.stop()
+            if hasattr(s, "progress_bar"):
+                s.progress_bar.close()
+
+        for w in self.workers:
             w.join(timeout=2)
             if w.is_alive():
-                logging.warning(f"Forcibly terminating worker {w.pid}")
                 w.terminate()
 
-        # Free shared memory
-        buffer_manager.cleanup()
+        for p in (self.frame_proc, self.result_proc):
+            if p:
+                p.stop()
+                p.join(timeout=2)
+                if p.is_alive():
+                    p.terminate()
 
-        if config.combined_frames:
-            frame_processor.stop()
-            frame_processor.join(timeout=2)
-            if frame_processor.is_alive():
-                frame_processor.terminate()
-
-        result_processor.stop()
-        result_processor.join(timeout=2)
-        if result_processor.is_alive():
-            result_processor.terminate()
-
-        if config.multi_workers:
-            worker_bar.close()
-
-        if config.display_detection:
+        if self.buffer_manager:
+            self.buffer_manager.cleanup()
+        for b in self.bars.values():
+            b.close()
+        if self.config.display_detection:
             cv2.destroyAllWindows()
 
-
-def inverse_transform_keypoints(keypoints, transform_info):
-    desired_w, desired_h = transform_info['canvas_size']
-    scale = transform_info['scale']
-    x_offset = transform_info['x_offset']
-    y_offset = transform_info['y_offset']
-    rotation = transform_info['rotation']
-    rotated_size = transform_info['rotated_size']
-    new_keypoints = []
-    for person in keypoints:
-        new_person = []
-        for (x, y) in person:
-
-            y_bl = desired_h - y
-            x_bl = desired_w - x
-
-            X = (x_bl - x_offset) / scale
-            Y = (y_bl - y_offset) / scale
-
-            if rotation % 360 == 0:
-                orig_x, orig_y = X, Y
-            elif rotation % 360 == 90:
-                orig_x = rotated_size[0] - Y
-                orig_y = X
-            elif rotation % 360 == 180:
-                orig_x = rotated_size[0] - X
-                orig_y = rotated_size[1] - Y
-            elif rotation % 360 == 270:
-                orig_x = Y
-                orig_y = rotated_size[1] - X
-            else:
-                orig_x, orig_y = X, Y
-            new_person.append([orig_x, orig_y])
-        new_keypoints.append(np.array(new_person))
-    return new_keypoints
+        logging.info("PoseEstimationSession stopped.")
 
 
 def save_keypoints_to_openpose(json_file_path, all_keypoints, all_scores):
