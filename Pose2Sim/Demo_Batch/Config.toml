@@ -92,7 +92,7 @@ output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a lis
 
 
 [synchronization]
-synchronization_gui = false # true or false. If true, a player will popup and let the user determine synchronization parameters. If false, it will be done automatically based on the parameters below
+synchronization_gui = true # true or false. If true, a player will popup and let the user determine synchronization parameters. If false, it will be done automatically based on the parameters below
 display_sync_plots = false # true or false (lowercase)
 keypoints_to_consider = 'all' # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
