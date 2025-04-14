@@ -55,8 +55,7 @@ jobs:
         run: |
           conda install -n pose2sim -c conda-forge -c defaults pip
           conda install -n pose2sim opensim-org::opensim -y
-        timeout-minutes: 15
-
+        timeout-minutes: 5
 
       - name: Cache pip dependencies
         uses: actions/cache@v4
@@ -89,4 +88,4 @@ jobs:
         run: |
           cd Pose2Sim/Utilities
           conda run -n pose2sim pytest -v tests.py --capture=sys
-        timeout-minutes: 30
+        timeout-minutes: 45

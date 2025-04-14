@@ -952,6 +952,10 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds
         logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}°.")
 
+    if Q_coords_low_speeds_low_angles.empty:
+        logging.warning('The selected person might not move, or is crouching for the whole sequence, or is not well detected. Taking all available data instead of filtering them.')
+        Q_coords_low_speeds_low_angles = Q_coords.copy()
+    
     if n_markers_init < n_markers:
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
 
