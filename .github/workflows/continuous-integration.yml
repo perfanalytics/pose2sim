@@ -18,12 +18,20 @@ permissions:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
 
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest, macos-13] # Mac ARM M1 vs Intel processors
         python-version: ["3.10", "3.11"]
+        include:
+          - os: ubuntu-latest
+            path: ~/.cache/pip
+          - os: macos-latest
+            path: ~/Library/Caches/pip
+          - os: windows-latest
+            path: ~\AppData\Local\pip\Cache
 
     steps:
       - name: Checkout code
@@ -47,6 +55,7 @@ jobs:
         run: |
           conda install -n pose2sim -c conda-forge -c defaults pip
           conda install -n pose2sim opensim-org::opensim -y
+        timeout-minutes: 5
 
       - name: Cache pip dependencies
         uses: actions/cache@v4
@@ -54,21 +63,23 @@ jobs:
           path: ${{ matrix.os == 'windows-latest' && 'C:\\Users\\runneradmin\\AppData\\Local\\pip\\Cache' || '~/.cache/pip' }}
           key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt') }}
           restore-keys: ${{ runner.os }}-pip-${{ matrix.python-version }}-
-        
+
       - name: Install pip dependencies
         run: |
           conda run -n pose2sim python -m pip install --upgrade pip
           conda run -n pose2sim python -m pip install flake8 pytest
           conda run -n pose2sim python -m pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
           # conda run -n pose2sim python -m pip install torch torchvision
-      
+        timeout-minutes: 10
+
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
           conda run -n pose2sim flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           conda run -n pose2sim flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-      
+        timeout-minutes: 5
+
       - name: Test with pytest
         env: 
           PYTHONIOENCODING: utf-8
@@ -77,3 +88,4 @@ jobs:
         run: |
           cd Pose2Sim/Utilities
           conda run -n pose2sim pytest -v tests.py --capture=sys
+        timeout-minutes: 45

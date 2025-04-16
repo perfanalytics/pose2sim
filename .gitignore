@@ -11,6 +11,7 @@ dist/
 **/*.sto
 **/*.c3d
 **/*.json
+**/*.csv
 
 **/Calib.toml
 **/pose-3d/

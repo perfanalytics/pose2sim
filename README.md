@@ -109,6 +109,43 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 - [How to cite and how to contribute](#how-to-cite-and-how-to-contribute)
     - [How to cite](#how-to-cite)
     - [How to contribute and to-do list](#how-to-contribute-and-to-do-list)
+- [Pose2Sim](#pose2sim)
+        - [N.B:. Please set undistort\_points and handle\_LR\_swap to false for now since it currently leads to inaccuracies. I'll try to fix it soon.](#nb-please-set-undistort_points-and-handle_lr_swap-to-false-for-now-since-it-currently-leads-to-inaccuracies-ill-try-to-fix-it-soon)
+- [Contents](#contents)
+- [Installation and Demonstration](#installation-and-demonstration)
+  - [Installation](#installation)
+  - [Demonstration Part-1: End to end video to 3D joint angle computation](#demonstration-part-1-end-to-end-video-to-3d-joint-angle-computation)
+  - [Demonstration Part-2: Visualize your results with OpenSim or Blender](#demonstration-part-2-visualize-your-results-with-opensim-or-blender)
+    - [Basic visualization with the OpenSim GUI](#basic-visualization-with-the-opensim-gui)
+    - [Further check with the Pose2Sim Blender add-on](#further-check-with-the-pose2sim-blender-add-on)
+  - [Demonstration Part-3: Try multi-person analysis](#demonstration-part-3-try-multi-person-analysis)
+  - [Demonstration Part-4: Try batch processing](#demonstration-part-4-try-batch-processing)
+- [Use on your own data](#use-on-your-own-data)
+  - [Setting up your project](#setting-up-your-project)
+  - [2D pose estimation](#2d-pose-estimation)
+    - [With RTMPose *(default)*:](#with-rtmpose-default)
+    - [With MMPose *(coming soon)*:](#with-mmpose-coming-soon)
+    - [With DeepLabCut:](#with-deeplabcut)
+    - [With OpenPose *(legacy)*:](#with-openpose-legacy)
+    - [With MediaPipe BlazePose *(legacy)*:](#with-mediapipe-blazepose-legacy)
+    - [With AlphaPose *(legacy)*:](#with-alphapose-legacy)
+  - [Camera calibration](#camera-calibration)
+    - [Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-caliscope-anipose-freemocap-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
+    - [Calculate from scratch](#calculate-from-scratch)
+  - [Synchronizing, Associating, Triangulating, Filtering](#synchronizing-associating-triangulating-filtering)
+    - [Synchronization](#synchronization)
+    - [Associate persons across cameras](#associate-persons-across-cameras)
+    - [Triangulating keypoints](#triangulating-keypoints)
+    - [Filtering 3D coordinates](#filtering-3d-coordinates)
+    - [Marker Augmentation](#marker-augmentation)
+  - [OpenSim kinematics](#opensim-kinematics)
+    - [Within Pose2Sim](#within-pose2sim)
+    - [Within OpenSim GUI](#within-opensim-gui)
+    - [Command line](#command-line)
+- [Utilities](#utilities)
+- [How to cite and how to contribute](#how-to-cite-and-how-to-contribute)
+    - [How to cite](#how-to-cite)
+    - [How to contribute and to-do list](#how-to-contribute-and-to-do-list)
 
 </br>
 
@@ -984,7 +1021,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Calibration:** Easier and clearer calibration procedure: separate intrinsic and extrinsic parameter calculation, edit corner detection if some are wrongly detected (or not visible). 
 &#10004; **Calibration:** Possibility to evaluate extrinsic parameters from cues on scene.
 &#9634; **Calibration:** Automatic calibration based on [keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
-&#9634; **Calibration:** Calibration of moving cameras. Detect or click points, and then track them for live calibration of moving cameras. Propose to click again when they are lost.
+&#9634; **Calibration:** Calibration of moving cameras. Detect or click points, and then track them for live calibration of moving cameras. Propose to click again when they are lost. Alternatively, use [DVPO](https://github.com/princeton-vl/DPVO) (see its implementation in [GVHMR](https://github.com/zju3dv/GVHMR/blob/main/hmr4d/utils/preproc/slam.py))
 &#9634; **Calibration:** Support vertical checkerboard.
 &#9634; **Calibration:** Calibrate cameras by pairs and compute average extrinsic calibration with [aniposelib](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/utils.py#L167). 
 &#9634; **Calibration:** Fine-tune calibration with bundle adjustment.
@@ -1065,4 +1102,3 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 - Post-doc at the [University of Bath (UK)](https://www.bath.ac.uk/) and engineer at [ForceTeck](https://forceteck.com/).
 - Demo data from [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
 - Thanks to [all the contributors](https://github.com/perfanalytics/pose2sim/graphs/contributors), past and to come! Thanks to everyone who gave feedback and contributed to making this software program better.
-
