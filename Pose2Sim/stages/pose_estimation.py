@@ -45,11 +45,13 @@ import numpy as np
 
 from multiprocessing import shared_memory
 from tqdm import tqdm
+from typing import Any
 
 from rtmlib import draw_skeleton
 
 from Pose2Sim.source import FrameData
 from deep_sort_realtime.deepsort_tracker import DeepSort
+from Pose2Sim.stages.base import BaseStage
 from Pose2Sim.common import (
     sort_people_sports2d,
     sort_people_deepsort,
@@ -74,29 +76,6 @@ __status__ = "Development"
 
 
 # CLASSES
-class BufferManager:
-    def __init__(self, config):
-        available_memory = psutil.virtual_memory().available
-        buffer_size = config.pose_model.det_input_size[0] * config.pose_model.det_input_size[1] * 3
-        self.buffers_count = min(int((available_memory / 2) / (buffer_size * (len(config.sources) / (len(config.sources) + 1)))), 10000)
-
-        logging.info(f"Allocating {self.buffers_count} buffers.")
-
-        self.buffers = {}
-        self.available_buffers = multiprocessing.Queue(maxsize=self.buffers_count)
-
-        for _ in range(self.buffers_count):
-            buf_uuid = str(uuid.uuid4())
-            shm = shared_memory.SharedMemory(name=buf_uuid, create=True, size=buffer_size)
-            self.buffers[buf_uuid] = shm
-            self.available_buffers.put(buf_uuid)
-
-    def cleanup(self):
-        for shm in self.buffers:
-            shm.close()
-            shm.unlink()
-
-
 class PoseEstimatorWorker(multiprocessing.Process):
     def __init__(self, config, input_queue, output_queue, tracker_ready_event):
         super().__init__(daemon=True)
@@ -176,108 +155,90 @@ class PoseEstimatorWorker(multiprocessing.Process):
         self.stopped = True
 
 
-class BaseSynchronizer:
-    def __init__(self, config, buffer_manager):
+class BaseProcessor:
+    def __init__(self, config):
         self.config = config
-        self.buffer_manager = buffer_manager
-
         self.sync_data = {}
-        self.ended = False
-
-        self.video_writers = {}
 
     def get_frames_list(self):
         frames_list = []
         for idx in sorted(self.sync_data.keys()):
             group = self.sync_data[idx]
-            if len(group) == len(self.sources):
+            if len(group) == len(self.config.sources):
                 complete_group = self.sync_data.pop(idx)
-                for source in self.sources:
+                for source in self.config.sources:
                     frame_data = (complete_group[source.name])
                     frames_list.append(frame_data)
                 return frames_list
 
-    def stop(self):
-        self.ended = True
 
-
-class InputQueueProcessor(multiprocessing.Process, BaseSynchronizer):
-    def __init__(self, config, input_queue, buffer_manager):
-        multiprocessing.Process.__init__(self)
-        BaseSynchronizer.__init__(self, config, buffer_manager)
+class InputQueueProcessor(multiprocessing.Process, BaseProcessor):
+    def __init__(self, config, input_queue, available_buffers, buffers):
+        BaseProcessor.__init__(self, config)
         self.input_queue = input_queue
+        self.available_buffers = available_buffers
+        self.buffers = buffers
 
     def run(self):
-        while not self.ended:
-            if all(not sources.ended for sources in self.config.sources):
-                self.stop()
-                break
-
-            if self.config.combined_frames:
-                for source in self.config.sources:
-                    frame_data = source.frame_queue.get()
-                    if frame_data.idx not in self.sync_data:
-                        self.sync_data[frame_data.idx] = {}
-                    self.sync_data[frame_data.idx][frame_data.source.name] = frame_data
-
-                if frames_list := self.get_frames_list():
-                    mosaic = np.zeros(
-                        (self.config.pose_model.det_input_size[0], self.config.pose_model.det_input_size[1], 3),
-                        dtype=np.uint8
-                    )
-                    timestamps = []
-                    idx = None
-
-                    for frame_data in frames_list:
-                        if not frame_data.placeholder:
-                            timestamps.append(frame_data.timestamp)
-                            idx = frame_data.idx
-                            frame = np.ndarray(
-                                frame_data.shape,
-                                dtype=np.dtype(frame_data.dtype),
-                                buffer=frame_data.buffer.buf,
-                            )
-                            self.buffer_manager.available_buffers.put(frame_data.buffer.name)
-
-                            source = frame_data.source
-                            mosaic[source.y_offset:source.y_offset + source.height,
-                                source.x_offset:source.x_offset + source.width] = frame
-
-                    avg_timestamp = np.mean(timestamps)
-                    mosaic_data = FrameData(None, avg_timestamp, idx)
-                    buffer = self.buffer_manager.available_buffers.get()
-                    shm = self.buffer_manager.buffers[buffer]
-                    mosaic_data.shape = mosaic.shape
-                    mosaic_data.dtype = mosaic.dtype.str
-                    mosaic_data.buffer = shm
-                    np_mosaic = np.ndarray(mosaic_data.shape, dtype=mosaic_data.dtype, buffer=shm.buf)
-                    np_mosaic[:] = mosaic
-
-                    self.input_queue.put(mosaic_data)
-            else:
-                for source in self.config.sources:
-                    self.input_queue.put(source.frame_queue.get())
-
-
-class OutputQueueProcessor(multiprocessing.Process, BaseSynchronizer):
-    def __init__(self, config, output_queue, buffer_manager):
-        multiprocessing.Process.__init__(self)
-        BaseSynchronizer.__init__(self, config, buffer_manager)
-        self.output_queue = output_queue
-
-    def run(self):
-        if self.save_video and self.config.save_files[0]:
+        if self.config.combined_frames:
             for source in self.config.sources:
-                source.intit_video_writer()
+                frame_data = source.frame_queue.get()
+                if frame_data.idx not in self.sync_data:
+                    self.sync_data[frame_data.idx] = {}
+                self.sync_data[frame_data.idx][frame_data.source.name] = frame_data
 
-        while not self.ended:
-            try:
-                frame_data = self.output_queue.get()
-                self.process_result_item(frame_data)
-            except queue.Empty:
-                time.sleep(0.005)
+            if frames_list := self.get_frames_list():
+                mosaic = np.zeros(
+                    (self.config.pose_model.det_input_size[0], self.config.pose_model.det_input_size[1], 3),
+                    dtype=np.uint8
+                )
+                timestamps = []
+                idx = None
 
-        cv2.destroyAllWindows()
+                for frame_data in frames_list:
+                    if not frame_data.placeholder:
+                        timestamps.append(frame_data.timestamp)
+                        idx = frame_data.idx
+                        frame = np.ndarray(
+                            frame_data.shape,
+                            dtype=np.dtype(frame_data.dtype),
+                            buffer=frame_data.buffer.buf,
+                        )
+                        self.available_buffers.put(frame_data.buffer.name)
+
+                        source = frame_data.source
+                        mosaic[source.y_offset:source.y_offset + source.height,
+                            source.x_offset:source.x_offset + source.width] = frame
+
+                avg_timestamp = np.mean(timestamps)
+                mosaic_data = FrameData(None, avg_timestamp, idx)
+                buffer = self.available_buffers.get()
+                shm = self.buffers[buffer]
+                mosaic_data.shape = mosaic.shape
+                mosaic_data.dtype = mosaic.dtype.str
+                mosaic_data.buffer = shm
+                np_mosaic = np.ndarray(mosaic_data.shape, dtype=mosaic_data.dtype, buffer=shm.buf)
+                np_mosaic[:] = mosaic
+
+                self.input_queue.put(mosaic_data)
+        else:
+            for source in self.config.sources:
+                self.input_queue.put(source.frame_queue.get())
+
+
+class OutputQueueProcessor(BaseProcessor):
+    def __init__(self, config, output_queue, available_buffers, buffers):
+        BaseProcessor.__init__(self, config)
+        self.output_queue = output_queue
+        self.available_buffers = available_buffers
+        self.buffers = buffers
+
+    def run(self):
+        try:
+            frame_data = self.output_queue.get()
+            self.process_result_item(frame_data)
+        except queue.Empty:
+            time.sleep(0.005)
 
     def process_result_item(self, frame_data):
         if self.combined_frames:
@@ -395,44 +356,31 @@ class OutputQueueProcessor(multiprocessing.Process, BaseSynchronizer):
             frame_data.source.video_writer.write(frame)
 
 
-class CaptureCoordinator(multiprocessing.Process):
-    def __init__(self, config, buffer_manager, tracker_ready_event):
-        super().__init__()
+class CaptureCoordinator():
+    def __init__(self, config, interval, available_buffers, buffers, buffers_count):
         self.config = config
-        self.buffer_manager = buffer_manager
-        self.tracker_ready_event = tracker_ready_event
-
-        self.ended = False
+        self.last_capture_time = time.time()
+        self.interval = interval
+        self.available_buffers = available_buffers
+        self.buffers = buffers
+        self.buffers_count = buffers_count
 
     def run(self):
-        self.tracker_ready_event.wait()
-        last_capture_time = time.time()
-        for source in self.config.sources:
-            source.start_in_process()
-            source.capture_ready_event.wait()
-        self.config.set_fps(min(source.fps for source in self.config.sources))
-        self.interval = 1.0 / self.config.fps
-        while not self.ended:
-            if all(source.ended for source in self.config.sources):
-                self.stop()
-                break
+        elapsed = time.time() - self.last_capture_time
+        if elapsed < self.interval:
+            time.sleep(self.interval - elapsed)
 
-            elapsed = time.time() - last_capture_time
-            if elapsed < self.interval:
-                time.sleep(self.interval - elapsed)
+        if self.available_buffers.qsize() == self.buffers_count:
+            empty = True
 
-            if self.buffer_manager.available_buffers.qsize() == self.buffer_manager.buffers_count:
-                empty = True
-
-            if self.mode == 'continuous' or (self.mode == 'alternating' and empty):
-                if self.available_frame_buffers.qsize() >= len(self.config.sources):
-                    for source in self.config.sources:
-                        buffer = self.buffer_manager.available_buffers.get()
-                        shared_memory = self.buffer_manager.buffers[buffer]
-                        self.source.command_queues.put(("CAPTURE_FRAME", shared_memory))
-                    last_capture_time = time.time()
-                else:
-                    empty = False
+        if self.mode == 'continuous' or (self.mode == 'alternating' and empty):
+            if self.available_frame_buffers.qsize() >= len(self.config.sources):
+                for source in self.config.sources:
+                    shared_memory = self.buffers[self.available_buffers.get()]
+                    self.source.command_queues.put(("CAPTURE_FRAME", shared_memory))
+                self.last_capture_time = time.time()
+            else:
+                empty = False
 
     def stop(self):
         self.ended = True
@@ -442,7 +390,6 @@ class CaptureCoordinator(multiprocessing.Process):
 class PoseEstimationSession:
     def __init__(self, config):
         self.config = config
-        self.buffer_manager = BufferManager(config)
         self.capture_coord = None
         self.frame_proc = None
         self.result_proc = None
@@ -459,42 +406,64 @@ class PoseEstimationSession:
         self.config.check_pose_estimation()
         self.config.get_mosaic_params()
 
-        self._launch_processes()
+        available_memory = psutil.virtual_memory().available
+        buffer_size = self.config.pose_model.det_input_size[0] * self.config.pose_model.det_input_size[1] * 3
+        self.buffers_count = min(
+            int((available_memory / 2) / (buffer_size * (len(self.config.sources) / (len(self.config.sources) + 1)))),
+            10000
+        )
 
-        logging.info("PoseEstimationSession started.")
+        self.buffers = {}
+        self.available_buffers = multiprocessing.Queue(maxsize=self.buffers_count)
 
-    def _launch_processes(self):
+        for _ in range(self.buffers_count):
+            buf_uuid = str(uuid.uuid4())
+            shm = shared_memory.SharedMemory(name=buf_uuid, create=True, size=buffer_size)
+            self.buffers[buf_uuid] = shm
+            self.available_buffers.put(buf_uuid)
 
-        tracker_ready = multiprocessing.Event()
+        for source in self.config.sources:
+            source.start_in_process()
+            source.capture_ready_event.wait()
+            if self.config.save_files[0]:
+                source.intit_video_writer()
+
+        self.config.set_fps(min(source.fps for source in self.config.sources))
+        
         self.capture_coord = CaptureCoordinator(
             config=self.config,
-            buffer_manager=self.buffer_manager,
-            tracker_ready_event=tracker_ready,
+            interval=1.0/self.config.fps,
+            available_buffers = self.available_buffers,
+            buffers = self.buffers,
+            buffers_count = self.buffers_count,
         )
-        self.capture_coord.start()
+
+        tracker_ready = multiprocessing.Event()
 
         self.input_queue  = multiprocessing.Queue()
         self.output_queue = multiprocessing.Queue()
 
-        self.frame_proc = InputQueueProcessor(
+        self.input_proc = InputQueueProcessor(
             config=self.config,
             input_queue=self.input_queue,
+            available_buffers = self.available_buffers,
+            buffers = self.buffers,
         )
-        self.result_proc = OutputQueueProcessor(
+        self.output_proc = OutputQueueProcessor(
             config=self.config,
             output_queue=self.output_queue,
+            available_buffers = self.available_buffers,
+            buffers = self.buffers,
         )
-        self.frame_proc.start()
-        self.result_proc.start()
+        
+        tracker_ready = multiprocessing.Event()
 
-        self._spawn_workers(tracker_ready)
-
-        self._init_progress_bars()
-
-    def _spawn_workers(self, tracker_ready):
         cpu = multiprocessing.cpu_count()
-        n_workers = max(1, cpu - len(self.config.sources) - 4)
-        logging.info(f"Starting {n_workers} workers.")
+
+        n_workers = 1
+        if self.config.multi_workers:
+            n_workers = max(1, cpu - len(self.config.sources) - 4)
+            logging.info(f"Starting {n_workers} workers.")
 
         def new_worker():
             w = PoseEstimatorWorker(
@@ -508,7 +477,8 @@ class PoseEstimationSession:
 
         self.workers = [new_worker() for _ in range(n_workers)]
 
-    def _init_progress_bars(self):
+        self.tracker_ready_event.wait()
+
         self.bars = {}
         bar_pos = 0
         for src in self.config.sources:
@@ -521,22 +491,36 @@ class PoseEstimationSession:
         )
         bar_pos += 1
 
-        self.bars["workers"] = tqdm(
-            total=len(self.workers),
-            desc="Active Workers", position=bar_pos, leave=True
-        )
+
+        if self.config.multi_workers:
+            self.bars["workers"] = tqdm(
+                total=len(self.workers),
+                desc="Active Workers", position=bar_pos, leave=True
+            )
+
+        logging.info("PoseEstimationSession started.")
 
     def run(self):
         try:
             prev_ended = 0
-            while not self._stop_event.is_set():
-                # Maj barres
-                self.bars["buffers"].n = self.buffer_manager.available_buffers.qsize()
+            
+            logging.info(f"Allocating {self.buffers_count} buffers.")
+
+            while not self.ended:
+                if not all(not sources.ended for sources in self.config.sources):
+                    self.capture_coord.run()
+                    self.input_proc.run()
+                
+                self.output_proc.run()
+
+                self.bars["buffers"].n = self.available_buffers.qsize()
                 self.bars["buffers"].refresh()
 
                 alive = sum(not w.ended for w in self.workers)
-                self.bars["workers"].n = alive
-                self.bars["workers"].refresh()
+
+                if self.config.multi_workers:
+                    self.bars["workers"].n = alive
+                    self.bars["workers"].refresh()
 
                 if alive == 0:
                     break
@@ -554,9 +538,7 @@ class PoseEstimationSession:
             self.stop()
 
     def stop(self):
-        if self._stop_event.is_set():
-            return
-        self._stop_event.set()
+        self.ended = True
 
         if self.capture_coord:
             self.capture_coord.stop()
@@ -579,14 +561,26 @@ class PoseEstimationSession:
                 if p.is_alive():
                     p.terminate()
 
-        if self.buffer_manager:
-            self.buffer_manager.cleanup()
+        for shm in self.buffers:
+            shm.close()
+            shm.unlink()
+
         for b in self.bars.values():
             b.close()
         if self.config.display_detection:
             cv2.destroyAllWindows()
 
         logging.info("PoseEstimationSession stopped.")
+
+
+class PoseEstimationStage(BaseStage):
+    name = "poseestimation"
+
+    def run(self, data_in: Any) -> Any:
+        with PoseEstimationSession(self.config) as session:
+            session.run()
+
+        return data_in
 
 
 def save_keypoints_to_openpose(json_file_path, all_keypoints, all_scores):

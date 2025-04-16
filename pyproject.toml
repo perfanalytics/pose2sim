@@ -30,6 +30,7 @@ classifiers = [
 urls = {Homepage = "https://github.com/perfanalytics/pose2sim", "Bug Tracker" = "https://github.com/perfanalytics/pose2sim/issues"}
 dependencies = [
     "toml",
+    "psutil",
     "numpy>=1.19",
     "lxml==4.9.4",
     "matplotlib",
@@ -57,6 +58,14 @@ packages = {find = {}}
 "*" = ["OpenSim_Setup/**", "MarkerAugmenter/**", "Demo_SinglePerson/**", "Demo_SinglePerson/**/.*", "Demo_SinglePerson/**/**/.*", "Demo_SinglePerson/**/**/**/.*", "Demo_MultiPerson/**", "Demo_MultiPerson/**/.*", "Demo_Batch/**", "Demo_Batch/**/.*", "Demo_Batch/**/**/.*"]
 
 [project.scripts]
+"calibration" = "Pose2Sim.stages.calibration:CalibrationStage"
+"pose_estimation" = "Pose2Sim.stages.pose_estimation:PoseEstimationStage"
+"sync"             = "Pose2Sim.stages.sync:SyncStage"
+"tracking"         = "Pose2Sim.stages.tracking:TrackingStage"
+"triangulation"    = "Pose2Sim.stages.triangulation:TriangulationStage"
+"filtering"        = "Pose2Sim.stages.filtering:FilteringStage"
+"markeraugmentation" = "Pose2Sim.stages.markeraugmentation:MarkerAugmentationStage"
+"ik"               = "Pose2Sim.stages.ik:IKStage"
 AlphaPose_to_OpenPose = "Pose2Sim.Utilities.AlphaPose_to_OpenPose:main"
 Blazepose_runsave = "Pose2Sim.Utilities.Blazepose_runsave:main"
 bodykin_from_mot_osim = "Pose2Sim.Utilities.bodykin_from_mot_osim:main"

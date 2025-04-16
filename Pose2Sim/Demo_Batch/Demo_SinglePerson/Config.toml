@@ -139,9 +139,10 @@ filter_order = 4
 # Take heart, calibration is not that complicated once you get the hang of it!
 [calibration]
 calibration_type = 'convert' # 'convert' or 'calculate'
+save_calibration = true
 
    [calibration.convert]
-   convert_from = 'Calib.qca.txt' # 'caliscope', 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
+   convert_from = 'calibration/Calib.qca.txt' # 'caliscope', 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
       [calibration.convert.caliscope]  # No parameter needed
       [calibration.convert.qualisys]
       binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2

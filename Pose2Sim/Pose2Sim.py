@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 '''
 ###########################################################################
 ## POSE2SIM                                                              ##
@@ -42,11 +41,15 @@ Pose2Sim.kinematics()
 # Then run OpenSim (see Readme.md)
 '''
 
+import importlib
 import os
 import time
 import logging
 from datetime import datetime
+from typing import Any, Iterable, Sequence
+
 from Pose2Sim.config import Config
+from Pose2Sim.stages.base import BaseStage
 
 # AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -59,10 +62,74 @@ __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
+def to_camel_case(snake_str):
+    return ''.join(word.capitalize() for word in snake_str.split('_'))
 
-# CLASS
+def _discover_stage(name: str) -> type[BaseStage]:
+    from importlib import metadata
+
+    for ep in metadata.entry_points(group="pose2sim.stages"):
+        if ep.name == name:
+            cls = ep.load()
+            if not issubclass(cls, BaseStage):
+                raise TypeError(f"Entry‑point '{name}' is not a BaseStage subclass")
+            return cls
+
+    try:
+        mod = importlib.import_module(f"Pose2Sim.stages.{name}")
+    except ModuleNotFoundError as exc:
+        raise ValueError(f"Stage '{name}' not found (no entry-point, no module)") from exc
+
+    camel = f"{to_camel_case(name)}Stage"
+    if not hasattr(mod, camel):
+        raise AttributeError(f"Module '{mod.__name__}' has no class '{camel}'")
+
+    cls = getattr(mod, camel)
+    if not issubclass(cls, BaseStage):
+        raise TypeError(f"{camel} is not a BaseStage subclass")
+    return cls
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+#  Pipeline
+# ────────────────────────────────────────────────────────────────────────────────
+
+
 class Pose2SimPipeline:
-    def __init__(self, config_input=None):
+    """Light orchestration: chain the requested stages.
+
+    Parameters
+    ----------
+    config : str | os.PathLike | dict | None
+        Path to a TOML/JSON/YAML config or a dict already loaded.
+    stages : Sequence[str] | None
+        Ordered list of stage *names* to execute. ``None`` = default full chain.
+    log_level : str
+        Logging level ("INFO", "DEBUG", …).
+    """
+
+    DEFAULT_CHAIN: tuple[str, ...] = (
+        "calibration",
+        "pose_estimation",
+        "sync",
+        "tracking",
+        "triangulation",
+        "filtering",
+        "markeraugmentation",
+        "ik",
+    )
+
+    # ---------------------------------------------------------------------
+    #  Init / context‑manager helpers
+    # ---------------------------------------------------------------------
+
+    def __init__(
+        self,
+        config_input: str | os.PathLike | dict | None = None,
+        stages: Sequence[str] | None = None,
+        *,
+        log_level: str = "INFO",
+    ) -> None:
         self.config = Config(config_input)
 
         if not self.config.use_custom_logging:
@@ -81,168 +148,78 @@ class Pose2SimPipeline:
                 ]
             )
 
-    def __enter__(self):
+        # ––– Instantiate stages –––––––––––––––––––––––––––––––––––––––––
+        wanted = stages or self.DEFAULT_CHAIN
+        self._stages: list[BaseStage] = [
+            _discover_stage(name)(self.config) for name in wanted
+        ]
+
+    # ------------------------------------------------------------------
+    #  Context‑manager so we guarantee setup/teardown
+    # ------------------------------------------------------------------
+
+    def __enter__(self) -> "Pose2SimPipeline":
+        for st in self._stages:
+            st.setup()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        logging.shutdown()
-
-    def _log_step_header(self, step_name, sub_config):
-        project_dir = sub_config.project_dir
-        seq_name = os.path.basename(project_dir)
-        frame_range = sub_config.frame_range
-        frames = "all frames" if not frame_range or frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"
-        logging.info("\n---------------------------------------------------------------------")
-        logging.info(f"{step_name} for {seq_name}, for {frames}.")
-        logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info(f"Project directory: {project_dir}")
-        logging.info("---------------------------------------------------------------------\n")
-
-    def calibration(self):
-        from Pose2Sim.calibration import calibrate_cams_all
-        sub_config = self.config.sub_configs[0]
-        logging.info("\n---------------------------------------------------------------------")
-        logging.info("Camera calibration")
-        logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info(f"Calibration directory: {sub_config.calib_dir}")
-        logging.info("---------------------------------------------------------------------\n")
-        start = time.time()
-        calibrate_cams_all(sub_config)
-        elapsed = time.time() - start
-        logging.info(f'\nCalibration took {elapsed:.2f} seconds.\n')
-
-    def poseEstimation(self):
-        from Pose2Sim.poseEstimation import PoseEstimationSession
-        for sub_config in self.config.sub_configs:
-            self._log_step_header("Pose estimation", sub_config)
-            start = time.time()
-            with PoseEstimationSession(sub_config) as session:
-                session.start()
-            elapsed = time.time() - start
-            logging.info(f'\nPose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
-
-    def synchronization(self):
-        from Pose2Sim.synchronization import synchronize_cams_all
-        for sub_config in self.config.sub_configs:
-            self._log_step_header("Camera synchronization", sub_config)
-            start = time.time()
-            synchronize_cams_all(sub_config)
-            elapsed = time.time() - start
-            logging.info(f'\nSynchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
-
-    def personAssociation(self):
-        from Pose2Sim.personAssociation import associate_all
-        for sub_config in self.config.sub_configs:
-            self._log_step_header("Associating persons", sub_config)
-            start = time.time()
-            associate_all(sub_config)
-            elapsed = time.time() - start
-            logging.info(f'\nAssociating persons took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
-
-    def triangulation(self):
-        from Pose2Sim.triangulation import triangulate_all
-        for sub_config in self.config.sub_configs:
-            self._log_step_header("Triangulation of 2D points", sub_config)
-            start = time.time()
-            triangulate_all(sub_config)
-            elapsed = time.time() - start
-            logging.info(f'\nTriangulation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
-
-    def filtering(self):
-        from Pose2Sim.filtering import filter_all
-        for sub_config in self.config.sub_configs:
-            self._log_step_header("Filtering 3D coordinates", sub_config)
-            filter_all(sub_config)
-            logging.info('\n')
-
-    def markerAugmentation(self):
-        from Pose2Sim.markerAugmentation import augment_markers_all
-        for sub_config in self.config.sub_configs:
-            self._log_step_header("Augmentation process", sub_config)
-            start = time.time()
-            augment_markers_all(sub_config)
-            elapsed = time.time() - start
-            logging.info(f'\nMarker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
-
-    def kinematics(self):
-        from Pose2Sim.kinematics import kinematics_all
-        for sub_config in self.config.sub_configs:
-            self._log_step_header("OpenSim scaling and inverse kinematics", sub_config)
-            start = time.time()
-            kinematics_all(sub_config)
-            elapsed = time.time() - start
-            logging.info(f'\nOpenSim scaling and inverse kinematics took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
-
-    def runAll(self, do_calibration=True, do_poseEstimation=True, do_synchronization=True, 
-               do_personAssociation=True, do_triangulation=True, do_filtering=True, 
-               do_markerAugmentation=True, do_kinematics=True):
-        logging.info("\n\n=====================================================================")
-        logging.info("RUNNING ALL.")
-        logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info(f"Project directory: {self.config.session_dir}\n")
-        logging.info("=====================================================================\n")
-
-        overall_start = time.time()
-        steps = [
-            (do_calibration, "Camera calibration", self.calibration),
-            (do_poseEstimation, "Pose estimation", self.poseEstimation),
-            (do_synchronization, "Camera synchronization", self.synchronization),
-            (do_personAssociation, "Associating persons", self.personAssociation),
-            (do_triangulation, "Triangulation", self.triangulation),
-            (do_filtering, "Filtering", self.filtering),
-            (do_markerAugmentation, "Marker augmentation", self.markerAugmentation),
-            (do_kinematics, "OpenSim processing", self.kinematics)
-        ]
-        for enabled, label, func in steps:
-            logging.info("\n\n=====================================================================")
-            if enabled:
-                logging.info(f"Running {label}...")
-                logging.info("=====================================================================")
-                start = time.time()
-                func()
-                elapsed = time.time() - start
-                logging.info(f'\n{label} took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
-            else:
-                logging.info(f"Skipping {label}.")
-                logging.info("=====================================================================")
-
+        for st in reversed(self._stages):
+            st.teardown()
         logging.info("Pose2Sim pipeline completed.")
-        overall_elapsed = time.time() - overall_start
-        logging.info(f'\nRUNNING ALL FUNCTIONS TOOK {time.strftime("%Hh%Mm%Ss", time.gmtime(overall_elapsed))}.\n')
+
+    # ------------------------------------------------------------------
+    #  Execution
+    # ------------------------------------------------------------------
+
+    def run(self, initial_data: Any = None) -> Any:
+        """Run the chain and return the last stage output."""
+        data = initial_data
+        for st in self._stages:
+            t0 = time.time()
+            logging.info("\n──────────────────────────────────────────────────────────────")
+            logging.info(
+                f"{st.name.upper()}  |  {datetime.now().strftime('%H:%M:%S')}  |  START"
+            )
+            data = st.run(data)
+            logging.info(
+                f"{st.name.upper()}  |  done in {time.time() - t0:.2f} s"
+            )
+        return data
+
+    @classmethod
+    def _single(cls, stage: str, cfg: str | os.PathLike | dict | None = None):
+        with cls(cfg, stages=[stage]) as pipe:
+            pipe.run()
 
 
-def calibration(config=None):
-    with Pose2SimPipeline(config) as pipeline:
-        pipeline.calibration()
+calibration = lambda cfg=None: Pose2SimPipeline._single("calibration", cfg)
+poseEstimation = lambda cfg=None: Pose2SimPipeline._single("pose_estimation", cfg)
+synchronization = lambda cfg=None: Pose2SimPipeline._single("sync", cfg)
+personAssociation = lambda cfg=None: Pose2SimPipeline._single("tracking", cfg)
+triangulation = lambda cfg=None: Pose2SimPipeline._single("triangulation", cfg)
+filtering = lambda cfg=None: Pose2SimPipeline._single("filtering", cfg)
+markerAugmentation = lambda cfg=None: Pose2SimPipeline._single("markeraugmentation", cfg)
+kinematics = lambda cfg=None: Pose2SimPipeline._single("ik", cfg)
 
-def poseEstimation(config=None):
-    with Pose2SimPipeline(config) as pipeline:
-        pipeline.poseEstimation()
 
-def synchronization(config=None):
-    with Pose2SimPipeline(config) as pipeline:
-        pipeline.synchronization()
+def runAll(cfg: str | os.PathLike | dict | None = None, stages: Iterable[str] | None = None):
+    """Run the whole chain (or the *stages* list)."""
 
-def personAssociation(config=None):
-    with Pose2SimPipeline(config) as pipeline:
-        pipeline.personAssociation()
+    with Pose2SimPipeline(cfg, stages=stages) as pipe:
+        pipe.run()
 
-def triangulation(config=None):
-    with Pose2SimPipeline(config) as pipeline:
-        pipeline.triangulation()
 
-def filtering(config=None):
-    with Pose2SimPipeline(config) as pipeline:
-        pipeline.filtering()
+if __name__ == "__main__":
+    import argparse
 
-def markerAugmentation(config=None):
-    with Pose2SimPipeline(config) as pipeline:
-        pipeline.markerAugmentation()
+    parser = argparse.ArgumentParser(description="Pose2Sim – modular pipeline")
+    parser.add_argument("config", nargs="?", help="Path to Config.toml (or JSON/YAML)")
+    parser.add_argument(
+        "--stages",
+        nargs="*",
+        help="Subset of stages to run (order preserved). Default = full chain.",
+    )
+    args = parser.parse_args()
 
-def kinematics(config=None):
-    with Pose2SimPipeline(config) as pipeline:
-        pipeline.kinematics()
-
-def runAll(config=None, **kwargs):
-    with Pose2SimPipeline(config) as pipeline:
-        pipeline.runAll(**kwargs)
+    runAll(args.config, stages=args.stages)

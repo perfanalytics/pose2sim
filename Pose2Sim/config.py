@@ -33,28 +33,72 @@ from Pose2Sim.common import natural_sort_key, zup2yup
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.source import WebcamSource, ImageSource, VideoSource
 from Pose2Sim.subject import Subject
-from Pose2Sim.calibration import QcaCalibration, OptitrackCalibration, ViconCalibration, EasyMocapCalibration, BiocvCalibration, OpencapCalibration, PointCalibration
+from Pose2Sim.stages.calibration import QcaCalibration, OptitrackCalibration, ViconCalibration, EasyMocapCalibration, BiocvCalibration, OpencapCalibration, PointCalibration
 
 
-class SubConfig:
-    def __init__(self, config_dict, session_dir):
-        '''
-        Initializes a sub-configuration from a dictionary and the session_dir
-        calculated by the Config class.
-        '''
-        self._config = config_dict
-        self.session_dir = session_dir
-        self.subjects = self.subjects()
+class Config:
+    def __init__(self, config_input=None):
+        self.config_input = config_input
+        self.config_dicts = [self._build_merged_config(config_input)][0]
         self.pose_model = PoseModel(self, self.pose.get("pose_model"))
         self.sources = self.sources()
+        self.subjects = self.subjects()
 
         self.fps = None
+
+    def _recursive_update(self, base, updates):
+        for key, value in updates.items():
+            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                base[key] = self._recursive_update(base[key], value)
+            else:
+                base[key] = value
+        return base
+
+    def _build_merged_config(self, config_input):
+        if isinstance(config_input, dict):
+            return config_input
+
+        if config_input is None:
+            current_dir = os.getcwd()
+        else:
+            current_dir = os.path.realpath(config_input)
+
+        config_paths = self._find_parent_configs(current_dir)
+
+        merged_config = {}
+        for cfg_file in reversed(config_paths):
+            try:
+                current_cfg = toml.load(cfg_file)
+                merged_config = self._recursive_update(merged_config, current_cfg)
+            except Exception as e:
+                raise ValueError(f"Unable to read {cfg_file}: {str(e)}")
+
+        if not merged_config:
+            raise FileNotFoundError("No Config.toml found.")
+
+        return merged_config
+
+    def _find_parent_configs(self, start_dir):
+        configs_found = []
+        current_dir = start_dir
+
+        while True:
+            config_toml = os.path.join(current_dir, "Config.toml")
+            if os.path.isfile(config_toml):
+                configs_found.append(config_toml)
+
+            parent = os.path.dirname(current_dir)
+            if parent == current_dir:
+                break
+            current_dir = parent
+
+        return configs_found
 
     def subjects(self):
         """
         Construit une liste d'objets Subject à partir de la config TOML.
         """
-        subjects_data_list = self._config.get("subjects")
+        subjects_data_list = self.config_dicts.get("subjects")
         subjects_list = []
         for sub_data in subjects_data_list:
             subject_obj = Subject(self, sub_data)
@@ -62,7 +106,7 @@ class SubConfig:
         return subjects_list
     
     def sources(self):
-        sources_data_list = self._config.get("sources")
+        sources_data_list = self.config_dicts.get("sources")
         sources_list = []
         for src_data in sources_data_list:
             path_val = src_data.get("path")
@@ -99,27 +143,19 @@ class SubConfig:
 
     @property
     def calibration(self):
-        return self._config.get("calibration")
+        return self.config_dicts.get("calibration")
+    
+    @property
+    def session_dir(self):
+        return os.path.realpath(os.getcwd())
+    
+    @property
+    def use_custom_logging(self):
+        return self.config_dicts.get("logging").get("use_custom_logging")
     
     @property
     def gray_capture(self):
         return self.pose.get("gray_capture")
-
-    @property
-    def calib_dir(self):
-        '''
-        Returns the calibration folder based on session_dir.
-        If no folder containing 'calib' is found, an exception is raised.
-        '''
-        try:
-            calib_dirs = [
-                os.path.join(self.session_dir, c)
-                for c in os.listdir(self.session_dir)
-                if "calib" in c.lower() and os.path.isdir(os.path.join(self.session_dir, c))
-            ]
-            return calib_dirs[0]
-        except IndexError:
-            raise FileNotFoundError("No calibration folder found in the project directory.")
 
     @property
     def extrinsics_corners_nb(self):
@@ -155,15 +191,15 @@ class SubConfig:
 
     @property
     def logging(self):
-        return self._config.get("logging")
+        return self.config_dicts.get("logging")
 
     @property
     def filtering(self):
-        return self._config.get("filtering")
+        return self.config_dicts.get("filtering")
 
     @property
     def kinematics(self):
-        return self._config.get("kinematics")
+        return self.config_dicts.get("kinematics")
     
     @property
     def fastest_frames_to_remove_percent(self):
@@ -187,35 +223,23 @@ class SubConfig:
 
     @property
     def markerAugmentation(self):
-        return self._config.get("markerAugmentation")
+        return self.config_dicts.get("markerAugmentation")
 
     @property
     def triangulation(self):
-        return self._config.get("triangulation")
+        return self.config_dicts.get("triangulation")
 
     @property
     def synchronization(self):
-        return self._config.get("synchronization")
+        return self.config_dicts.get("synchronization")
 
     @property
     def personAssociation(self):
-        return self._config.get("personAssociation")
+        return self.config_dicts.get("personAssociation")
     
     @property
     def project(self):
-        return self._config.get("project")
-
-    @property
-    def project_dir(self):
-        '''
-        Returns the absolute path to the project directory.
-        Raises FileNotFoundError if the directory is not found.
-        '''
-        project_dir = self.project.get("project_dir")
-        abs_path = os.path.realpath(project_dir)
-        if not os.path.exists(abs_path):
-            raise FileNotFoundError(f"Project directory does not exist: {abs_path}")
-        return abs_path
+        return self.config_dicts.get("project")
 
     @property
     def frame_range(self):
@@ -226,7 +250,7 @@ class SubConfig:
 
     @property
     def pose(self):
-        return self._config.get("pose")
+        return self.config_dicts.get("pose")
 
     @property
     def osim_setup_dir(self):
@@ -235,20 +259,6 @@ class SubConfig:
         '''
         pose2sim_path = Path(sys.modules["Pose2Sim"].__file__).resolve().parent
         return pose2sim_path / "OpenSim_Setup"
-
-    def calibrate_sources(self):
-        calib_data = toml.load(self.calib_file)
-        for source in self.sources:
-            if source.name in calib_data:
-                data = calib_data[source.name]
-                source.ret = 0.0
-                source.S = data['size']
-                source.K = np.array(data['matrix'])
-                source.D = data['distortions']
-                source.R = [0.0, 0.0, 0.0]
-                source.T = [0.0, 0.0, 0.0]
-            else :
-                logging.info(f"[{source.name}] No existing calibration found.")
 
     @property
     def object_coords_3d(self):
@@ -292,18 +302,12 @@ class SubConfig:
                 raise NameError("Conversion file path not specified in configuration.")
 
             if not os.path.isabs(convert_path):
-                convert_path = os.path.join(self.calib_dir, convert_path)
+                convert_path = os.path.join(self.session_dir, convert_path)
 
             if not os.path.exists(convert_path):
-                raise NameError(f"File {convert_path} not found in {self.calib_dir}.")
+                raise NameError(f"File {convert_path} not found.")
             
             filename = os.path.basename(convert_path).lower()
-
-        if self.calib_file:
-            self.calibrate_sources()
-            data = toml.load(self.calib_output_path)
-        else:
-            data = {}
 
         extrinsinc = False
         for source in self.sources:
@@ -356,18 +360,18 @@ class SubConfig:
 
         elif calib_type == "calculate":
             if extrinsinc:
-                trc_write(self.object_coords_3d, os.path.join(self.calib_dir, f'Object_points.trc'))
+                trc_write(self.object_coords_3d, os.path.join(self.session_dir, f'Object_points.trc'))
             calibration = PointCalibration(self, None)
 
         else:
             logging.info("Invalid calibration_type in Config.toml")
             return ValueError("Invalid calibration_type in Config.toml")
 
-        return data, calibration, convert_path
+        return calibration, convert_path
 
     @property
     def calib_file(self):
-        calib_file = glob.glob(os.path.join(self.calib_dir, "Calib.toml"))
+        calib_file = glob.glob(self.calib_output_path)
         if len(calib_file) == 0:
             logging.info("No existing calibration file found.")
             return None
@@ -375,7 +379,7 @@ class SubConfig:
     
     @property 
     def calib_output_path(self):
-        return os.path.join(self.calib_dir, f"Calib.toml")
+        return os.path.join(self.session_dir, f"Calib.toml")
 
     @property 
     def intrinsics_extension(self):
@@ -420,12 +424,12 @@ class SubConfig:
         Returns parameters related to data filtering, such as input TRC paths,
         output TRC paths, filter type, frame rate, etc.
         '''
-        pose3d_dir = os.path.realpath(os.path.join(self.project_dir, "pose-3d"))
+        pose3d_dir = os.path.realpath(os.path.join(self.session_dir, "pose-3d"))
         display_figures = self.filtering.get("display_figures")
         filter_type = self.filtering.get("type")
         make_c3d = self.filtering.get("make_c3d")
 
-        video_dir = os.path.join(self.project_dir, "videos")
+        video_dir = os.path.join(self.session_dir, "videos")
         vid_img_extension = self.pose_conf.get("vid_img_extension")
         video_files = glob.glob(os.path.join(video_dir, "*" + vid_img_extension))
 
@@ -445,8 +449,8 @@ class SubConfig:
 
         use_augmentation = self.kinematics.get("use_augmentation")
 
-        pose3d_dir = Path(self.project_dir) / "pose-3d"
-        kinematics_dir = Path(self.project_dir) / "kinematics"
+        pose3d_dir = Path(self.session_dir) / "pose-3d"
+        kinematics_dir = Path(self.session_dir) / "kinematics"
         kinematics_dir.mkdir(parents=True, exist_ok=True)
         opensim_logs_file = kinematics_dir / "opensim_logs.txt"
 
@@ -543,8 +547,8 @@ class SubConfig:
         '''
         Returns parameters needed for marker augmentation (LSTM-based).
         '''
-        pathInputTRCFile = os.path.realpath(os.path.join(self.project_dir, "pose-3d"))
-        pathOutputTRCFile = os.path.realpath(os.path.join(self.project_dir, "pose-3d"))
+        pathInputTRCFile = os.path.realpath(os.path.join(self.session_dir, "pose-3d"))
+        pathOutputTRCFile = os.path.realpath(os.path.join(self.session_dir, "pose-3d"))
 
         make_c3d = self.markerAugmentation.get("make_c3d")
 
@@ -612,9 +616,9 @@ class SubConfig:
         undistort_points = self.triangulation.get("undistort_points")
         make_c3d = self.triangulation.get("make_c3d")
 
-        pose_dir = os.path.join(self.project_dir, "pose")
-        poseSync_dir = os.path.join(self.project_dir, "pose-sync")
-        poseTracked_dir = os.path.join(self.project_dir, "pose-associated")
+        pose_dir = os.path.join(self.session_dir, "pose")
+        poseSync_dir = os.path.join(self.session_dir, "pose-sync")
+        poseTracked_dir = os.path.join(self.session_dir, "pose-associated")
         error_threshold_triangulation = self.triangulation.get("reproj_error_threshold_triangulation")
     
         return (
@@ -650,7 +654,7 @@ class SubConfig:
         """
         Returns parameters for synchronization.
         """
-        pose_dir = os.path.realpath(os.path.join(self.project_dir, "pose"))
+        pose_dir = os.path.realpath(os.path.join(self.session_dir, "pose"))
         fps = self.project.get("frame_rate")
         display_sync_plots = self.synchronization.get("display_sync_plots")
         keypoints_to_consider = self.synchronization.get("keypoints_to_consider")
@@ -663,7 +667,7 @@ class SubConfig:
         filter_order = int(self.synchronization.get("filter_order", 0))
 
         # Determine frame rate from the first video if set to 'auto'
-        video_dir = os.path.join(self.project_dir, "videos")
+        video_dir = os.path.join(self.session_dir, "videos")
         vid_img_extension = self.pose_conf.get("vid_img_extension", "")
         vid_or_img_files = glob.glob(os.path.join(video_dir, "*" + vid_img_extension))
 
@@ -713,17 +717,17 @@ class SubConfig:
         multi_person = self.project.get("multi_person", False)
 
         if multi_person:
-            seq_name = f"{os.path.basename(os.path.realpath(self.project_dir))}_P{id_person+1}"
+            seq_name = f"{os.path.basename(os.path.realpath(self.session_dir))}_P{id_person+1}"
         else:
-            seq_name = f"{os.path.basename(os.path.realpath(self.project_dir))}"
+            seq_name = f"{os.path.basename(os.path.realpath(self.session_dir))}"
 
-        pose3d_dir = os.path.join(self.project_dir, "pose-3d")
+        pose3d_dir = os.path.join(self.session_dir, "pose-3d")
 
         # Determine frame rate
-        video_dir = os.path.join(self.project_dir, "videos")
+        video_dir = os.path.join(self.session_dir, "videos")
         vid_img_extension = self.pose_conf.get("vid_img_extension", "")
         video_files = glob.glob(os.path.join(video_dir, "*" + vid_img_extension))
-        frame_rate = self._config.get("project", {}).get("frame_rate")
+        frame_rate = self.config_dicts.get("project", {}).get("frame_rate")
         if frame_rate == "auto":
             try:
                 cap = cv2.VideoCapture(video_files[0])
@@ -744,7 +748,7 @@ class SubConfig:
     
     @property
     def pose_dir(self):
-        return os.path.join(self.project_dir, 'pose')
+        return os.path.join(self.session_dir, 'pose')
     
     @property
     def webcam_recording(self):
@@ -861,7 +865,7 @@ class SubConfig:
         '''
         Returns parameters for person association (single or multi-person).
         '''
-        project_dir = self.project_dir
+        session_dir = self.session_dir
         multi_person = self.project.get("multi_person")
 
         min_cameras_for_triangulation = self.triangulation.get("min_cameras_for_triangulation")
@@ -882,12 +886,12 @@ class SubConfig:
         except:
             raise Exception("No calibration directory found.")
 
-        pose_dir = os.path.join(project_dir, "pose")
-        poseSync_dir = os.path.join(project_dir, "pose-sync")
-        poseTracked_dir = os.path.join(project_dir, "pose-associated")
+        pose_dir = os.path.join(session_dir, "pose")
+        poseSync_dir = os.path.join(session_dir, "pose-sync")
+        poseTracked_dir = os.path.join(session_dir, "pose-associated")
 
         return (
-            project_dir,
+            session_dir,
             self.session_dir,
             pose_dir,
             poseSync_dir,
@@ -902,105 +906,6 @@ class SubConfig:
             undistort_points,
         )
 
-
-class Config:
-    def __init__(self, config_input=None):
-        '''
-        Initializes the main configuration.
-
-        Arguments:
-          - config_input: Either a configuration dictionary,
-                          or the path to the folder containing Config.toml files.
-                          If None, the current folder is used.
-        '''
-        self.config_input = config_input
-        self.level, self.config_dicts = self._read_config_files(config_input)
-        self.session_dir = self._determine_session_dir()
-        self.use_custom_logging = self.config_dicts[0].get("logging").get("use_custom_logging")
-        self.sub_configs = [SubConfig(cfg, self.session_dir) for cfg in self.config_dicts]
-
-    def _recursive_update(self, base, updates):
-        for key, value in updates.items():
-            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-                base[key] = self._recursive_update(base[key], value)
-            else:
-                base[key] = value
-        return base
-
-    def _determine_level(self, config_dir):
-        len_paths = [
-            len(root.split(os.sep))
-            for root, dirs, files in os.walk(config_dir)
-            if "Config.toml" in files
-        ]
-        if not len_paths:
-            raise FileNotFoundError("You must have a Config.toml file in each trial folder or root folder.")
-        level = max(len_paths) - min(len_paths) + 1
-        return level
-
-    def _read_config_files(self, config_input):
-        if isinstance(config_input, dict):
-            # Single config dictionary
-            level = 2
-            config_dicts = [config_input]
-            if config_dicts[0].get("project").get("project_dir") is None:
-                raise ValueError("Please specify the project directory in the configuration.")
-        else:
-            # config_input is a folder path or None
-            config_dir = "." if config_input is None else config_input
-            level = self._determine_level(config_dir)
-
-            if level == 1:
-                try:
-                    session_config = toml.load(os.path.join(config_dir, "..", "Config.toml"))
-                    trial_config = toml.load(os.path.join(config_dir, "Config.toml"))
-                    session_config = self._recursive_update(session_config, trial_config)
-                except Exception:
-                    session_config = toml.load(os.path.join(config_dir, "Config.toml"))
-                session_config.get("project").update({"project_dir": config_dir})
-                config_dicts = [session_config]
-
-            elif level == 2:
-                session_config = toml.load(os.path.join(config_dir, "Config.toml"))
-                config_dicts = []
-                for root, dirs, files in os.walk(config_dir):
-                    if "Config.toml" in files and root != config_dir:
-                        trial_config = toml.load(os.path.join(root, "Config.toml"))
-                        temp = deepcopy(session_config)
-                        temp = self._recursive_update(temp, trial_config)
-                        temp.get("project", {}).update(
-                            {"project_dir": os.path.join(config_dir, os.path.relpath(root))}
-                        )
-                        if os.path.basename(root) not in temp.get("project").get("exclude_from_batch"):
-                            config_dicts.append(temp)
-            else:
-                raise ValueError("Unsupported configuration level.")
-
-        return level, config_dicts
-
-    def _determine_session_dir(self):
-        try:
-            if self.level == 2:
-                session_dir = os.path.realpath(os.getcwd())
-            else:
-                session_dir = os.path.realpath(os.path.join(os.getcwd(), ".."))
-            calib_dirs = [
-                os.path.join(session_dir, d)
-                for d in os.listdir(session_dir)
-                if os.path.isdir(os.path.join(session_dir, d)) and "calib" in d.lower()
-            ]
-            if calib_dirs:
-                return session_dir
-            else:
-                return os.path.realpath(os.getcwd())
-        except Exception:
-            return os.path.realpath(os.getcwd())
-
-    def __repr__(self):
-        return (
-            f"Config(level={self.level}, nb_configs={len(self.config_dicts)}, "
-            f"session_dir='{self.session_dir}', use_custom_logging={self.use_custom_logging})"
-        )
     
 def trc_write(object_coords_3d, trc_path):
     '''

@@ -43,7 +43,7 @@ from abc import ABC, abstractmethod
 from mpl_interactions import zoom_factory, panhandler
 
 from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance
-
+from Pose2Sim.stages.base import BaseStage
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -865,27 +865,30 @@ def toml_write(config, data, calibration):
         toml.dump(data, f)
 
 
-def calibrate_cams_all(config):
-    '''
-    Either converts a preexisting calibration file, 
-    or calculates calibration from scratch (from a board or from points).
-    Stores calibration in a .toml file
-    Prints recap.
-    
-    INPUTS:
-    - a config_dict dictionary
+class CalibrationStage(BaseStage):
+    name = "calibration"
 
-    OUTPUT:
-    - a .toml camera calibration file
-    '''
+    def run(self, data_in):
+        calibration, convert_path = self.config.get_calibration_params()
+        if self.config.calib_file:
+            data = toml.load(self.config.calib_output_path)
+            calibrate_sources(data)
+        else:
+            data = {}
+        calibration.calibrate(convert_path)
+        toml_write(self.config, data, calibration)
+        logging.info(f'Calibration file is stored at {self.config.calib_output_path}.')
+        return data_in
 
-    # Read config_dict
-    data, calibration, convert_path = config.get_calibration_params()
-
-    # Calibrate
-    calibration.calibrate(convert_path)
-
-    # Write calibration file
-    toml_write(config, data, calibration)
-    
-    logging.info(f'Calibration file is stored at {config.calib_output_path}.')
+def calibrate_sources(self, data):
+    for source in self.sources:
+        if source.name in data:
+            source_data = data[source.name]
+            source.ret = 0.0
+            source.S = source_data['size']
+            source.K = np.array(source_data['matrix'])
+            source.D = source_data['distortions']
+            source.R = [0.0, 0.0, 0.0]
+            source.T = [0.0, 0.0, 0.0]
+        else :
+            logging.info(f"[{source.name}] No existing calibration found.")
