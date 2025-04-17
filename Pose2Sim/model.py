@@ -2,6 +2,9 @@ from enum import Enum
 from functools import partial
 import logging
 from anytree.importer import DictImporter
+import re
+import json
+import ast
 
 from rtmlib import BodyWithFeet, Wholebody, Body, Hand, Custom
 from Pose2Sim.skeletons import HALPE_26, COCO_133_WRIST, COCO_133, COCO_17, HAND_21, FACE_106, ANIMAL2D_17, BODY_25B, BODY_25, BODY_135, BLAZEPOSE, HALPE_68, HALPE_136, COCO, MPII
@@ -82,16 +85,12 @@ class PoseModelEnum(Enum):
 
 
 class PoseModel:
-    def __init__(self, config, pose_model):
-        self.name = pose_model
-        self.pose_model_enum = self.get_pose_model(pose_model)
-        self.config = config
-
-        self.mode = config.pose.get('mode')
-        self.backend = None
-        self.device = None
-        self.det_input_size = None
-        self.output_format = config.pose.get('output_format')
+    def __init__(self, config):
+        self.pose_model_enum = self.get_pose_model(config.pose_model)
+        self.backend, self.device = init_backend_device(config.backend, config.device)
+        self.det_frequency = config.det_frequency
+        self.mode = config.mode
+        self.to_openpose = True
 
         self.load_model_instance()
 
@@ -114,19 +113,28 @@ class PoseModel:
             raise ValueError(f"{pose_model}")
 
     def load_model_instance(self):
-
-        self.backend, self.device = init_backend_device(self.config.backend, self.config.device)
-
-        self.det_input_size = self.pose_model_enum.model_class.MODE[self.config.mode]['det_input_size']
         if self.pose_model_enum.model_class is None:
             try:
-                det_class, det, self.det_input_size, pose_class, pose, pose_input_size = self.config.get_custom_model_params()
+                try:
+                    mode = ast.literal_eval(mode)
+                except:  # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+                    mode = mode.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/', ':/').replace('":"\\', ':\\')
+                    mode = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', mode)  # changes "[640", "640]" to [640,640]
+                    mode = json.loads(mode)
+                det_class = mode.get('det_class')
+                det = mode.get('det_model')
+                self.det_input_size = mode.get('det_input_size')
+                pose_class = mode.get('pose_class')
+                pose = mode.get('pose_model')
+                pose_input_size = mode.get('pose_input_size')
                 self.pose_model_enum.model_class = partial(Custom,
                                         det_class=det_class, det=det, det_input_size=self.det_input_size,
                                         pose_class=pose_class, pose=pose, pose_input_size=pose_input_size,
                                         backend=self.backend, device=self.device)
             except Exception:
                 raise NameError(f"{self.name} invalid mode. Must be 'lightweight', 'balanced', 'performance', or a dictionary of parameters defined in Config.toml.")
+        else:
+            self.det_input_size = self.pose_model_enum.model_class.MODE[self.mode]['det_input_size']
 
         if self.pose_model_enum.skeleton is None:
             try:
@@ -137,7 +145,7 @@ class PoseModel:
                 raise NameError(f"Skeleton {self.name} not found in skeletons.py nor in Config.toml")
 
         logging.info(f'\nPose tracking set up for "{self.name}" model.')
-        logging.info(f'Mode: {self.config.mode}.')
+        logging.info(f'Mode: {self.mode}.')
 
 
 def init_backend_device(backend, device):

@@ -14,5 +14,9 @@ class BaseStage(ABC):
     def run(self, data_in: Any) -> Any:
         ...
 
+    @abstractmethod
+    def save_data(self, data_out: Any) -> None:
+        ...
+
     def teardown(self) -> None:
         pass

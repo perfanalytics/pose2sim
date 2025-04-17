@@ -20,29 +20,21 @@ import toml
 import cv2
 import math
 import sys
-import pandas as pd
 from pathlib import Path
-from copy import deepcopy
-import numpy as np
 import re
 import json
 import ast
 
-from Pose2Sim.model import PoseModel
-from Pose2Sim.common import natural_sort_key, zup2yup
+from Pose2Sim.common import natural_sort_key
 from Pose2Sim.MarkerAugmenter import utilsDataman
-from Pose2Sim.source import WebcamSource, ImageSource, VideoSource
-from Pose2Sim.subject import Subject
-from Pose2Sim.stages.calibration import QcaCalibration, OptitrackCalibration, ViconCalibration, EasyMocapCalibration, BiocvCalibration, OpencapCalibration, PointCalibration
+from Pose2Sim.model import PoseModel
+from Pose2Sim.source import WebcamSource
 
 
 class Config:
     def __init__(self, config_input=None):
         self.config_input = config_input
-        self.config_dicts = [self._build_merged_config(config_input)][0]
-        self.pose_model = PoseModel(self, self.pose.get("pose_model"))
-        self.sources = self.sources()
-        self.subjects = self.subjects()
+        self.config_dict = [self._build_merged_config(config_input)][0]
 
         self.fps = None
 
@@ -94,88 +86,186 @@ class Config:
 
         return configs_found
 
-    def subjects(self):
-        """
-        Construit une liste d'objets Subject à partir de la config TOML.
-        """
-        subjects_data_list = self.config_dicts.get("subjects")
-        subjects_list = []
-        for sub_data in subjects_data_list:
-            subject_obj = Subject(self, sub_data)
-            subjects_list.append(subject_obj)
-        return subjects_list
+    @property
+    def session_dir(self):
+        return os.path.realpath(os.getcwd())
+
+    # Project
+
+    @property
+    def project(self):
+        return self.config_dict.get("project")
+
+    @property
+    def frame_rate(self):
+        return self.project.get("frame_rate")
+
+    @property 
+    def frame_range(self):
+        frame_range = self.project.get('frame_range')
+        if not frame_range:
+            return None
+        if len(frame_range) == 2 and all(isinstance(x, int) for x in frame_range):
+            return set(range(frame_range))
+        return set(frame_range)
+
+    # Pose
+
+    @property
+    def pose(self):
+        return self.config_dict.get("pose")
+
+    @property
+    def pose_model(self):
+        return self.pose.get('pose_model')
+
+    @property
+    def mode(self):
+        return self.pose.get('mode')
     
-    def sources(self):
-        sources_data_list = self.config_dicts.get("sources")
-        sources_list = []
-        for src_data in sources_data_list:
-            path_val = src_data.get("path")
-            if isinstance(path_val, int):
-                source_obj = WebcamSource(self, src_data, self.pose_model)
-            else:
-                path_str = str(path_val)
-                abs_path = os.path.abspath(path_str)
+    @property
+    def det_frequency(self):
+        return self.config_dict.get("det_frequency")
 
-                if os.path.isdir(abs_path):
-                    source_obj = ImageSource(self, src_data, self.pose_model)
+    @property
+    def backend(self):
+        return self.pose.get('backend')
 
-                elif os.path.isfile(abs_path):
-                    source_obj = VideoSource(self, src_data, self.pose_model)
+    @property
+    def device(self):
+        return self.pose.get('device')
 
-                elif path_str.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
-                    logging.error(f"Video file '{path_str}' not found.")
-                    raise FileNotFoundError(f"Video file '{path_str}' not found.")
+    # PoseEstimation
 
-                elif path_str.endswith(("/", "\\")):
-                    logging.error(f"Folder '{path_str}' not found.")
-                    raise FileNotFoundError(f"Folder '{path_str}' not found.")
-                
-                else:
-                    logging.error(f"Unable to create a source from '{path_str}'.")
-                    raise FileNotFoundError(f"Unable to create a source from '{path_str}'.")
+    @property
+    def pose_dir(self):
+        return os.path.join(self.session_dir, 'pose')
 
-            sources_list.append(source_obj)
-        return sources_list
-    
     def set_fps(self, value):
         self.fps = value
         logging.info(f'[Pose estimation] capture frame rate set to: {self.fps}.')
 
     @property
-    def calibration(self):
-        return self.config_dicts.get("calibration")
+    def pose_estimation(self):
+        return self.config_dict.get("poseEstimation")
     
     @property
-    def session_dir(self):
-        return os.path.realpath(os.getcwd())
+    def output_format(self):
+        return self.pose_estimation.get('output_format')
+
+    @property
+    def webcam_recording(self):
+        return self.pose_estimation.get('webcam_recording')
     
+    @property
+    def save_files(self):
+        save_files = self.pose_estimation.get('save_video')
+        save_images = ('to_images' in save_files)
+        save_video = ('to_video' in save_files)
+        return save_video, save_images
+    
+    @property
+    def tracking_mode(self):
+        return self.pose_estimation.get('tracking_mode')
+    
+    @property
+    def multi_person(self):
+        return self.pose_estimation.get('multi_person')
+
+    @property 
+    def combined_frames(self):
+        return self.pose_estimation.get('combined_frames')
+
+    @property 
+    def multi_workers(self):
+        return self.pose_estimation.get('multi_workers')
+
+    def check_pose_estimation(self):
+        overwrite_pose = self.pose_estimation.get('overwrite_pose')
+
+        for source in self.sources:
+            if not isinstance(source, WebcamSource):
+                if os.path.exists(os.path.join(self.pose_dir, source.name)) and not overwrite_pose:
+                    logging.info(f'[{source.name} - pose estimation] Skipping as it has already been done.'
+                                'To recalculate, set overwrite_pose to true in Config.toml.')
+                    return
+                elif os.path.exists(os.path.join(self.pose_dir, source.name)) and overwrite_pose:
+                    logging.info(f'[{source.name} - pose estimation] Overwriting estimation results.')
+    
+    def get_deepsort_params(self):
+        try:
+            deepsort_params = ast.literal_eval(deepsort_params)
+        except:  # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+            deepsort_params = deepsort_params.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/', ':/').replace('":"\\', ':\\')
+            deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params)  # changes "[640", "640]" to [640,640]
+            deepsort_params = json.loads(deepsort_params)
+        
+        return deepsort_params
+
+    # Logging
+
     @property
     def use_custom_logging(self):
-        return self.config_dicts.get("logging").get("use_custom_logging")
-    
-    @property
-    def gray_capture(self):
-        return self.pose.get("gray_capture")
+        return self.config_dict.get("logging").get("use_custom_logging")
+
+    # Calibration
 
     @property
-    def extrinsics_corners_nb(self):
-        return self.calibration.get("calculate").get("extrinsics").get("board").get("extrinsics_corners_nb")
+    def calib_output_path(self):
+        return os.path.join(self.session_dir, f"Calib.toml")
 
     @property
-    def extrinsics_square_size(self):
-        return self.calibration.get("calculate").get("extrinsics").get("board").get("extrinsics_square_size") / 1000.0
+    def calibration(self):
+        return self.config_dict.get("calibration")
+
+    @property
+    def calib_type(self):
+        return self.calibration.get("calibration_type")
+
+    @property
+    def overwrite_intrinsics(self):
+        return self.calibration.get("overwrite_intrinsics")
+
+    @property
+    def overwrite_extrinsics(self):
+        return self.calibration.get("overwrite_extrinsics")
 
     @property
     def calculate_extrinsics(self):
-        return self.calibration.get("calculate").get("extrinsics").get("calculate_extrinsics")
-    
+        return self.calibration.get("calculate_extrinsics")
+
+    # Calibration - Convert
+
     @property
-    def extract_every_N_sec(self):
-        return self.calibration.get("calculate").get("intrinsics").get("extract_every_N_sec")
+    def convert_path(self):
+        convert_path = self.calibration.get("convert").get("convert_from")    
+        if not convert_path:
+            raise NameError("Conversion file path not specified in configuration.")
+
+        if not os.path.isabs(convert_path):
+            convert_path = os.path.join(self.session_dir, convert_path)
+
+        if not os.path.exists(convert_path):
+            raise NameError(f"File {convert_path} not found.")
+        return convert_path
+    
+    # Calibration - Convert - Qualisys
+
+    @property
+    def binning_factor_qualisys(self):
+        return self.config.calibration.get("convert").get("qualisys").get("binning_factor", 1)
+
+    # Calibration - Calculate
 
     @property
     def overwrite_extraction(self):
-        return False
+        return self.calibration.get("calculate").get("overwrite_extraction")
+
+    @property
+    def extract_every_N_sec(self):
+        return self.calibration.get("calculate").get("extract_every_N_sec")
+
+    # Calibration - Calculate - Intrinsics
 
     @property
     def show_detection_intrinsics(self):
@@ -190,16 +280,50 @@ class Config:
         return self.calibration.get("calculate").get("intrinsics").get("intrinsics_square_size") / 1000.0
 
     @property
-    def logging(self):
-        return self.config_dicts.get("logging")
+    def intrinsics_extension(self):
+        return self.calibration.get("calculate").get("intrinsics").get("intrinsics_extension")
+
+    # Calibration - Calculate - Extrinsics
+
+    @property
+    def extrinsics_method(self):
+        return self.calibration.get("calculate").get("extrinsics").get("extrinsics_method")
+
+    @property
+    def extrinsics_extension(self):
+        return self.calibration.get("calculate").get("extrinsics").get("extrinsics_extension")
+
+    @property
+    def show_reprojection_error(self):
+        return self.calibration.get("calculate").get("extrinsics").get("show_reprojection_error")
+
+    # Calibration - Calculate - Extrinsics - Board
+
+    @property
+    def extrinsics_corners_nb(self):
+        return self.calibration.get("calculate").get("extrinsics").get("board").get("extrinsics_corners_nb")
+
+    @property
+    def extrinsics_square_size(self):
+        return self.calibration.get("calculate").get("extrinsics").get("board").get("extrinsics_square_size") / 1000.0
+
+    # Calibration - Calculate - Extrinsics - Scene
+
+    @property
+    def object_coords_3d(self):
+        return self.calibration.get("calculate").get("extrinsics").get("scene").get("object_coords_3d")
+
+    # Filtering
 
     @property
     def filtering(self):
-        return self.config_dicts.get("filtering")
+        return self.config_dict.get("filtering")
+
+    # Kinematics
 
     @property
     def kinematics(self):
-        return self.config_dicts.get("kinematics")
+        return self.config_dict.get("kinematics")
     
     @property
     def fastest_frames_to_remove_percent(self):
@@ -221,36 +345,29 @@ class Config:
     def default_height(self):
         return self.kinematics.get("default_height")
 
+    # Marker Augmentation
+
     @property
     def markerAugmentation(self):
-        return self.config_dicts.get("markerAugmentation")
+        return self.config_dict.get("markerAugmentation")
+
+    # Triangulation
 
     @property
     def triangulation(self):
-        return self.config_dicts.get("triangulation")
+        return self.config_dict.get("triangulation")
+
+    # Synchronization
 
     @property
     def synchronization(self):
-        return self.config_dicts.get("synchronization")
+        return self.config_dict.get("synchronization")
+
+    # Person Association
 
     @property
     def personAssociation(self):
-        return self.config_dicts.get("personAssociation")
-    
-    @property
-    def project(self):
-        return self.config_dicts.get("project")
-
-    @property
-    def frame_range(self):
-        '''
-        Returns the frame range specified in the configuration.
-        '''
-        return self.project.get("frame_range")
-
-    @property
-    def pose(self):
-        return self.config_dicts.get("pose")
+        return self.config_dict.get("personAssociation")
 
     @property
     def osim_setup_dir(self):
@@ -260,164 +377,6 @@ class Config:
         pose2sim_path = Path(sys.modules["Pose2Sim"].__file__).resolve().parent
         return pose2sim_path / "OpenSim_Setup"
 
-    @property
-    def object_coords_3d(self):
-        object_coords_3d = self.calibration.get("calculate").get("extrinsics").get("object_coords_3d")
-        if self.extrinsics_method in {'board', 'scene'}:
-            # Define 3D object points
-            if self.extrinsics_method == 'board':
-                object_coords_3d = np.zeros((self.extrinsics_corners_nb[0] * self.extrinsics_corners_nb[1], 3), np.float32)
-                object_coords_3d[:, :2] = np.mgrid[0:self.extrinsics_corners_nb[0], 0:self.extrinsics_corners_nb[1]].T.reshape(-1, 2)
-                object_coords_3d[:, :2] = object_coords_3d[:, 0:2] * self.extrinsics_square_size
-                return object_coords_3d
-            elif self.extrinsics_method == 'scene':
-                return object_coords_3d
-
-            elif self.extrinsics_method == 'keypoints':
-                raise NotImplementedError('This has not been integrated yet.')
-
-        else:
-            raise ValueError('Wrong value for extrinsics_method')
-
-    def get_calibration_params(self):
-        '''
-        Extracts and returns calibration parameters from the configuration.
-
-        Returns a tuple:
-          - calib_output_path: path to the calibration file to write
-          - calib_full_type: full calibration type (e.g. 'convert_qualisys', 'calculate', etc.)
-          - args_calib_fun: arguments to pass to the calibration function
-
-        In case of error (unknown calibration type or missing file), raises an exception.
-        '''
-        calib_type = self.calibration.get("calibration_type")
-        overwrite_intrinsics = self.calibration.get("calculate").get("intrinsics").get("overwrite_intrinsics", False)
-        overwrite_extrinsics = True
-
-        convert_path = None
-
-        if calib_type == "convert":
-            convert_path = self.calibration.get("convert").get("convert_from")
-            if not convert_path:
-                raise NameError("Conversion file path not specified in configuration.")
-
-            if not os.path.isabs(convert_path):
-                convert_path = os.path.join(self.session_dir, convert_path)
-
-            if not os.path.exists(convert_path):
-                raise NameError(f"File {convert_path} not found.")
-            
-            filename = os.path.basename(convert_path).lower()
-
-        extrinsinc = False
-        for source in self.sources:
-            if not overwrite_intrinsics and len(source.S) != 0 and len(source.D) != 0 and len(source.K) != 0:
-                logging.info(
-                    f"[{source.name} - intrinsic] Intrinsic calibration loaded from '{os.path.relpath(self.calib_file)}'."
-                )
-                logging.info(
-                    'To recalculate, set "overwrite_intrinsics" to true in Config.toml.'
-                )
-            else:
-                if calib_type == "convert":
-                    source.intrinsics_files = convert_path
-                elif calib_type == "calculate":
-                    if source.calib_intrinsics != "live":
-                        source.intrinsics_files = source.get_calib_files(source.calib_intrinsics, self.intrinsics_extension, "intrinsics")
-
-            if not overwrite_extrinsics and len(source.R) != 0 and len(source.T) != 0:
-                logging.info(
-                    f"[{source.name} - entrinsic] Extrinsic calibration loaded from '{os.path.relpath(self.calib_file)}'."
-                )
-                logging.info(
-                    'To recalculate, set "overwrite_extrinsics" to true in Config.toml.'
-                )
-            else:
-                extrinsinc = True
-                if calib_type == "convert":
-                    source.extrinsics_files = convert_path
-                elif calib_type == "calculate":
-                    source.extrinsics_files = source.get_calib_files(source.calib_extrinsics, self.extrinsics_extension, "extrinsics")
-
-        if calib_type == "convert":
-            if filename.endswith(".qca.txt"):
-                calibration = QcaCalibration(self, self.calibration.get("convert", {}).get("qualisys", {}).get("binning_factor", 1))
-            elif filename.endswith(".xcp"):
-                calibration = ViconCalibration(self, 1)
-            elif filename.endswith(".pickle"):
-                calibration = OpencapCalibration(self, 1)
-            elif filename.endswith(".yml"):
-                calibration = EasyMocapCalibration(self, 1)
-            elif filename.endswith(".calib"):
-                calibration = BiocvCalibration(self, 1)
-            elif filename.endswith(".csv"):
-                calibration = OptitrackCalibration(self, 1)
-            elif any(filename.endswith(ext) for ext in [".anipose", ".freemocap", ".caliscope"]):
-                logging.info("\n--> No conversion required for Caliscope, AniPose, or FreeMocap. Calibration will be ignored.\n")
-                return None
-            else:
-                raise NameError(f"File {filename} not supported for conversion.")
-
-        elif calib_type == "calculate":
-            if extrinsinc:
-                trc_write(self.object_coords_3d, os.path.join(self.session_dir, f'Object_points.trc'))
-            calibration = PointCalibration(self, None)
-
-        else:
-            logging.info("Invalid calibration_type in Config.toml")
-            return ValueError("Invalid calibration_type in Config.toml")
-
-        return calibration, convert_path
-
-    @property
-    def calib_file(self):
-        calib_file = glob.glob(self.calib_output_path)
-        if len(calib_file) == 0:
-            logging.info("No existing calibration file found.")
-            return None
-        return calib_file[0]
-    
-    @property 
-    def calib_output_path(self):
-        return os.path.join(self.session_dir, f"Calib.toml")
-
-    @property 
-    def intrinsics_extension(self):
-        return self.calibration.get("calculate").get("intrinsics").get("intrinsics_extension")
-
-    @property 
-    def extrinsics_method(self):
-        return self.calibration.get("calculate").get("extrinsics").get("extrinsics_method")
-
-    @property 
-    def extrinsics_extension(self):
-        if self.extrinsics_method == "board":
-            return self.calibration.get("calculate").get("extrinsics").get("board").get("extrinsics_extension")
-        else:
-            return self.calibration.get("calculate").get("extrinsics").get("scene").get("extrinsics_extension")
-
-    @property 
-    def show_reprojection_error(self):
-        if self.extrinsics_method == "board":
-            return self.calibration.get("calculate").get("extrinsics").get("board").get("show_reprojection_error")
-        else:
-            return self.calibration.get("calculate").get("extrinsics").get("scene").get("show_reprojection_error")
-
-    @property 
-    def backend(self):
-        return self.pose.get('backend')
-
-    @property 
-    def device(self):
-        return self.pose.get('device')
-    
-    @property 
-    def mode(self):
-        return self.pose.get('mode')
-
-    @property 
-    def frame_rate(self):
-        return self.project.get("frame_rate")
 
     def get_filtering_params(self):
         '''
@@ -727,7 +686,7 @@ class Config:
         video_dir = os.path.join(self.session_dir, "videos")
         vid_img_extension = self.pose_conf.get("vid_img_extension", "")
         video_files = glob.glob(os.path.join(video_dir, "*" + vid_img_extension))
-        frame_rate = self.config_dicts.get("project", {}).get("frame_rate")
+        frame_rate = self.config_dict.get("project", {}).get("frame_rate")
         if frame_rate == "auto":
             try:
                 cap = cv2.VideoCapture(video_files[0])
@@ -745,121 +704,6 @@ class Config:
         trc_path = os.path.realpath(os.path.join(pose3d_dir, trc_f))
 
         return trc_path, trc_f, frame_rate
-    
-    @property
-    def pose_dir(self):
-        return os.path.join(self.session_dir, 'pose')
-    
-    @property
-    def webcam_recording(self):
-        return self.pose.get('webcam_recording')
-    
-    @property
-    def save_files(self):
-        save_files = self.pose.get('save_video')
-        save_images = ('to_images' in save_files)
-        save_video = ('to_video' in save_files)
-        return save_video, save_images
-    
-    @property
-    def tracking_mode(self):
-        return self.pose.get('tracking_mode')
-    
-    @property
-    def multi_person(self):
-        return self.project.get('multi_person')
-
-    def check_pose_estimation(self):
-        # Read config
-        overwrite_pose = self.pose.get('overwrite_pose')
-
-        for source in self.sources:
-            if not isinstance(source, WebcamSource):
-                if os.path.exists(os.path.join(self.pose_dir, source.name)) and not overwrite_pose:
-                    logging.info(f'[{source.name} - pose estimation] Skipping as it has already been done.'
-                                'To recalculate, set overwrite_pose to true in Config.toml.')
-                    return
-                elif os.path.exists(os.path.join(self.pose_dir, source.name)) and overwrite_pose:
-                    logging.info(f'[{source.name} - pose estimation] Overwriting estimation results.')
-    
-    def get_mosaic_params(self):
-        '''
-        Returns the parameters required for pose estimation.
-        '''
-
-        mosaic_rows = 0
-        mosaic_cols = 0
-
-        if self.combined_frames:
-            mosaic_cols = math.ceil(math.sqrt(len(self.sources)))
-            mosaic_rows = mosaic_cols
-            cell_w = self.pose_model.det_input_size[0] // mosaic_cols
-            cell_h = self.pose_model.det_input_size[1] // mosaic_rows
-
-            logging.info(f"Combined frames: {mosaic_rows} rows & {mosaic_cols} cols")
-
-            for i, source in enumerate(self.sources):
-                r = i // mosaic_cols
-                c = i % mosaic_cols
-                x_off = c * cell_w
-                y_off = r * cell_h
-                source.x_offset = x_off
-                source.y_offset = y_off
-                source.desired_width = cell_w
-                source.desired_height = cell_h
-
-            frame_size = (cell_w, cell_h)
-        else:
-            frame_size = self.pose_model.det_input_size
-            logging.info(f"Frame input size: {frame_size[0]}x{frame_size[1]}")
-            for source in self.sources:
-                source.desired_width = frame_size[0]
-                source.desired_height = frame_size[1]
-
-        return (mosaic_rows, mosaic_cols)
-    
-    @property 
-    def combined_frames(self):
-        return self.pose.get('combined_frames')
-
-    @property 
-    def multi_workers(self):
-        return self.pose.get('multi_workers')
-
-    @property 
-    def frame_range(self):
-        frame_range = self.project.get('frame_range')
-        if not frame_range:
-            return None
-        if len(frame_range) == 2 and all(isinstance(x, int) for x in frame_range):
-            return set(range(frame_range))
-        return set(frame_range)
-
-    def get_custom_model_params(self):
-        try:
-            mode = ast.literal_eval(mode)
-        except:  # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
-            mode = mode.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/', ':/').replace('":"\\', ':\\')
-            mode = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', mode)  # changes "[640", "640]" to [640,640]
-            mode = json.loads(mode)
-        det_class = mode.get('det_class')
-        det = mode.get('det_model')
-        det_input_size = mode.get('det_input_size')
-        pose_class = mode.get('pose_class')
-        pose = mode.get('pose_model')
-        pose_input_size = mode.get('pose_input_size')
-        
-        return det_class, det, det_input_size, pose_class, pose, pose_input_size
-    
-    def get_deepsort_params(self):
-        try:
-            deepsort_params = ast.literal_eval(deepsort_params)
-        except:  # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
-            deepsort_params = deepsort_params.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/', ':/').replace('":"\\', ':\\')
-            deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params)  # changes "[640", "640]" to [640,640]
-            deepsort_params = json.loads(deepsort_params)
-        
-        return deepsort_params
 
     def get_person_association_params(self):
         '''
@@ -905,42 +749,3 @@ class Config:
             likelihood_threshold_association,
             undistort_points,
         )
-
-    
-def trc_write(object_coords_3d, trc_path):
-    '''
-    Make Opensim compatible trc file from a dataframe with 3D coordinates
-
-    INPUT:
-    - object_coords_3d: list of 3D point lists
-    - trc_path: output path of the trc file
-
-    OUTPUT:
-    - trc file with 2 frames of the same 3D points
-    '''
-
-    #Header
-    DataRate = CameraRate = OrigDataRate = 1
-    NumFrames = 2
-    NumMarkers = len(object_coords_3d)
-    keypoints_names = np.arange(NumMarkers)
-    header_trc = ['PathFileType\t4\t(X/Y/Z)\t' + os.path.basename(trc_path), 
-            'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames', 
-            '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, NumFrames])),
-            'Frame#\tTime\t' + '\t\t\t'.join(str(k) for k in keypoints_names) + '\t\t',
-            '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(NumMarkers)])]
-    
-    # Zup to Yup coordinate system
-    object_coords_3d = pd.DataFrame([np.array(object_coords_3d).flatten(), np.array(object_coords_3d).flatten()])
-    object_coords_3d = zup2yup(object_coords_3d)
-    
-    #Add Frame# and Time columns
-    object_coords_3d.index = np.array(range(0, NumFrames)) + 1
-    object_coords_3d.insert(0, 't', object_coords_3d.index / DataRate)
-
-    #Write file
-    with open(trc_path, 'w') as trc_o:
-        [trc_o.write(line+'\n') for line in header_trc]
-        object_coords_3d.to_csv(trc_o, sep='\t', index=True, header=None, lineterminator='\n')
-
-    return trc_path

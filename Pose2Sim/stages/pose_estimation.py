@@ -77,9 +77,10 @@ __status__ = "Development"
 
 # CLASSES
 class PoseEstimatorWorker(multiprocessing.Process):
-    def __init__(self, config, input_queue, output_queue, tracker_ready_event):
+    def __init__(self, config, pose_model, input_queue, output_queue, tracker_ready_event):
         super().__init__(daemon=True)
         self.config = config
+        self.pose_model = pose_model
         self.input_queue = input_queue
         self.output_queue = output_queue
         self.tracker_ready_event = tracker_ready_event
@@ -92,16 +93,16 @@ class PoseEstimatorWorker(multiprocessing.Process):
             self.deepsort_tracker = DeepSort(**self.config.get_deepsort_params())
 
     def run(self):
-        model = self.config.pose_model.pose_model_enum.model_class(mode=self.config.pose_model.mode,
-            to_openpose=self.config.pose_model.output_format,
-            backend=self.config.pose_model.backend,
-            device=self.config.pose_model.device)
+        model = self.pose_model.pose_model_enum.model_class(mode=self.pose_model.mode,
+            to_openpose=self.pose_model.to_openpose,
+            backend=self.pose_model.backend,
+            device=self.pose_model.device)
 
         try:
             self.det_model = model.det_model
         except AttributeError:  # rtmo
             self.det_model = None
-        self.pose_model = model.pose_model
+        self.model = model.pose_model
 
         self.tracker_ready_event.set()
 
@@ -117,7 +118,7 @@ class PoseEstimatorWorker(multiprocessing.Process):
 
             if not frame_data.placeholder:
                 if self.det_model is not None:
-                    if frame_data.idx % self.det_frequency == 0:
+                    if frame_data.idx % self.pose_model.det_frequency == 0:
                         bboxes = self.det_model(frame)
                         if frame_data.source is not None:
                             self.prev_bboxes[frame_data.source.name] = bboxes
@@ -128,9 +129,9 @@ class PoseEstimatorWorker(multiprocessing.Process):
                             bboxes = self.prev_bboxes.get(frame_data.source.name, None)
                         else:
                             bboxes = self.prev_bboxes
-                    frame_data.keypoints, frame_data.scores = self.pose_model(frame, bboxes=bboxes)
+                    frame_data.keypoints, frame_data.scores = self.model(frame, bboxes=bboxes)
                 else:  # rtmo
-                    frame_data.keypoints, frame_data.scores = self.pose_model(frame)
+                    frame_data.keypoints, frame_data.scores = self.model(frame)
 
                 if self.multi_person:
                     if self.tracking_mode == 'deepsort':
@@ -285,10 +286,10 @@ class OutputQueueProcessor(BaseProcessor):
                 idx        = mosaic_data.idx,
                 keypoints  = rec_kpts,
                 scores     = rec_scores,
+                frame      = mosaic[y0:y1, x0:x1],
             )
 
-            frame = mosaic[y0:y1, x0:x1]
-            self.handle_output(frame, frame_data)
+            output(frame_data)
 
     def handle_individual_frames(self, frame_data):
         if frame_data.idx not in self.sync_data:
@@ -309,8 +310,10 @@ class OutputQueueProcessor(BaseProcessor):
                     )
                     self.buffer_manager.available_buffers.put(frame_data.buffer.name)
                     if self.config.save_files[0] or self.config.save_files[1] or self.config.display_detection:
-                        frame = draw_skeleton(frame, frame_data.keypoints, frame_data.scores)
-                    self.handle_output(frame, frame_data)
+                        frame_data.frame = draw_skeleton(frame, frame_data.keypoints, frame_data.scores)
+                    
+                    output(frame_data)
+                    
                     if mosaic:
                         source = frame_data.source
                         mosaic[source.y_offset:source.y_offset + source.height,
@@ -343,17 +346,6 @@ class OutputQueueProcessor(BaseProcessor):
         if key in [ord('q'), 27]:
             logging.info("User closed display.")
             self.stop()
-
-    def handle_output(self, frame, frame_data):
-        file_name = f"{frame_data.source.name}_{frame_data.timestamp}_{frame_data.idx:06d}"
-
-        if 'openpose' in self.output_format:
-            json_path = os.path.join(frame_data.source.output_dir, f"{file_name}.json")
-            save_keypoints_to_openpose(json_path, frame_data.keypoints, frame_data.scores)
-        if self.save_images:
-            cv2.imwrite(os.path.join(frame_data.source.img_output_dir, f"{file_name}.jpg"), frame)
-        if self.save_video:
-            frame_data.source.video_writer.write(frame)
 
 
 class CaptureCoordinator():
@@ -582,6 +574,18 @@ class PoseEstimationStage(BaseStage):
 
         return data_in
 
+    def save_data(self, data_out):
+        file_name = f"{data_out.source.name}_{data_out.timestamp}_{data_out.idx:06d}"
+
+        if self.config.save_images:
+            cv2.imwrite(os.path.join(data_out.source.img_output_dir, f"{file_name}.jpg"), data_out.frame)
+        if self.config.save_video:
+            data_out.source.video_writer.write(data_out.frame)
+        if 'openpose' in self.config.output_format:
+            json_path = os.path.join(data_out.source.output_dir, f"{file_name}.json")
+            save_keypoints_to_openpose(json_path, data_out.keypoints, data_out.scores)
+        # if 'deeplabcut' in self.config.output_format:
+        # if 'pose2sim' in self.config.output_format:
 
 def save_keypoints_to_openpose(json_file_path, all_keypoints, all_scores):
     '''
@@ -715,3 +719,36 @@ def save_keypoints_to_deeplabcut(csv_file_path, all_keypoints, all_scores, times
     # Create a DataFrame for the new row and append it.
     new_row_df = pd.DataFrame([row_data], columns=new_header)
     new_row_df.to_csv(csv_file_path, mode='a', header=not os.path.exists(csv_file_path), index=False)
+
+
+def get_mosaic_params(self):
+    mosaic_rows = 0
+    mosaic_cols = 0
+
+    if self.combined_frames:
+        mosaic_cols = math.ceil(math.sqrt(len(self.sources)))
+        mosaic_rows = mosaic_cols
+        cell_w = self.pose_model.det_input_size[0] // mosaic_cols
+        cell_h = self.pose_model.det_input_size[1] // mosaic_rows
+
+        logging.info(f"Combined frames: {mosaic_rows} rows & {mosaic_cols} cols")
+
+        for i, source in enumerate(self.sources):
+            r = i // mosaic_cols
+            c = i % mosaic_cols
+            x_off = c * cell_w
+            y_off = r * cell_h
+            source.x_offset = x_off
+            source.y_offset = y_off
+            source.desired_width = cell_w
+            source.desired_height = cell_h
+
+        frame_size = (cell_w, cell_h)
+    else:
+        frame_size = self.pose_model.det_input_size
+        logging.info(f"Frame input size: {frame_size[0]}x{frame_size[1]}")
+        for source in self.sources:
+            source.desired_width = frame_size[0]
+            source.desired_height = frame_size[1]
+
+    return (mosaic_rows, mosaic_cols)

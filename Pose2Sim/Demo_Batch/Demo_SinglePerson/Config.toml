@@ -19,6 +19,11 @@
 
 [project]
 frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video and webcam (Don't work with images) 
+frame_range = [] # For example [10,300], or [] for all frames. 
+## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
+## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
+## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
+## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
 
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
@@ -35,9 +40,8 @@ mass = 55
 
 [[sources]]
 name = "image1"
-path = "videos/cam01.mp4"
-timestamp_path = "videos/cam01.txt"
-timestamp = "video/cam01_timestamps.csv"
+path = ["videos/cam01.mp4"]
+timestamp_path = ["videos/cam01.txt"]
 rotation = 0
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
 time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
@@ -46,8 +50,8 @@ calib_extrinsics = "extrinsics/ext_cam01_img/"
 
 [[sources]]
 name = "cam02"
-path = "videos/cam02.mp4"
-timestamp_path = "videos/cam02.txt"
+path = ["videos/cam02.mp4"]
+timestamp_path = ["videos/cam02.txt"]
 rotation = 0
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
 time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
@@ -63,11 +67,6 @@ calib_extrinsics = "live"
 backend = "MSMF"
 capture_codec = "MJPG"
 record_codec = "mp4v"
-
-## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
-## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
-## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
-## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
 
 [pose]
 pose_model = 'Body_with_feet'  #With RTMLib: 
@@ -115,6 +114,7 @@ det_frequency = 4 # Run person detection only every N frames, and inbetween trac
 device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
 
+[poseEstimation]
 tracking_mode = 'sports2d' # 'sports2d' or 'deepsort'. 'deepsort' is slower but more robust in difficult configurations
 deepsort_params = """{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8}""" # """{dictionary between 3 double quotes}"""
                   # More robust in crowded scenes but Can be tricky to parametrize. More information there: https://github.com/levan92/deep_sort_realtime/blob/master/deep_sort_realtime/deepsort_tracker.py#L51
@@ -139,7 +139,9 @@ filter_order = 4
 # Take heart, calibration is not that complicated once you get the hang of it!
 [calibration]
 calibration_type = 'convert' # 'convert' or 'calculate'
-save_calibration = true
+overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
+overwrite_extrinsics = false # set to false if you don't want to recalculate extrinsic parameters
+calculate_extrinsics = true # true or false (lowercase)
 
    [calibration.convert]
    convert_from = 'calibration/Calib.qca.txt' # 'caliscope', 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
@@ -155,34 +157,32 @@ save_calibration = true
       [calibration.convert.freemocap]  # No parameter needed
   
 
-   [calibration.calculate] 
+   [calibration.calculate]
+   extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
+   overwrite_extraction = false
+
       # Camera properties, theoretically need to be calculated only once in a camera lifetime
       [calibration.calculate.intrinsics]
-      overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
       show_detection_intrinsics = true # true or false (lowercase)
       intrinsics_extension = 'jpg' # any video or image extension
-      extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
       intrinsics_corners_nb = [4,7]
       intrinsics_square_size = 60 # mm
 
       # Camera placements, need to be done before every session
       [calibration.calculate.extrinsics]
-      calculate_extrinsics = true # true or false (lowercase) 
       extrinsics_method = 'scene' # 'board', 'scene', 'keypoints'
+      show_reprojection_error = true # true or false (lowercase)
+      extrinsics_extension = 'png' # any video or image extension
       # 'board' should be large enough to be detected when laid on the floor. Not recommended.
       # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out.
       # 'keypoints' uses automatic pose estimation of a person freely walking and waving arms in the scene. Slighlty less accurate, requires synchronized cameras.
       moving_cameras = false # Not implemented yet
 
          [calibration.calculate.extrinsics.board]
-         show_reprojection_error = true # true or false (lowercase)
-         extrinsics_extension = 'png' # any video or image extension
          extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
          extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
 
          [calibration.calculate.extrinsics.scene]
-         show_reprojection_error = true # true or false (lowercase)
-         extrinsics_extension = 'png' # any video or image extension
          # list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
          # in m -> unlike for intrinsics, NOT in mm!
          object_coords_3d =   [[-2.0,  0.3,  0.0], 

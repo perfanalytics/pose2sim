@@ -37,6 +37,7 @@ class FrameData:
     placeholder: bool = False
     keypoints: dict = None
     scores: dict = None
+    frame: np.ndarray = None
 
 
 class BaseSource(abc.ABC):

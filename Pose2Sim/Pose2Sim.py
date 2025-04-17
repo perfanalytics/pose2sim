@@ -49,6 +49,9 @@ from datetime import datetime
 from typing import Any, Iterable, Sequence
 
 from Pose2Sim.config import Config
+from Pose2Sim.model import PoseModel
+from Pose2Sim.source import WebcamSource, ImageSource, VideoSource
+from Pose2Sim.subject import Subject
 from Pose2Sim.stages.base import BaseStage
 
 # AUTHORSHIP INFORMATION
@@ -127,10 +130,13 @@ class Pose2SimPipeline:
         self,
         config_input: str | os.PathLike | dict | None = None,
         stages: Sequence[str] | None = None,
-        *,
-        log_level: str = "INFO",
+        save_data: bool = False,
     ) -> None:
         self.config = Config(config_input)
+
+        self.pose_model = PoseModel(self.config, self.config.pose.get("pose_model"))
+        self.sources = self.sources()
+        self.subjects = self.subjects()
 
         if not self.config.use_custom_logging:
             for handler in logging.root.handlers[:]:
@@ -148,11 +154,57 @@ class Pose2SimPipeline:
                 ]
             )
 
+        self.save_data = save_data
+
         # ––– Instantiate stages –––––––––––––––––––––––––––––––––––––––––
         wanted = stages or self.DEFAULT_CHAIN
         self._stages: list[BaseStage] = [
             _discover_stage(name)(self.config) for name in wanted
         ]
+
+
+    def subjects(self):
+        """
+        Construit une liste d'objets Subject à partir de la config TOML.
+        """
+        subjects_data_list = self.config.get("subjects")
+        subjects_list = []
+        for sub_data in subjects_data_list:
+            subject_obj = Subject(self.config, sub_data)
+            subjects_list.append(subject_obj)
+        return subjects_list
+    
+    def sources(self):
+        sources_data_list = self.config.get("sources")
+        sources_list = []
+        for src_data in sources_data_list:
+            path_val = src_data.get("path")
+            if isinstance(path_val, int):
+                source_obj = WebcamSource(self.config, src_data, self.pose_model)
+            else:
+                path_str = str(path_val)
+                abs_path = os.path.abspath(path_str)
+
+                if os.path.isdir(abs_path):
+                    source_obj = ImageSource(self.config, src_data, self.pose_model)
+
+                elif os.path.isfile(abs_path):
+                    source_obj = VideoSource(self.config, src_data, self.pose_model)
+
+                elif path_str.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
+                    logging.error(f"Video file '{path_str}' not found.")
+                    raise FileNotFoundError(f"Video file '{path_str}' not found.")
+
+                elif path_str.endswith(("/", "\\")):
+                    logging.error(f"Folder '{path_str}' not found.")
+                    raise FileNotFoundError(f"Folder '{path_str}' not found.")
+                
+                else:
+                    logging.error(f"Unable to create a source from '{path_str}'.")
+                    raise FileNotFoundError(f"Unable to create a source from '{path_str}'.")
+
+            sources_list.append(source_obj)
+        return sources_list
 
     # ------------------------------------------------------------------
     #  Context‑manager so we guarantee setup/teardown
@@ -182,31 +234,33 @@ class Pose2SimPipeline:
                 f"{st.name.upper()}  |  {datetime.now().strftime('%H:%M:%S')}  |  START"
             )
             data = st.run(data)
+            if self.save_data:
+                st.save_data(data)
             logging.info(
                 f"{st.name.upper()}  |  done in {time.time() - t0:.2f} s"
             )
         return data
 
     @classmethod
-    def _single(cls, stage: str, cfg: str | os.PathLike | dict | None = None):
-        with cls(cfg, stages=[stage]) as pipe:
+    def _single(cls, stage: str, cfg: str | os.PathLike | dict | None = None, save_data: bool = False):
+        with cls(cfg, stages=[stage], save_data=save_data) as pipe:
             pipe.run()
 
 
-calibration = lambda cfg=None: Pose2SimPipeline._single("calibration", cfg)
-poseEstimation = lambda cfg=None: Pose2SimPipeline._single("pose_estimation", cfg)
-synchronization = lambda cfg=None: Pose2SimPipeline._single("sync", cfg)
-personAssociation = lambda cfg=None: Pose2SimPipeline._single("tracking", cfg)
-triangulation = lambda cfg=None: Pose2SimPipeline._single("triangulation", cfg)
-filtering = lambda cfg=None: Pose2SimPipeline._single("filtering", cfg)
-markerAugmentation = lambda cfg=None: Pose2SimPipeline._single("markeraugmentation", cfg)
-kinematics = lambda cfg=None: Pose2SimPipeline._single("ik", cfg)
+calibration = lambda cfg=None: Pose2SimPipeline._single("calibration", cfg, True)
+poseEstimation = lambda cfg=None: Pose2SimPipeline._single("pose_estimation", cfg, True)
+synchronization = lambda cfg=None: Pose2SimPipeline._single("sync", cfg, True)
+personAssociation = lambda cfg=None: Pose2SimPipeline._single("tracking", cfg, True)
+triangulation = lambda cfg=None: Pose2SimPipeline._single("triangulation", cfg, True)
+filtering = lambda cfg=None: Pose2SimPipeline._single("filtering", cfg, True)
+markerAugmentation = lambda cfg=None: Pose2SimPipeline._single("markeraugmentation", cfg, True)
+kinematics = lambda cfg=None: Pose2SimPipeline._single("ik", cfg, True)
 
 
-def runAll(cfg: str | os.PathLike | dict | None = None, stages: Iterable[str] | None = None):
+def runAll(cfg: str | os.PathLike | dict | None = None, stages: Iterable[str] | None = None, save_data: bool = True):
     """Run the whole chain (or the *stages* list)."""
 
-    with Pose2SimPipeline(cfg, stages=stages) as pipe:
+    with Pose2SimPipeline(cfg, stages=stages, save_data=save_data) as pipe:
         pipe.run()
 
 

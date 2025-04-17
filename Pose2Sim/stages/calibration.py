@@ -33,7 +33,9 @@ import os
 import toml
 import logging
 import pickle
+import glob
 import numpy as np
+import pandas as pd
 import cv2
 from lxml import etree
 import warnings
@@ -42,7 +44,7 @@ from PIL import Image
 from abc import ABC, abstractmethod
 from mpl_interactions import zoom_factory, panhandler
 
-from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance
+from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, zup2yup
 from Pose2Sim.stages.base import BaseStage
 
 ## AUTHORSHIP INFORMATION
@@ -62,14 +64,18 @@ class Calibration(ABC):
     Abstract base class for calibration conversion.
     
     This class defines the interface for calibrating both intrinsic and extrinsic parameters.
-    It expects a configuration object (config) and an optional binning factor.
     """
-    def __init__(self, config, binning_factor=1):
-        self.config = config
-        self.binning_factor = binning_factor
+    @abstractmethod
+    def calibrate_intrinsics(self, source):
+        """
+        Abstract method to perform calibration.
+        
+        file_paths can be a string (for single-file calibrations) or a list/tuple for dual-file calibrations.
+        """
+        pass
 
     @abstractmethod
-    def calibrate(self, file_paths):
+    def calibrate_extrinsics(self, source):
         """
         Abstract method to perform calibration.
         
@@ -86,31 +92,27 @@ class QcaCalibration(Calibration):
     from the calibration file and, if extrinsics are provided, converts the extrinsic rotation and translation 
     using a world-to-camera conversion. The rotation is then converted to an OpenCV rotation vector.
     """
-    def calibrate(self, file_to_convert_path):
-        logging.info(f'Converting {file_to_convert_path} to .toml calibration file...')
-        root = etree.parse(file_to_convert_path).getroot()
-        camera_tags = root.findall('cameras/camera')
-        fov_tags = root.findall('cameras/camera/fov_video')
-        intrinsic_tags = root.findall('cameras/camera/intrinsic')
-        transform_tags = root.findall('cameras/camera/transform')
-        
-        for i, tag in enumerate(camera_tags):
-            name = tag.attrib.get('serial')
-            source = next((s for s in self.config.sources if s.name == name), None)
-            if source is None:
-                logging.warning(f"No source linked to config name: '{name}'.")
-                continue
+    def __init__(self, path, binning_factor):
+        self.path = path
+        root = etree.parse(self.path).getroot()
+        self.binning_factor = binning_factor
+        self.camera_tags = root.findall('cameras/camera')
+        self.fov_tags = root.findall('cameras/camera/fov_video')
+        self.intrinsic_tags = root.findall('cameras/camera/intrinsic')
+        self.transform_tags = root.findall('cameras/camera/transform')
 
-            # Intrinsic calibration block
-            if len(source.intrinsics_files) != 0:
+    def calibrate_intrinsics(self, source):
+        for i, tag in enumerate(self.camera_tags):
+            name = tag.attrib.get('serial')
+            if name == source.name:
                 source.ret_int = float(tag.attrib.get('avg-residual'))
                 video_res = tag.attrib.get('video_resolution')
                 res_value = int(video_res[:-1]) if video_res is not None else 1080
-                fov_tag = fov_tags[i]
+                fov_tag = self.fov_tags[i]
                 w = (float(fov_tag.attrib.get('right')) - float(fov_tag.attrib.get('left')) + 1) / self.binning_factor / (1080 / res_value)
                 h = (float(fov_tag.attrib.get('bottom')) - float(fov_tag.attrib.get('top')) + 1) / self.binning_factor / (1080 / res_value)
                 source.S = [w, h]
-                intrinsic_tag = intrinsic_tags[i]
+                intrinsic_tag = self.intrinsic_tags[i]
                 fu = float(intrinsic_tag.get('focalLengthU')) / 64 / self.binning_factor / (1080 / res_value)
                 fv = float(intrinsic_tag.get('focalLengthV')) / 64 / self.binning_factor / (1080 / res_value)
                 left_val = float(fov_tag.attrib.get('left'))
@@ -125,15 +127,19 @@ class QcaCalibration(Calibration):
                 source.D = [k1, k2, p1, p2]
                 source.R = []
                 source.T = []
+        if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
+            logging.info(f"[{source.name}] No intrinsic calibration found in {self.path}.")
 
-            # Extrinsic calibration block
-            if len(source.extrinsics_files) != 0:
+    def calibrate_extrinsics(self, source):
+        for i, tag in enumerate(self.camera_tags):
+            name = tag.attrib.get('serial')
+            if name == source.name:
                 # Warn if intrinsic calibration has not been performed.
                 if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
                     logging.warning(f"You should not calibrate the extrinsics of {source.name} without first calibrating the intrinsics.")
 
                 source.ret = None
-                transform_tag = transform_tags[i]
+                transform_tag = self.transform_tags[i]
                 r11 = float(transform_tag.get('r11'))
                 r12 = float(transform_tag.get('r12'))
                 r13 = float(transform_tag.get('r13'))
@@ -156,6 +162,8 @@ class QcaCalibration(Calibration):
                 # Convert rotation matrix to an OpenCV rotation vector
                 source.R = cv2.Rodrigues(r_transf)[0].flatten()
                 source.T = t_transf
+        if len(source.R) == 0 and len(source.T) == 0:
+            logging.info(f"[{source.name}] No extrinsic calibration found in {self.path}.")
 
 
 class OptitrackCalibration(Calibration):
@@ -165,7 +173,11 @@ class OptitrackCalibration(Calibration):
     Since the Optitrack calibration values are provided externally (see Readme.md),
     this class raises an error to instruct the user to retrieve those values manually.
     """
-    def calibrate(self, file_to_convert_path):
+    def calibrate_intrinsics(self, source):
+        logging.warning('Refer to Readme.md for retrieving Optitrack calibration values.')
+        raise NameError("Refer to Readme.md for retrieving Optitrack calibration values.")
+
+    def calibrate_extrinsics(self, source):
         logging.warning('Refer to Readme.md for retrieving Optitrack calibration values.')
         raise NameError("Refer to Readme.md for retrieving Optitrack calibration values.")
 
@@ -174,24 +186,20 @@ class ViconCalibration(Calibration):
     """
     Converts a Vicon .xcp calibration file.
     
-    This class extracts intrinsic parameters (including the residual error from the config file)
+    This class extracts intrinsic parameters (including the residual error)
     and computes extrinsic parameters by converting the quaternion orientation to a rotation matrix,
     switching from world to camera coordinates, and converting the rotation to OpenCV format.
     """
-    def calibrate(self, file_to_convert_path):
-        logging.info(f'Converting {file_to_convert_path} to .toml calibration file...')
-        root = etree.parse(file_to_convert_path).getroot()
-        for cam_elem in root.findall('Camera'):
+
+    def __init__(self, path):
+        self.path = path
+        self.cameras = etree.parse(self.path).getroot().findall('Camera')
+
+    def calibrate_intrinsics(self, source):
+        for cam_elem in self.cameras:
             name = cam_elem.attrib.get('DEVICEID')
-            source = next((s for s in self.config.sources if s.name == name), None)
-            if source is None:
-                logging.warning(f"No source linked to config name: '{name}'.")
-                continue
-            
-            keyframe = cam_elem.findall('KeyFrames/KeyFrame')[0]
-            
-            # Intrinsic calibration block
-            if len(source.intrinsics_files) != 0:
+            if name == source.name:
+                keyframe = cam_elem.findall('KeyFrames/KeyFrame')[0]
                 source.ret_int = float(keyframe.attrib.get('WORLD_ERROR'))
                 source.S = [float(t) for t in cam_elem.attrib.get('SENSOR_SIZE').split()]
                 fu = float(keyframe.attrib.get('FOCAL_LENGTH'))
@@ -208,9 +216,14 @@ class ViconCalibration(Calibration):
                 source.D = dist + [0.0, 0.0]
                 source.R = []
                 source.T = []
-            
-            # Extrinsic calibration block
-            if len(source.extrinsics_files) != 0:
+        if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
+            logging.info(f"[{source.name}] No intrinsic calibration found in {self.path}.")
+
+    def calibrate_extrinsics(self, source):
+        for cam_elem in self.cameras:
+            name = cam_elem.attrib.get('DEVICEID')
+            if name == source.name:
+                keyframe = cam_elem.findall('KeyFrames/KeyFrame')[0]
                 if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
                     logging.warning(f"You should not calibrate the extrinsics of {source.name} without first calibrating the intrinsics.")
 
@@ -222,6 +235,8 @@ class ViconCalibration(Calibration):
                 r_trans, t_trans = world_to_camera_persp(r_orig, t_orig)
                 source.R = np.array(cv2.Rodrigues(r_trans)[0]).flatten()
                 source.T = np.array(t_trans)
+        if len(source.R) == 0 and len(source.T) == 0:
+            logging.info(f"[{source.name}] No extrinsic calibration found in {self.path}.")
 
 
 class EasyMocapCalibration(Calibration):
@@ -232,17 +247,17 @@ class EasyMocapCalibration(Calibration):
     it assigns the intrinsic matrix, image size, and distortion parameters. For extrinsics,
     it reads the extrinsic rotation and translation directly from the YAML file.
     """
-    def calibrate(self, files_to_convert_paths):
-        extrinsic_path, intrinsic_path = files_to_convert_paths
+
+    def __init__(self, path):
+        self.path = path
+
+    def calibrate_intrinsics(self, source):
+        _, intrinsic_path = self.path
         intrinsic_yml = cv2.FileStorage(intrinsic_path, cv2.FILE_STORAGE_READ)
         cam_number = int(intrinsic_yml.getNode('names').size())
         for i in range(cam_number):
             name = intrinsic_yml.getNode('names').at(i).string()
-            source = next((s for s in self.config.sources if s.name == name), None)
-            if source is None:
-                logging.warning(f"No source linked to config name: '{name}'.")
-                continue
-            if len(source.intrinsics_files) != 0:
+            if name == source.name:
                 K_mat = intrinsic_yml.getNode(f'K_{name}').mat()
                 source.ret_int = None
                 source.S = [K_mat[0, 2] * 2, K_mat[1, 2] * 2]
@@ -250,23 +265,24 @@ class EasyMocapCalibration(Calibration):
                 source.D = intrinsic_yml.getNode(f'dist_{name}').mat().flatten()[:-1]
                 source.R = []
                 source.T = []
+        if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
+            logging.info(f"[{source.name}] No intrinsic calibration found in {self.path}.")
 
+    def calibrate_extrinsics(self, source):
+        extrinsic_path, _ = self.path
         extrinsic_yml = cv2.FileStorage(extrinsic_path, cv2.FILE_STORAGE_READ)
         cam_number = int(extrinsic_yml.getNode('names').size())
         for i in range(cam_number):
             name = extrinsic_yml.getNode('names').at(i).string()
-            source = next((s for s in self.config.sources if s.name == name), None)
-            if source is None:
-                logging.warning(f"No source linked to config name: '{name}'.")
-                continue
-
-            if len(source.extrinsics_files) != 0:
+            if name == source.name:
                 if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
                     logging.warning(f"You should not calibrate the extrinsics of {source.name} without first calibrating the intrinsics.")
 
                 source.ret = None
                 source.R = extrinsic_yml.getNode(f'R_{name}').mat().flatten()
                 source.T = extrinsic_yml.getNode(f'T_{name}').mat().flatten()
+        if len(source.R) == 0 and len(source.T) == 0:
+            logging.info(f"[{source.name}] No extrinsic calibration found in {self.path}.")
 
 
 class BiocvCalibration(Calibration):
@@ -277,17 +293,16 @@ class BiocvCalibration(Calibration):
     and distortion parameters. For extrinsics, it converts the rotation matrix (to an OpenCV rotation vector)
     and adjusts the translation (dividing by 1000 for unit conversion).
     """
-    def calibrate(self, files_to_convert_paths):
-        logging.info(f'Converting {[os.path.basename(f) for f in files_to_convert_paths]} to .toml calibration file...')
-        for i, f_path in enumerate(files_to_convert_paths):
+
+    def __init__(self, path):
+        self.path = path
+
+    def calibrate_intrinsics(self, source):
+        for i, f_path in enumerate(self.path):
             with open(f_path) as f:
                 calib_data = f.read().split('\n')
             name = f'cam_{str(i).zfill(2)}'
-            source = next((s for s in self.config.sources if s.name == name), None)
-            if source is None:
-                logging.warning(f"No source linked to config name: '{name}'.")
-                continue
-            if len(source.intrinsics_files) != 0:
+            if name == source.name:
                 source.ret_int = None
                 source.S = [float(calib_data[0]), float(calib_data[1])]
                 source.K = np.array([
@@ -298,7 +313,15 @@ class BiocvCalibration(Calibration):
                 source.D = [float(d) for d in calib_data[-2].split()[:4]]
                 source.R = []
                 source.T = []
-            if len(source.extrinsics_files) != 0:
+        if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
+            logging.info(f"[{source.name}] No intrinsic calibration found in {self.path}.")
+
+    def calibrate_extrinsics(self, source):
+        for i, f_path in enumerate(self.path):
+            with open(f_path) as f:
+                calib_data = f.read().split('\n')
+            name = f'cam_{str(i).zfill(2)}'
+            if name == source.name:
                 if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
                     logging.warning(f"You should not calibrate the extrinsics of {source.name} without first calibrating the intrinsics.")
 
@@ -306,6 +329,37 @@ class BiocvCalibration(Calibration):
                 RT = np.array([list(map(float, line.split())) for line in calib_data[6:9]])
                 source.R = cv2.Rodrigues(RT[:, :3])[0].squeeze()
                 source.T = RT[:, 3] / 1000
+        if len(source.R) == 0 and len(source.T) == 0:
+            logging.info(f"[{source.name}] No extrinsic calibration found in {self.path}.")
+
+
+class LoadCalibration(Calibration):
+    def __init__(self, path):
+        self.path = path
+        calib_file = glob.glob(self.path)
+        if len(calib_file) == 0:
+            logging.info(f"No calibration file found in {self.path}.")
+        else:
+            self.data = toml.load(calib_file)
+
+    def calibrate_intrinsics(self, source):
+        if source.name in self.data:
+            source_data = self.data[source.name]
+            source.ret_int = 0.0
+            source.S = source_data['size']
+            source.K = np.array(source_data['matrix'])
+            source.D = source_data['distortions']
+        else :
+            logging.info(f"[{source.name}] No calibration found in {self.path}.")
+
+    def calibrate_extrinsics(self, source):
+        if source.name in self.data:
+            source_data = self.data[source.name]
+            source.ret = 0.0
+            source.R = [0.0, 0.0, 0.0]
+            source.T = [0.0, 0.0, 0.0]
+        else:
+            logging.info(f"[{source.name}] No extrinsic calibration found in {self.path}.")
 
 
 class OpencapCalibration(Calibration):
@@ -316,24 +370,29 @@ class OpencapCalibration(Calibration):
     For extrinsics, it converts the rotation using a world-to-camera conversion and additional rotations
     so that the final rotation (and translation) are in the OpenCV camera frame.
     """
-    def calibrate(self, files_to_convert_paths):
-        logging.info(f'Converting {[os.path.basename(f) for f in files_to_convert_paths]} to .toml calibration file...')
-        for i, f_path in enumerate(files_to_convert_paths):
+
+    def __init__(self, path):
+        self.path = path
+
+    def calibrate_intrinsics(self, source):
+        for i, f_path in enumerate(self.path):
             with open(f_path, 'rb') as f_pickle:
                 calib_data = pickle.load(f_pickle)
             name = f'cam_{str(i).zfill(2)}'
-            source = next((s for s in self.config.sources if s.name == name), None)
-            if source is None:
-                logging.warning(f"No source linked to config name: '{name}'.")
-                continue
-            if len(source.intrinsics_files) != 0:
+            if name == source.name:
                 source.ret_int = None
                 source.S = list(map(float, calib_data['imageSize'].squeeze()[:-1]))
                 source.D = list(map(float, calib_data['distortion'][0][:-1]))
                 source.K = calib_data['intrinsicMat']
-                source.R = []
-                source.T = []
-            if len(source.extrinsics_files) != 0:
+        if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
+            logging.info(f"[{source.name}] No intrinsic calibration found in {self.path}.")
+
+    def calibrate_extrinsics(self, source):
+        for i, f_path in enumerate(self.path):
+            with open(f_path, 'rb') as f_pickle:
+                calib_data = pickle.load(f_pickle)
+            name = f'cam_{str(i).zfill(2)}'
+            if name == source.name:
                 if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
                     logging.warning(f"You should not calibrate the extrinsics of {source.name} without first calibrating the intrinsics.")
 
@@ -348,6 +407,8 @@ class OpencapCalibration(Calibration):
                 R_c_90, T_c_90 = world_to_camera_persp(R_w_90, T_w_90)
                 source.R = cv2.Rodrigues(R_c_90)[0].squeeze()
                 source.T = T_cam / 1000
+        if len(source.R) == 0 and len(source.T) == 0:
+            logging.info(f"[{source.name}] No extrinsic calibration found in {self.path}.")
 
 
 class PointCalibration(Calibration):
@@ -358,96 +419,101 @@ class PointCalibration(Calibration):
     distortion parameters, and the intrinsic residual error. For extrinsic calibration,
     compute the camera pose and then calculates the reprojection error.
     """
-    def calibrate(self, files_to_convert_paths):
-        for source in self.config.sources:
-            # Intrinsic calibration block (using a checkerboard)
-            if len(source.intrinsics_files) != 0:
-                logging.info(f'Intrinsic calibration for {source.name}:')
-                objp = np.zeros((self.config.intrinsics_corners_nb[0] * self.config.intrinsics_corners_nb[1], 3), np.float32)
-                objp[:, :2] = np.mgrid[0:self.config.intrinsics_corners_nb[0], 0:self.config.intrinsics_corners_nb[1]].T.reshape(-1, 2)
-                objp[:, :2] *= self.config.intrinsics_square_size
-                objpoints = []  # 3D points in world space
-                imgpoints = []  # 2D points in image plane
-                source.extract_frames('intrinsic')
-                for img_path in source.intrinsics_files:
-                    imgp_confirmed, objp_confirmed = findCorners(img_path, self.config.intrinsics_corners_nb, objp=objp, show=self.config.show_detection_intrinsics)
-                    if isinstance(imgp_confirmed, np.ndarray):
-                        imgpoints.append(imgp_confirmed)
-                        objpoints.append(objp_confirmed if self.config.show_detection_intrinsics else objp)
-                if len(imgpoints) < 10:
-                    logging.info(f"Only {len(imgpoints)} images with detected corners for {source.name}. Intrinsic calibration may be inaccurate.")
-                img = cv2.imread(str(img_path))
-                objpoints = np.array(objpoints)
-                ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
-                    objpoints, imgpoints, img.shape[1::-1], None, None,
-                    flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_USE_LU)
-                )
-                h, w = img.shape[:2]
-                source.ret_int = ret_cam
-                source.S = [w, h]
-                source.K = dist[0]
-                source.D = mtx
-                source.R = []
-                source.T = []
-        
-            # Extrinsic calibration block
-            if len(source.extrinsics_files) != 0:
-                print(source.extrinsics_files)
-                if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
-                    logging.warning(f"Cannot calibrate extrinsics for {source.name} without first calibrating intrinsics.")
-                    raise ValueError(f"Cannot calibrate extrinsics for {source.name} without first calibrating intrinsics.")
-                logging.info(f'Extrinsic calibration for {source.name}:')
-                source.extract_frames('extrinsic')
-                if self.config.extrinsics_method == 'board':
-                    imgp, objp = findCorners(source.extrinsics_files[0], self.config.extrinsics_corners_nb, objp=self.config.object_coords_3d, show=self.config.show_reprojection_error)
-                    if len(imgp) == 0:
-                        logging.exception('No corners detected. Use "scene" method or verify detection settings.')
-                        raise ValueError('No corners detected.')
-                elif self.config.extrinsics_method == 'scene':
-                    imgp, objp = imgp_objp_visualizer_clicker(img, imgp=[], objp=self.config.object_coords_3d, img_path=source.extrinsics_files[0])
-                    if len(imgp) == 0:
-                        logging.exception('No points clicked (or fewer than required).')
-                        raise ValueError('No points clicked (or fewer than required).')
-                    if len(objp) < 10:
-                        logging.info(f"Only {len(objp)} reference points for {source.name}. Extrinsic calibration may be imprecise.")
-                mtx, dist = np.array(source.K), np.array(source.D)
-                _, r, t = cv2.solvePnP(objp * 1000, imgp, mtx, dist)
-                source.R = r.flatten()  # Extrinsic rotation vector in OpenCV format
-                source.T = t.flatten() / 1000  # Extrinsic translation vector in meters (converted)
-                # Projection of object points to image plane
-                # # Former way, distortions used to be ignored
-                # Kh_cam = np.block([mtx, np.zeros(3).reshape(3,1)])
-                # r_mat, _ = cv2.Rodrigues(r)
-                # H_cam = np.block([[r_mat,t.reshape(3,1)], [np.zeros(3), 1 ]])
-                # P_cam = Kh_cam @ H_cam
-                # proj_obj = [ ( P_cam[0] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)),  P_cam[1] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)) ) for o in objp]
-                proj_obj = np.squeeze(cv2.projectPoints(objp, r, t, mtx, dist)[0])
 
-                if self.config.show_reprojection_error:
-                    # Reopen image, otherwise 2 sets of text are overlaid
-                    img = cv2.imread(source.extrinsic_files[0])
-                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    def __init__(self, config):
+        self.config = config
 
-                    for o in proj_obj:
-                        cv2.circle(img, (int(o[0]), int(o[1])), 8, (0,0,255), -1) 
-                    for i in imgp:
-                        cv2.drawMarker(img, (int(i[0][0]), int(i[0][1])), (0,255,0), cv2.MARKER_CROSS, 15, 2)
-                    cv2.putText(img, 'Verify calibration results, then close window.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
-                    cv2.putText(img, 'Verify calibration results, then close window.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA) 
-                    cv2.drawMarker(img, (20,40), (0,255,0), cv2.MARKER_CROSS, 15, 2)
-                    cv2.putText(img, '    Clicked points', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
-                    cv2.putText(img, '    Clicked points', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
-                    cv2.circle(img, (20,60), 8, (0,0,255), -1)    
-                    cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
-                    cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
-                    im_pil = Image.fromarray(img)
-                    im_pil.show(title = os.path.basename(source.extrinsic_files[0]))
+    def calibrate_intrinsics(self, source):
+        source.get_calib_files(source.calib_intrinsics, self.config.intrinsics_extension, "intrinsics")
+        if len(source.intrinsics_files) != 0:
+            logging.info(f'Intrinsic calibration for {source.name}:')
+            objp = np.zeros((self.config.intrinsics_corners_nb[0] * self.config.intrinsics_corners_nb[1], 3), np.float32)
+            objp[:, :2] = np.mgrid[0:self.config.intrinsics_corners_nb[0], 0:self.config.intrinsics_corners_nb[1]].T.reshape(-1, 2)
+            objp[:, :2] *= self.config.intrinsics_square_size
+            objpoints = []  # 3D points in world space
+            imgpoints = []  # 2D points in image plane
+            source.extract_frames('intrinsic')
+            for img_path in source.intrinsics_files:
+                imgp_confirmed, objp_confirmed = findCorners(img_path, self.config.intrinsics_corners_nb, objp=objp, show=self.config.show_detection_intrinsics)
+                if isinstance(imgp_confirmed, np.ndarray):
+                    imgpoints.append(imgp_confirmed)
+                    objpoints.append(objp_confirmed if self.config.show_detection_intrinsics else objp)
+            if len(imgpoints) < 10:
+                logging.info(f"Only {len(imgpoints)} images with detected corners for {source.name}. Intrinsic calibration may be inaccurate.")
+            img = cv2.imread(str(img_path))
+            objpoints = np.array(objpoints)
+            ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
+                objpoints, imgpoints, img.shape[1::-1], None, None,
+                flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_USE_LU)
+            )
+            h, w = img.shape[:2]
+            source.ret_int = ret_cam
+            source.S = [w, h]
+            source.K = dist[0]
+            source.D = mtx
 
-                    # Calculate reprojection error
+    def calibrate_extrinsics(self, source):
+        source.get_calib_files(source.calib_extrinsics, self.config.extrinsics_extension, "extrinsics")
+        if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
+            logging.warning(f"Cannot calibrate extrinsics for {source.name} without first calibrating intrinsics.")
+            raise ValueError(f"Cannot calibrate extrinsics for {source.name} without first calibrating intrinsics.")
+        logging.info(f'Extrinsic calibration for {source.name}:')
+        source.extract_frames('extrinsic')
+        object_coords_3d = self.config.object_coords_3d
+        if self.config.extrinsics_method == 'board':
+            object_coords_3d = np.zeros((self.extrinsics_corners_nb[0] * self.extrinsics_corners_nb[1], 3), np.float32)
+            object_coords_3d[:, :2] = np.mgrid[0:self.extrinsics_corners_nb[0], 0:self.extrinsics_corners_nb[1]].T.reshape(-1, 2)
+            object_coords_3d[:, :2] = object_coords_3d[:, 0:2] * self.config.extrinsics_square_size
+            imgp, objp = findCorners(source.extrinsics_files[0], self.config.extrinsics_corners_nb, objp=object_coords_3d, show=self.config.show_reprojection_error)
+            if len(imgp) == 0:
+                logging.exception('No corners detected. Use "scene" method or verify detection settings.')
+                raise ValueError('No corners detected.')
+        elif self.config.extrinsics_method == 'scene':
+            imgp, objp = imgp_objp_visualizer_clicker(img, imgp=[], objp=object_coords_3d, img_path=source.extrinsics_files[0])
+            if len(imgp) == 0:
+                logging.exception('No points clicked (or fewer than required).')
+                raise ValueError('No points clicked (or fewer than required).')
+            if len(objp) < 10:
+                logging.info(f"Only {len(objp)} reference points for {source.name}. Extrinsic calibration may be imprecise.")
+        trc_write(object_coords_3d, os.path.join(self.config.session_dir, f'Object_points.trc'))
+        mtx, dist = np.array(source.K), np.array(source.D)
+        _, r, t = cv2.solvePnP(objp * 1000, imgp, mtx, dist)
+        source.R = r.flatten()  # Extrinsic rotation vector in OpenCV format
+        source.T = t.flatten() / 1000  # Extrinsic translation vector in meters (converted)
+        # Projection of object points to image plane
+        # # Former way, distortions used to be ignored
+        # Kh_cam = np.block([mtx, np.zeros(3).reshape(3,1)])
+        # r_mat, _ = cv2.Rodrigues(r)
+        # H_cam = np.block([[r_mat,t.reshape(3,1)], [np.zeros(3), 1 ]])
+        # P_cam = Kh_cam @ H_cam
+        # proj_obj = [ ( P_cam[0] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)),  P_cam[1] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)) ) for o in objp]
+        proj_obj = np.squeeze(cv2.projectPoints(objp, r, t, mtx, dist)[0])
 
-                imgp_to_objreproj_dist = [euclidean_distance(proj_obj[n], imgp[n]) for n in range(len(proj_obj))]
-                rms_px = np.sqrt(np.sum([d**2 for d in imgp_to_objreproj_dist]))
-                source.ret = rms_px
+        if self.config.show_reprojection_error:
+            # Reopen image, otherwise 2 sets of text are overlaid
+            img = cv2.imread(source.extrinsic_files[0])
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+            for o in proj_obj:
+                cv2.circle(img, (int(o[0]), int(o[1])), 8, (0,0,255), -1) 
+            for i in imgp:
+                cv2.drawMarker(img, (int(i[0][0]), int(i[0][1])), (0,255,0), cv2.MARKER_CROSS, 15, 2)
+            cv2.putText(img, 'Verify calibration results, then close window.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
+            cv2.putText(img, 'Verify calibration results, then close window.', (20, 20), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA) 
+            cv2.drawMarker(img, (20,40), (0,255,0), cv2.MARKER_CROSS, 15, 2)
+            cv2.putText(img, '    Clicked points', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
+            cv2.putText(img, '    Clicked points', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
+            cv2.circle(img, (20,60), 8, (0,0,255), -1)    
+            cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
+            cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
+            im_pil = Image.fromarray(img)
+            im_pil.show(title = os.path.basename(source.extrinsic_files[0]))
+
+            # Calculate reprojection error
+
+        imgp_to_objreproj_dist = [euclidean_distance(proj_obj[n], imgp[n]) for n in range(len(proj_obj))]
+        rms_px = np.sqrt(np.sum([d**2 for d in imgp_to_objreproj_dist]))
+        source.ret = rms_px
 
 
 def findCorners(img_path, corner_nb, objp=[], show=True):
@@ -812,7 +878,70 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
         return None, None
 
 
-def toml_write(config, data, calibration):
+class CalibrationStage(BaseStage):
+    name = "calibration"
+
+    def run(self, data_in):
+        if self.config.calib_type == "convert":            
+            filename = os.path.basename(self.config.convert_path).lower()
+
+            if filename.endswith(".qca.txt"):
+                calibration = QcaCalibration(self, self.config.convert_path, self.config.binning_factor_qualisys)
+            elif filename.endswith(".xcp"):
+                calibration = ViconCalibration(self, self.config.convert_path)
+            elif filename.endswith(".pickle"):
+                calibration = OpencapCalibration(self, self.config.convert_path)
+            elif filename.endswith(".yml"):
+                calibration = EasyMocapCalibration(self, self.config.convert_path)
+            elif filename.endswith(".calib"):
+                calibration = BiocvCalibration(self, self.config.convert_path)
+            elif filename.endswith(".csv"):
+                calibration = OptitrackCalibration(self, self.config.convert_path)
+            elif any(filename.endswith(ext) for ext in [".anipose", ".freemocap", ".caliscope"]):
+                #TODO
+                logging.info("\n--> No conversion required for Caliscope, AniPose, or FreeMocap. Calibration will be ignored.\n")
+                return None
+            else:
+                raise NameError(f"File {filename} not supported for conversion.")
+
+        elif self.config.calib_type == "calculate":
+            calibration = PointCalibration(self, self.config)
+
+        elif self.config.calib_type == "load":
+            calibration = LoadCalibration(self, self.config.calib_output_path)
+
+        else:
+            logging.info("Invalid calibration_type in Config.toml")
+            return ValueError("Invalid calibration_type in Config.toml")
+
+        for source in self.sources:
+            if not self.config.overwrite_intrinsics and len(source.S) != 0 and len(source.D) != 0 and len(source.K) != 0:
+                logging.info(
+                    f"[{source.name} - intrinsic] Existing intrinsic calibration."
+                )
+                logging.info(
+                    'To recalculate, set "overwrite_intrinsics" to true in Config.toml.'
+                )
+            else:
+                calibration.calibrate_intrinsics(source)
+
+            if not self.config.overwrite_extrinsics and len(source.R) != 0 and len(source.T) != 0:
+                logging.info(
+                    f"[{source.name} - entrinsic] Existing extrinsic calibration."
+                )
+                logging.info(
+                    'To recalculate, set "overwrite_extrinsics" to true in Config.toml.'
+                )
+            else:
+                calibration.calibrate_intrinsics(source)
+
+        return data_in
+
+    def save_data(self, data_out):
+        toml_write(self.sources, self.config.calib_output_path)
+
+
+def toml_write(sources, calib_output_path):
     '''
     Writes calibration parameters to a .toml file
 
@@ -828,7 +957,9 @@ def toml_write(config, data, calibration):
     OUTPUTS:
     - a .toml file cameras calibrations
     '''
-    for source in config.sources:
+    data = {}
+
+    for source in sources:
         if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0 and len(source.R) == 0 and len(source.T) == 0:
             logging.warning(f"[{source.name}] has not been calibrated.")
     
@@ -861,34 +992,46 @@ def toml_write(config, data, calibration):
         "error": 0.0
     }
     
-    with open(config.calib_output_path, 'w') as f:
+    with open(calib_output_path, 'w') as f:
         toml.dump(data, f)
 
+    logging.info(f'Calibration file is stored at {calib_output_path}.')
 
-class CalibrationStage(BaseStage):
-    name = "calibration"
 
-    def run(self, data_in):
-        calibration, convert_path = self.config.get_calibration_params()
-        if self.config.calib_file:
-            data = toml.load(self.config.calib_output_path)
-            calibrate_sources(data)
-        else:
-            data = {}
-        calibration.calibrate(convert_path)
-        toml_write(self.config, data, calibration)
-        logging.info(f'Calibration file is stored at {self.config.calib_output_path}.')
-        return data_in
+def trc_write(object_coords_3d, trc_path):
+    '''
+    Make Opensim compatible trc file from a dataframe with 3D coordinates
 
-def calibrate_sources(self, data):
-    for source in self.sources:
-        if source.name in data:
-            source_data = data[source.name]
-            source.ret = 0.0
-            source.S = source_data['size']
-            source.K = np.array(source_data['matrix'])
-            source.D = source_data['distortions']
-            source.R = [0.0, 0.0, 0.0]
-            source.T = [0.0, 0.0, 0.0]
-        else :
-            logging.info(f"[{source.name}] No existing calibration found.")
+    INPUT:
+    - object_coords_3d: list of 3D point lists
+    - trc_path: output path of the trc file
+
+    OUTPUT:
+    - trc file with 2 frames of the same 3D points
+    '''
+
+    #Header
+    DataRate = CameraRate = OrigDataRate = 1
+    NumFrames = 2
+    NumMarkers = len(object_coords_3d)
+    keypoints_names = np.arange(NumMarkers)
+    header_trc = ['PathFileType\t4\t(X/Y/Z)\t' + os.path.basename(trc_path), 
+            'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames', 
+            '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, NumFrames])),
+            'Frame#\tTime\t' + '\t\t\t'.join(str(k) for k in keypoints_names) + '\t\t',
+            '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(NumMarkers)])]
+    
+    # Zup to Yup coordinate system
+    object_coords_3d = pd.DataFrame([np.array(object_coords_3d).flatten(), np.array(object_coords_3d).flatten()])
+    object_coords_3d = zup2yup(object_coords_3d)
+    
+    #Add Frame# and Time columns
+    object_coords_3d.index = np.array(range(0, NumFrames)) + 1
+    object_coords_3d.insert(0, 't', object_coords_3d.index / DataRate)
+
+    #Write file
+    with open(trc_path, 'w') as trc_o:
+        [trc_o.write(line+'\n') for line in header_trc]
+        object_coords_3d.to_csv(trc_o, sep='\t', index=True, header=None, lineterminator='\n')
+
+    return trc_path
