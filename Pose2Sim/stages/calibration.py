@@ -41,11 +41,15 @@ from lxml import etree
 import warnings
 import matplotlib.pyplot as plt
 from PIL import Image
-from abc import ABC, abstractmethod
 from mpl_interactions import zoom_factory, panhandler
+from pathlib import Path
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from typing import Any, Optional
 
 from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, zup2yup
 from Pose2Sim.stages.base import BaseStage
+from Pose2Sim.source import BaseSource
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -57,6 +61,97 @@ __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
+
+
+@dataclass
+class CalibrationSettings:
+    session_dir: Path
+    calib_output_path: Path
+    calib_type: str
+    overwrite_intrinsics: bool
+    overwrite_extrinsics: bool
+    calculate_extrinsics: bool
+
+    convert_path: Optional[Path] = None
+    binning_factor_qualisys: Optional[int] = None
+
+    overwrite_extraction: Optional[bool] = None
+    extract_every_N_sec: Optional[float] = None
+
+    show_detection_intrinsics: Optional[bool] = None
+    intrinsics_corners_nb: Optional[int] = None
+    intrinsics_square_size: Optional[float] = None
+    intrinsics_extension: Optional[str] = None
+
+    extrinsics_method: Optional[str] = None
+    extrinsics_extension: Optional[str] = None
+    show_reprojection_error: Optional[bool] = None
+    extrinsics_corners_nb: Optional[int] = None
+    extrinsics_square_size: Optional[float] = None
+    object_coords_3d: Optional[list[list[float]]] = None
+
+    @classmethod
+    def from_config(cls, cfg: dict[str, Any], session_dir: Path) -> "CalibrationSettings":
+        cal_cfg   = cfg.get("calibration")
+        c_type    = cal_cfg.get("calibration_type")
+        out_path  = Path(session_dir) / "Calib.toml"
+
+        kwargs: dict[str, Any] = dict(
+            session_dir           = Path(session_dir),
+            calib_output_path     = out_path,
+            calib_type            = c_type,
+            overwrite_intrinsics  = cal_cfg.get("overwrite_intrinsics"),
+            overwrite_extrinsics  = cal_cfg.get("overwrite_extrinsics"),
+            calculate_extrinsics  = cal_cfg.get("calculate_extrinsics"),
+        )
+
+        if c_type == "convert":
+            conv_cfg  = cal_cfg.get("convert")
+            conv_path = Path(conv_cfg.get("convert_from")).expanduser()
+            if not conv_path.is_absolute():
+                conv_path = Path(session_dir) / conv_path
+            if not conv_path.exists():
+                raise FileNotFoundError(f"Conversion file '{conv_path}' not found.")
+
+            kwargs.update(
+                convert_path            = conv_path,
+                binning_factor_qualisys = conv_cfg.get("qualisys").get("binning_factor"),
+            )
+
+        elif c_type == "calculate":
+            calc_cfg = cal_cfg.get("calculate", {})
+            kwargs.update(
+                overwrite_extraction     = calc_cfg.get("overwrite_extraction"),
+                extract_every_N_sec      = calc_cfg.get("extract_every_N_sec"),
+            )
+
+            intr = calc_cfg.get("intrinsics", {})
+            kwargs.update(
+                show_detection_intrinsics = intr.get("show_detection_intrinsics"),
+                intrinsics_corners_nb     = intr.get("intrinsics_corners_nb"),
+                intrinsics_square_size    = intr.get("intrinsics_square_size") / 1000.0,
+                intrinsics_extension      = intr.get("intrinsics_extension"),
+            )
+
+            extr = calc_cfg.get("extrinsics", {})
+            method = extr.get("extrinsics_method", "board")
+            kwargs.update(
+                extrinsics_method        = method,
+                extrinsics_extension     = extr.get("extrinsics_extension"),
+                show_reprojection_error  = extr.get("show_reprojection_error"),
+            )
+
+            if method == "board":
+                board = extr.get("board", {})
+                kwargs.update(
+                    extrinsics_corners_nb  = board.get("extrinsics_corners_nb"),
+                    extrinsics_square_size = board.get("extrinsics_square_size") / 1000.0,
+                )
+            elif method == "scene":
+                scene = extr.get("scene", {})
+                kwargs.update(object_coords_3d = scene.get("object_coords_3d"))
+
+        return cls(**kwargs)
 
 
 class Calibration(ABC):
@@ -881,22 +976,27 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
 class CalibrationStage(BaseStage):
     name = "calibration"
 
+    def __init__(self, settings: CalibrationSettings, sources: list[BaseSource], session_dir: Path):
+        self.sources     = sources
+        self.session_dir = Path(session_dir)
+        self.settings    = settings
+
     def run(self, data_in):
-        if self.config.calib_type == "convert":            
-            filename = os.path.basename(self.config.convert_path).lower()
+        if self.settings.calib_type == "convert":            
+            filename = os.path.basename(self.settings.convert_path).lower()
 
             if filename.endswith(".qca.txt"):
-                calibration = QcaCalibration(self, self.config.convert_path, self.config.binning_factor_qualisys)
+                calibration = QcaCalibration(self, self.settings.convert_path, self.settings.binning_factor_qualisys)
             elif filename.endswith(".xcp"):
-                calibration = ViconCalibration(self, self.config.convert_path)
+                calibration = ViconCalibration(self, self.settings.convert_path)
             elif filename.endswith(".pickle"):
-                calibration = OpencapCalibration(self, self.config.convert_path)
+                calibration = OpencapCalibration(self, self.settings.convert_path)
             elif filename.endswith(".yml"):
-                calibration = EasyMocapCalibration(self, self.config.convert_path)
+                calibration = EasyMocapCalibration(self, self.settings.convert_path)
             elif filename.endswith(".calib"):
-                calibration = BiocvCalibration(self, self.config.convert_path)
+                calibration = BiocvCalibration(self, self.settings.convert_path)
             elif filename.endswith(".csv"):
-                calibration = OptitrackCalibration(self, self.config.convert_path)
+                calibration = OptitrackCalibration(self, self.settings.convert_path)
             elif any(filename.endswith(ext) for ext in [".anipose", ".freemocap", ".caliscope"]):
                 #TODO
                 logging.info("\n--> No conversion required for Caliscope, AniPose, or FreeMocap. Calibration will be ignored.\n")
@@ -904,18 +1004,18 @@ class CalibrationStage(BaseStage):
             else:
                 raise NameError(f"File {filename} not supported for conversion.")
 
-        elif self.config.calib_type == "calculate":
-            calibration = PointCalibration(self, self.config)
+        elif self.settings.calib_type == "calculate":
+            calibration = PointCalibration(self, self.settings)
 
-        elif self.config.calib_type == "load":
-            calibration = LoadCalibration(self, self.config.calib_output_path)
+        elif self.settings.calib_type == "load":
+            calibration = LoadCalibration(self, self.settings.calib_output_path)
 
         else:
             logging.info("Invalid calibration_type in Config.toml")
             return ValueError("Invalid calibration_type in Config.toml")
 
         for source in self.sources:
-            if not self.config.overwrite_intrinsics and len(source.S) != 0 and len(source.D) != 0 and len(source.K) != 0:
+            if not self.settings.overwrite_intrinsics and len(source.S) != 0 and len(source.D) != 0 and len(source.K) != 0:
                 logging.info(
                     f"[{source.name} - intrinsic] Existing intrinsic calibration."
                 )
@@ -925,7 +1025,7 @@ class CalibrationStage(BaseStage):
             else:
                 calibration.calibrate_intrinsics(source)
 
-            if not self.config.overwrite_extrinsics and len(source.R) != 0 and len(source.T) != 0:
+            if not self.settings.overwrite_extrinsics and len(source.R) != 0 and len(source.T) != 0:
                 logging.info(
                     f"[{source.name} - entrinsic] Existing extrinsic calibration."
                 )
@@ -938,7 +1038,7 @@ class CalibrationStage(BaseStage):
         return data_in
 
     def save_data(self, data_out):
-        toml_write(self.sources, self.config.calib_output_path)
+        toml_write(self.sources, self.settings.calib_output_path)
 
 
 def toml_write(sources, calib_output_path):

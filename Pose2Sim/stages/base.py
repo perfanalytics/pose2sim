@@ -1,18 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Dict
 
 class BaseStage(ABC):
     name: str = "base"
-
-    def __init__(self, config, **kwargs) -> None:
-        self.config = config
+    stream: bool = False
+    sentinel = object()
 
     def setup(self) -> None:
         pass
 
     @abstractmethod
-    def run(self, data_in: Any) -> Any:
-        ...
+    def run(self, *args, **kwargs): ...
 
     @abstractmethod
     def save_data(self, data_out: Any) -> None:

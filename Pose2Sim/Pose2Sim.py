@@ -93,11 +93,6 @@ def _discover_stage(name: str) -> type[BaseStage]:
     return cls
 
 
-# ────────────────────────────────────────────────────────────────────────────────
-#  Pipeline
-# ────────────────────────────────────────────────────────────────────────────────
-
-
 class Pose2SimPipeline:
     """Light orchestration: chain the requested stages.
 
@@ -122,10 +117,6 @@ class Pose2SimPipeline:
         "ik",
     )
 
-    # ---------------------------------------------------------------------
-    #  Init / context‑manager helpers
-    # ---------------------------------------------------------------------
-
     def __init__(
         self,
         config_input: str | os.PathLike | dict | None = None,
@@ -134,7 +125,7 @@ class Pose2SimPipeline:
     ) -> None:
         self.config = Config(config_input)
 
-        self.pose_model = PoseModel(self.config, self.config.pose.get("pose_model"))
+        self.pose_model = PoseModel(self.config.pose_model, self.config.backend, self.config.device, self.config.det_frequency, self.config.mode)
         self.sources = self.sources()
         self.subjects = self.subjects()
 
@@ -156,7 +147,6 @@ class Pose2SimPipeline:
 
         self.save_data = save_data
 
-        # ––– Instantiate stages –––––––––––––––––––––––––––––––––––––––––
         wanted = stages or self.DEFAULT_CHAIN
         self._stages: list[BaseStage] = [
             _discover_stage(name)(self.config) for name in wanted
@@ -206,10 +196,6 @@ class Pose2SimPipeline:
             sources_list.append(source_obj)
         return sources_list
 
-    # ------------------------------------------------------------------
-    #  Context‑manager so we guarantee setup/teardown
-    # ------------------------------------------------------------------
-
     def __enter__(self) -> "Pose2SimPipeline":
         for st in self._stages:
             st.setup()
@@ -220,31 +206,56 @@ class Pose2SimPipeline:
             st.teardown()
         logging.info("Pose2Sim pipeline completed.")
 
-    # ------------------------------------------------------------------
-    #  Execution
-    # ------------------------------------------------------------------
-
-    def run(self, initial_data: Any = None) -> Any:
-        """Run the chain and return the last stage output."""
+    def run(self, initial_data=None):
         data = initial_data
-        for st in self._stages:
+        batch_end = 0
+
+        for idx, st in enumerate(self._stages):
+            if getattr(st, "stream", False):
+                batch_end = idx
+                break
             t0 = time.time()
-            logging.info("\n──────────────────────────────────────────────────────────────")
-            logging.info(
-                f"{st.name.upper()}  |  {datetime.now().strftime('%H:%M:%S')}  |  START"
-            )
+            logging.info(f"[{st.name}] START (batch)")
             data = st.run(data)
             if self.save_data:
                 st.save_data(data)
-            logging.info(
-                f"{st.name.upper()}  |  done in {time.time() - t0:.2f} s"
-            )
-        return data
+            logging.info(f"[{st.name}] done in {time.time()-t0:.2f}s")
+        else:
+            return data
+
+        stream_stages = self._stages[batch_end:]
+
+        qs = [mp.Queue(maxsize=256) for _ in range(len(stream_stages)+1)]
+
+        for i, st in enumerate(stream_stages):
+            threading.Thread( 
+                target=self._batch_worker,
+                args=(st, qs[i], qs[i+1]),
+                daemon=True
+            ).start()
+
+        for item in iter(qs[-1].get, BaseStage.sentinel):
+            pass
+
+        # arrêt propre
+        for st in stream_stages:
+            if getattr(st, "stream", False):
+                st.stop_stream()
 
     @classmethod
     def _single(cls, stage: str, cfg: str | os.PathLike | dict | None = None, save_data: bool = False):
         with cls(cfg, stages=[stage], save_data=save_data) as pipe:
             pipe.run()
+
+    @staticmethod
+    def _batch_worker(stage, in_q, out_q):
+        for item in iter(in_q.get, BaseStage.sentinel):
+            res = stage.run(item)
+            if res is not None:
+                out_q.put(res)
+            if stage.save_data:
+                stage.save_data(res)
+        out_q.put(BaseStage.sentinel)
 
 
 calibration = lambda cfg=None: Pose2SimPipeline._single("calibration", cfg, True)

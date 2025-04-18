@@ -18,25 +18,18 @@ import glob
 import logging
 import toml
 import cv2
-import math
 import sys
 from pathlib import Path
-import re
-import json
-import ast
 
 from Pose2Sim.common import natural_sort_key
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.model import PoseModel
-from Pose2Sim.source import WebcamSource
 
 
 class Config:
     def __init__(self, config_input=None):
         self.config_input = config_input
         self.config_dict = [self._build_merged_config(config_input)][0]
-
-        self.fps = None
 
     def _recursive_update(self, base, updates):
         for key, value in updates.items():
@@ -141,177 +134,11 @@ class Config:
     def pose_dir(self):
         return os.path.join(self.session_dir, 'pose')
 
-    def set_fps(self, value):
-        self.fps = value
-        logging.info(f'[Pose estimation] capture frame rate set to: {self.fps}.')
-
-    @property
-    def pose_estimation(self):
-        return self.config_dict.get("poseEstimation")
-    
-    @property
-    def output_format(self):
-        return self.pose_estimation.get('output_format')
-
-    @property
-    def webcam_recording(self):
-        return self.pose_estimation.get('webcam_recording')
-    
-    @property
-    def save_files(self):
-        save_files = self.pose_estimation.get('save_video')
-        save_images = ('to_images' in save_files)
-        save_video = ('to_video' in save_files)
-        return save_video, save_images
-    
-    @property
-    def tracking_mode(self):
-        return self.pose_estimation.get('tracking_mode')
-    
-    @property
-    def multi_person(self):
-        return self.pose_estimation.get('multi_person')
-
-    @property 
-    def combined_frames(self):
-        return self.pose_estimation.get('combined_frames')
-
-    @property 
-    def multi_workers(self):
-        return self.pose_estimation.get('multi_workers')
-
-    def check_pose_estimation(self):
-        overwrite_pose = self.pose_estimation.get('overwrite_pose')
-
-        for source in self.sources:
-            if not isinstance(source, WebcamSource):
-                if os.path.exists(os.path.join(self.pose_dir, source.name)) and not overwrite_pose:
-                    logging.info(f'[{source.name} - pose estimation] Skipping as it has already been done.'
-                                'To recalculate, set overwrite_pose to true in Config.toml.')
-                    return
-                elif os.path.exists(os.path.join(self.pose_dir, source.name)) and overwrite_pose:
-                    logging.info(f'[{source.name} - pose estimation] Overwriting estimation results.')
-    
-    def get_deepsort_params(self):
-        try:
-            deepsort_params = ast.literal_eval(deepsort_params)
-        except:  # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
-            deepsort_params = deepsort_params.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/', ':/').replace('":"\\', ':\\')
-            deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params)  # changes "[640", "640]" to [640,640]
-            deepsort_params = json.loads(deepsort_params)
-        
-        return deepsort_params
-
     # Logging
 
     @property
     def use_custom_logging(self):
         return self.config_dict.get("logging").get("use_custom_logging")
-
-    # Calibration
-
-    @property
-    def calib_output_path(self):
-        return os.path.join(self.session_dir, f"Calib.toml")
-
-    @property
-    def calibration(self):
-        return self.config_dict.get("calibration")
-
-    @property
-    def calib_type(self):
-        return self.calibration.get("calibration_type")
-
-    @property
-    def overwrite_intrinsics(self):
-        return self.calibration.get("overwrite_intrinsics")
-
-    @property
-    def overwrite_extrinsics(self):
-        return self.calibration.get("overwrite_extrinsics")
-
-    @property
-    def calculate_extrinsics(self):
-        return self.calibration.get("calculate_extrinsics")
-
-    # Calibration - Convert
-
-    @property
-    def convert_path(self):
-        convert_path = self.calibration.get("convert").get("convert_from")    
-        if not convert_path:
-            raise NameError("Conversion file path not specified in configuration.")
-
-        if not os.path.isabs(convert_path):
-            convert_path = os.path.join(self.session_dir, convert_path)
-
-        if not os.path.exists(convert_path):
-            raise NameError(f"File {convert_path} not found.")
-        return convert_path
-    
-    # Calibration - Convert - Qualisys
-
-    @property
-    def binning_factor_qualisys(self):
-        return self.config.calibration.get("convert").get("qualisys").get("binning_factor", 1)
-
-    # Calibration - Calculate
-
-    @property
-    def overwrite_extraction(self):
-        return self.calibration.get("calculate").get("overwrite_extraction")
-
-    @property
-    def extract_every_N_sec(self):
-        return self.calibration.get("calculate").get("extract_every_N_sec")
-
-    # Calibration - Calculate - Intrinsics
-
-    @property
-    def show_detection_intrinsics(self):
-        return self.calibration.get("calculate").get("intrinsics").get("show_detection_intrinsics")
-
-    @property
-    def intrinsics_corners_nb(self):
-        return self.calibration.get("calculate").get("intrinsics").get("intrinsics_corners_nb")
-
-    @property
-    def intrinsics_square_size(self):
-        return self.calibration.get("calculate").get("intrinsics").get("intrinsics_square_size") / 1000.0
-
-    @property
-    def intrinsics_extension(self):
-        return self.calibration.get("calculate").get("intrinsics").get("intrinsics_extension")
-
-    # Calibration - Calculate - Extrinsics
-
-    @property
-    def extrinsics_method(self):
-        return self.calibration.get("calculate").get("extrinsics").get("extrinsics_method")
-
-    @property
-    def extrinsics_extension(self):
-        return self.calibration.get("calculate").get("extrinsics").get("extrinsics_extension")
-
-    @property
-    def show_reprojection_error(self):
-        return self.calibration.get("calculate").get("extrinsics").get("show_reprojection_error")
-
-    # Calibration - Calculate - Extrinsics - Board
-
-    @property
-    def extrinsics_corners_nb(self):
-        return self.calibration.get("calculate").get("extrinsics").get("board").get("extrinsics_corners_nb")
-
-    @property
-    def extrinsics_square_size(self):
-        return self.calibration.get("calculate").get("extrinsics").get("board").get("extrinsics_square_size") / 1000.0
-
-    # Calibration - Calculate - Extrinsics - Scene
-
-    @property
-    def object_coords_3d(self):
-        return self.calibration.get("calculate").get("extrinsics").get("scene").get("object_coords_3d")
 
     # Filtering
 

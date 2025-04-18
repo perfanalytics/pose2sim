@@ -1228,7 +1228,7 @@ def draw_bounding_box(img, X, Y, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)],
     return img
 
 
-def draw_skel(img, X, Y, model):
+def draw_skel(img, X, Y, skeleton):
     '''
     Draws keypoints and skeleton for each person.
     Skeletons have a different color for each person.
@@ -1237,7 +1237,7 @@ def draw_skel(img, X, Y, model):
     - img: opencv image
     - X: list of list of x coordinates
     - Y: list of list of y coordinates
-    - model: skeleton model (from skeletons.py)
+    - skeleton: skeleton model (from skeletons.py)
     - colors: list of colors to cycle through
     
     OUTPUT:
@@ -1246,7 +1246,7 @@ def draw_skel(img, X, Y, model):
     
     # Get (unique) pairs between which to draw a line
     id_pairs, name_pairs = [], []
-    for data_i in PreOrderIter(model.root, filter_=lambda node: node.is_leaf):
+    for data_i in PreOrderIter(skeleton.root, filter_=lambda node: node.is_leaf):
         node_branch_ids = [node_i.id for node_i in data_i.path]
         node_branch_names = [node_i.name for node_i in data_i.path]
         id_pairs += [[node_branch_ids[i],node_branch_ids[i+1]] for i in range(len(node_branch_ids)-1)]

@@ -37,11 +37,17 @@ import time
 import json
 import logging
 import queue
+import math
 import multiprocessing
 import psutil
 import cv2
 import uuid
 import numpy as np
+import pandas as pd
+import re
+import ast
+from pathlib import Path
+from dataclasses import dataclass
 
 from multiprocessing import shared_memory
 from tqdm import tqdm
@@ -52,6 +58,8 @@ from rtmlib import draw_skeleton
 from Pose2Sim.source import FrameData
 from deep_sort_realtime.deepsort_tracker import DeepSort
 from Pose2Sim.stages.base import BaseStage
+from Pose2Sim.source import BaseSource, WebcamSource
+from Pose2Sim.model import PoseModel
 from Pose2Sim.common import (
     sort_people_sports2d,
     sort_people_deepsort,
@@ -75,25 +83,58 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
+@dataclass
+class PoseEstimationSettings:
+    output_format: str
+    webcam_recording: bool
+    save_video: bool
+    save_images: bool
+    tracking_mode: str
+    display_detection: bool
+    multi_person: bool
+    combined_frames: bool
+    multi_workers: int
+    overwrite_pose: bool
+    deepsort_params: dict[str, Any]
+
+    # Fabrication à partir du dictionnaire complet de config ---------------- #
+    @classmethod
+    def from_config(cls, cfg: dict[str, Any]) -> "PoseEstimationSettings":
+        pe = cfg.get("poseEstimation")
+        save_flags = pe.get("save_video")
+        return cls(
+            output_format           = pe.get("output_format"),
+            webcam_recording        = pe.get("webcam_recording"),
+            save_video              = "to_video"  in save_flags,
+            save_images             = "to_images" in save_flags,
+            tracking_mode           = pe.get("tracking_mode"),
+            display_detection       = pe.get("display_detection"),
+            multi_person            = pe.get("multi_person"),
+            combined_frames         = pe.get("combined_frames"),
+            multi_workers           = pe.get("multi_workers"),
+            overwrite_pose          = pe.get("overwrite_pose"),
+            deepsort_params         = pe.get("get_deepsort_params"),
+        )
+
+
 # CLASSES
 class PoseEstimatorWorker(multiprocessing.Process):
-    def __init__(self, config, pose_model, input_queue, output_queue, tracker_ready_event):
+    def __init__(self, sources, pose_model, input_queue, output_queue, tracker_ready_event, deepsort_params=None):
         super().__init__(daemon=True)
-        self.config = config
+        self.sources = sources
         self.pose_model = pose_model
         self.input_queue = input_queue
         self.output_queue = output_queue
         self.tracker_ready_event = tracker_ready_event
+        self.deepsort_params = deepsort_params
+        self.deepsort_tracker = None
 
         self.ended = True
         self.prev_keypoints = {}
         self.prev_bboxes = {}
 
-        if self.config.tracking_mode == 'deepsort' and self.config.multi_person:
-            self.deepsort_tracker = DeepSort(**self.config.get_deepsort_params())
-
     def run(self):
-        model = self.pose_model.pose_model_enum.model_class(mode=self.pose_model.mode,
+        model = self.pose_model.model_class(mode=self.pose_model.mode,
             to_openpose=self.pose_model.to_openpose,
             backend=self.pose_model.backend,
             device=self.pose_model.device)
@@ -107,7 +148,7 @@ class PoseEstimatorWorker(multiprocessing.Process):
         self.tracker_ready_event.set()
 
         while not self.ended:
-            if all(source.ended for source in self.config.sources) and self.input_queue.isEmpty():
+            if all(source.ended for source in self.sources) and self.input_queue.isEmpty():
                 self.ended = True
                 break
 
@@ -135,6 +176,8 @@ class PoseEstimatorWorker(multiprocessing.Process):
 
                 if self.multi_person:
                     if self.tracking_mode == 'deepsort':
+                        if self.deepsort_tracker == None:
+                            self.deepsort_tracker = DeepSort(**self.deepsort_params)
                         frame_data.keypoints, frame_data.scores = sort_people_deepsort(frame_data.keypoints, frame_data.scores, self.deepsort_tracker, frame, frame_data.idx)
                     if self.tracking_mode == 'sports2d':
                         if frame_data.source is not None:
@@ -157,86 +200,38 @@ class PoseEstimatorWorker(multiprocessing.Process):
 
 
 class BaseProcessor:
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, sources, queue, combined_frames, available_buffers, buffers, frame_size):
+        self.sources = sources
         self.sync_data = {}
+        self.combined_frames = combined_frames
+        self.queue = queue
+        self.available_buffers = available_buffers
+        self.buffers = buffers
+        self.frame_size = frame_size
 
     def get_frames_list(self):
         frames_list = []
         for idx in sorted(self.sync_data.keys()):
             group = self.sync_data[idx]
-            if len(group) == len(self.config.sources):
+            if len(group) == len(self.sources):
                 complete_group = self.sync_data.pop(idx)
-                for source in self.config.sources:
+                for source in self.sources:
                     frame_data = (complete_group[source.name])
                     frames_list.append(frame_data)
                 return frames_list
 
 
-class InputQueueProcessor(multiprocessing.Process, BaseProcessor):
-    def __init__(self, config, input_queue, available_buffers, buffers):
-        BaseProcessor.__init__(self, config)
-        self.input_queue = input_queue
-        self.available_buffers = available_buffers
-        self.buffers = buffers
-
-    def run(self):
-        if self.config.combined_frames:
-            for source in self.config.sources:
-                frame_data = source.frame_queue.get()
-                if frame_data.idx not in self.sync_data:
-                    self.sync_data[frame_data.idx] = {}
-                self.sync_data[frame_data.idx][frame_data.source.name] = frame_data
-
-            if frames_list := self.get_frames_list():
-                mosaic = np.zeros(
-                    (self.config.pose_model.det_input_size[0], self.config.pose_model.det_input_size[1], 3),
-                    dtype=np.uint8
-                )
-                timestamps = []
-                idx = None
-
-                for frame_data in frames_list:
-                    if not frame_data.placeholder:
-                        timestamps.append(frame_data.timestamp)
-                        idx = frame_data.idx
-                        frame = np.ndarray(
-                            frame_data.shape,
-                            dtype=np.dtype(frame_data.dtype),
-                            buffer=frame_data.buffer.buf,
-                        )
-                        self.available_buffers.put(frame_data.buffer.name)
-
-                        source = frame_data.source
-                        mosaic[source.y_offset:source.y_offset + source.height,
-                            source.x_offset:source.x_offset + source.width] = frame
-
-                avg_timestamp = np.mean(timestamps)
-                mosaic_data = FrameData(None, avg_timestamp, idx)
-                buffer = self.available_buffers.get()
-                shm = self.buffers[buffer]
-                mosaic_data.shape = mosaic.shape
-                mosaic_data.dtype = mosaic.dtype.str
-                mosaic_data.buffer = shm
-                np_mosaic = np.ndarray(mosaic_data.shape, dtype=mosaic_data.dtype, buffer=shm.buf)
-                np_mosaic[:] = mosaic
-
-                self.input_queue.put(mosaic_data)
-        else:
-            for source in self.config.sources:
-                self.input_queue.put(source.frame_queue.get())
-
-
 class OutputQueueProcessor(BaseProcessor):
-    def __init__(self, config, output_queue, available_buffers, buffers):
-        BaseProcessor.__init__(self, config)
-        self.output_queue = output_queue
-        self.available_buffers = available_buffers
-        self.buffers = buffers
+    def __init__(self, sources, combined_frames, queue, available_buffers, buffers, frame_size, display_detection, save_video, save_images, skeleton):
+        BaseProcessor.__init__(self, sources, queue, combined_frames, available_buffers, buffers, frame_size)
+        self.display_detection = display_detection
+        self.save_video = save_video
+        self.save_images = save_images
+        self.skeleton = skeleton
 
     def run(self):
         try:
-            frame_data = self.output_queue.get()
+            frame_data = self.queue.get()
             self.process_result_item(frame_data)
         except queue.Empty:
             time.sleep(0.005)
@@ -253,14 +248,14 @@ class OutputQueueProcessor(BaseProcessor):
             dtype=np.dtype(mosaic_data.dtype),
             buffer=mosaic_data.buffer.buf,
         )
-        self.buffer_manager.available_buffers.put(mosaic_data.buffer.name)
+        self.available_buffers.put(mosaic_data.buffer.name)
 
         if self.save_images or self.save_video or self.display_detection:
             mosaic = draw_skeleton(mosaic, mosaic_data.keypoints, mosaic_data.scores)
             if self.display_detection:
                 self.show_mosaic(mosaic)
 
-        for source in self.config.sources:
+        for source in self.sources:
             rec_kpts = []
             rec_scores = []
 
@@ -298,7 +293,7 @@ class OutputQueueProcessor(BaseProcessor):
         if frames_list := self.get_frames_list():
             if self.display_detection:
                 mosaic = np.zeros(
-                    (self.config.pose_model.det_input_size[0], self.config.pose_model.det_input_size[1], 3),
+                    self.frame_size,
                     dtype=np.uint8
                 )
             for frame_data in frames_list:
@@ -308,12 +303,12 @@ class OutputQueueProcessor(BaseProcessor):
                         dtype=np.dtype(frame_data.dtype),
                         buffer=frame_data.buffer.buf,
                     )
-                    self.buffer_manager.available_buffers.put(frame_data.buffer.name)
-                    if self.config.save_files[0] or self.config.save_files[1] or self.config.display_detection:
-                        frame_data.frame = draw_skeleton(frame, frame_data.keypoints, frame_data.scores)
-                    
+                    self.available_buffers.put(frame_data.buffer.name)
+                    if self.save_images or self.save_video or self.display_detection:
+                        frame_data.frame = frame = draw_skeleton(frame, frame_data.keypoints, frame_data.scores)
+
                     output(frame_data)
-                    
+
                     if mosaic:
                         source = frame_data.source
                         mosaic[source.y_offset:source.y_offset + source.height,
@@ -337,7 +332,7 @@ class OutputQueueProcessor(BaseProcessor):
             if self.multi_person: 
                 frame = draw_bounding_box(frame, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
             frame = draw_keypts(frame, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
-            frame = draw_skel(frame, valid_X, valid_Y, self.pose_model)
+            frame = draw_skel(frame, valid_X, valid_Y, self.skeleton)
             return frame
 
     def show_mosaic(self, mosaic):
@@ -348,16 +343,59 @@ class OutputQueueProcessor(BaseProcessor):
             self.stop()
 
 
-class CaptureCoordinator():
-    def __init__(self, config, interval, available_buffers, buffers, buffers_count):
-        self.config = config
+class InputQueueProcessor(BaseProcessor):
+    def __init__(self, sources, queue, interval, combined_frames, available_buffers, buffers, buffers_count, frame_size):
+        BaseProcessor.__init__(self, sources, queue, combined_frames, available_buffers, buffers, frame_size)
         self.last_capture_time = time.time()
         self.interval = interval
-        self.available_buffers = available_buffers
-        self.buffers = buffers
         self.buffers_count = buffers_count
 
     def run(self):
+        if self.combined_frames:
+            for source in self.sources:
+                frame_data = source.frame_queue.get()
+                if frame_data.idx not in self.sync_data:
+                    self.sync_data[frame_data.idx] = {}
+                self.sync_data[frame_data.idx][frame_data.source.name] = frame_data
+
+            if frames_list := self.get_frames_list():
+                mosaic = np.zeros(
+                    self.frame_size,
+                    dtype=np.uint8
+                )
+                timestamps = []
+                idx = None
+
+                for frame_data in frames_list:
+                    if not frame_data.placeholder:
+                        timestamps.append(frame_data.timestamp)
+                        idx = frame_data.idx
+                        frame = np.ndarray(
+                            frame_data.shape,
+                            dtype=np.dtype(frame_data.dtype),
+                            buffer=frame_data.buffer.buf,
+                        )
+                        self.available_buffers.put(frame_data.buffer.name)
+
+                        source = frame_data.source
+                        mosaic[source.y_offset:source.y_offset + source.height,
+                            source.x_offset:source.x_offset + source.width] = frame
+
+                avg_timestamp = np.mean(timestamps)
+                mosaic_data = FrameData(None, avg_timestamp, idx)
+                buffer = self.available_buffers.get()
+                shm = self.buffers[buffer]
+                mosaic_data.shape = mosaic.shape
+                mosaic_data.dtype = mosaic.dtype.str
+                mosaic_data.buffer = shm
+                np_mosaic = np.ndarray(mosaic_data.shape, dtype=mosaic_data.dtype, buffer=shm.buf)
+                np_mosaic[:] = mosaic
+
+                self.queue.put(mosaic_data)
+        else:
+            for source in self.sources:
+                self.queue.put(source.frame_queue.get())
+
         elapsed = time.time() - self.last_capture_time
         if elapsed < self.interval:
             time.sleep(self.interval - elapsed)
@@ -366,8 +404,8 @@ class CaptureCoordinator():
             empty = True
 
         if self.mode == 'continuous' or (self.mode == 'alternating' and empty):
-            if self.available_frame_buffers.qsize() >= len(self.config.sources):
-                for source in self.config.sources:
+            if self.available_frame_buffers.qsize() >= len(self.sources):
+                for source in self.sources:
                     shared_memory = self.buffers[self.available_buffers.get()]
                     self.source.command_queues.put(("CAPTURE_FRAME", shared_memory))
                 self.last_capture_time = time.time()
@@ -376,12 +414,15 @@ class CaptureCoordinator():
 
     def stop(self):
         self.ended = True
-        for source in self.config.sources:
+        for source in self.sources:
             self.source.command_queues.put(None)
 
+
 class PoseEstimationSession:
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, settings, sources, pose_model):
+        self.settings = settings
+        self.sources = sources
+        self.pose_model = pose_model
         self.capture_coord = None
         self.frame_proc = None
         self.result_proc = None
@@ -395,13 +436,50 @@ class PoseEstimationSession:
         self.stop()
 
     def start(self):
-        self.config.check_pose_estimation()
-        self.config.get_mosaic_params()
+        overwrite_pose = self.pose_estimation.get('overwrite_pose')
+
+        for source in self.sources:
+            if not isinstance(source, WebcamSource):
+                if os.path.exists(os.path.join(self.pose_dir, source.name)) and not overwrite_pose:
+                    logging.info(f'[{source.name} - pose estimation] Skipping as it has already been done.'
+                                'To recalculate, set overwrite_pose to true in Config.toml.')
+                    return
+                elif os.path.exists(os.path.join(self.pose_dir, source.name)) and overwrite_pose:
+                    logging.info(f'[{source.name} - pose estimation] Overwriting estimation results.')
+
+        mosaic_rows = 0
+        mosaic_cols = 0
+
+        if self.settings.combined_frames:
+            mosaic_cols = math.ceil(math.sqrt(len(self.sources)))
+            mosaic_rows = mosaic_cols
+            cell_w = self.pose_model.det_input_size[0] // mosaic_cols
+            cell_h = self.pose_model.det_input_size[1] // mosaic_rows
+
+            logging.info(f"Combined frames: {mosaic_rows} rows & {mosaic_cols} cols")
+
+            for i, source in enumerate(self.sources):
+                r = i // mosaic_cols
+                c = i % mosaic_cols
+                x_off = c * cell_w
+                y_off = r * cell_h
+                source.x_offset = x_off
+                source.y_offset = y_off
+                source.desired_width = cell_w
+                source.desired_height = cell_h
+
+            frame_size = (cell_w, cell_h)
+        else:
+            frame_size = self.pose_model.det_input_size
+            logging.info(f"Frame input size: {frame_size[0]}x{frame_size[1]}")
+            for source in self.sources:
+                source.desired_width = frame_size[0]
+                source.desired_height = frame_size[1]
 
         available_memory = psutil.virtual_memory().available
-        buffer_size = self.config.pose_model.det_input_size[0] * self.config.pose_model.det_input_size[1] * 3
+        self.frame_size = self.pose_model.det_input_size[0] * self.pose_model.det_input_size[1] * 3
         self.buffers_count = min(
-            int((available_memory / 2) / (buffer_size * (len(self.config.sources) / (len(self.config.sources) + 1)))),
+            int((available_memory / 2) / (self.frame_size * (len(self.sources) / (len(self.sources) + 1)))),
             10000
         )
 
@@ -410,25 +488,18 @@ class PoseEstimationSession:
 
         for _ in range(self.buffers_count):
             buf_uuid = str(uuid.uuid4())
-            shm = shared_memory.SharedMemory(name=buf_uuid, create=True, size=buffer_size)
+            shm = shared_memory.SharedMemory(name=buf_uuid, create=True, size=self.frame_size)
             self.buffers[buf_uuid] = shm
             self.available_buffers.put(buf_uuid)
 
-        for source in self.config.sources:
+        for source in self.sources:
             source.start_in_process()
             source.capture_ready_event.wait()
-            if self.config.save_files[0]:
+            if self.settings.save_files[0]:
                 source.intit_video_writer()
 
-        self.config.set_fps(min(source.fps for source in self.config.sources))
-        
-        self.capture_coord = CaptureCoordinator(
-            config=self.config,
-            interval=1.0/self.config.fps,
-            available_buffers = self.available_buffers,
-            buffers = self.buffers,
-            buffers_count = self.buffers_count,
-        )
+        self.fps = min(source.fps for source in self.sources)
+        logging.info(f'[Pose estimation] capture frame rate set to: {self.fps}.')
 
         tracker_ready = multiprocessing.Event()
 
@@ -436,16 +507,22 @@ class PoseEstimationSession:
         self.output_queue = multiprocessing.Queue()
 
         self.input_proc = InputQueueProcessor(
-            config=self.config,
-            input_queue=self.input_queue,
+            sources=self.sources,
+            queue=self.input_queue,
+            interval=1.0/self.fps,
+            combined_frames=self.settings.combined_frames,
             available_buffers = self.available_buffers,
             buffers = self.buffers,
+            buffers_count = self.buffers_count,
+            frame_size=self.frame_size,
         )
         self.output_proc = OutputQueueProcessor(
-            config=self.config,
-            output_queue=self.output_queue,
+            sources=self.sources,
+            combined_frames=self.settings.combined_frames,
+            queue=self.output_queue,
             available_buffers = self.available_buffers,
             buffers = self.buffers,
+            frame_size=self.frame_size,
         )
         
         tracker_ready = multiprocessing.Event()
@@ -453,16 +530,28 @@ class PoseEstimationSession:
         cpu = multiprocessing.cpu_count()
 
         n_workers = 1
-        if self.config.multi_workers:
-            n_workers = max(1, cpu - len(self.config.sources) - 4)
+
+        deepsort_params = None
+        if self.settings.tracking_mode == 'deepsort':
+            try:
+                deepsort_params = ast.literal_eval(self.setting.deepsort_params)
+            except:  # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+                deepsort_params = deepsort_params.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/', ':/').replace('":"\\', ':\\')
+                deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params)  # changes "[640", "640]" to [640,640]
+                deepsort_params = json.loads(deepsort_params)
+
+        if self.settings.multi_workers:
+            n_workers = max(1, cpu - len(self.sources) - 4)
             logging.info(f"Starting {n_workers} workers.")
 
         def new_worker():
             w = PoseEstimatorWorker(
-                cfg_path=self.config,
+                sources=self.sources,
+                pose_model=self.pose_model,
                 input_queue=self.input_queue,
                 output_queue=self.output_queue,
                 tracker_ready_event=tracker_ready,
+                deepsort_params=deepsort_params,
             )
             w.start()
             return w
@@ -473,7 +562,7 @@ class PoseEstimationSession:
 
         self.bars = {}
         bar_pos = 0
-        for src in self.config.sources:
+        for src in self.sources:
             src.progress_bar.position = bar_pos
             bar_pos += 1
 
@@ -484,7 +573,7 @@ class PoseEstimationSession:
         bar_pos += 1
 
 
-        if self.config.multi_workers:
+        if self.settings.multi_workers:
             self.bars["workers"] = tqdm(
                 total=len(self.workers),
                 desc="Active Workers", position=bar_pos, leave=True
@@ -499,7 +588,7 @@ class PoseEstimationSession:
             logging.info(f"Allocating {self.buffers_count} buffers.")
 
             while not self.ended:
-                if not all(not sources.ended for sources in self.config.sources):
+                if not all(not sources.ended for sources in self.sources):
                     self.capture_coord.run()
                     self.input_proc.run()
                 
@@ -510,7 +599,7 @@ class PoseEstimationSession:
 
                 alive = sum(not w.ended for w in self.workers)
 
-                if self.config.multi_workers:
+                if self.settings.multi_workers:
                     self.bars["workers"].n = alive
                     self.bars["workers"].refresh()
 
@@ -519,7 +608,7 @@ class PoseEstimationSession:
 
                 if cv2.waitKey(1) & 0xFF == ord(" "):
                     logging.info("Space bar pressed: stopping sources.")
-                    for s in self.config.sources:
+                    for s in self.sources:
                         s.stop()
 
                 time.sleep(0.05)
@@ -536,10 +625,9 @@ class PoseEstimationSession:
             self.capture_coord.stop()
             self.capture_coord.join(timeout=2)
 
-        for s in getattr(self.config, "sources", []):
+        for s in self.sources:
             s.stop()
-            if hasattr(s, "progress_bar"):
-                s.progress_bar.close()
+            s.progress_bar.close()
 
         for w in self.workers:
             w.join(timeout=2)
@@ -559,33 +647,43 @@ class PoseEstimationSession:
 
         for b in self.bars.values():
             b.close()
-        if self.config.display_detection:
+        if self.settings.display_detection:
             cv2.destroyAllWindows()
 
         logging.info("PoseEstimationSession stopped.")
 
 
 class PoseEstimationStage(BaseStage):
-    name = "poseestimation"
+    name = "pose_estimation"
+    stream = True
 
-    def run(self, data_in: Any) -> Any:
-        with PoseEstimationSession(self.config) as session:
-            session.run()
+    def __init__(self, settings: PoseEstimationSettings, sources: list[BaseSource], session_dir: Path, pose_model: PoseModel):
+        self.settings    = settings
+        self.sources     = sources
+        self.session_dir = Path(session_dir)
+        self.pose_model  = pose_model
 
-        return data_in
+    def run(self, in_q, out_q, stop_evt):
+        with PoseEstimationSession(self.cfg, self.sources,
+                                   self.pose_model) as sess:
+            while not stop_evt.is_set():
+                frame = sess.loop_step()
+                out_q.put(frame)
+        out_q.put(BaseStage.sentinel)
 
     def save_data(self, data_out):
         file_name = f"{data_out.source.name}_{data_out.timestamp}_{data_out.idx:06d}"
 
-        if self.config.save_images:
+        if self.settings.save_files[1]:
             cv2.imwrite(os.path.join(data_out.source.img_output_dir, f"{file_name}.jpg"), data_out.frame)
-        if self.config.save_video:
+        if self.settings.save_files[0]:
             data_out.source.video_writer.write(data_out.frame)
-        if 'openpose' in self.config.output_format:
+        if 'openpose' in self.settings.output_format:
             json_path = os.path.join(data_out.source.output_dir, f"{file_name}.json")
             save_keypoints_to_openpose(json_path, data_out.keypoints, data_out.scores)
-        # if 'deeplabcut' in self.config.output_format:
-        # if 'pose2sim' in self.config.output_format:
+        # if 'deeplabcut' in self.settings.output_format:
+        # if 'pose2sim' in self.settings.output_format:
+
 
 def save_keypoints_to_openpose(json_file_path, all_keypoints, all_scores):
     '''
@@ -719,36 +817,3 @@ def save_keypoints_to_deeplabcut(csv_file_path, all_keypoints, all_scores, times
     # Create a DataFrame for the new row and append it.
     new_row_df = pd.DataFrame([row_data], columns=new_header)
     new_row_df.to_csv(csv_file_path, mode='a', header=not os.path.exists(csv_file_path), index=False)
-
-
-def get_mosaic_params(self):
-    mosaic_rows = 0
-    mosaic_cols = 0
-
-    if self.combined_frames:
-        mosaic_cols = math.ceil(math.sqrt(len(self.sources)))
-        mosaic_rows = mosaic_cols
-        cell_w = self.pose_model.det_input_size[0] // mosaic_cols
-        cell_h = self.pose_model.det_input_size[1] // mosaic_rows
-
-        logging.info(f"Combined frames: {mosaic_rows} rows & {mosaic_cols} cols")
-
-        for i, source in enumerate(self.sources):
-            r = i // mosaic_cols
-            c = i % mosaic_cols
-            x_off = c * cell_w
-            y_off = r * cell_h
-            source.x_offset = x_off
-            source.y_offset = y_off
-            source.desired_width = cell_w
-            source.desired_height = cell_h
-
-        frame_size = (cell_w, cell_h)
-    else:
-        frame_size = self.pose_model.det_input_size
-        logging.info(f"Frame input size: {frame_size[0]}x{frame_size[1]}")
-        for source in self.sources:
-            source.desired_width = frame_size[0]
-            source.desired_height = frame_size[1]
-
-    return (mosaic_rows, mosaic_cols)
