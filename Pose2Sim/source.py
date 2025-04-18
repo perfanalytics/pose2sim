@@ -48,9 +48,6 @@ class BaseSource(abc.ABC):
         self.name = data.get("name")
         self.rotation = data.get("rotation", 0)
 
-        self.extrinsics_files = {}
-        self.intrinsics_files = {}
-
         self.calib_intrinsics = data.get("calib_intrinsics")
         self.calib_extrinsics = data.get("calib_extrinsics")
         self.rotation = data.get("rotation")
@@ -121,23 +118,51 @@ class BaseSource(abc.ABC):
                 else:
                     pass
 
+    def get_calib_files(self, calib_type, calib_folder, extension, extract_every_N_sec=1):
+        folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
+        if folder == "live":
+            #TODO: Extract frames from webcam
+            logging.error(f"[{self.name}] Live calibration not already implemented.")
+            raise ValueError(f"[{self.name}] Live calibration not already implemented.")
+        else :
+            if not os.path.isdir(calib_folder):
+                logging.warning(f"[{self.name} - {calib_type}] Calibration skipped: The specified folder has not been found '{folder}'")
+            else:
+                files = glob.glob(calib_folder)
+                if not files:
+                    logging.error(f"[{self.name} - {calib_type}] No files found in folder '{folder}'.")
+                    raise ValueError(f"[{self.name} - {calib_type}] No files found in folder '{folder}'.")
+                else:
+                    files = glob.glob(os.path.join(calib_folder, f"*{extension}"))
+                    if not files:
+                        try:
+                            cap = cv2.VideoCapture(files[0])
+                            if cap.isOpened():
+                                fps = cap.get(cv2.CAP_PROP_FPS)
+                                if fps == 0:
+                                    cap.release()
+                                    logging.error(f"[{self.name} - {calib_type}] FPS is 0, cannot extract frames.")
+                                    raise ValueError(f"[{self.name} - {calib_type}] FPS is 0, cannot extract frames.")
+                                fps = round(fps)
 
-    def get_calib_files(self, folder, extension, calibration_name):
-        calib_folder = os.path.join(self.config.calib_dir, folder)
-        if not os.path.isdir(calib_folder):
-            logging.warning(
-                f"[{self.name} - {calibration_name}] Calibration skipped: The specified folder does not exist -> '{folder}'"
-            )
-            return {}
+                            logging.info(f"[{self.name} - {calib_type}] Extracting frames")
+                            while True:
+                                ret, frame = cap.read()
+                                if not ret:
+                                    break
+                                if frame_nb % (fps * extract_every_N_sec) == 0:
+                                    img_path = os.path.join(folder, self.name + '_' + str(frame_nb).zfill(5) + '.png')
+                                    cv2.imwrite(img_path, frame)
+                                frame_nb += 1
+                            cap.release()
 
-        files = glob.glob(os.path.join(calib_folder, f"*{extension}"))
-        if not files:
-            logging.warning(
-                f"[{self.name} - {calibration_name}] Calibration skipped: No files with the extension '{extension}' found in folder '{folder}'."
-            )
-            return {}
+                            return glob.glob(os.path.join(folder, self.name + '*' + '.png')).sort
 
-        return files
+                        except Exception as e:
+                            logging.error(f"[{self.name} - {calib_type}] Files found in {folder} could not be read.")
+                            raise ValueError(f"[{self.name} - {calib_type}] Files found in {folder} could not be read.")
+                    else:
+                        return files
 
     def calculate_calibration_residuals(self):
         if len(self.S) != 0 and len(self.D) != 0 and len(self.K) != 0 and len(self.R) != 0 and len(self.T) != 0:
@@ -279,13 +304,13 @@ class WebcamSource(BaseSource):
             dt = datetime.now(timezone.utc)
         timestamp = dt.strftime("%Y%m%dT%H%M%S") + f"{dt.microsecond:06d}"
 
+        frame_data = FrameData(self, timestamp, self.idx)
+
         if not ret or frame is None:
             if capture:
                 logging.error(f"[{self.name}] Unable to read the frame.")
                 return None, frame_data
             pass
-
-        frame_data = FrameData(self, timestamp, self.idx)
 
         if self.rotation == 90:
             frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
@@ -344,63 +369,6 @@ class WebcamSource(BaseSource):
         self.y_offset = self.y_offset + ((self.desired_height - self.target_height) // 2)
 
         logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.target_width}x{self.target_height}")
-
-    def extract_frames(self, calib_type):
-        folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
-        if folder == "live":
-            #TODO: Extract frames from webcam
-            logging.error(f"[{self.name}] Live calibration not already implemented.")
-            raise ValueError(f"[{self.name}] Live calibration not already implemented.")
-        else :
-            files = self.intrinsics_files if calib_type == 'intrinsic' else self.extrinsics_files
-
-            try:
-                cap = cv2.VideoCapture(files[0])
-                if not cap.isOpened():
-                    raise Exception("File could not be opened.")
-
-                frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                if frame_count == 1:
-                    return
-
-            except Exception as e:
-                logging.error(f"Files found in {folder} are not images or videos.")
-                raise ValueError(f"Files found in {folder} are not images or videos.")
-
-            new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
-            if new_files and not self.config.overwrite_extraction:
-                logging.info("Frames have already been extracted and overwrite_extraction is False.")
-                if calib_type == 'intrinsic':
-                    self.intrinsics_files = new_files
-                else:
-                    self.extrinsics_files = new_files
-                return
-
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            if fps == 0:
-                cap.release()
-                logging.error("FPS is 0, cannot extract frames.")
-                raise ValueError("FPS is 0, cannot extract frames.")
-            fps = round(fps)
-
-            frame_nb = 0
-            logging.info(f"[{self.name}]Extracting frames")
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                if frame_nb % (fps * self.config.extract_every_N_sec) == 0:
-                    img_path = os.path.join(folder, self.name + '_' + str(frame_nb).zfill(5) + '.png')
-                    cv2.imwrite(img_path, frame)
-                frame_nb += 1
-            cap.release()
-
-            new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
-            new_files.sort()
-            if calib_type == 'intrinsic':
-                self.intrinsics_files = new_files
-            else:
-                self.extrinsics_files = new_files
 
     def measure_actual_fps(self, cap, num_frames):
         for _ in range(10):
@@ -523,61 +491,6 @@ class VideoSource(BaseSource):
 
         logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.target_width}x{self.target_height}")
 
-    def extract_frames(self, calib_type):
-        folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
-        if folder == "live":
-            logging.error(f"[{self.name}] Live calibration not available from a video source.")
-            raise ValueError(f"[{self.name}] Live calibration not available from a video source.")
-        files = self.intrinsics_files if calib_type == 'intrinsic' else self.extrinsics_files
-
-        try:
-            cap = cv2.VideoCapture(files[0])
-            if not cap.isOpened():
-                raise Exception("File could not be opened.")
-
-            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            if frame_count == 1:
-                return
-
-        except Exception as e:
-            logging.error(f"Files found in {folder} are not images or videos.")
-            raise ValueError(f"Files found in {folder} are not images or videos.")
-
-        new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
-        if new_files and not self.config.overwrite_extraction:
-            logging.info("Frames have already been extracted and overwrite_extraction is False.")
-            if calib_type == 'intrinsic':
-                self.intrinsics_files = new_files
-            else:
-                self.extrinsics_files = new_files
-            return
-        
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        if fps == 0:
-            cap.release()
-            logging.error("FPS is 0, cannot extract frames.")
-            raise ValueError("FPS is 0, cannot extract frames.")
-        fps = round(fps)
-
-        frame_nb = 0
-        logging.info(f"[{self.name}]Extracting frames")
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            if frame_nb % (fps * self.config.extract_every_N_sec) == 0:
-                img_path = os.path.join(folder, self.name + '_' + str(frame_nb).zfill(5) + '.png')
-                cv2.imwrite(img_path, frame)
-            frame_nb += 1
-        cap.release()
-
-        new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
-        new_files.sort()
-        if calib_type == 'intrinsic':
-            self.intrinsics_files = new_files
-        else:
-            self.extrinsics_files = new_files
-
     def stop(self):
         self.ended = True
         logging.info(f"[{self.name}] Stopped.")
@@ -685,61 +598,6 @@ class ImageSource(BaseSource):
         self.y_offset = self.y_offset + ((self.desired_height - self.target_height) // 2)
 
         logging.info(f"[{self.name}] Dimensions of source after rotation ({self.rotation}°) and model scaling (including mosaic scaling if included): {self.target_width}x{self.target_height}")
-
-    def extract_frames(self, calib_type):
-        files = self.intrinsics_files if calib_type == 'intrinsic' else self.extrinsics_files
-        if folder == "live":
-            logging.error(f"[{self.name}] Live calibration not available from an image source.")
-            raise ValueError(f"[{self.name}] Live calibration not available from an image source.")
-        folder = self.calib_intrinsics if calib_type == 'intrinsic' else self.calib_extrinsics
-
-        try:
-            cap = cv2.VideoCapture(files[0])
-            if not cap.isOpened():
-                raise Exception("File could not be opened.")
-
-            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            if frame_count == 1:
-                return
-
-        except Exception as e:
-            logging.error(f"Files found in {folder} are not images or videos.")
-            raise ValueError(f"Files found in {folder} are not images or videos.")
-
-        new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
-        if new_files and not self.config.overwrite_extraction:
-            logging.info("Frames have already been extracted and overwrite_extraction is False.")
-            if calib_type == 'intrinsic':
-                self.intrinsics_files = new_files
-            else:
-                self.extrinsics_files = new_files
-            return
-        
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        if fps == 0:
-            cap.release()
-            logging.error("FPS is 0, cannot extract frames.")
-            raise ValueError("FPS is 0, cannot extract frames.")
-        fps = round(fps)
-
-        frame_nb = 0
-        logging.info(f"[{self.name}]Extracting frames")
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            if frame_nb % (fps * self.config.extract_every_N_sec) == 0:
-                img_path = os.path.join(folder, self.name + '_' + str(frame_nb).zfill(5) + '.png')
-                cv2.imwrite(img_path, frame)
-            frame_nb += 1
-        cap.release()
-
-        new_files = glob.glob(os.path.join(folder, self.name + '*' + '.png'))
-        new_files.sort()
-        if calib_type == 'intrinsic':
-            self.intrinsics_files = new_files
-        else:
-            self.extrinsics_files = new_files
 
     def stop(self):
         self.ended = True

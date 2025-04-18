@@ -65,7 +65,7 @@ __status__ = "Development"
 
 @dataclass
 class CalibrationSettings:
-    session_dir: Path
+    calib_dir: Path
     calib_output_path: Path
     calib_type: str
     overwrite_intrinsics: bool
@@ -94,10 +94,11 @@ class CalibrationSettings:
     def from_config(cls, cfg: dict[str, Any], session_dir: Path) -> "CalibrationSettings":
         cal_cfg   = cfg.get("calibration")
         c_type    = cal_cfg.get("calibration_type")
-        out_path  = Path(session_dir) / "Calib.toml"
+        calib_dir  = Path(session_dir) / "calibration"
+        out_path  = Path(calib_dir) / "Calib.toml"
 
         kwargs: dict[str, Any] = dict(
-            session_dir           = Path(session_dir),
+            calib_dir             = calib_dir,
             calib_output_path     = out_path,
             calib_type            = c_type,
             overwrite_intrinsics  = cal_cfg.get("overwrite_intrinsics"),
@@ -109,7 +110,7 @@ class CalibrationSettings:
             conv_cfg  = cal_cfg.get("convert")
             conv_path = Path(conv_cfg.get("convert_from")).expanduser()
             if not conv_path.is_absolute():
-                conv_path = Path(session_dir) / conv_path
+                conv_path = Path(calib_dir) / conv_path
             if not conv_path.exists():
                 raise FileNotFoundError(f"Conversion file '{conv_path}' not found.")
 
@@ -515,62 +516,59 @@ class PointCalibration(Calibration):
     compute the camera pose and then calculates the reprojection error.
     """
 
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, settings):
+        self.settings = settings
 
     def calibrate_intrinsics(self, source):
-        source.get_calib_files(source.calib_intrinsics, self.config.intrinsics_extension, "intrinsics")
-        if len(source.intrinsics_files) != 0:
-            logging.info(f'Intrinsic calibration for {source.name}:')
-            objp = np.zeros((self.config.intrinsics_corners_nb[0] * self.config.intrinsics_corners_nb[1], 3), np.float32)
-            objp[:, :2] = np.mgrid[0:self.config.intrinsics_corners_nb[0], 0:self.config.intrinsics_corners_nb[1]].T.reshape(-1, 2)
-            objp[:, :2] *= self.config.intrinsics_square_size
-            objpoints = []  # 3D points in world space
-            imgpoints = []  # 2D points in image plane
-            source.extract_frames('intrinsic')
-            for img_path in source.intrinsics_files:
-                imgp_confirmed, objp_confirmed = findCorners(img_path, self.config.intrinsics_corners_nb, objp=objp, show=self.config.show_detection_intrinsics)
-                if isinstance(imgp_confirmed, np.ndarray):
-                    imgpoints.append(imgp_confirmed)
-                    objpoints.append(objp_confirmed if self.config.show_detection_intrinsics else objp)
-            if len(imgpoints) < 10:
-                logging.info(f"Only {len(imgpoints)} images with detected corners for {source.name}. Intrinsic calibration may be inaccurate.")
-            img = cv2.imread(str(img_path))
-            objpoints = np.array(objpoints)
-            ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
-                objpoints, imgpoints, img.shape[1::-1], None, None,
-                flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_USE_LU)
-            )
-            h, w = img.shape[:2]
-            source.ret_int = ret_cam
-            source.S = [w, h]
-            source.K = dist[0]
-            source.D = mtx
+        files = source.get_calib_files("intrinsics", self.settings.calib_dir, self.settings.intrinsics_extension)
+        logging.info(f'Intrinsic calibration for {source.name}:')
+        objp = np.zeros((self.settings.intrinsics_corners_nb[0] * self.settings.intrinsics_corners_nb[1], 3), np.float32)
+        objp[:, :2] = np.mgrid[0:self.settings.intrinsics_corners_nb[0], 0:self.settings.intrinsics_corners_nb[1]].T.reshape(-1, 2)
+        objp[:, :2] *= self.settings.intrinsics_square_size
+        objpoints = []  # 3D points in world space
+        imgpoints = []  # 2D points in image plane
+        for file in files:
+            imgp_confirmed, objp_confirmed = findCorners(file, self.settings.intrinsics_corners_nb, objp=objp, show=self.settings.show_detection_intrinsics)
+            if isinstance(imgp_confirmed, np.ndarray):
+                imgpoints.append(imgp_confirmed)
+                objpoints.append(objp_confirmed if self.settings.show_detection_intrinsics else objp)
+        if len(imgpoints) < 10:
+            logging.info(f"Only {len(imgpoints)} images with detected corners for {source.name}. Intrinsic calibration may be inaccurate.")
+        img = cv2.imread(str(file))
+        objpoints = np.array(objpoints)
+        ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
+            objpoints, imgpoints, img.shape[1::-1], None, None,
+            flags=(cv2.CALIB_FIX_K3 + cv2.CALIB_USE_LU)
+        )
+        h, w = img.shape[:2]
+        source.ret_int = ret_cam
+        source.S = [w, h]
+        source.K = dist[0]
+        source.D = mtx
 
     def calibrate_extrinsics(self, source):
-        source.get_calib_files(source.calib_extrinsics, self.config.extrinsics_extension, "extrinsics")
+        files = source.get_calib_files('extrinsic', self.settings.calib_dir, self.settings.extrinsics_extension)
         if len(source.S) == 0 and len(source.D) == 0 and len(source.K) == 0:
             logging.warning(f"Cannot calibrate extrinsics for {source.name} without first calibrating intrinsics.")
             raise ValueError(f"Cannot calibrate extrinsics for {source.name} without first calibrating intrinsics.")
         logging.info(f'Extrinsic calibration for {source.name}:')
-        source.extract_frames('extrinsic')
-        object_coords_3d = self.config.object_coords_3d
-        if self.config.extrinsics_method == 'board':
+        object_coords_3d = self.settings.object_coords_3d
+        if self.settings.extrinsics_method == 'board':
             object_coords_3d = np.zeros((self.extrinsics_corners_nb[0] * self.extrinsics_corners_nb[1], 3), np.float32)
             object_coords_3d[:, :2] = np.mgrid[0:self.extrinsics_corners_nb[0], 0:self.extrinsics_corners_nb[1]].T.reshape(-1, 2)
-            object_coords_3d[:, :2] = object_coords_3d[:, 0:2] * self.config.extrinsics_square_size
-            imgp, objp = findCorners(source.extrinsics_files[0], self.config.extrinsics_corners_nb, objp=object_coords_3d, show=self.config.show_reprojection_error)
+            object_coords_3d[:, :2] = object_coords_3d[:, 0:2] * self.settings.extrinsics_square_size
+            imgp, objp = findCorners(files[0], self.settings.extrinsics_corners_nb, objp=object_coords_3d, show=self.settings.show_reprojection_error)
             if len(imgp) == 0:
                 logging.exception('No corners detected. Use "scene" method or verify detection settings.')
                 raise ValueError('No corners detected.')
-        elif self.config.extrinsics_method == 'scene':
-            imgp, objp = imgp_objp_visualizer_clicker(img, imgp=[], objp=object_coords_3d, img_path=source.extrinsics_files[0])
+        elif self.settings.extrinsics_method == 'scene':
+            imgp, objp = imgp_objp_visualizer_clicker(img, imgp=[], objp=object_coords_3d, img_path=files[0])
             if len(imgp) == 0:
                 logging.exception('No points clicked (or fewer than required).')
                 raise ValueError('No points clicked (or fewer than required).')
             if len(objp) < 10:
                 logging.info(f"Only {len(objp)} reference points for {source.name}. Extrinsic calibration may be imprecise.")
-        trc_write(object_coords_3d, os.path.join(self.config.session_dir, f'Object_points.trc'))
+        trc_write(object_coords_3d, os.path.join(self.settings.calib_dir, f'Object_points.trc'))
         mtx, dist = np.array(source.K), np.array(source.D)
         _, r, t = cv2.solvePnP(objp * 1000, imgp, mtx, dist)
         source.R = r.flatten()  # Extrinsic rotation vector in OpenCV format
@@ -584,7 +582,7 @@ class PointCalibration(Calibration):
         # proj_obj = [ ( P_cam[0] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)),  P_cam[1] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)) ) for o in objp]
         proj_obj = np.squeeze(cv2.projectPoints(objp, r, t, mtx, dist)[0])
 
-        if self.config.show_reprojection_error:
+        if self.settings.show_reprojection_error:
             # Reopen image, otherwise 2 sets of text are overlaid
             img = cv2.imread(source.extrinsic_files[0])
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -976,9 +974,8 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
 class CalibrationStage(BaseStage):
     name = "calibration"
 
-    def __init__(self, settings: CalibrationSettings, sources: list[BaseSource], session_dir: Path):
+    def __init__(self, settings: CalibrationSettings, sources: list[BaseSource]):
         self.sources     = sources
-        self.session_dir = Path(session_dir)
         self.settings    = settings
 
     def run(self, data_in):
