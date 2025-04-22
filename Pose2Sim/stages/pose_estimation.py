@@ -222,12 +222,13 @@ class BaseProcessor:
 
 
 class OutputQueueProcessor(BaseProcessor):
-    def __init__(self, sources, combined_frames, queue, available_buffers, buffers, frame_size, display_detection, save_video, save_images, skeleton):
+    def __init__(self, sources, combined_frames, queue, available_buffers, buffers, frame_size, display_detection, save_video, save_images, skeleton, downstream_queue):
         BaseProcessor.__init__(self, sources, queue, combined_frames, available_buffers, buffers, frame_size)
         self.display_detection = display_detection
         self.save_video = save_video
         self.save_images = save_images
         self.skeleton = skeleton
+        self.downstream_queue = downstream_queue
 
     def run(self):
         try:
@@ -281,10 +282,17 @@ class OutputQueueProcessor(BaseProcessor):
                 idx        = mosaic_data.idx,
                 keypoints  = rec_kpts,
                 scores     = rec_scores,
-                frame      = mosaic[y0:y1, x0:x1],
+                file_name = f"{source.name}_{mosaic_data.timestamp}_{mosaic_data.idx:06d}"
             )
 
-            output(frame_data)
+            frame = mosaic[y0:y1, x0:x1],
+
+            if self.settings.save_files[1]:
+                cv2.imwrite(os.path.join(frame_data.source.img_output_dir, f"{frame_data.file_name}.jpg"), frame)
+            if self.settings.save_files[0]:
+                frame_data.source.video_writer.write(frame)
+
+            self.downstream_queue.put(frame_data)
 
     def handle_individual_frames(self, frame_data):
         if frame_data.idx not in self.sync_data:
@@ -305,9 +313,16 @@ class OutputQueueProcessor(BaseProcessor):
                     )
                     self.available_buffers.put(frame_data.buffer.name)
                     if self.save_images or self.save_video or self.display_detection:
-                        frame_data.frame = frame = draw_skeleton(frame, frame_data.keypoints, frame_data.scores)
+                        frame = draw_skeleton(frame, frame_data.keypoints, frame_data.scores)
 
-                    output(frame_data)
+                    frame_data.file_name = f"{source.name}_{frame_data.timestamp}_{frame_data.idx:06d}"
+
+                    if self.settings.save_files[1]:
+                        cv2.imwrite(os.path.join(frame_data.source.img_output_dir, f"{frame_data.file_name}.jpg"), frame)
+                    if self.settings.save_files[0]:
+                        frame_data.source.video_writer.write(frame)
+
+                    self.downstream_queue.put(frame_data)
 
                     if mosaic:
                         source = frame_data.source
@@ -419,7 +434,7 @@ class InputQueueProcessor(BaseProcessor):
 
 
 class PoseEstimationSession:
-    def __init__(self, settings, sources, pose_model):
+    def __init__(self, settings, sources, pose_model, downstream_queue):
         self.settings = settings
         self.sources = sources
         self.pose_model = pose_model
@@ -427,6 +442,7 @@ class PoseEstimationSession:
         self.frame_proc = None
         self.result_proc = None
         self.workers = []
+        self.downstream_queue = downstream_queue
 
     def __enter__(self):
         self.start()
@@ -523,6 +539,7 @@ class PoseEstimationSession:
             available_buffers = self.available_buffers,
             buffers = self.buffers,
             frame_size=self.frame_size,
+            downstream_queue=self.downstream_queue,
         )
         
         tracker_ready = multiprocessing.Event()
@@ -664,22 +681,18 @@ class PoseEstimationStage(BaseStage):
         self.pose_model  = pose_model
 
     def run(self, in_q, out_q, stop_evt):
-        with PoseEstimationSession(self.cfg, self.sources,
-                                   self.pose_model) as sess:
+        with PoseEstimationSession(self.settings, self.sources,
+                                   self.pose_model, out_q) as sess:
             while not stop_evt.is_set():
-                frame = sess.loop_step()
-                out_q.put(frame)
+                sess.run()
         out_q.put(BaseStage.sentinel)
 
-    def save_data(self, data_out):
-        file_name = f"{data_out.source.name}_{data_out.timestamp}_{data_out.idx:06d}"
+    def from_config(self, config):
+        self.settings = PoseEstimationSettings.from_config(config)
 
-        if self.settings.save_files[1]:
-            cv2.imwrite(os.path.join(data_out.source.img_output_dir, f"{file_name}.jpg"), data_out.frame)
-        if self.settings.save_files[0]:
-            data_out.source.video_writer.write(data_out.frame)
+    def save_data(self, data_out):
         if 'openpose' in self.settings.output_format:
-            json_path = os.path.join(data_out.source.output_dir, f"{file_name}.json")
+            json_path = os.path.join(data_out.source.output_dir, f"{data_out.file_name}.json")
             save_keypoints_to_openpose(json_path, data_out.keypoints, data_out.scores)
         # if 'deeplabcut' in self.settings.output_format:
         # if 'pose2sim' in self.settings.output_format:

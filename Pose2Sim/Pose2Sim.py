@@ -43,6 +43,8 @@ Pose2Sim.kinematics()
 
 import importlib
 import os
+import threading
+import multiprocessing as mp
 import time
 import logging
 from datetime import datetime
@@ -94,18 +96,6 @@ def _discover_stage(name: str) -> type[BaseStage]:
 
 
 class Pose2SimPipeline:
-    """Light orchestration: chain the requested stages.
-
-    Parameters
-    ----------
-    config : str | os.PathLike | dict | None
-        Path to a TOML/JSON/YAML config or a dict already loaded.
-    stages : Sequence[str] | None
-        Ordered list of stage *names* to execute. ``None`` = default full chain.
-    log_level : str
-        Logging level ("INFO", "DEBUG", …).
-    """
-
     DEFAULT_CHAIN: tuple[str, ...] = (
         "calibration",
         "pose_estimation",
@@ -152,18 +142,14 @@ class Pose2SimPipeline:
             _discover_stage(name)(self.config) for name in wanted
         ]
 
-
     def subjects(self):
-        """
-        Construit une liste d'objets Subject à partir de la config TOML.
-        """
         subjects_data_list = self.config.get("subjects")
         subjects_list = []
         for sub_data in subjects_data_list:
             subject_obj = Subject(self.config, sub_data)
             subjects_list.append(subject_obj)
         return subjects_list
-    
+
     def sources(self):
         sources_data_list = self.config.get("sources")
         sources_list = []
@@ -188,7 +174,7 @@ class Pose2SimPipeline:
                 elif path_str.endswith(("/", "\\")):
                     logging.error(f"Folder '{path_str}' not found.")
                     raise FileNotFoundError(f"Folder '{path_str}' not found.")
-                
+
                 else:
                     logging.error(f"Unable to create a source from '{path_str}'.")
                     raise FileNotFoundError(f"Unable to create a source from '{path_str}'.")

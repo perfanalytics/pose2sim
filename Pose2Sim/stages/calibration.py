@@ -668,7 +668,7 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
             logging.info(f'{os.path.basename(img_path)}: Corners not found: please label them by hand.')
             return imgp_objp_visualizer_clicker(img, imgp=[], objp=objp, img_path=img_path)
         else:
-            logging.info(f'{os.path.basename(img_path)}: Corners not found. To label them by hand, set "show_detection_intrinsics" to true in the Config.toml file.')
+            logging.info(f'{os.path.basename(img_path)}: Corners not found. To label them by hand, set "show_detection_intrinsics" to true in your settings.')
             return []
 
 
@@ -975,8 +975,8 @@ class CalibrationStage(BaseStage):
     name = "calibration"
 
     def __init__(self, settings: CalibrationSettings, sources: list[BaseSource]):
-        self.sources     = sources
         self.settings    = settings
+        self.sources     = sources
 
     def run(self, data_in):
         if self.settings.calib_type == "convert":            
@@ -1008,8 +1008,8 @@ class CalibrationStage(BaseStage):
             calibration = LoadCalibration(self, self.settings.calib_output_path)
 
         else:
-            logging.info("Invalid calibration_type in Config.toml")
-            return ValueError("Invalid calibration_type in Config.toml")
+            logging.info("Invalid calibration_type in your settings.")
+            return ValueError("Invalid calibration_type in your settings.")
 
         for source in self.sources:
             if not self.settings.overwrite_intrinsics and len(source.S) != 0 and len(source.D) != 0 and len(source.K) != 0:
@@ -1017,7 +1017,7 @@ class CalibrationStage(BaseStage):
                     f"[{source.name} - intrinsic] Existing intrinsic calibration."
                 )
                 logging.info(
-                    'To recalculate, set "overwrite_intrinsics" to true in Config.toml.'
+                    'To recalculate, set "overwrite_intrinsics" to true in your settings.'
                 )
             else:
                 calibration.calibrate_intrinsics(source)
@@ -1027,12 +1027,15 @@ class CalibrationStage(BaseStage):
                     f"[{source.name} - entrinsic] Existing extrinsic calibration."
                 )
                 logging.info(
-                    'To recalculate, set "overwrite_extrinsics" to true in Config.toml.'
+                    'To recalculate, set "overwrite_extrinsics" to true in your settings.'
                 )
             else:
                 calibration.calibrate_intrinsics(source)
 
         return data_in
+
+    def from_config(self, config):
+        self.settings = CalibrationSettings.from_config(config)
 
     def save_data(self, data_out):
         toml_write(self.sources, self.settings.calib_output_path)
