@@ -183,7 +183,7 @@ def bodykin_from_mot_osim_func(*args):
     bodyHeader = 'times, ' + ''.join([f'{b}_x, {b}_y, {b}_z, {b}_rotx, {b}_roty, {b}_rotz, ' for b in bodyNames])[:-2]
 
     # Unwrap angles
-    for n,col in enumerate(bodyHeader):
+    for n,col in enumerate(bodyHeader.split(', ')):
         if '_rot' in col:
             loc_rot_frame_all_np[:,n] = np.unwrap(loc_rot_frame_all_np[:,n],period=2*np.pi)
 
