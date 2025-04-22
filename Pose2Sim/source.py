@@ -150,10 +150,10 @@ class BaseSource(abc.ABC):
                                 ret, frame = cap.read()
                                 if not ret:
                                     break
+                                frame_nb += 1
                                 if frame_nb % (fps * extract_every_N_sec) == 0:
                                     img_path = os.path.join(folder, self.name + '_' + str(frame_nb).zfill(5) + '.png')
                                     cv2.imwrite(img_path, frame)
-                                frame_nb += 1
                             cap.release()
 
                             return glob.glob(os.path.join(folder, self.name + '*' + '.png')).sort
