@@ -109,7 +109,7 @@ class TestWorkflow(unittest.TestCase):
         # SINGLE-PERSON   #
         ###################
 
-        project_dir = '../Demo_SinglePerson'
+        project_dir = '../Demo_Batch/Demo_SinglePerson'
         config_dict = toml.load(os.path.join(project_dir, 'Config.toml'))
 
         # lightweight, openvino, cpu
