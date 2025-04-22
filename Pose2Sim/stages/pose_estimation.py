@@ -315,7 +315,7 @@ class OutputQueueProcessor(BaseProcessor):
                     if self.save_images or self.save_video or self.display_detection:
                         frame = draw_skeleton(frame, frame_data.keypoints, frame_data.scores)
 
-                    frame_data.file_name = f"{source.name}_{frame_data.timestamp}_{frame_data.idx:06d}"
+                    frame_data.file_name = f"{frame_data.source.name}_{frame_data.timestamp}_{frame_data.idx:06d}"
 
                     if self.settings.save_files[1]:
                         cv2.imwrite(os.path.join(frame_data.source.img_output_dir, f"{frame_data.file_name}.jpg"), frame)

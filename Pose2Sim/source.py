@@ -146,6 +146,7 @@ class BaseSource(abc.ABC):
                                 fps = round(fps)
 
                             logging.info(f"[{self.name} - {calib_type}] Extracting frames")
+                            frame_nb = 0
                             while True:
                                 ret, frame = cap.read()
                                 if not ret:

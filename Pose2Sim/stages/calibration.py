@@ -552,6 +552,7 @@ class PointCalibration(Calibration):
             logging.warning(f"Cannot calibrate extrinsics for {source.name} without first calibrating intrinsics.")
             raise ValueError(f"Cannot calibrate extrinsics for {source.name} without first calibrating intrinsics.")
         logging.info(f'Extrinsic calibration for {source.name}:')
+        img = cv2.imread(source.extrinsic_files[0])
         object_coords_3d = self.settings.object_coords_3d
         if self.settings.extrinsics_method == 'board':
             object_coords_3d = np.zeros((self.extrinsics_corners_nb[0] * self.extrinsics_corners_nb[1], 3), np.float32)
