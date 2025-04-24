@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pose2sim"
-version = "0.10.17"
+version = "0.10.19"
 authors = [
     {name = "David Pagnon", email = "contact@david-pagnon.com"},
 ]
