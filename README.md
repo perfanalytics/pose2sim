@@ -498,7 +498,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
   - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
   - Calibration can be skipped since these formats are natively supported by Pose2Sim.
 - **From [Qualisys](https://www.qualisys.com):**
-  - Export calibration to `.qca.txt` within QTM.
+  - Export calibration to `.qca.txt` within QTM (see [there](https://github.com/perfanalytics/pose2sim/issues/56#issuecomment-1855933754)).
   - Copy it in the `Calibration` Pose2Sim folder.
   - set `convert_from` to 'qualisys' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
   - If you set your cameras vertically and the videos are rendered sideways, you need to rotate them and the calibration file before running pose estimation. [Use this script](https://github.com/perfanalytics/pose2sim/issues/136#issuecomment-2398110061).
