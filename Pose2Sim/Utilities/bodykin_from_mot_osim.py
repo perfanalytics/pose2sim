@@ -12,18 +12,19 @@
     
     Equivalent to OpenSim Analysis -> BodyKinematics but without the bugs in 
     orientations due to their use of Euler angle instead of homography matrices
+    Angles are unwrapped (np.unwrap) with an assumed period of 2*pi/360.
 
     Transforms from OpenSim's yup to Blender's zup unless you set direction = 'yup'
-    
-    Beware, it can be quite slow depending on the ccomplexity 
+    An optional arugment may be passed by the user to maintain the opensim convention ('yup') 
+
+    Beware, it can be quite slow depending on the complexity 
     of the model and on the number of frames.
     
     Usage: 
     from Pose2Sim.Utilities import bodykin_from_mot_osim; bodykin_from_mot_osim.bodykin_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_csv_file>')
     bodykin_from_mot_osim -m input_mot_file -o input_osim_file
-    bodykin_from_mot_osim -m input_mot_file -o input_osim_file -c output_csv_file
+    bodykin_from_mot_osim -m input_mot_file -o input_osim_file -c output_csv_file -d direction
 '''
-
 
 ## INIT
 import os
@@ -31,7 +32,7 @@ import numpy as np
 import opensim as osim
 import argparse
 
-direction = 'zup' # 'zup' or 'yup'
+#direction = 'zup' # 'zup' or 'yup'
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon, Jonathan Camargo"
@@ -50,10 +51,10 @@ def main():
     parser.add_argument('-m', '--input_mot_file', required = True, help='input .mot file')
     parser.add_argument('-o', '--input_osim_file', required = True, help='input .osim file')
     parser.add_argument('-c', '--csv_output_file', required = False, help='output csv file')
+    parser.add_argument('-d', '--direction', required=False, help='vertical axis direction')
     args = vars(parser.parse_args())
     
     bodykin_from_mot_osim_func(args)
-
 
 def bodykin_from_mot_osim_func(*args):
     '''
@@ -64,9 +65,9 @@ def bodykin_from_mot_osim_func(*args):
     orientations due to their use of Euler angle instead of homography matrices
     
     Usage: 
-    from Pose2Sim.Utilities import bodykin_from_mot_osim; bodykin_from_mot_osim.bodykin_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_csv_file>')
+    from Pose2Sim.Utilities import bodykin_from_mot_osim; bodykin_from_mot_osim.bodykin_from_mot_osim_func(r'<input_mot_file>', r'<output_osim_file>', r'<output_csv_file>','<direction>')
     bodykin_from_mot_osim -m input_mot_file -o input_osim_file
-    bodykin_from_mot_osim -m input_mot_file -o input_osim_file -t output_csv_file
+    bodykin_from_mot_osim -m input_mot_file -o input_osim_file -t output_csv_file -d direction
     '''
     
     try:
@@ -76,6 +77,10 @@ def bodykin_from_mot_osim_func(*args):
             output_csv_file = motion_path.replace('.mot', '.csv')
         else:
             output_csv_file = args[0]['csv_output_file']
+        if args[0]['direction'] == None:
+            direction = 'zup'
+        else:
+            direction = args[0]['direction']
     except:
         motion_path = args[0] # invoked as a function
         osim_path = args[1]
@@ -83,6 +88,10 @@ def bodykin_from_mot_osim_func(*args):
             output_csv_file = args[2]
         except:
             output_csv_file = motion_path.replace('.mot', '.csv')
+        try:
+            direction = args[3]
+        except:
+            direction = 'zup'
     
     
     # Read model and motion files
@@ -168,14 +177,20 @@ def bodykin_from_mot_osim_func(*args):
         
         loc_rot_frame_all.append(loc_rot_frame)
 
-    # Export to csv
+    # Create arrays and headers
     loc_rot_frame_all_np = np.array(loc_rot_frame_all)
     loc_rot_frame_all_np = np.insert(loc_rot_frame_all_np, 0, times, axis=1) # insert time column
     bodyHeader = 'times, ' + ''.join([f'{b}_x, {b}_y, {b}_z, {b}_rotx, {b}_roty, {b}_rotz, ' for b in bodyNames])[:-2]
+
+    # Unwrap angles
+    for n,col in enumerate(bodyHeader.split(', ')):
+        if '_rot' in col:
+            loc_rot_frame_all_np[:,n] = np.unwrap(loc_rot_frame_all_np[:,n],period=2*np.pi)
+
+    # Export to csv
     np.savetxt(os.path.splitext(output_csv_file)[0]+'.csv', loc_rot_frame_all_np, delimiter=',', header=bodyHeader)
     
     print(f'CSV file generated at {os.path.splitext(output_csv_file)[0]+".csv"}.\n')
-    
     
 if __name__ == '__main__':
     main()
