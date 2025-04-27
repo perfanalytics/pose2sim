@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pose2sim"
-version = "0.10.17"
+version = "0.10.20"
 authors = [
     {name = "David Pagnon", email = "contact@david-pagnon.com"},
 ]
@@ -12,14 +12,15 @@ description = "Markerless kinematics with any cameras — From 2D Pose estimatio
 readme = "README.md"
 requires-python = ">=3.9"
 keywords = ["markerless", "kinematics", "OpenPose", "OpenSim", "3D human pose", "biomechanics", "mocap", "blender", "motion capture"]
-license = { file = "LICENSE" }
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Healthcare Industry",
     "Intended Audience :: Education",
-    "License :: OSI Approved :: BSD License",
+    # "License :: OSI Approved :: BSD-3-Clause",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Image Processing",
