@@ -3,7 +3,7 @@
 
 '''
     ######################################################
-    ## Face Detection and Blurring (or black polygon) ##
+    ###### Face Blurring with polygon or rectangle #######
     ######################################################
 
     Detect faces in videos and blur them.
