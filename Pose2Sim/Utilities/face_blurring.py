@@ -15,6 +15,7 @@
         OR face_blurring -i input_video_file
         OR face_blurring -i input_video_file -o output_video_file
 
+        # TODO: Add support for batch processing of multiple videos in a root folder.
         If you want to blur faces many videos in a root folder:
         from Pose2Sim.Utilities import face_blurring; face_blurring.face_blurring_func(r'<root_folder>')
         OR face_blurring -r root_folder
