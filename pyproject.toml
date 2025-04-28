@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pose2sim"
-version = "0.10.20"
+version = "0.10.21"
 authors = [
     {name = "David Pagnon", email = "contact@david-pagnon.com"},
 ]
@@ -69,6 +69,7 @@ calib_toml_to_easymocap = "Pose2Sim.Utilities.calib_toml_to_easymocap:main"
 calib_toml_to_opencap = "Pose2Sim.Utilities.calib_toml_to_opencap:main"
 calib_toml_to_qca = "Pose2Sim.Utilities.calib_toml_to_qca:main"
 DLC_to_OpenPose = "Pose2Sim.Utilities.DLC_to_OpenPose:main"
+face_blurring = "Pose2Sim.Utilities.face_blurring:main"
 json_display_with_img = "Pose2Sim.Utilities.json_display_with_img:main"
 json_display_without_img = "Pose2Sim.Utilities.json_display_without_img:main"
 MMPose_to_OpenPose = "Pose2Sim.Utilities.MMPose_to_OpenPose:main"

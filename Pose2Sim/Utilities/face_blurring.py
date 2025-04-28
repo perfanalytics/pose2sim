@@ -6,8 +6,7 @@
     ###### Face Blurring with polygon or rectangle #######
     ######################################################
 
-    Detect faces in videos and blur them.
-    If you concern privacy more seriously, you can replace the blurring by a black polygon.
+    Detect faces in videos and blur or mask them.
 
     Usage:
         If you want to blur faces in a video:
@@ -15,102 +14,109 @@
         OR face_blurring -i input_video_file
         OR face_blurring -i input_video_file -o output_video_file
 
+        Other arguments are available, type face_blurring -h for a list.
+
+
         # TODO: Add support for batch processing of multiple videos in a root folder.
         If you want to blur faces many videos in a root folder:
         from Pose2Sim.Utilities import face_blurring; face_blurring.face_blurring_func(r'<root_folder>')
         OR face_blurring -r root_folder
 '''
 
+
 ## INIT
 import cv2
 import numpy as np
-import os
 import logging
 import argparse
 import time
+from pathlib import Path
 from tqdm import tqdm
-from functools import partial
-from rtmlib import PoseTracker, Custom
+from rtmlib import Body, PoseTracker
 from Pose2Sim.poseEstimation import setup_backend_device, save_to_openpose
+
+
+## AUTHORSHIP INFORMATION
+__author__ = "HunMin Kim, David Pagnon"
+__copyright__ = "Copyright 2023, BlendOSim & Sim2Blend"
+__credits__ = ["HunMin Kim", "David Pagnon"]
+__license__ = "BSD 3-Clause License"
+from importlib.metadata import version
+__version__ = version('pose2sim')
+__maintainer__ = "David Pagnon"
+__email__ = "contact@david-pagnon.com"
+__status__ = "Development"
+
 
 # Define face-related keypoint indices based on standard COCO-17/MMPose order
 # nose, left_eye, right_eye, left_ear, right_ear
 # (Refer to https://github.com/Tau-J/rtmlib/blob/main/rtmlib/visualization/skeleton/coco17.py)
-FACE_KEYPOINT_INDECES = [0, 1, 2, 3, 4]
+FACE_KEYPOINT_INDICES = [0, 1, 2, 3, 4]
 
 # Default settings
-DEFAULT_MODE = 'lightweight'
-DEFAULT_CONFIDENCE_THRESHOLD = 0.1 # Face keypoint confidence threshold; face keypoints basically have low confidence.
-DEFAULT_BLUR_TYPE = 'blur' # 'blur' or 'black'
-DEFAULT_BLUR_SHAPE = "rectangle" # Shape of the blurred area: 'polygon' or 'rectangle'
-DEFAULT_BLUR_INTENCITY = "medium" # low, medium, high
-DEFAULT_BLUR_SIZE = "small" # 'small', 'medium', 'large'
-DEFAULT_SAVE_JSON = True # Save detected face keypoints to JSON files
 DEFAULT_VISUALIZE = False # Display the processed video in real-time (set default to False)
+DEFAULT_BLUR_TYPE = 'blur' # 'blur' or 'black'
+DEFAULT_BLUR_INTENSITY = "medium" # low, medium, high
+DEFAULT_BLUR_SHAPE = "rectangle" # Shape of the blurred area: 'polygon' or 'rectangle'
+DEFAULT_BLUR_SIZE = "small" # 'small', 'medium', 'large'
+DEFAULT_BACKEND = 'auto'
+DEFAULT_DEVICE = 'auto'
+DEFAULT_MODEL_TYPE = 'rtmpose' # 'rtmpose' or 'rtmo'
+DEFAULT_MODE = 'lightweight'
+DEFAULT_DET_FREQUENCY = 10 
+DEFAULT_CONFIDENCE_THRESHOLD = 0.1 # Face keypoint confidence threshold; face keypoints basically have low confidence.
+DEFAULT_SAVE_JSON = False # Save detected face keypoints to JSON files
 
-# RTMO model information (refer to https://github.com/Tau-J/rtmlib/blob/main/rtmlib/tools/solution/body.py)
-RTMO_MODELS = {
-    'lightweight': {
-        'pose': 'https://download.openmmlab.com/mmpose/v1/projects/rtmo/onnx_sdk/rtmo-s_8xb32-600e_body7-640x640-dac2bf74_20231211.zip',
-        'pose_input_size': (640, 640),
-     },
-     'balanced': {
-        'pose': 'https://download.openmmlab.com/mmpose/v1/projects/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.zip',
-        'pose_input_size': (640, 640),
-     },
-     'performance': {
-        'pose': 'https://download.openmmlab.com/mmpose/v1/projects/rtmo/onnx_sdk/rtmo-l_16xb16-600e_body7-640x640-b37118ce_20231211.zip',
-        'pose_input_size': (640, 640),
-     }
-}
 
 def face_blurring_func(**args):
     """Core logic for face blurring.
     Takes arguments as a dictionary.
     """
+
     input_video_path = args.get('input')
     output_video_path = args.get('output', None) # Use .get for defaults
-    mode = args.get('mode', DEFAULT_MODE)
-    conf_threshold = args.get('conf', DEFAULT_CONFIDENCE_THRESHOLD)
+    visualize = args.get('visualize', DEFAULT_VISUALIZE)
     blur_type = args.get('blur_type', DEFAULT_BLUR_TYPE)
+    blur_intensity = args.get('blur_intensity', DEFAULT_BLUR_INTENSITY) # Retrieve blur_intensity
     blur_shape = args.get('blur_shape', DEFAULT_BLUR_SHAPE)
     blur_size = args.get('blur_size', DEFAULT_BLUR_SIZE) # Retrieve blur_size
-    blur_intensity = args.get('blur_intensity', DEFAULT_BLUR_INTENCITY) # Retrieve blur_intensity
+    model_type = args.get('model_type', DEFAULT_MODEL_TYPE)
+    mode = args.get('mode', DEFAULT_MODE)
+    det_frequency = args.get('det_frequency', DEFAULT_DET_FREQUENCY)
+    backend = args.get('backend', DEFAULT_BACKEND)
+    device = args.get('device', DEFAULT_DEVICE)
+    conf_threshold = args.get('conf', DEFAULT_CONFIDENCE_THRESHOLD)
     save_json = args.get('save_json', DEFAULT_SAVE_JSON)
-    visualize = args.get('visualize', DEFAULT_VISUALIZE)
+
 
     # Setup basic logging
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+    input_video_path = Path(input_video_path)
     logging.info(f"Processing video: {input_video_path}")
     start_time = time.time()
 
-    # Setup backend and device automatically
-    backend, device = setup_backend_device() # Use default values
+    # Setup pose estimator
+    backend, device = setup_backend_device(backend=backend, device=device) # Use default values
 
-    # --- RTMO Model Setup and Direct PoseTracker Initialization ---
-    rtmo_pose_path = RTMO_MODELS[mode]['pose']
-    rtmo_input_size = RTMO_MODELS[mode]['pose_input_size']
-
-    # --- Use Custom solution with partial for RTMO --- 
-    RTMO_Solution = partial(Custom,
-                            pose_class='RTMO', # Specify RTMO class
-                            pose=rtmo_pose_path, # Provide model path
-                            pose_input_size=rtmo_input_size, # Provide input size
-                            to_openpose=False, # RTMO uses MMPose format by default
+    if model_type == 'rtmpose':
+        pose_sol = PoseTracker(Body,
+                            det_frequency=det_frequency,
+                            tracking=False,
+                            mode=mode,
+                            to_openpose=False,
                             backend=backend,
                             device=device)
-
-    # Initialize PoseTracker with the configured Custom solution
-    pose_tracker = PoseTracker(solution=RTMO_Solution, # Pass the partial object
-                               tracking=False, # Tracking is not needed for face blurring
-                               to_openpose=False # Consistent with solution setting
-                               )
-
-    # --- Model Setup Complete ---
-
-
+    elif model_type == 'rtmo':
+        pose_sol = Body(pose='rtmo', 
+                        mode=mode,
+                        to_openpose=False,
+                        backend=backend,
+                        device=device)
+    else:
+        raise ValueError(f"Unknown model_type '{model_type}'. Please use 'rtmpose' or 'rtmo'.")
+    
     # Open video capture
     cap = cv2.VideoCapture(input_video_path)
     if not cap.isOpened():
@@ -125,24 +131,17 @@ def face_blurring_func(**args):
 
     # Setup video writer
     if output_video_path is None:
-        base_name = os.path.basename(input_video_path)
-        name, ext = os.path.splitext(base_name)
-        output_video_path = os.path.join(os.path.dirname(input_video_path), f"blurred_{name}{ext}")
+        output_video_path = input_video_path.parent / f"{input_video_path.stem}_blurred{input_video_path.suffix}"
+    else:
+        output_video_path = Path(output_video_path)
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
+    out = cv2.VideoWriter(str(output_video_path), fourcc, fps, (frame_width, frame_height))
 
     # Setup JSON output directory if needed
-    json_output_dir = None
     if save_json:
-        video_name_wo_ext = os.path.splitext(os.path.basename(input_video_path))[0]
-        # Change save location to a 'pose_blurred' subfolder within the original video folder
-        pose_blurred_dir = os.path.join(os.path.dirname(input_video_path), 'pose_blurred')
-        if not os.path.exists(pose_blurred_dir):
-             os.makedirs(pose_blurred_dir)
-        json_output_dir = os.path.join(pose_blurred_dir, f'{video_name_wo_ext}_face_json')
-        if not os.path.exists(json_output_dir):
-            os.makedirs(json_output_dir)
+        json_output_dir = output_video_path.parent / f'{output_video_path.stem}_face_json'
+        json_output_dir.mkdir(exist_ok=True)
         # logging.info(f"Face keypoints JSON will be saved to: {json_output_dir}")
 
     if visualize:
@@ -157,8 +156,7 @@ def face_blurring_func(**args):
                 break
 
             # 1. Detect poses (keypoints and scores)
-            keypoints, scores = pose_tracker(frame) # keypoints: [N_persons, N_kpts, 2], scores: [N_persons, N_kpts]
-
+            keypoints, scores = pose_sol(frame) # keypoints: [N_persons, N_kpts, 2], scores: [N_persons, N_kpts]
             processed_frame = frame.copy() # Copy original frame for processing
 
             # Prepare data for JSON saving (only face keypoints)
@@ -168,8 +166,8 @@ def face_blurring_func(**args):
             # 2. Iterate through detected persons to apply obscuration and prepare JSON data
             for person_idx, (person_kpts, person_scores) in enumerate(zip(keypoints, scores)):
                 # 3. Extract face keypoints and scores
-                face_kpts = person_kpts[FACE_KEYPOINT_INDECES]
-                face_scores = person_scores[FACE_KEYPOINT_INDECES]
+                face_kpts = person_kpts[FACE_KEYPOINT_INDICES]
+                face_scores = person_scores[FACE_KEYPOINT_INDICES]
 
                 # 4. Filter valid keypoints by confidence threshold
                 valid_indices = np.where(face_scores >= conf_threshold)[0]
@@ -180,7 +178,7 @@ def face_blurring_func(**args):
                 points_for_hull = valid_detected_kpts.copy().astype(int) # Start with valid detected points, ensure int
 
                 # Check if we have enough points for estimation (at least eyes and nose)
-                # Get indices relative to FACE_KEYPOINT_INDECES
+                # Get indices relative to FACE_KEYPOINT_INDICES
                 nose_idx_in_face = 0 
                 leye_idx_in_face = 1
                 reye_idx_in_face = 2
@@ -246,7 +244,7 @@ def face_blurring_func(**args):
 
                 # --- Prepare filtered data for save_to_openpose --- 
                 if save_json:
-                    for i, kpt_idx in enumerate(FACE_KEYPOINT_INDECES):
+                    for i, kpt_idx in enumerate(FACE_KEYPOINT_INDICES):
                         if face_scores[i] >= conf_threshold:
                             # Copy only valid face keypoints and scores to the arrays for saving
                             keypoints_for_json[person_idx, kpt_idx] = person_kpts[kpt_idx]
@@ -255,11 +253,8 @@ def face_blurring_func(**args):
 
             # 6. Save face keypoints to JSON using save_to_openpose (once per frame)
             if save_json:
-                json_file_path = os.path.join(json_output_dir, f'{os.path.splitext(os.path.basename(input_video_path))[0]}_{frame_idx:06d}_face.json')
-                # Ensure the directory exists before saving
-                if not os.path.exists(os.path.dirname(json_file_path)):
-                     os.makedirs(os.path.dirname(json_file_path))
-                save_to_openpose(json_file_path, keypoints_for_json, scores_for_json)
+                json_file_path = json_output_dir / f'{input_video_path.stem}_{frame_idx:06d}_face.json'
+                save_to_openpose(str(json_file_path), keypoints_for_json, scores_for_json)
 
             # 7. Visualize if enabled
             if visualize:
@@ -391,32 +386,25 @@ def main():
     parser = argparse.ArgumentParser(description='Detect and blur faces in a video using RTMO.')
     parser.add_argument('-i', '--input', required=True, help='Path to the input video file (string).')
     parser.add_argument('-o', '--output', default=None, help='Path to the output video file (string). Defaults to "blurred_<input_name>".')
-    parser.add_argument('--mode', default=DEFAULT_MODE, choices=RTMO_MODELS.keys(), help=f'Pose estimation mode (string, default: {DEFAULT_MODE}).')
-    parser.add_argument('--conf', type=float, default=DEFAULT_CONFIDENCE_THRESHOLD, help=f'Minimum confidence threshold for face keypoints (float, default: {DEFAULT_CONFIDENCE_THRESHOLD}).')
-    parser.add_argument('--blur-type', default=DEFAULT_BLUR_TYPE, choices=['blur', 'black'], help=f'Type of obscuration (string, default: {DEFAULT_BLUR_TYPE}).')
-    parser.add_argument('--blur-shape', default=DEFAULT_BLUR_SHAPE, choices=['polygon', 'rectangle'], help=f'Shape of the blurred area (string, default: {DEFAULT_BLUR_SHAPE}).')
-    parser.add_argument('--blur-size', default=DEFAULT_BLUR_SIZE, choices=['small', 'medium', 'large'], help=f'Size of the estimated face area for padding (string, default: {DEFAULT_BLUR_SIZE}).')
-    parser.add_argument('--blur-intensity', default=DEFAULT_BLUR_INTENCITY, choices=['low', 'medium', 'high'], help=f'Intensity of Gaussian blur (string: low, medium, high. default: {DEFAULT_BLUR_INTENCITY}).')
-    parser.add_argument('--no-json', action='store_false', dest='save_json', help='Disable saving face keypoints to JSON files (boolean, default: {DEFAULT_SAVE_JSON}).')
     parser.add_argument('--visualize', action='store_true', help=f'Enable real-time visualization (boolean, default: {DEFAULT_VISUALIZE}).')
+    parser.add_argument('--blur_type', default=DEFAULT_BLUR_TYPE, choices=['blur', 'black'], help=f'Type of obscuration (string, default: {DEFAULT_BLUR_TYPE}).')
+    parser.add_argument('--blur_intensity', default=DEFAULT_BLUR_INTENSITY, choices=['low', 'medium', 'high'], help=f'Intensity of Gaussian blur (string: low, medium, high. default: {DEFAULT_BLUR_INTENSITY}).')
+    parser.add_argument('--blur_size', default=DEFAULT_BLUR_SIZE, choices=['small', 'medium', 'large'], help=f'Size of the estimated face area for padding (string, default: {DEFAULT_BLUR_SIZE}).')
+    parser.add_argument('--blur_shape', default=DEFAULT_BLUR_SHAPE, choices=['polygon', 'rectangle'], help=f'Shape of the blurred area (string, default: {DEFAULT_BLUR_SHAPE}).')
+    parser.add_argument('--backend', default=DEFAULT_BACKEND, help="Backend if you don't want it to be determined automatically ('onnxruntime', 'openvino', ...)")
+    parser.add_argument('--device', default=DEFAULT_DEVICE, help="Device if you don't want it to be determined automatically ('cpu', 'cuda', 'mps', ...)")
+    parser.add_argument('--model_type', default=DEFAULT_MODEL_TYPE, help='Model type (string, "rtmo" or "rtmpose". Default: "rtmpose").')
+    parser.add_argument('--mode', default=DEFAULT_MODE, choices=list(vars(Body)['MODE'].keys()), help=f'Pose estimation mode (string among {list(vars(Body)["MODE"].keys())}, default: {DEFAULT_MODE}).')
+    parser.add_argument('--det_frequency', type=int, default=DEFAULT_DET_FREQUENCY, help=f'Detection frequency. The higher, the faster the process will go but potentially at the expense of a lesser accuracy (int, default: {DEFAULT_DET_FREQUENCY}).')
+    parser.add_argument('--conf', type=float, default=DEFAULT_CONFIDENCE_THRESHOLD, help=f'Minimum confidence threshold for face keypoints (float, default: {DEFAULT_CONFIDENCE_THRESHOLD}).')
+    parser.add_argument('--save_json', action='store_true', dest='save_json', help='Saving face keypoints to JSON files (boolean, default: {DEFAULT_SAVE_JSON}).')
 
-    args = parser.parse_args()
+    args = vars(parser.parse_args())
 
-    face_blurring_func(
-        input=args.input,
-        output=args.output,
-        mode=args.mode,
-        conf=args.conf,
-        blur_type=args.blur_type,
-        blur_shape=args.blur_shape,
-        blur_size=args.blur_size,
-        blur_intensity=args.blur_intensity,
-        save_json=args.save_json,
-        visualize=args.visualize
-    )
+    face_blurring_func(**args)
 
     # Example usage from terminal:
-    # python Utilities/face_blurring.py -i path/to/your/video.mp4 -o path/to/output/blurred_video.mp4 --blur-type black --visualize
+    # python Utilities/face_blurring.py -i path/to/your/video.mp4 -o path/to/output/blurred_video.mp4 --blur_type black --visualize
 
 if __name__ == '__main__':
     main()
