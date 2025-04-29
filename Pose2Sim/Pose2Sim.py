@@ -47,7 +47,7 @@ import threading
 import multiprocessing as mp
 import time
 import logging
-from datetime import datetime
+from logging.handlers import QueueHandler
 from typing import Any, Iterable, Sequence
 
 from Pose2Sim.config import Config
@@ -116,8 +116,42 @@ class Pose2SimPipeline:
         self.config = Config(config_input)
 
         self.pose_model = PoseModel(self.config.pose_model, self.config.backend, self.config.device, self.config.det_frequency, self.config.mode)
-        self.sources = self.sources()
-        self.subjects = self.subjects()
+
+        sources_data_list = self.config.config_dict.get("sources")
+        self.sources = []
+        for src_data in sources_data_list:
+            path_val = src_data.get("path")
+            if isinstance(path_val, int):
+                source_obj = WebcamSource(self.config, src_data, self.pose_model)
+            else:
+                path_str = str(path_val[0])
+                abs_path = os.path.abspath(path_str)
+
+                if os.path.isdir(abs_path):
+                    source_obj = ImageSource(self.config, src_data, self.pose_model)
+
+                elif os.path.isfile(abs_path):
+                    source_obj = VideoSource(self.config, src_data, self.pose_model)
+
+                elif path_str.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
+                    logging.error(f"Video file '{path_str}' not found.")
+                    raise FileNotFoundError(f"Video file '{path_str}' not found.")
+
+                elif path_str.endswith(("/", "\\")):
+                    logging.error(f"Folder '{path_str}' not found.")
+                    raise FileNotFoundError(f"Folder '{path_str}' not found.")
+
+                else:
+                    logging.error(f"Unable to create a source from '{path_str}'.")
+                    raise FileNotFoundError(f"Unable to create a source from '{path_str}'.")
+
+            self.sources.append(source_obj)
+
+        subjects_data_list = self.config.config_dict.get("subjects")
+        self.subjects = []
+        for sub_data in subjects_data_list:
+            subject_obj = Subject(self.config, sub_data)
+            self.subjects.append(subject_obj)
 
         if not self.config.use_custom_logging:
             for handler in logging.root.handlers[:]:
@@ -141,46 +175,6 @@ class Pose2SimPipeline:
         self._stages: list[BaseStage] = [
             _discover_stage(name)(self.config) for name in wanted
         ]
-
-    def subjects(self):
-        subjects_data_list = self.config.get("subjects")
-        subjects_list = []
-        for sub_data in subjects_data_list:
-            subject_obj = Subject(self.config, sub_data)
-            subjects_list.append(subject_obj)
-        return subjects_list
-
-    def sources(self):
-        sources_data_list = self.config.get("sources")
-        sources_list = []
-        for src_data in sources_data_list:
-            path_val = src_data.get("path")
-            if isinstance(path_val, int):
-                source_obj = WebcamSource(self.config, src_data, self.pose_model)
-            else:
-                path_str = str(path_val)
-                abs_path = os.path.abspath(path_str)
-
-                if os.path.isdir(abs_path):
-                    source_obj = ImageSource(self.config, src_data, self.pose_model)
-
-                elif os.path.isfile(abs_path):
-                    source_obj = VideoSource(self.config, src_data, self.pose_model)
-
-                elif path_str.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
-                    logging.error(f"Video file '{path_str}' not found.")
-                    raise FileNotFoundError(f"Video file '{path_str}' not found.")
-
-                elif path_str.endswith(("/", "\\")):
-                    logging.error(f"Folder '{path_str}' not found.")
-                    raise FileNotFoundError(f"Folder '{path_str}' not found.")
-
-                else:
-                    logging.error(f"Unable to create a source from '{path_str}'.")
-                    raise FileNotFoundError(f"Unable to create a source from '{path_str}'.")
-
-            sources_list.append(source_obj)
-        return sources_list
 
     def __enter__(self) -> "Pose2SimPipeline":
         for st in self._stages:

@@ -28,7 +28,6 @@ from Pose2Sim.model import PoseModel
 
 class Config:
     def __init__(self, config_input=None):
-        self.config_input = config_input
         self.config_dict = [self._build_merged_config(config_input)][0]
 
     def _recursive_update(self, base, updates):
@@ -127,12 +126,6 @@ class Config:
     @property
     def device(self):
         return self.pose.get('device')
-
-    # PoseEstimation
-
-    @property
-    def pose_dir(self):
-        return os.path.join(self.session_dir, 'pose')
 
     # Logging
 

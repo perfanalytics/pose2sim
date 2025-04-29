@@ -43,7 +43,7 @@ class FrameData:
 class BaseSource(abc.ABC):
     def __init__(self, config, data: dict, pose_model):
         self.pose_model = pose_model
-        self.config = config
+        self.config = config.config_dict
         self.data = data
         self.name = data.get("name")
         self.rotation = data.get("rotation", 0)
@@ -68,8 +68,6 @@ class BaseSource(abc.ABC):
         self.frame_queue = multiprocessing.Queue()
 
         self.scale = 1
-
-        self.create_output_folders()
 
         self.capture_ready_event = multiprocessing.Event()
 
@@ -179,31 +177,6 @@ class BaseSource(abc.ABC):
                 self.ret_mm = np.around(self.ret_px * Dm * 1000 / f_px, decimals=3)
                 logging.info(f"[{self.name} - extrinsic] Residual (RMS) calibration error: {self.ret_px} px, which corresponds to {self.ret_mm} mm.")
 
-    def create_output_folders(self):
-
-        os.makedirs(self.config.pose_dir, exist_ok=True)
-
-        if isinstance(self, WebcamSource):
-            now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-            output_dir_name = f"{self.name}_{now}"
-
-            if self.config.webcam_recording:
-                self.output_video_path = os.path.join(self.config.pose_dir, f"{output_dir_name}_record.avi")
-                self.csv_file = os.path.join(self.config.pose_dir, f"{output_dir_name}_timestamps.csv")
-
-        else:
-            output_dir_name = self.name
-            self.output_dir = os.path.join(self.config.pose_dir, f"{output_dir_name}_output")
-            os.makedirs(self.output_dir, exist_ok=True)
-
-        self.img_output_dir = None
-        if self.config.save_files[0]:
-            self.img_output_dir = os.path.join(self.config.pose_dir, f"{output_dir_name}_img")
-            os.makedirs(self.img_output_dir, exist_ok=True)
-
-        if self.config.save_files[1]:
-            self.output_video_path = os.path.join(self.config.pose_dir, f"{output_dir_name}_pose.avi")
-
     def intit_video_writer(self):
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         self.video_writer = cv2.VideoWriter(
@@ -227,10 +200,6 @@ class BaseSource(abc.ABC):
 
     @abc.abstractmethod
     def read(self):
-        pass
-
-    @abc.abstractmethod
-    def extract_frames(self):
         pass
 
     @abc.abstractmethod

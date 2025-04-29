@@ -48,6 +48,7 @@ import re
 import ast
 from pathlib import Path
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from multiprocessing import shared_memory
 from tqdm import tqdm
@@ -679,8 +680,34 @@ class PoseEstimationStage(BaseStage):
         self.sources     = sources
         self.session_dir = Path(session_dir)
         self.pose_model  = pose_model
+        self.pose_dir = os.path.join(self.session_dir, 'pose')
 
     def run(self, in_q, out_q, stop_evt):
+        os.makedirs(self.pose_dir, exist_ok=True)
+
+        for source in self.sources:
+            if isinstance(self, WebcamSource):
+                now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+                output_dir_name = f"{source.name}_{now}"
+
+                if self.settings.webcam_recording:
+                    source.output_video_path = os.path.join(self.pose_dir, f"{output_dir_name}_record.avi")
+                    source.csv_file = os.path.join(self.pose_dir, f"{output_dir_name}_timestamps.csv")
+
+            else:
+                output_dir_name = self.name
+                if 'openpose' in self.settings.output_format:
+                    source.output_dir = os.path.join(self.pose_dir, f"{output_dir_name}_output")
+                    os.makedirs(source.output_dir, exist_ok=True)
+
+            if self.settings.save_images:
+                source.img_output_dir = os.path.join(self.pose_dir, f"{output_dir_name}_img")
+                os.makedirs(source.img_output_dir, exist_ok=True)
+
+            if self.settings.save_video:
+                source.output_video_path = os.path.join(self.pose_dir, f"{output_dir_name}_pose.avi")  
+
+
         with PoseEstimationSession(self.settings, self.sources,
                                    self.pose_model, out_q) as sess:
             while not stop_evt.is_set():
