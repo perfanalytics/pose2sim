@@ -203,7 +203,7 @@ class QcaCalibration(Calibration):
             if name == source.name:
                 source.ret_int = float(tag.attrib.get('avg-residual'))
                 video_res = tag.attrib.get('video_resolution')
-                res_value = int(video_res[:-1]) if video_res is not None else 1080
+                res_value = int(video_res[:-1]) if video_res not in (None, "N/A") else 1080
                 fov_tag = self.fov_tags[i]
                 w = (float(fov_tag.attrib.get('right')) - float(fov_tag.attrib.get('left')) + 1) / self.binning_factor / (1080 / res_value)
                 h = (float(fov_tag.attrib.get('bottom')) - float(fov_tag.attrib.get('top')) + 1) / self.binning_factor / (1080 / res_value)

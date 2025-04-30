@@ -846,6 +846,15 @@ A list of standalone tools (see [Utilities](https://github.com/perfanalytics/pos
 
 
 <details>
+    <summary><b>Video editing</b> (CLICK TO SHOW)</summary>
+      <pre>
+      
+  [face_blurring.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/face_blurring.py)
+  Blurs or masks faces on a video.
+     </pre>
+  </details>
+  
+<details>
   <summary><b>Converting pose files</b> (CLICK TO SHOW)</summary>
     <pre>
 
