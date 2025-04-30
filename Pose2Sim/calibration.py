@@ -128,7 +128,7 @@ def read_qca(qca_path, binning_factor):
     for i, tag in enumerate(root.findall('cameras/camera')):
         ret += [float(tag.attrib.get('avg-residual'))]
         C += [tag.attrib.get('serial')]
-        res += [int(tag.attrib.get('video_resolution')[:-1]) if tag.attrib.get('video_resolution') is not None else 1080]
+        res += [int(tag.attrib.get('video_resolution')[:-1]) if tag.attrib.get('video_resolution') not in (None, "N/A") else 1080]
         if tag.attrib.get('model') in ('Miqus Video', 'Miqus Video UnderWater', 'none'):
             vid_id += [i]
     
