@@ -73,6 +73,7 @@ def face_blurring_func(**args):
     Takes arguments as a dictionary.
     """
 
+    root_path = args.get('root')
     input_video_path = args.get('input')
     output_video_path = args.get('output', None) # Use .get for defaults
     visualize = args.get('visualize', DEFAULT_VISUALIZE)
@@ -93,9 +94,26 @@ def face_blurring_func(**args):
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    input_video_path = Path(input_video_path)
-    logging.info(f"Processing video: {input_video_path}")
-    start_time = time.time()
+    # Determine input videos
+    if root_path:
+        root_path = Path(root_path)
+        # Find mp4 and avi files recursively, excluding those starting with '_blurred' <- to avoid processing already processed videos
+        video_files_mp4 = list(root_path.rglob('*.mp4'))
+        video_files_avi = list(root_path.rglob('*.avi'))
+        # Filter out videos whose stem ends with _blurred
+        input_videos = [v for v in video_files_mp4 + video_files_avi if not v.stem.endswith('_blurred')]
+        if not input_videos:
+            logging.error(f"Error: No compatible video files found in {root_path}")
+            return
+        logging.info(f"Found {len(input_videos)} videos in {root_path}. Processing...")
+    elif input_video_path:
+        input_videos = [Path(input_video_path)]
+        logging.info(f"Processing single video: {input_video_path}")
+    else:
+        logging.error("Error: Neither root path nor input video path was provided.")
+        return
+
+    start_time_total = time.time()
 
     # Setup pose estimator
     backend, device = setup_backend_device(backend=backend, device=device) # Use default values
@@ -109,175 +127,198 @@ def face_blurring_func(**args):
                             backend=backend,
                             device=device)
     elif model_type == 'rtmo':
-        pose_sol = Body(pose='rtmo', 
+        pose_sol = Body(pose='rtmo',
                         mode=mode,
                         to_openpose=False,
                         backend=backend,
                         device=device)
     else:
         raise ValueError(f"Unknown model_type '{model_type}'. Please use 'rtmpose' or 'rtmo'.")
-    
-    # Open video capture
-    cap = cv2.VideoCapture(input_video_path)
-    if not cap.isOpened():
-        logging.error(f"Error: Could not open video file {input_video_path}")
-        return
 
-    # Get video properties
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    # --- Loop through each input video --- 
+    for current_input_video_path in input_videos:
+        logging.info(f"--- Processing video: {current_input_video_path} ---")
+        start_time_video = time.time()
 
-    # Setup video writer
-    if output_video_path is None:
-        output_video_path = input_video_path.parent / f"{input_video_path.stem}_blurred{input_video_path.suffix}"
-    else:
-        output_video_path = Path(output_video_path)
+        # Open video capture for the current video
+        cap = cv2.VideoCapture(str(current_input_video_path)) # Should be str
+        if not cap.isOpened():
+            logging.error(f"Error: Could not open video file {current_input_video_path}. Skipping.")
+            continue # Skip to the next video
 
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(str(output_video_path), fourcc, fps, (frame_width, frame_height))
+        # Get video properties
+        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    # Setup JSON output directory if needed
-    if save_json:
-        json_output_dir = output_video_path.parent / f'{output_video_path.stem}_face_json'
-        json_output_dir.mkdir(exist_ok=True)
-        # logging.info(f"Face keypoints JSON will be saved to: {json_output_dir}")
+        # Setup video writer for the current video
+        # Determine output path based on whether an explicit output was given
+        if output_video_path is None:
+            # Default: save next to input video with '_blurred' prefix
+            current_output_video_path = current_input_video_path.parent / f"{current_input_video_path.stem}_blurred{current_input_video_path.suffix}"
+        elif len(input_videos) > 1 and root_path:
+            # Multiple videos from root, explicit output is a directory
+            output_dir = Path(output_video_path)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            current_output_video_path = output_dir / f"{current_input_video_path.stem}_blurred{current_input_video_path.suffix}"
+        else:
+            # Single video or specific output file provided
+            current_output_video_path = Path(output_video_path)
+            # Ensure parent directory exists if it's a specific file path
+            current_output_video_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if visualize:
-        cv2.namedWindow("Face Blurring", cv2.WINDOW_NORMAL)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(str(current_output_video_path), fourcc, fps, (frame_width, frame_height))
+        logging.info(f"Output video will be saved to: {current_output_video_path}")
 
-    # Process frames
-    frame_idx = 0
-    with tqdm(total=total_frames, desc="Blurring faces") as pbar:
-        while cap.isOpened():
-            success, frame = cap.read()
-            if not success:
-                break
+        # Setup JSON output directory if needed for the current video
+        current_json_output_dir = None
+        if save_json:
+            json_output_parent_dir = current_output_video_path.parent
+            current_json_output_dir = json_output_parent_dir / f'{current_output_video_path.stem}_face_json'
+            current_json_output_dir.mkdir(exist_ok=True)
+            logging.info(f"Face keypoints JSON will be saved to: {current_json_output_dir}")
 
-            # 1. Detect poses (keypoints and scores)
-            keypoints, scores = pose_sol(frame) # keypoints: [N_persons, N_kpts, 2], scores: [N_persons, N_kpts]
-            processed_frame = frame.copy() # Copy original frame for processing
+        if visualize:
+            window_name = f"Face Blurring - {current_input_video_path.name}"
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
-            # Prepare data for JSON saving (only face keypoints)
-            keypoints_for_json = np.zeros_like(keypoints)
-            scores_for_json = np.zeros_like(scores)
-
-            # 2. Iterate through detected persons to apply obscuration and prepare JSON data
-            for person_idx, (person_kpts, person_scores) in enumerate(zip(keypoints, scores)):
-                # 3. Extract face keypoints and scores
-                face_kpts = person_kpts[FACE_KEYPOINT_INDICES]
-                face_scores = person_scores[FACE_KEYPOINT_INDICES]
-
-                # 4. Filter valid keypoints by confidence threshold
-                valid_indices = np.where(face_scores >= conf_threshold)[0]
-                valid_detected_kpts = face_kpts[valid_indices]
-                # valid_detected_scores = face_scores[valid_indices] # Not used currently
-
-                # --- Estimate Forehead and Chin Points --- 
-                points_for_hull = valid_detected_kpts.copy().astype(int) # Start with valid detected points, ensure int
-
-                # Check if we have enough points for estimation (at least eyes and nose)
-                # Get indices relative to FACE_KEYPOINT_INDICES
-                nose_idx_in_face = 0 
-                leye_idx_in_face = 1
-                reye_idx_in_face = 2
-
-                # Check if these keypoints are valid based on their original indices in face_scores
-                nose_valid = face_scores[nose_idx_in_face] >= conf_threshold
-                leye_valid = face_scores[leye_idx_in_face] >= conf_threshold
-                reye_valid = face_scores[reye_idx_in_face] >= conf_threshold
-
-                if nose_valid and leye_valid and reye_valid:
-                    nose_pt = face_kpts[nose_idx_in_face]
-                    leye_pt = face_kpts[leye_idx_in_face]
-                    reye_pt = face_kpts[reye_idx_in_face]
-                    
-                    # Calculate center points and distance
-                    y_eye_avg = (leye_pt[1] + reye_pt[1]) / 2
-                    x_center = (leye_pt[0] + reye_pt[0]) / 2 # Use eye center for x
-                    y_nose = nose_pt[1]
-
-                    d_face = abs(y_nose - y_eye_avg) # Use abs for safety
-
-                    if d_face > 1: # Ensure the distance is meaningful (e.g., more than 1 pixel)
-                        
-                        # NOTE: Since we don't have full face keypoints, we used the distance between eyes and nose to estimate the forehead and chin points.
-                        # From my rule of thumb for 'polygon' blur_shape, the forehead is usually 2.5x and the chin is 3x the distance between eyes and nose.
-                        #                       for 'rectangle' blur_shape, the forehead is usually 2x and the chin is 2.5x the distance between eyes and nose.
-                        if blur_size == "small":
-                            factor_chin = 2.5 # Add some padding downwards
-                            factor_forehead = 2.0 # Add a bit more padding upwards
-                        elif blur_size == "medium":
-                            factor_chin = 3.0 # Add some padding downwards
-                            factor_forehead = 2.5 # Add a bit more padding upwards
-                        elif blur_size == "large":
-                            factor_chin = 4.0 # Add some padding downwards
-                            factor_forehead = 3.0 # Add a bit more padding upwards
-                        else: # Default to medium if unknown value
-                            logging.warning(f"Unknown blur_size '{blur_size}', plase select from 'small', 'medium', 'large'.")
-                            factor_chin = 3.0 
-                            factor_forehead = 2.5
-
-                        # Estimate chin
-                        y_chin = y_nose + d_face * factor_chin
-                        chin_pt = np.array([[int(x_center), int(y_chin)]])
-
-                        # Estimate forehead top
-                        y_forehead = y_eye_avg - d_face * factor_forehead
-                        forehead_pt = np.array([[int(x_center), int(y_forehead)]])
-
-                        # Add estimated points to the list for hull calculation
-                        # Ensure points_for_hull is 2D before vstack if it was empty
-                        if points_for_hull.shape[0] > 0:
-                            points_for_hull = np.vstack([points_for_hull, chin_pt, forehead_pt])
-                        else: # Handle case where no initial points were valid
-                            points_for_hull = np.vstack([chin_pt, forehead_pt])
-                # --- End Estimation ---
-
-                # 5. Apply blurring/black polygon using combined points if enough points exist
-                # Need at least 3 points (original or combined) to form a hull/ROI
-                # if len(valid_face_kpts_obscuration) >= 3: # Old check
-                if points_for_hull.shape[0] >= 3:
-                    # Pass blur_intensity to apply_face_obscuration
-                    processed_frame = apply_face_obscuration(processed_frame, points_for_hull, blur_type, blur_shape, blur_intensity)
-
-                # --- Prepare filtered data for save_to_openpose --- 
-                if save_json:
-                    for i, kpt_idx in enumerate(FACE_KEYPOINT_INDICES):
-                        if face_scores[i] >= conf_threshold:
-                            # Copy only valid face keypoints and scores to the arrays for saving
-                            keypoints_for_json[person_idx, kpt_idx] = person_kpts[kpt_idx]
-                            scores_for_json[person_idx, kpt_idx] = person_scores[kpt_idx]
-                # --- End JSON data preparation for this person --- 
-
-            # 6. Save face keypoints to JSON using save_to_openpose (once per frame)
-            if save_json:
-                json_file_path = json_output_dir / f'{input_video_path.stem}_{frame_idx:06d}_face.json'
-                save_to_openpose(str(json_file_path), keypoints_for_json, scores_for_json)
-
-            # 7. Visualize if enabled
-            if visualize:
-                cv2.imshow("Face Blurring", processed_frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+        # Process frames for the current video
+        frame_idx = 0
+        with tqdm(total=total_frames, desc=f"Blurring {current_input_video_path.name}") as pbar:
+            while cap.isOpened():
+                success, frame = cap.read()
+                if not success:
                     break
 
-            # 8. Write processed frame to output video
-            out.write(processed_frame)
+                # 1. Detect poses (keypoints and scores)
+                keypoints, scores = pose_sol(frame) # keypoints: [N_persons, N_kpts, 2], scores: [N_persons, N_kpts]
+                processed_frame = frame.copy() # Copy original frame for processing
 
-            frame_idx += 1
-            pbar.update(1)
+                # Prepare data for JSON saving (only face keypoints)
+                keypoints_for_json = np.zeros_like(keypoints)
+                scores_for_json = np.zeros_like(scores)
 
-    # Release resources
-    cap.release()
-    out.release()
-    if visualize:
-        cv2.destroyAllWindows()
+                # 2. Iterate through detected persons to apply obscuration and prepare JSON data
+                for person_idx, (person_kpts, person_scores) in enumerate(zip(keypoints, scores)):
+                    # 3. Extract face keypoints and scores
+                    face_kpts = person_kpts[FACE_KEYPOINT_INDICES]
+                    face_scores = person_scores[FACE_KEYPOINT_INDICES]
+
+                    # 4. Filter valid keypoints by confidence threshold
+                    valid_indices = np.where(face_scores >= conf_threshold)[0]
+                    valid_detected_kpts = face_kpts[valid_indices]
+                    # valid_detected_scores = face_scores[valid_indices] # Not used currently
+
+                    # --- Estimate Forehead and Chin Points --- 
+                    points_for_hull = valid_detected_kpts.copy().astype(int) # Start with valid detected points, ensure int
+
+                    # Check if we have enough points for estimation (at least eyes and nose)
+                    # Get indices relative to FACE_KEYPOINT_INDICES
+                    nose_idx_in_face = 0 
+                    leye_idx_in_face = 1
+                    reye_idx_in_face = 2
+
+                    # Check if these keypoints are valid based on their original indices in face_scores
+                    nose_valid = face_scores[nose_idx_in_face] >= conf_threshold
+                    leye_valid = face_scores[leye_idx_in_face] >= conf_threshold
+                    reye_valid = face_scores[reye_idx_in_face] >= conf_threshold
+
+                    if nose_valid and leye_valid and reye_valid:
+                        nose_pt = face_kpts[nose_idx_in_face]
+                        leye_pt = face_kpts[leye_idx_in_face]
+                        reye_pt = face_kpts[reye_idx_in_face]
+                        
+                        # Calculate center points and distance
+                        y_eye_avg = (leye_pt[1] + reye_pt[1]) / 2
+                        x_center = (leye_pt[0] + reye_pt[0]) / 2 # Use eye center for x
+                        y_nose = nose_pt[1]
+
+                        d_face = abs(y_nose - y_eye_avg) # Use abs for safety
+
+                        if d_face > 1: # Ensure the distance is meaningful (e.g., more than 1 pixel)
+                            
+                            # NOTE: Since we don't have full face keypoints, we used the distance between eyes and nose to estimate the forehead and chin points.
+                            # From my rule of thumb for 'polygon' blur_shape, the forehead is usually 2.5x and the chin is 3x the distance between eyes and nose.
+                            #                       for 'rectangle' blur_shape, the forehead is usually 2x and the chin is 2.5x the distance between eyes and nose.
+                            if blur_size == "small":
+                                factor_chin = 2.5 # Add some padding downwards
+                                factor_forehead = 2.0 # Add a bit more padding upwards
+                            elif blur_size == "medium":
+                                factor_chin = 3.0 # Add some padding downwards
+                                factor_forehead = 2.5 # Add a bit more padding upwards
+                            elif blur_size == "large":
+                                factor_chin = 4.0 # Add some padding downwards
+                                factor_forehead = 3.0 # Add a bit more padding upwards
+                            else: # Default to medium if unknown value
+                                logging.warning(f"Unknown blur_size '{blur_size}', please select from 'small', 'medium', 'large'. For now, blur_size is set to 'medium'.")
+                                factor_chin = 3.0 
+                                factor_forehead = 2.5
+
+                            # Estimate chin
+                            y_chin = y_nose + d_face * factor_chin
+                            chin_pt = np.array([[int(x_center), int(y_chin)]])
+
+                            # Estimate forehead top
+                            y_forehead = y_eye_avg - d_face * factor_forehead
+                            forehead_pt = np.array([[int(x_center), int(y_forehead)]])
+
+                            # Add estimated points to the list for hull calculation
+                            # Ensure points_for_hull is 2D before vstack if it was empty
+                            if points_for_hull.shape[0] > 0:
+                                points_for_hull = np.vstack([points_for_hull, chin_pt, forehead_pt])
+                            else: # Handle case where no initial points were valid
+                                points_for_hull = np.vstack([chin_pt, forehead_pt])
+                    # --- End Estimation ---
+
+                    # 5. Apply blurring/black polygon using combined points if enough points exist
+                    # Need at least 3 points (original or combined) to form a hull/ROI
+                    # if len(valid_face_kpts_obscuration) >= 3: # Old check
+                    if points_for_hull.shape[0] >= 3:
+                        # Pass blur_intensity to apply_face_obscuration
+                        processed_frame = apply_face_obscuration(processed_frame, points_for_hull, blur_type, blur_shape, blur_intensity)
+
+                    # --- Prepare filtered data for save_to_openpose --- 
+                    if save_json and current_json_output_dir:
+                        for i, kpt_idx in enumerate(FACE_KEYPOINT_INDICES):
+                            if face_scores[i] >= conf_threshold:
+                                # Copy only valid face keypoints and scores to the arrays for saving
+                                keypoints_for_json[person_idx, kpt_idx] = person_kpts[kpt_idx]
+                                scores_for_json[person_idx, kpt_idx] = person_scores[kpt_idx]
+                    # --- End JSON data preparation for this person --- 
+
+                # 6. Save face keypoints to JSON using save_to_openpose (once per frame)
+                if save_json and current_json_output_dir:
+                    json_file_path = current_json_output_dir / f'{current_output_video_path.stem}_{frame_idx:06d}_face.json'
+                    save_to_openpose(str(json_file_path), keypoints_for_json, scores_for_json)
+
+                # 7. Visualize if enabled
+                if visualize:
+                    cv2.imshow(window_name, processed_frame)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+
+                # 8. Write processed frame to output video
+                out.write(processed_frame)
+
+                frame_idx += 1
+                pbar.update(1)
+            
+        # Release resources
+        cap.release()
+        out.release()
+        if visualize:
+            cv2.destroyWindow(window_name)
+
+        logging.info(f"Finished processing {current_input_video_path}.")
+        end_time_video = time.time()
+        logging.info(f"Processing {current_input_video_path.name} took {end_time_video - start_time_video:.2f} seconds.")
+    # --- End loop through videos ---
 
     logging.info("Face blurring process finished.")
-
-    end_time = time.time()
-    logging.info(f"Processing finished in {end_time - start_time:.2f} seconds.")
+    end_time_total = time.time()
+    logging.info(f"Total processing finished in {end_time_total - start_time_total:.2f} seconds.")
 
 
 def apply_face_obscuration(frame: np.ndarray, face_keypoints: np.ndarray, blur_type: str, blur_shape: str, blur_intensity: int) -> np.ndarray:
@@ -384,7 +425,8 @@ def apply_face_obscuration(frame: np.ndarray, face_keypoints: np.ndarray, blur_t
 
 def main():
     parser = argparse.ArgumentParser(description='Detect and blur faces in a video using RTMO.')
-    parser.add_argument('-i', '--input', required=True, help='Path to the input video file (string).')
+    parser.add_argument('-r', '--root', required=False, help='Path to the root directory (string).')
+    parser.add_argument('-i', '--input', required=False, help='Path to the input video file (string).')
     parser.add_argument('-o', '--output', default=None, help='Path to the output video file (string). Defaults to "blurred_<input_name>".')
     parser.add_argument('--visualize', action='store_true', help=f'Enable real-time visualization (boolean, default: {DEFAULT_VISUALIZE}).')
     parser.add_argument('--blur_type', default=DEFAULT_BLUR_TYPE, choices=['blur', 'black'], help=f'Type of obscuration (string, default: {DEFAULT_BLUR_TYPE}).')
@@ -401,10 +443,21 @@ def main():
 
     args = vars(parser.parse_args())
 
+    # Confirm that exactly one of root or input is provided
+    if not (args['root'] or args['input']):
+        parser.error('Either --root or --input must be provided.')
+    if args['root'] and args['input']:
+        parser.error('Provide either --root or --input, not both.')
+
     face_blurring_func(**args)
 
     # Example usage from terminal:
-    # python Utilities/face_blurring.py -i path/to/your/video.mp4 -o path/to/output/blurred_video.mp4 --blur_type black --visualize
+
+    # If you want to blur faces in a video:
+    # python Utilities/face_blurring.py -i path/to/your/video.mp4 --blur_type black --visualize
+
+    # If you want to blur faces in a root folder:
+    # python Utilities/face_blurring.py -r path/to/your/root/folder --blur_type black --visualize
 
 if __name__ == '__main__':
     main()
