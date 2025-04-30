@@ -7,6 +7,8 @@
     ######################################################
 
     Detect faces in videos and blur or mask them.
+    Beware that if a person is not detected in one or several frames, their face will not be blurred.
+    Contributions are welcome if you can provide a fix!
 
     Usage:
         If you want to blur faces in a video:
@@ -64,7 +66,7 @@ DEFAULT_DEVICE = 'auto'
 DEFAULT_MODEL_TYPE = 'rtmpose' # 'rtmpose' or 'rtmo'
 DEFAULT_MODE = 'lightweight'
 DEFAULT_DET_FREQUENCY = 10 
-DEFAULT_CONFIDENCE_THRESHOLD = 0.1 # Face keypoint confidence threshold; face keypoints basically have low confidence.
+DEFAULT_CONFIDENCE_THRESHOLD = 0.0 # Face keypoint confidence threshold; face keypoints basically have low confidence.
 DEFAULT_SAVE_JSON = False # Save detected face keypoints to JSON files
 VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', 
     '.m4v', '.mpg', '.mpeg', '.3gp', '.ts', '.mts', '.m2ts'}
@@ -426,7 +428,7 @@ def apply_face_obscuration(frame: np.ndarray, face_keypoints: np.ndarray, blur_t
 # --- Argument Parser and Main Function --- 
 
 def main():
-    parser = argparse.ArgumentParser(description='Detect and blur faces in a video using RTMO.')
+    parser = argparse.ArgumentParser(description='Detect and blur faces in a video.')
     parser.add_argument('-r', '--root', required=False, help='Path to the root directory (string).')
     parser.add_argument('-i', '--input', required=False, help='Path to the input video file (string).')
     parser.add_argument('-o', '--output', default=None, help='Path to the output video file (string). Defaults to "blurred_<input_name>".')
