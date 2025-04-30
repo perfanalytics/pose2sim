@@ -66,7 +66,8 @@ DEFAULT_MODE = 'lightweight'
 DEFAULT_DET_FREQUENCY = 10 
 DEFAULT_CONFIDENCE_THRESHOLD = 0.1 # Face keypoint confidence threshold; face keypoints basically have low confidence.
 DEFAULT_SAVE_JSON = False # Save detected face keypoints to JSON files
-
+VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', 
+    '.m4v', '.mpg', '.mpeg', '.3gp', '.ts', '.mts', '.m2ts'}
 
 def face_blurring_func(**args):
     """Core logic for face blurring.
@@ -97,13 +98,14 @@ def face_blurring_func(**args):
     # Determine input videos
     if root_path:
         root_path = Path(root_path)
-        # Find mp4 and avi files recursively, excluding those starting with '_blurred' <- to avoid processing already processed videos
-        video_files_mp4 = list(root_path.rglob('*.mp4'))
-        video_files_avi = list(root_path.rglob('*.avi'))
+        # Find vide files recursively, excluding those starting with '_blurred' <- to avoid processing already processed videos
+        video_files = [file for file in Path('.').glob('**/*')
+                        if file.is_file() and file.suffix.lower() in VIDEO_EXTENSIONS]
+       
         # Filter out videos whose stem ends with _blurred
-        input_videos = [v for v in video_files_mp4 + video_files_avi if not v.stem.endswith('_blurred')]
+        input_videos = [v for v in video_files if not v.stem.endswith('_blurred')]
         if not input_videos:
-            logging.error(f"Error: No compatible video files found in {root_path}")
+            logging.error(f"Error: No video files found in {root_path}")
             return
         logging.info(f"Found {len(input_videos)} videos in {root_path}. Processing...")
     elif input_video_path:
