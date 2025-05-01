@@ -493,13 +493,13 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
 
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
     try:
-        calib_file = glob.glob(os.path.join(calib_dir, f'Calib*.toml'))[0]
+        calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
+        calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
     except:
         pass
     if not overwrite_intrinsics and 'calib_file' in locals():
         logging.info(f'\nPreexisting calibration file found: \'{calib_file}\'.')
         logging.info(f'\nRetrieving intrinsic parameters from file. Set "overwrite_intrinsics" to true in Config.toml to recalculate them.')
-        calib_file = glob.glob(os.path.join(calib_dir, f'Calib*.toml'))[0]
         calib_data = toml.load(calib_file)
 
         ret, C, S, D, K, R, T = [], [], [], [], [], [], []
