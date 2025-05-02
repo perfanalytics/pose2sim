@@ -25,11 +25,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest, macos-13] # Mac ARM M1 vs Intel processors
         python-version: ["3.10", "3.11"]
-        cache-path:
-          ubuntu-latest: ~/.cache/pip
-          macos-latest: ~/Library/Caches/pip
-          macos-13: ~/Library/Caches/pip
-          windows-latest: C:\Users\runneradmin\AppData\Local\pip\Cache
+        include:
+          - os: ubuntu-latest
+            path: ~/.cache/pip
+          - os: macos-latest
+            path: ~/Library/Caches/pip
+          - os: windows-latest
+            path: ~\AppData\Local\pip\Cache
 
     steps:
       - name: Checkout code
