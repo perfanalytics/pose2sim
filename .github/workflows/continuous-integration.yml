@@ -27,11 +27,11 @@ jobs:
         python-version: ["3.10", "3.11"]
         include:
           - os: ubuntu-latest
-            path: ~/.cache/pip
+            cache-path: ~/.cache/pip
           - os: macos-latest
-            path: ~/Library/Caches/pip
+            cache-path: ~/Library/Caches/pip
           - os: windows-latest
-            path: ~\AppData\Local\pip\Cache
+            cache-path: ~\AppData\Local\pip\Cache
 
     steps:
       - name: Checkout code
