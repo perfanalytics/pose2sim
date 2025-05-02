@@ -85,5 +85,6 @@ jobs:
           PYTHONUNBUFFERED: "1"
           KMP_DUPLICATE_LIB_OK: TRUE
         run: |
+          eval "$(conda shell.bash hook)"  # Initialize conda for the shell
           conda activate pose2sim
           pytest -v Pose2Sim/Utilities/tests.py --capture=sys
