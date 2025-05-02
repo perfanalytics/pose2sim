@@ -28,10 +28,12 @@ jobs:
         include:
           - os: ubuntu-latest
             cache-path: ~/.cache/pip
-          - os: macos-latest
-            cache-path: ~/Library/Caches/pip
           - os: windows-latest
-            cache-path: ~\AppData\Local\pip\Cache
+            cache-path: C:\Users\runneradmin\AppData\Local\pip\Cache
+          - os: macos-latest
+            cache-path: /Library/Caches/pip
+          - os: macos-13
+            cache-path: ~/Library/Caches/pip
 
     steps:
       - name: Checkout code
