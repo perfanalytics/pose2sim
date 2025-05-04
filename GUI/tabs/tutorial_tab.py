@@ -5,6 +5,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 import subprocess
 import threading
+import webbrowser
 import cv2
 from PIL import Image, ImageTk
 
@@ -17,16 +18,13 @@ class TutorialTab:
         self.frame = ctk.CTkFrame(parent)
         
         # Initialize variables
-        self.current_step = 0
-        self.total_steps = 4  # Number of tutorial steps
         self.marker_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tutorial_completed")
         
-        # Video player variables
-        self.video_path = None
-        self.video_cap = None
-        self.playing = False
-        self.current_frame = 0
-        self.play_after_id = None
+        # Video links
+        self.video_links = {
+            '2d': "https://drive.google.com/file/d/1Lglv-1tdO4FFKUl2LA7dKhYvPcsWbLmJ/view?usp=drive_link",
+            '3d': "https://drive.google.com/file/d/1fNQDtc0f1jYOrgqkQcVHQ3XPfbdTIqTr/view?usp=drive_link"
+        }
         
         # Dependency check results
         self.dependencies = {
@@ -69,67 +67,90 @@ class TutorialTab:
         )
         self.title_label.pack(pady=(0, 20))
         
-        # Video player frame
-        self.video_frame = ctk.CTkFrame(self.content_frame)
-        self.video_frame.pack(fill='x', pady=10)
+        # Video information section
+        video_info_frame = ctk.CTkFrame(self.content_frame, fg_color=("gray95", "gray20"))
+        video_info_frame.pack(fill='x', pady=10, padx=20)
         
-        # Video canvas
-        self.video_canvas = tk.Canvas(self.video_frame, bg="black", height=400)
-        self.video_canvas.pack(fill='x', pady=10)
+        ctk.CTkLabel(
+            video_info_frame,
+            text="Due to size, tutorial videos are hosted on Google Drive",
+            font=("Helvetica", 16, "bold"),
+            wraplength=600
+        ).pack(pady=(10, 5))
         
-        # Initial message
-        self.video_message = ctk.CTkLabel(
-            self.video_canvas,
-            text="Loading tutorial...",
-            font=("Helvetica", 16),
-            text_color="white"
+        # Get the analysis mode
+        analysis_mode = getattr(self.app, 'analysis_mode', '3d')
+        
+        # Video buttons frame
+        video_buttons_frame = ctk.CTkFrame(video_info_frame, fg_color="transparent")
+        video_buttons_frame.pack(pady=10)
+        
+        # Button for current mode video
+        current_mode_text = "Watch 2D Tutorial Video" if analysis_mode == '2d' else "Watch 3D Tutorial Video"
+        ctk.CTkButton(
+            video_buttons_frame,
+            text=current_mode_text,
+            command=lambda: self.open_video_link(analysis_mode),
+            font=("Helvetica", 14, "bold"),
+            width=250,
+            height=40,
+            fg_color="#4CAF50",
+            hover_color="#388E3C"
+        ).pack(side='left', padx=10)
+        
+        # Button for other mode video
+        other_mode = '3d' if analysis_mode == '2d' else '2d'
+        other_mode_text = "Watch 3D Tutorial Video" if analysis_mode == '2d' else "Watch 2D Tutorial Video"
+        ctk.CTkButton(
+            video_buttons_frame,
+            text=other_mode_text,
+            command=lambda: self.open_video_link(other_mode),
+            font=("Helvetica", 14),
+            width=250,
+            height=40
+        ).pack(side='left', padx=10)
+        
+        # Tutorial image placeholder
+        self.tutorial_img_frame = ctk.CTkFrame(self.content_frame, height=300)
+        self.tutorial_img_frame.pack(fill='x', pady=10)
+        
+        # Load a placeholder image or tutorial screenshot if available
+        tutorial_img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "tutorial_preview.png")
+        
+        if os.path.exists(tutorial_img_path):
+            try:
+                # Load and display image
+                img = Image.open(tutorial_img_path)
+                img = img.resize((800, 300), Image.LANCZOS)
+                self.tutorial_img = ctk.CTkImage(light_image=img, dark_image=img, size=(800, 300))
+                
+                img_label = ctk.CTkLabel(self.tutorial_img_frame, image=self.tutorial_img, text="")
+                img_label.pack(pady=10)
+            except Exception as e:
+                ctk.CTkLabel(
+                    self.tutorial_img_frame,
+                    text="Tutorial Preview Image Not Available",
+                    font=("Helvetica", 16)
+                ).pack(expand=True)
+        else:
+            ctk.CTkLabel(
+                self.tutorial_img_frame,
+                text="Tutorial Preview Image Not Available",
+                font=("Helvetica", 16)
+            ).pack(expand=True)
+        
+        # Add beta version message box
+        self.beta_message_frame = ctk.CTkFrame(self.content_frame, fg_color="white")
+        self.beta_message_frame.pack(fill='x', pady=10, padx=40)
+
+        self.beta_message = ctk.CTkLabel(
+            self.beta_message_frame,
+            text="This GUI is a beta version. If you have recommendations, errors, or suggestions please send them to yacine.pose2sim@gmail.com",
+            font=("Helvetica", 12),
+            text_color="black",
+            wraplength=600
         )
-        self.video_message.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
-        
-        # Video controls frame
-        self.controls_frame = ctk.CTkFrame(self.video_frame)
-        self.controls_frame.pack(fill='x', pady=5)
-        
-        # Play/Pause button
-        self.play_button = ctk.CTkButton(
-            self.controls_frame,
-            text="▶️ Play",
-            command=self.toggle_play,
-            width=100
-        )
-        self.play_button.pack(side='left', padx=10)
-        
-        # Previous button
-        self.prev_button = ctk.CTkButton(
-            self.controls_frame,
-            text="⏮️ Previous",
-            command=self.previous_step,
-            width=100
-        )
-        self.prev_button.pack(side='left', padx=10)
-        
-        # Next button
-        self.next_button = ctk.CTkButton(
-            self.controls_frame,
-            text="Next ⏭️",
-            command=self.next_step,
-            width=100
-        )
-        self.next_button.pack(side='left', padx=10)
-        
-        # Progress bar
-        self.progress_var = ctk.DoubleVar(value=0)
-        self.progress_bar = ctk.CTkProgressBar(self.video_frame)
-        self.progress_bar.pack(fill='x', padx=10, pady=5)
-        self.progress_bar.set(0)
-        
-        # Current step indicator
-        self.step_label = ctk.CTkLabel(
-            self.video_frame,
-            text="Step 1 of 4: Introduction",
-            font=("Helvetica", 14)
-        )
-        self.step_label.pack(pady=5)
+        self.beta_message.pack(pady=10, padx=10)
         
         # Description text
         self.description_frame = ctk.CTkFrame(self.content_frame)
@@ -141,7 +162,17 @@ class TutorialTab:
             font=("Helvetica", 12)
         )
         self.description_text.pack(fill='x', padx=10, pady=10)
-        self.description_text.insert("1.0", "Welcome to the Pose2Sim tutorial. This guide will help you set up and use Pose2Sim effectively. Please follow along with the video instructions.")
+        
+        description = (
+            "Welcome to the Pose2Sim tutorial. This guide will help you set up and use Pose2Sim effectively.\n\n"
+            "The tutorial videos cover:\n"
+            "• Configuration workflow\n"
+            "• Data processing\n"
+            "• Advanced features\n\n"
+            "Click on the video link above to watch the complete tutorial on Google Drive."
+        )
+        
+        self.description_text.insert("1.0", description)
         self.description_text.configure(state="disabled")
         
         # Dependency check frame
@@ -203,7 +234,7 @@ class TutorialTab:
         self.bottom_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         self.bottom_frame.pack(fill='x', pady=20)
         
-        # Skip tutorial button (initially hidden)
+        # Skip tutorial button
         self.skip_button = ctk.CTkButton(
             self.bottom_frame,
             text="Skip Tutorial",
@@ -212,8 +243,9 @@ class TutorialTab:
             fg_color="#FF9500",
             hover_color="#FF7000"
         )
+        self.skip_button.pack(side='right', padx=10)
         
-        # Complete tutorial button (initially hidden)
+        # Complete tutorial button
         self.complete_button = ctk.CTkButton(
             self.bottom_frame,
             text="Complete Tutorial",
@@ -222,214 +254,21 @@ class TutorialTab:
             fg_color="#4CAF50",
             hover_color="#388E3C"
         )
-        
-        # Load the first tutorial step
-        self.load_tutorial_step(0)
+        self.complete_button.pack(side='right', padx=10)
+    
+    def open_video_link(self, mode):
+        """Open the video link in a web browser"""
+        if mode in self.video_links:
+            webbrowser.open(self.video_links[mode])
     
     def check_tutorial_status(self):
         """Check if the tutorial has been completed before"""
         if os.path.exists(self.marker_file):
-            # Tutorial has been completed before, show skip button
-            self.skip_button.pack(side='right', padx=10)
+            # Tutorial has been completed before, only show skip button
+            self.complete_button.pack_forget()
         else:
-            # First time user, show complete button on last step
-            if self.current_step == self.total_steps - 1:
-                self.complete_button.pack(side='right', padx=10)
-    
-    def load_tutorial_step(self, step_index):
-        """Load a specific tutorial step"""
-        # Update step counter
-        self.current_step = step_index
-        
-        # Update step label
-        step_titles = [
-            "Introduction",
-            "Installation & Setup",
-            "Configuration Workflow",
-            "Advanced Features"
-        ]
-        
-        if 0 <= step_index < len(step_titles):
-            self.step_label.configure(text=f"Step {step_index + 1} of {self.total_steps}: {step_titles[step_index]}")
-        
-        # Load the appropriate video for this step
-        tutorial_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tutorial")
-        video_path = os.path.join(tutorial_folder, f"tutorial_step{step_index + 1}.mp4")
-        
-        # Check if video exists
-        if os.path.exists(video_path):
-            self.load_video(video_path)
-        else:
-            # Show message if video doesn't exist
-            self.video_message.configure(text=f"Tutorial video not found:\n{video_path}")
-            self.video_message.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
-        
-        # Update description text
-        descriptions = [
-            "Welcome to Pose2Sim! This tutorial will guide you through the setup and use of this powerful 3D pose estimation tool. "
-            "Pose2Sim enables you to transform 2D keypoints from multiple camera views into accurate 3D pose data.",
-            
-            "For Pose2Sim to work correctly, you need to install several dependencies. We'll check your system for Anaconda, "
-            "OpenSim, PyTorch, and other required components. Missing components can be installed with the buttons below.",
-            
-            "The Pose2Sim workflow has several steps: calibration, pose estimation, synchronization, triangulation, filtering, and more. "
-            "This interface guides you through each step with clear instructions.",
-            
-            "Pose2Sim includes advanced features like batch processing, marker augmentation, and customizable filtering. "
-            "These options help you adapt the tool to different research needs."
-        ]
-        
-        if 0 <= step_index < len(descriptions):
-            self.description_text.configure(state="normal")
-            self.description_text.delete("1.0", tk.END)
-            self.description_text.insert("1.0", descriptions[step_index])
-            self.description_text.configure(state="disabled")
-        
-        # Enable/disable navigation buttons
-        self.prev_button.configure(state="normal" if step_index > 0 else "disabled")
-        self.next_button.configure(state="normal" if step_index < self.total_steps - 1 else "disabled")
-        
-        # Show/hide complete button based on step
-        self.complete_button.pack_forget()
-        if step_index == self.total_steps - 1 and not os.path.exists(self.marker_file):
-            self.complete_button.pack(side='right', padx=10)
-    
-    def load_video(self, video_path):
-        """Load a video file for the tutorial"""
-        try:
-            # Close any previously open video
-            if self.video_cap is not None:
-                self.video_cap.release()
-            
-            # Hide video message
-            self.video_message.place_forget()
-            
-            # Open the video file
-            self.video_cap = cv2.VideoCapture(video_path)
-            
-            if not self.video_cap.isOpened():
-                raise ValueError("Could not open video file")
-            
-            # Get video properties
-            self.video_path = video_path
-            self.current_frame = 0
-            self.total_frames = int(self.video_cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            
-            # Display first frame
-            self.update_video_frame()
-            
-            # Enable play button
-            self.play_button.configure(state="normal", text="▶️ Play")
-            self.playing = False
-            
-        except Exception as e:
-            self.video_message.configure(text=f"Error loading video:\n{str(e)}")
-            self.video_message.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
-    
-    def update_video_frame(self):
-        """Update video display with current frame"""
-        if self.video_cap is None:
-            return
-            
-        # Seek to the current frame
-        self.video_cap.set(cv2.CAP_PROP_POS_FRAMES, self.current_frame)
-        
-        # Read the frame
-        ret, frame = self.video_cap.read()
-        
-        if not ret:
-            # End of video
-            self.playing = False
-            self.play_button.configure(text="▶️ Play")
-            return
-            
-        # Convert frame to RGB
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        
-        # Get canvas dimensions
-        canvas_width = self.video_canvas.winfo_width()
-        canvas_height = self.video_canvas.winfo_height()
-        
-        if canvas_width < 10 or canvas_height < 10:
-            canvas_width = 800
-            canvas_height = 400
-        
-        # Calculate scaling to fit the canvas while maintaining aspect ratio
-        frame_h, frame_w = frame_rgb.shape[:2]
-        scale = min(canvas_width / frame_w, canvas_height / frame_h)
-        
-        new_width = int(frame_w * scale)
-        new_height = int(frame_h * scale)
-        
-        # Resize the frame
-        frame_resized = cv2.resize(frame_rgb, (new_width, new_height))
-        
-        # Convert to PIL Image
-        image = Image.fromarray(frame_resized)
-        
-        # Convert to PhotoImage
-        self.photo = ImageTk.PhotoImage(image=image)
-        
-        # Update canvas
-        self.video_canvas.delete("all")
-        
-        # Center the image
-        x_offset = (canvas_width - new_width) // 2
-        y_offset = (canvas_height - new_height) // 2
-        
-        self.video_canvas.create_image(x_offset, y_offset, anchor="nw", image=self.photo)
-        
-        # Update progress bar
-        progress = self.current_frame / max(1, self.total_frames - 1)
-        self.progress_bar.set(progress)
-    
-    def toggle_play(self):
-        """Toggle video playback"""
-        if self.video_cap is None:
-            return
-            
-        self.playing = not self.playing
-        
-        if self.playing:
-            self.play_button.configure(text="⏸️ Pause")
-            self.play_video()
-        else:
-            self.play_button.configure(text="▶️ Play")
-            # Cancel scheduled frame updates
-            if self.play_after_id:
-                self.frame.after_cancel(self.play_after_id)
-                self.play_after_id = None
-    
-    def play_video(self):
-        """Play the video from the current position"""
-        if not self.playing or self.video_cap is None:
-            return
-        
-        # Move to next frame
-        self.current_frame += 1
-        
-        # Check if we reached the end
-        if self.current_frame >= self.total_frames:
-            self.current_frame = 0  # Loop back to beginning
-        
-        # Update the display
-        self.update_video_frame()
-        
-        # Schedule next frame update
-        fps = self.video_cap.get(cv2.CAP_PROP_FPS)
-        delay = int(1000 / max(1, fps))  # milliseconds between frames
-        
-        self.play_after_id = self.frame.after(delay, self.play_video)
-    
-    def next_step(self):
-        """Move to the next tutorial step"""
-        if self.current_step < self.total_steps - 1:
-            self.load_tutorial_step(self.current_step + 1)
-    
-    def previous_step(self):
-        """Move to the previous tutorial step"""
-        if self.current_step > 0:
-            self.load_tutorial_step(self.current_step - 1)
+            # First time user, show both buttons
+            pass
     
     def skip_tutorial(self):
         """Skip the tutorial and move to the main app"""
@@ -440,15 +279,6 @@ class TutorialTab:
         )
         
         if response:
-            # Stop video playback
-            self.playing = False
-            if self.play_after_id:
-                self.frame.after_cancel(self.play_after_id)
-            
-            # Release video resource
-            if self.video_cap:
-                self.video_cap.release()
-            
             # Move to the next tab
             if hasattr(self.app, 'show_tab'):
                 tab_order = list(self.app.tabs.keys())

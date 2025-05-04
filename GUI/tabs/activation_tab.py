@@ -41,7 +41,7 @@ class ActivationTab:
         launch_text = "Launch Sports2D" if self.app.analysis_mode == '2d' else "Launch Pose2Sim"
         ctk.CTkLabel(
             self.content_frame,
-            text=f"Choose how you want to {launch_text}:",
+            text=f"Start {launch_text} with Anaconda Prompt:",
             font=('Helvetica', 16)
         ).pack(pady=10)
         
@@ -49,19 +49,7 @@ class ActivationTab:
         card_frame = ctk.CTkFrame(self.content_frame)
         card_frame.pack(pady=40)
         
-        # CMD Button
-        ctk.CTkButton(
-            card_frame,
-            text=self.app.lang_manager.get_text('launch_cmd'),
-            command=lambda: self.activate_with_method('cmd'),
-            width=250,
-            height=50,
-            font=('Helvetica', 16),
-            fg_color="#3a86ff",
-            hover_color="#0066CC"
-        ).pack(pady=20)
-        
-        # Anaconda Prompt Button
+        # Only show Anaconda Prompt Button
         ctk.CTkButton(
             card_frame,
             text=self.app.lang_manager.get_text('launch_conda'),
@@ -71,18 +59,6 @@ class ActivationTab:
             font=('Helvetica', 16),
             fg_color="#4CAF50",
             hover_color="#388E3C"
-        ).pack(pady=20)
-        
-        # PowerShell Button
-        ctk.CTkButton(
-            card_frame,
-            text=self.app.lang_manager.get_text('launch_powershell'),
-            command=lambda: self.activate_with_method('powershell'),
-            width=250,
-            height=50,
-            font=('Helvetica', 16),
-            fg_color="#9B59B6",
-            hover_color="#8E44AD"
         ).pack(pady=20)
         
         # Setup and configuration notice
@@ -205,7 +181,7 @@ class ActivationTab:
             app_name = "Sports2D" if self.app.analysis_mode == '2d' else "Pose2Sim"
             messagebox.showinfo(
                 "Activation Started",
-                f"{app_name} has been launched with {method}."
+                f"{app_name} has been launched with Anaconda Prompt."
             )
             
         except Exception as e:
