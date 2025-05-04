@@ -168,8 +168,8 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.1
   <!-- print(f'torch version: {torch.__version__}, cuda version: {torch.version.cuda}, cudnn version: {torch.backends.cudnn.version()}, onnxruntime version: {ort.__version__}') -->
 
 > **Note on storage use:**\
-     A full installation takes up to 11 GB of storage spate. However, GPU support is not mandatory and takes about 6 GB. Moreover, [marker augmentation](#marker-augmentation) requires Tensorflow and does not necessarily yield better results. You can save an additional 1.3 GB by uninstalling it: `pip uninstall tensorflow`.\
-     A minimal installation with carefully chosen pose models and without GPU support, Tensorflow, PyQt5 **would take less than 3 GB**.\
+     A full installation takes up to 10 GB of storage spate. However, GPU support is not mandatory and takes about 6 GB.\
+     A minimal installation with carefully chosen pose models and without GPU support **would take less than 3 GB**.\
     <img src="Content/Storage.png" width="760">
 
 

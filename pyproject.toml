@@ -4,8 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pose2sim"
-version = "0.10.21"
+dynamic = ["version"] # Generate version from git tags
 authors = [
+    {name = "David Pagnon", email = "contact@david-pagnon.com"},
+]
+maintainers = [
     {name = "David Pagnon", email = "contact@david-pagnon.com"},
 ]
 description = "Markerless kinematics with any cameras — From 2D Pose estimation to 3D OpenSim motion"
@@ -44,7 +47,6 @@ dependencies = [
     "filterpy",
     "ipython",
     "c3d",
-    "tensorflow",
     "rtmlib",
     "openvino",
     "opencv-python",

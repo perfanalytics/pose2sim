@@ -452,7 +452,7 @@ def perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir,
         scaling_path_temp = str(kinematics_dir / (trc_file.stem + '_scaling_setup.xml'))
         
         # Remove fastest frames, frames with null speed, and frames with large hip and knee angles
-        Q_coords, _, _, markers, _ = read_trc(trc_file)
+        Q_coords, frames_col, _, markers, _ = read_trc(trc_file)
         Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, close_to_zero_speed=close_to_zero_speed_m)
 
         if Q_coords_low_speeds_low_angles.size == 0:
@@ -570,6 +570,8 @@ def kinematics_all(config_dict):
     session_dir = Path(project_dir) / '..'
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
+
+    frame_range = config_dict.get('project').get('frame_range')
     use_augmentation = config_dict.get('kinematics').get('use_augmentation')
     use_contacts_muscles = config_dict.get('kinematics').get('use_contacts_muscles')
 
@@ -635,7 +637,7 @@ def kinematics_all(config_dict):
         subject_height = []
         for trc_file in trc_files:
             try:
-                trc_data, _, _, markers, _ = read_trc(trc_file)
+                trc_data, frames_col, _, markers, _ = read_trc(trc_file)
                 height = compute_height(
                     trc_data,
                     markers,

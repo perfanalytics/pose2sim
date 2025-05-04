@@ -219,6 +219,7 @@ make_c3d = false # also save triangulated data in c3d format
 ## Requires the following markers: ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
 ##        "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
 ##        "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
+feet_on_floor = true # true or false (lowercase) # If true, markers will be translated so that the feet are on the floor (assuming that the floor is flat). Useful if you want to estimate ground reaction forces or joint loads.
 make_c3d = true # save triangulated data in c3d format in addition to trc
 
 

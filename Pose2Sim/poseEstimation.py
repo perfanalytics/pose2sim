@@ -38,7 +38,6 @@ import json
 import re
 import logging
 import ast
-import numpy as np
 from functools import partial
 from tqdm import tqdm
 from anytree.importer import DictImporter

@@ -24,7 +24,6 @@ OUTPUT:
 ## INIT
 import os
 import glob
-import fnmatch
 import numpy as np
 import pandas as pd
 import cv2
@@ -34,11 +33,11 @@ import logging
 from scipy import signal
 from scipy.ndimage import gaussian_filter1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
-from filterpy.kalman import KalmanFilter, rts_smoother
+from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
 from Pose2Sim.common import plotWindow
-from Pose2Sim.common import convert_to_c3d
+from Pose2Sim.common import convert_to_c3d, read_trc
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -456,6 +455,7 @@ def filter_all(config_dict):
 
     # Get frame_rate
     video_dir = os.path.join(project_dir, 'videos')
+    frame_range = config_dict.get('project').get('frame_range')
     vid_img_extension = config_dict['pose']['vid_img_extension']
     video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
     frame_rate = config_dict.get('project').get('frame_rate')
@@ -471,30 +471,37 @@ def filter_all(config_dict):
     
     # Trc paths
     trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in file]
-    trc_f_out = [f'{os.path.basename(t).split(".")[0]}_filt_{filter_type}.trc' for t in trc_path_in]
-    trc_path_out = [os.path.join(pose3d_dir, t) for t in trc_f_out]
-    
-    for person_id, (t_in, t_out) in enumerate(zip(trc_path_in, trc_path_out)):
-        # Read trc header
-        with open(t_in, 'r') as trc_file:
-            header = [next(trc_file) for line in range(5)]
+    for person_id, t_path_in in enumerate(trc_path_in):
+        # Read trc coordinate values
+        t_file_in = os.path.basename(t_path_in)
+        Q_coords, frames_col, time_col, markers, header = read_trc(t_path_in)
 
-        # Read trc coordinates values
-        trc_df = pd.read_csv(t_in, sep="\t", skiprows=4)
-        frames_col, time_col = trc_df.iloc[:,0], trc_df.iloc[:,1]
-        Q_coord = trc_df.drop(trc_df.columns[[0, 1, -1]], axis=1)
+        # frame range selection
+        f_range = [[frames_col[0], frames_col[1]] if frame_range==[] else frame_range][0]
+        frame_nb = f_range[1] - f_range[0]
+        f_index = [frames_col[frames_col==f_range[0]].index[0], frames_col[frames_col==f_range[1]-1].index[0]+1]
+        Q_coords = Q_coords.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
+        frames_col = frames_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
+        time_col = time_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
+
+        t_path_out = t_path_in.replace(t_path_in.split('_')[-1], f'{f_range[0]}-{f_range[1]}_filt_{filter_type}.trc')
+        t_file_out = os.path.basename(t_path_out)
+        header[0] = header[0].replace(t_file_in, t_file_out)
+        header[2] = '\t'.join(part if i != 2 else str(frame_nb) for i, part in enumerate(header[2].split('\t')))
+        header[2] = '\t'.join(part if i != 7 else str(frame_nb)+'\n' for i, part in enumerate(header[2].split('\t')))
 
         # Filter coordinates
-        Q_filt = Q_coord.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
+        Q_filt = Q_coords.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
+
 
         # Display figures
         if display_figures:
             # Retrieve keypoints
-            keypoints_names = pd.read_csv(t_in, sep="\t", skiprows=3, nrows=0).columns[2::3][:-1].to_numpy()
-            display_figures_fun(Q_coord, Q_filt, time_col, keypoints_names, person_id)
+            keypoints_names = pd.read_csv(t_path_in, sep="\t", skiprows=3, nrows=0).columns[2::3][:-1].to_numpy()
+            display_figures_fun(Q_coords, Q_filt, time_col, keypoints_names, person_id)
 
         # Reconstruct trc file with filtered coordinates
-        with open(t_out, 'w') as trc_o:
+        with open(t_path_out, 'w') as trc_o:
             [trc_o.write(line) for line in header]
             Q_filt.insert(0, 'Frame#', frames_col)
             Q_filt.insert(1, 'Time', time_col)
@@ -503,9 +510,7 @@ def filter_all(config_dict):
 
         # Save c3d
         if make_c3d:
-            convert_to_c3d(t_out)
+            convert_to_c3d(t_path_out)
 
         # Recap
-        recap_filter3d(config_dict, t_out)
-
-
+        recap_filter3d(config_dict, t_path_out)
