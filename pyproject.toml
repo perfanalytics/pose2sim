@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools >= 42", "wheel"] # PEP 508 specs
+requires = ["setuptools >= 42", "wheel", "setuptools-scm"] # PEP 508 specs
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -53,6 +53,8 @@ dependencies = [
     "opencv-python",
     "deep-sort-realtime",
 ]
+
+[tool.setuptools_scm]
 
 [tool.setuptools]
 packages = {find = {}}
