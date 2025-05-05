@@ -123,7 +123,7 @@ def augment_markers_all(config_dict):
     trimmed_extrema_percent = config_dict.get('kinematics').get('trimmed_extrema_percent')
     default_height = config_dict.get('kinematics').get('default_height')
 
-    augmenterDir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'markerAugmenter')
+    augmenterDir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'MarkerAugmenter')
     augmenterModelName = 'LSTM'
     augmenter_model = 'v0.3'
 
