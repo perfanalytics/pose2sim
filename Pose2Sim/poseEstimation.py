@@ -35,12 +35,20 @@
 import os
 import glob
 import json
+import re
 import logging
+import ast
+import numpy as np
+from functools import partial
 from tqdm import tqdm
+from anytree.importer import DictImporter
 import cv2
 
-from rtmlib import PoseTracker, Body, Wholebody, BodyWithFeet, draw_skeleton
-from Pose2Sim.common import natural_sort_key, sort_people_sports2d
+from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
+from deep_sort_realtime.deepsort_tracker import DeepSort
+from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort, sort_people_rtmlib,\
+                        colors, thickness, draw_bounding_box, draw_keypts, draw_skel
+from Pose2Sim.skeletons import *
 
 
 ## AUTHORSHIP INFORMATION
@@ -55,6 +63,88 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def setup_pose_tracker(ModelClass, det_frequency, mode, tracking, backend, device):
+    '''
+    Set up the RTMLib pose tracker with the appropriate model and backend.
+    If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
+
+    INPUTS:
+    - ModelClass: class. The RTMlib model class to use for pose detection (Body, BodyWithFeet, Wholebody)
+    - det_frequency: int. The frequency of pose detection (every N frames)
+    - mode: str. The mode of the pose tracker ('lightweight', 'balanced', 'performance')
+    - tracking: bool. Whether to track persons across frames with RTMlib tracker
+    - backend: str. The backend to use for pose detection (onnxruntime, openvino, opencv)
+    - device: str. The device to use for pose detection (cpu, cuda, rocm, mps)
+
+    OUTPUTS:
+    - pose_tracker: PoseTracker. The initialized pose tracker object    
+    '''
+
+    backend, device = setup_backend_device(backend=backend, device=device)
+
+    # Initialize the pose tracker with Halpe26 model
+    pose_tracker = PoseTracker(
+        ModelClass,
+        det_frequency=det_frequency,
+        mode=mode,
+        backend=backend,
+        device=device,
+        tracking=tracking,
+        to_openpose=False)
+        
+    return pose_tracker
+
+
+def setup_backend_device(backend='auto', device='auto'):
+    '''
+    Set up the backend and device for the pose tracker based on the availability of hardware acceleration.
+    TensorRT is not supported by RTMLib yet: https://github.com/Tau-J/rtmlib/issues/12
+
+    If device and backend are not specified, they are automatically set up in the following order of priority:
+    1. GPU with CUDA and ONNXRuntime backend (if CUDAExecutionProvider is available)
+    2. GPU with ROCm and ONNXRuntime backend (if ROCMExecutionProvider is available, for AMD GPUs)
+    3. GPU with MPS or CoreML and ONNXRuntime backend (for macOS systems)
+    4. CPU with OpenVINO backend (default fallback)
+    '''
+
+    if device!='auto' and backend!='auto':
+        device = device.lower()
+        backend = backend.lower()
+
+    if device=='auto' or backend=='auto':
+        if device=='auto' and backend!='auto' or device!='auto' and backend=='auto':
+            logging.warning(f"If you set device or backend to 'auto', you must set the other to 'auto' as well. Both device and backend will be determined automatically.")
+
+        try:
+            import torch
+            import onnxruntime as ort
+            if torch.cuda.is_available() == True and 'CUDAExecutionProvider' in ort.get_available_providers():
+                device = 'cuda'
+                backend = 'onnxruntime'
+                logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
+            elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
+                device = 'rocm'
+                backend = 'onnxruntime'
+                logging.info(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
+            else:
+                raise 
+        except:
+            try:
+                import onnxruntime as ort
+                if 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
+                    device = 'mps'
+                    backend = 'onnxruntime'
+                    logging.info(f"\nValid MPS installation found: using ONNXRuntime backend with GPU.")
+                else:
+                    raise
+            except:
+                device = 'cpu'
+                backend = 'openvino'
+                logging.info(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
+        
+    return backend, device
+
+
 def save_to_openpose(json_file_path, keypoints, scores):
     '''
     Save the keypoints and scores to a JSON file in the OpenPose format
@@ -98,18 +188,22 @@ def save_to_openpose(json_file_path, keypoints, scores):
         json.dump(json_output, json_file)
 
 
-def process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person):
+def process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker):
     '''
     Estimate pose from a video file
     
     INPUTS:
     - video_path: str. Path to the input video file
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
+    - pose_model: str. The pose model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
     - display_detection: bool. Whether to show real-time visualization
     - frame_range: list. Range of frames to process
+    - multi_person: bool. Whether to detect multiple people in the video
+    - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
+    - deepsort_tracker: DeepSort tracker object or None
 
     OUTPUTS:
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
@@ -134,7 +228,7 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
     
     if save_video: # Set up video writer
         fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
-        fps = cap.get(cv2.CAP_PROP_FPS) # Get the frame rate from the raw video
+        fps = round(cap.get(cv2.CAP_PROP_FPS)) # Get the frame rate from the raw video
         W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) # Get the width and height from the raw video
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
         
@@ -145,22 +239,27 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     f_range = [[total_frames] if frame_range==[] else frame_range][0]
-    with tqdm(total=total_frames, desc=f'Processing {os.path.basename(video_path)}') as pbar:
+    with tqdm(iterable=range(*f_range), desc=f'Processing {os.path.basename(video_path)}') as pbar:
+        frame_count = 0
         while cap.isOpened():
             # print('\nFrame ', frame_idx)
             success, frame = cap.read()
+            frame_count += 1
             if not success:
                 break
             
             if frame_idx in range(*f_range):
-                # Perform pose estimation on the frame
+                # Detect poses
                 keypoints, scores = pose_tracker(frame)
 
-                # Tracking people IDs across frames
+                # Track poses across frames
                 if multi_person:
-                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
-           
+                    if tracking_mode == 'deepsort':
+                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count)
+                    if tracking_mode == 'sports2d': 
+                        if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                        prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+                    
                 # Save to json
                 if 'openpose' in output_format:
                     json_file_path = os.path.join(json_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.json')
@@ -168,8 +267,22 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
 
                 # Draw skeleton on the frame
                 if display_detection or save_video or save_images:
-                    img_show = frame.copy()
-                    img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+                    # try:
+                    #     # MMPose skeleton
+                    #     img_show = frame.copy()
+                    #     img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+                    # except:
+                        # Sports2D skeleton
+                        valid_X, valid_Y, valid_scores = [], [], []
+                        for person_keypoints, person_scores in zip(keypoints, scores):
+                            person_X, person_Y = person_keypoints[:, 0], person_keypoints[:, 1]
+                            valid_X.append(person_X)
+                            valid_Y.append(person_Y)
+                            valid_scores.append(person_scores)
+                        img_show = frame.copy()
+                        img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
+                        img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
+                        img_show = draw_skel(img_show, valid_X, valid_Y, pose_model)
                 
                 if display_detection:
                     cv2.imshow(f"Pose Estimation {os.path.basename(video_path)}", img_show)
@@ -196,7 +309,7 @@ def process_video(video_path, pose_tracker, output_format, save_video, save_imag
         cv2.destroyAllWindows()
 
 
-def process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, fps, save_video, save_images, display_detection, frame_range, multi_person):
+def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker):
     '''
     Estimate pose estimation from a folder of images
     
@@ -204,11 +317,15 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
     - image_folder_path: str. Path to the input image folder
     - vid_img_extension: str. Extension of the image files
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
+    - pose_model: str. The pose model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
     - display_detection: bool. Whether to show real-time visualization
     - frame_range: list. Range of frames to process
+    - multi_person: bool. Whether to detect multiple people in the video
+    - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
+    - deepsort_tracker: DeepSort tracker object or None
 
     OUTPUTS:
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
@@ -239,17 +356,21 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
         if frame_idx in range(*f_range):
             try:
                 frame = cv2.imread(image_file)
+                frame_idx += 1
             except:
                 raise NameError(f"{image_file} is not an image. Videos must be put in the video directory, not in subdirectories.")
             
-            # Perform pose estimation on the image
+            # Detect poses
             keypoints, scores = pose_tracker(frame)
 
-            # Tracking people IDs across frames
+            # Track poses across frames
             if multi_person:
-                if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores)
-            
+                if tracking_mode == 'deepsort':
+                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
+                if tracking_mode == 'sports2d': 
+                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+                    
             # Extract frame number from the filename
             if 'openpose' in output_format:
                 json_file_path = os.path.join(json_output_dir, f"{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.json")
@@ -257,8 +378,22 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
 
             # Draw skeleton on the image
             if display_detection or save_video or save_images:
-                img_show = frame.copy()
-                img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+                try:
+                    # MMPose skeleton
+                    img_show = frame.copy()
+                    img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
+                except:
+                    # Sports2D skeleton
+                    valid_X, valid_Y, valid_scores = [], [], []
+                    for person_keypoints, person_scores in zip(keypoints, scores):
+                        person_X, person_Y = person_keypoints[:, 0], person_keypoints[:, 1]
+                        valid_X.append(person_X)
+                        valid_Y.append(person_Y)
+                        valid_scores.append(person_scores)
+                    img_show = frame.copy()
+                    img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
+                    img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
+                    img_show = draw_skel(img_show, valid_X, valid_Y, pose_model)
 
             if display_detection:
                 cv2.imshow(f"Pose Estimation {os.path.basename(image_folder_path)}", img_show)
@@ -280,7 +415,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, output_fo
         cv2.destroyAllWindows()
 
 
-def rtm_estimator(config_dict):
+def estimate_pose_all(config_dict):
     '''
     Estimate pose from a video file or a folder of images and 
     write the results to JSON files, videos, and/or images.
@@ -326,6 +461,20 @@ def rtm_estimator(config_dict):
     display_detection = config_dict['pose']['display_detection']
     overwrite_pose = config_dict['pose']['overwrite_pose']
     det_frequency = config_dict['pose']['det_frequency']
+    tracking_mode = config_dict.get('pose').get('tracking_mode')
+    if tracking_mode == 'deepsort' and multi_person:
+        deepsort_params = config_dict.get('pose').get('deepsort_params')
+        try:
+            deepsort_params = ast.literal_eval(deepsort_params)
+        except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+            deepsort_params = deepsort_params.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/',':/').replace('":"\\',':\\')
+            deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params) # changes "[640", "640]" to [640,640]
+            deepsort_params = json.loads(deepsort_params)
+        deepsort_tracker = DeepSort(**deepsort_params)
+    else:
+        deepsort_tracker = None
+    backend = config_dict['pose']['backend']
+    device = config_dict['pose']['device']
 
     # Determine frame rate
     video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
@@ -335,41 +484,14 @@ def rtm_estimator(config_dict):
             cap = cv2.VideoCapture(video_files[0])
             if not cap.isOpened():
                 raise FileNotFoundError(f'Error: Could not open {video_files[0]}. Check that the file exists.')
-            frame_rate = cap.get(cv2.CAP_PROP_FPS)
+            frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
             if frame_rate == 0:
                 frame_rate = 30
                 logging.warning(f'Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps.')
         except:
             frame_rate = 30
 
-    # If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
-    try:
-        import torch
-        import onnxruntime as ort
-        if torch.cuda.is_available() and 'CUDAExecutionProvider' in ort.get_available_providers():
-            device = 'cuda'
-            backend = 'onnxruntime'
-            logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
-        elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
-            device = 'rocm'
-            backend = 'onnxruntime'
-            logging.info(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
-        else:
-            raise 
-    except:
-        try:
-            import onnxruntime as ort
-            if 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
-                device = 'mps'
-                backend = 'onnxruntime'
-                logging.info(f"\nValid MPS installation found: using ONNXRuntime backend with GPU.")
-            else:
-                raise
-        except:
-            device = 'cpu'
-            backend = 'openvino'
-            logging.info(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
-
+    # Set detection frequency
     if det_frequency>1:
         logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points.')
     elif det_frequency==1:
@@ -378,32 +500,74 @@ def rtm_estimator(config_dict):
         raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
 
     # Select the appropriate model based on the model_type
-    if pose_model.upper() == 'HALPE_26':
-        ModelClass = BodyWithFeet
+    logging.info('\nEstimating pose...')
+    if pose_model.upper() in ('HALPE_26', 'BODY_WITH_FEET'):
+        model_name = 'HALPE_26'
+        ModelClass = BodyWithFeet # 26 keypoints(halpe26)
         logging.info(f"Using HALPE_26 model (body and feet) for pose estimation.")
-    elif pose_model.upper() == 'COCO_133':
+    elif pose_model.upper() in ('COCO_133', 'WHOLE_BODY', 'WHOLE_BODY_WRIST'):
+        model_name = 'COCO_133'
         ModelClass = Wholebody
         logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation.")
-    elif pose_model.upper() == 'COCO_17':
-        ModelClass = Body # 26 keypoints(halpe26)
+    elif pose_model.upper() in ('COCO_17', 'BODY'):
+        model_name = 'COCO_17'
+        ModelClass = Body
         logging.info(f"Using COCO_17 model (body) for pose estimation.")
+    elif pose_model.upper() =='HAND':
+        model_name = 'HAND_21'
+        ModelClass = Hand
+        logging.info(f"Using HAND_21 model for pose estimation.")
+    elif pose_model.upper() =='FACE':
+        model_name = 'FACE_106'
+        logging.info(f"Using FACE_106 model for pose estimation.")
+    elif pose_model.upper() =='ANIMAL':
+        model_name = 'ANIMAL2D_17'
+        logging.info(f"Using ANIMAL2D_17 model for pose estimation.")
     else:
-        raise ValueError(f"Invalid model_type: {pose_model}. Must be 'HALPE_26', 'COCO_133', or 'COCO_17'. Use another network (MMPose, DeepLabCut, OpenPose, AlphaPose, BlazePose...) and convert the output files if you need another model. See documentation.")
-    logging.info(f'Mode: {mode}.\n')
+        model_name = pose_model.upper()
+        logging.info(f"Using model {model_name} for pose estimation.")
+    pose_model_name = pose_model
+    try:
+        pose_model = eval(model_name)
+    except:
+        try: # from Config.toml
+            pose_model = DictImporter().import_(config_dict.get('pose').get(pose_model))
+            if pose_model.id == 'None':
+                pose_model.id = None
+        except:
+            raise NameError(f'{pose_model} not found in skeletons.py nor in Config.toml')
+
+    # Select device and backend
+    backend, device = setup_backend_device(backend=backend, device=device)
+
+    # Manually select the models if mode is a dictionary rather than 'lightweight', 'balanced', or 'performance'
+    if not mode in ['lightweight', 'balanced', 'performance'] or 'ModelClass' not in locals():
+        try:
+            try:
+                mode = ast.literal_eval(mode)
+            except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+                mode = mode.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/',':/').replace('":"\\',':\\')
+                mode = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', mode) # changes "[640", "640]" to [640,640]
+                mode = json.loads(mode)
+            det_class = mode.get('det_class')
+            det = mode.get('det_model')
+            det_input_size = mode.get('det_input_size')
+            pose_class = mode.get('pose_class')
+            pose = mode.get('pose_model')
+            pose_input_size = mode.get('pose_input_size')
+
+            ModelClass = partial(Custom,
+                        det_class=det_class, det=det, det_input_size=det_input_size,
+                        pose_class=pose_class, pose=pose, pose_input_size=pose_input_size,
+                        backend=backend, device=device)
+            
+        except (json.JSONDecodeError, TypeError):
+            logging.warning("\nInvalid mode. Must be 'lightweight', 'balanced', 'performance', or '''{dictionary}''' of parameters within triple quotes. Make sure input_sizes are within square brackets.")
+            logging.warning('Using the default "balanced" mode.')
+            mode = 'balanced'
 
 
-    # Initialize the pose tracker
-    pose_tracker = PoseTracker(
-        ModelClass,
-        det_frequency=det_frequency,
-        mode=mode,
-        backend=backend,
-        device=device,
-        tracking=False,
-        to_openpose=False)
-
-
-    logging.info('\nEstimating pose...')
+    # Estimate pose
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
         os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
@@ -414,19 +578,35 @@ def rtm_estimator(config_dict):
             raise
             
     except:
-        video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+        # Set up pose tracker
+        try:
+            pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+        except:
+            logging.error('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
+            raise ValueError('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
+
+        if tracking_mode not in ['deepsort', 'sports2d']:
+            logging.warning(f"Tracking mode {tracking_mode} not recognized. Using sports2d method.")
+            tracking_mode = 'sports2d'
+        logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
+        logging.info(f'Mode: {mode}.')
+        logging.info(f'Tracking is done with {tracking_mode}{" " if not tracking_mode=="deepsort" else f" with parameters: {deepsort_params}"}.\n')
+
+        video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
         if not len(video_files) == 0: 
             # Process video files
-            logging.info(f'Found video files with extension {vid_img_extension}.')
+            logging.info(f'Found video files with {vid_img_extension} extension.')
             for video_path in video_files:
                 pose_tracker.reset()
-                process_video(video_path, pose_tracker, output_format, save_video, save_images, display_detection, frame_range, multi_person)
+                if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()
+                process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
 
         else:
             # Process image folders
-            logging.info(f'Found image folders with extension {vid_img_extension}.')
-            image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
+            logging.info(f'Found image folders with {vid_img_extension} extension.')
+            image_folders = sorted([f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
             for image_folder in image_folders:
                 pose_tracker.reset()
                 image_folder_path = os.path.join(video_dir, image_folder)
-                process_images(image_folder_path, vid_img_extension, pose_tracker, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person)
+                if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()                
+                process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)

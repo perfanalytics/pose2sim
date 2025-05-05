@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint on several OS with a several versions of Python
 # See: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Build on Win-MacOS-Ubuntu with Python 3.9-3.11
+name: Build on Win-MacOS-Ubuntu with Python 3.10-3.11
 
 on:
   push:
@@ -22,8 +22,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest, macos-13]
-        python-version: [3.9, "3.10", "3.11"]
+        os: [ubuntu-latest, windows-latest, macos-latest, macos-13] # Mac ARM M1 vs Intel processors
+        python-version: ["3.10", "3.11"]
 
     steps:
       - name: Checkout code
@@ -60,6 +60,7 @@ jobs:
           conda run -n pose2sim python -m pip install --upgrade pip
           conda run -n pose2sim python -m pip install flake8 pytest
           conda run -n pose2sim python -m pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
+          # conda run -n pose2sim python -m pip install torch torchvision
       
       - name: Lint with flake8
         run: |

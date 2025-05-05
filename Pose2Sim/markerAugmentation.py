@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
 '''
 ###########################################################################
 ## AUGMENT MARKER DATA                                                   ##
@@ -30,7 +29,7 @@ import logging
 
 from Pose2Sim.MarkerAugmenter import utilsDataman
 from Pose2Sim.MarkerAugmenter.utils import TRC2numpy
-from Pose2Sim.common import convert_to_c3d, natural_sort_key
+from Pose2Sim.common import convert_to_c3d, natural_sort_key, read_trc, compute_height
 
 
 ## AUTHORSHIP INFORMATION
@@ -78,7 +77,7 @@ def check_neck_data(trc_file):
     return trc_file
 
 
-def augmentTRC(config_dict):
+def augment_markers_all(config_dict):
     # get parameters from Config.toml
     project_dir = config_dict.get('project').get('project_dir')
     pathInputTRCFile = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
@@ -87,6 +86,12 @@ def augmentTRC(config_dict):
     subject_height = config_dict.get('project').get('participant_height')
     subject_mass = config_dict.get('project').get('participant_mass')
     
+    fastest_frames_to_remove_percent = config_dict.get('kinematics').get('fastest_frames_to_remove_percent')
+    close_to_zero_speed = config_dict.get('kinematics').get('close_to_zero_speed_m')
+    large_hip_knee_angles = config_dict.get('kinematics').get('large_hip_knee_angles')
+    trimmed_extrema_percent = config_dict.get('kinematics').get('trimmed_extrema_percent')
+    default_height = config_dict.get('kinematics').get('default_height')
+
     augmenterDir = os.path.dirname(utilsDataman.__file__)
     augmenterModelName = 'LSTM'
     augmenter_model = 'v0.3'
@@ -106,22 +111,47 @@ def augmentTRC(config_dict):
         trc_files = trc_no_filtering
     sorted(trc_files, key=natural_sort_key)
 
-    # Get subject heights and masses
+    # Calculate subject heights
     if subject_height is None or subject_height == 0:
-        subject_height = [1.75] * len(trc_files)
-        logging.warning("No subject height found in Config.toml. Using default height of 1.75m.")
+        subject_height = [default_height] * len(trc_files)
+        logging.warning(f"No subject height found in Config.toml. Using default height of {default_height}m.")
+    elif isinstance(subject_height, str) and subject_height.lower() == 'auto':
+        subject_height = []
+        for trc_file in trc_files:
+            try:
+                trc_data, _, _, markers, _ = read_trc(trc_file)
+                height = compute_height(
+                    trc_data,
+                    markers,
+                    fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
+                    close_to_zero_speed=close_to_zero_speed,
+                    large_hip_knee_angles=large_hip_knee_angles,
+                    trimmed_extrema_percent=trimmed_extrema_percent
+                )
+                if not np.isnan(height):
+                    logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m\n")
+                else:
+                    logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
+                    logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, close_to_zero_speed_m, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
+                    height = default_height
+            except Exception as e:
+                logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
+                logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, close_to_zero_speed_m, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
+                height = default_height
+            subject_height.append(height)
     elif not type(subject_height) == list: # int or float
         subject_height = [subject_height]
-    elif len(subject_height) < len(trc_files):
-        logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to 1.75m.")
-        subject_height += [1.75] * (len(trc_files) - len(subject_height))
+    if len(subject_height) < len(trc_files):
+        logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to {default_height}m.")
+        subject_height += [default_height] * (len(trc_files) - len(subject_height))
 
+    # Get subject masses
     if subject_mass is None or subject_mass == 0:
         subject_mass = [70] * len(trc_files)
         logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
     elif not type(subject_mass) == list:
         subject_mass = [subject_mass]
-    elif len(subject_mass) < len(trc_files):
+    if len(subject_mass) < len(trc_files):
         logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.")
         subject_mass += [70] * (len(trc_files) - len(subject_mass))
 
@@ -290,4 +320,3 @@ def augmentTRC(config_dict):
             logging.info(f'Augmented trc files have been converted to c3d.')
             
     return min_y_pos
-

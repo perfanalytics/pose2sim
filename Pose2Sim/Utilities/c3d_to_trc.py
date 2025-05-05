@@ -55,7 +55,10 @@ def c3d_to_trc_func(*args):
             trc_path = args[0]['output']
     except:
         c3d_path = args[0] # invoked as a function
-        trc_path = c3d_path.replace('.c3d', '.trc')
+        try:
+            trc_path = args[1]
+        except:
+            trc_path = c3d_path.replace('.c3d', '.trc')
         
     # c3d header
     reader = c3d.Reader(open(c3d_path, 'rb'))

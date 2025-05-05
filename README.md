@@ -9,6 +9,8 @@
 [![status](https://joss.theoj.org/papers/a31cb207a180f7ac9838d049e3a0de26/status.svg)](https://joss.theoj.org/papers/a31cb207a180f7ac9838d049e3a0de26)
 [![DOI](https://zenodo.org/badge/501642916.svg)](https://zenodo.org/doi/10.5281/zenodo.10658947)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+\
+[![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
 
 
 # Pose2Sim
@@ -18,7 +20,7 @@
 
 > **_News_: Version 0.10.0:**\
 > **OpenSim scaling and inverse kinematics are now integrated in Pose2Sim!** No static trial needed.\
-> **Other recently added features**: Pose estimation, Automatic camera synchronization, Multi-person analysis, Blender visualization, Marker augmentation, Batch processing.
+> **Other recently added features**: Pose estimation, Automatic camera synchronization, Multi-person analysis, Blender visualization and rig, Marker augmentation, Batch processing.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
 > To upgrade, type `pip install pose2sim --upgrade`
@@ -31,7 +33,7 @@ and lens distortions are better taken into account.\ -->
 
 <br>
 
-`Pose2Sim` provides a workflow for 3D markerless kinematics, as an alternative to traditional marker-based MoCap methods. 
+`Pose2Sim` provides a workflow for 3D markerless kinematics (human or animal), as an alternative to traditional marker-based MoCap methods. 
 
 **Pose2Sim** is free and open-source, low-cost but with research-grade accuracy and production-grade robustness. It gives a maximum of control on clearly explained parameters. Any combination of phones, webcams, or GoPros can be used with fully clothed subjects, so it is particularly adapted to the sports field, the doctor's office, or for outdoor 3D animation capture.
 
@@ -60,9 +62,9 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 - [x] **v0.8** *(04/2024)*: New synchronization tool
 - [x] **v0.9** *(07/2024)*: Integration of pose estimation in the pipeline
 - [x] **v0.10 *(09/2024)*: Integration of OpenSim in the pipeline**
-- [ ] v0.11: Integration of Sports2D, and documentation on new website
-- [ ] v0.13: Graphical User Interface
-- [ ] v0.12: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
+- [ ] v0.11: Integration of Sports2D, monocular 3D pose estimation, and documentation on new website
+- [ ] v0.12: Graphical User Interface
+- [ ] v0.13: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
 - [ ] v1.0: First full release
 
 ***N.B.:*** As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
@@ -114,7 +116,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 
    Once installed, open an Anaconda prompt and create a virtual environment:
    ```
-   conda create -n Pose2Sim python=3.9 -y 
+   conda create -n Pose2Sim python=3.10 -y 
    conda activate Pose2Sim
    ```
 
@@ -125,7 +127,7 @@ Install the OpenSim Python API (if you do not want to install via conda, refer [
    ```
    
 3. **Install Pose2Sim**:\
-If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9 is installed. 
+If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.10 is installed. 
    - OPTION 1: **Quick install:** Open a terminal. 
        ``` cmd
        pip install pose2sim
@@ -245,13 +247,14 @@ All of them are clearly documented: feel free to play with them!
 > _**Another person, hidden all along, will appear when multi-person analysis is activated!**_
 
 Go to the Multi-participant Demo folder: `cd <path>\Pose2Sim\Demo_MultiPerson`. \
+Make sure that `multi_person = true` is set in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_MultiPerson/Config.toml) file.\
 Type `ipython`, and try the following code:
 
 ``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.calibration()
 Pose2Sim.poseEstimation()
-# Pose2Sim.synchronization()
+Pose2Sim.synchronization()
 Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
 Pose2Sim.filtering()
@@ -263,7 +266,7 @@ or equivalently:
 
 ``` python
 from Pose2Sim import Pose2Sim
-Pose2Sim.runAll(do_synchronization=False) # Synchronization possible, but tricky with multiple persons
+Pose2Sim.runAll() 
 ```
 
 One .trc file per participant will be generated and stored in the `pose-3d` directory.\
@@ -274,7 +277,6 @@ You can visualize your results with Blender as explained in [Demonstration Part-
 <br>
 
 ***N.B.:***
-- In [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), set `project` > `multi_person = true` for each trial that contains multiple persons.
 - Make sure that the order of `markerAugmentation` > `participant_height` and `participant_mass` matches the person's IDs.
 
 <br/>
@@ -351,10 +353,47 @@ Pose2Sim.poseEstimation()
 
 </br>
 
-*N.B.:* Pose estimation can be run in `lightweight`, `balanced`, or `performance` mode.\
-*N.B.:* The `pose_model` with body, feet, hands, and face is required for wrist motion but is much slower and slightly less accurate on body keypoints.\
-*N.B.:* The `GPU` will be used with ONNX backend if a valid CUDA installation is found (or ROCM with AMD GPUS, or MPS with MacOS), otherwise the `CPU` will be used with OpenVINO backend.\
-*N.B.:* Pose estimation can be dramatically sped up by increasing the value of `det_frequency`. In that case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames).
+***N.B.:* To analyse wrist motion:**\
+'Whole_body_wrist' or 'Whole_body' `pose_model` is required in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml). Note that these are slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints. 
+
+<br>
+
+***N.B.:* To speed up the process:**
+- Disable `display_detection` and `save_video` 
+- Increase the value of `det_frequency`. In this case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames)
+- Use your GPU (See [Installation](#installation)). Slightly more involved, but often worth it. Note that the optimal device _(CPU or GPU)_ and backend for your configuration will be automatically selected, but you can also manually select them in Config.toml.
+- Run pose estimation in `lightweight` mode instead of `balanced` or `performance`. However, this will reduce the quality of results. 
+- Use `tracking_mode = 'sports2d'`: Will use the default Sports2D tracker. Unlike DeepSort, it is faster, does not require any parametrization, and is as good in non-crowded scenes. 
+
+<br>
+
+***N.B.:* To use custom detection and pose models:**
+- Other than 'lightweight', 'balanced', or 'performance' modes, you can use any other pose estimation models through [RTMLib](https://github.com/Tau-J/rtmlib) (hand, face, animal, or any custom trained models).
+- The (optional) detection model, pose model, and input sizes can be written in a dictionary (**within triple quotes**) as shown below. Models can be local paths or URLs, with .onnx or .zip extensions. Make sure the input_sizes are **within square brackets**. 
+
+  ```
+  # Equivalent to mode='balanced', with body_with_feet pose model
+  mode = """{'det_class':'YOLOX',
+         'det_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/yolox_m_8xb8-300e_humanart-c2c7a14a.zip',
+         'det_input_size':[640, 640],
+         'pose_class':'RTMPose',
+         'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip',
+         'pose_input_size':[192,256]}"""
+
+  # With one-stage RTMO model 
+  # Requires pose_model = 'Body'. Marker augmentation won't work, Kinematic analysis will
+  mode = """{'pose_class':'RTMO', 
+         'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.zip', 
+         'pose_input_size':[640, 640]}"""
+
+  # With animal pose estimation:
+  # Marker augmentation won't work, and you will need to create your own OpenSim skeleton for kinematic analysis.
+  mode = """{'pose_class':'RTMPose',
+         'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.zip',
+         'pose_input_size':[256,256]}"""
+
+  # Same approach for hand or face pose estimation, check the RTMLib documentation for more information.
+  ```
 
 <img src="Content/Pose2D.png" width="760">
 
@@ -539,7 +578,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 ### Synchronization
 
-> _**2D points can be triangulated only if they represent the same body position across all cameras: therefore, views need to be synchronized.**_\
+> _**2D points can be triangulated only if they represent the same body position across all cameras: therefore, views need to be synchronized. This module helps you do it.**_\
 For each camera, the algorithm computes mean vertical speed for the chosen keypoints, and synchronizes by finding the time offset for which the correlation is highest.
 
 >***N.B.:** Skip this step if your cameras are natively synchronized.*
@@ -554,19 +593,18 @@ Pose2Sim.synchronization()
 
 <img src="Content/P2S_synchronization.png" width="760">
 
-In `multi_person` mode, a video will pop up to let the user choose on which person to synchronize.\
-<img src="Content/synchro_multi.jpg" width="380">
+<br> 
+
+You can choose the keypoints to synchronize on, the reference person, and the time when the vertical speed is the highest. You can either tune these parameters in the GUI (set `synchronization_gui = true`) or set them in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
+
+<img src="Content/synchro_multi.jpg" width="760">
 
 <img src="Content/synchro.jpg" width="760">
-
-If results are not satisfying, edit your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file:\
-All keypoints can be taken into account, or a subset of them.\
-The whole capture can be used for synchronization, or you can choose a time range when the participant is roughly horizontally static but with a clear vertical motion (set `approx_time_maxspeed` and `time_range_around_maxspeed` accordingly). 
 
 *N.B.:* Works best when:
 - the participant does not move towards or away from the cameras
 - they perform a clear vertical movement
-- the capture lasts at least 5 seconds long, so that there is enough data to synchronize on
+- the capture lasts at least 5 seconds, so that there is enough data to synchronize on
 - the capture lasts a few minutes maximum, so that cameras are less likely to [drift with time](https://github.com/mprib/caliscope/discussions/496)
 
 *N.B.:* Alternatively, synchronize cameras using a flashlight, a clap, or a clear event. GoPro cameras can also be synchronized with a timecode, by GPS (outdoors), or with their app (slightly less reliable).
@@ -649,7 +687,7 @@ _**Note that inverse kinematic results are not necessarily better after marker a
 **Make sure that `participant_height` is correct in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.** `participant_mass` is mostly optional for IK.\
 Only works with models estimating at least the following keypoints (e.g., not COCO):
 ``` python
- ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
+ ["RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
  "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
  "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
 ```
@@ -678,9 +716,10 @@ This can be either done fully automatically within Pose2Sim, or manually within 
 > *No need for a static trial!*\
 > _**Note that automatic scaling is not recommended when the participant is mostly crouching or sitting. In this case, scale manually on a standing trial**_ (see [next section](#within-opensim-gui)).
 
-> Model scaling is done according to the mean of the segment lengths, across a subset of frames. We remove the 10% fastest frames (potential outliers), the frames where the speed is 0 (person probably out of frame), the frames where the average knee and hip flexion angles are above 45° (pose estimation is not precise when the person is crouching) and the 20% most extreme segment values after the previous operations (potential outliers).
+> Model scaling is done according to the mean of the segment lengths, across a subset of frames. We remove the 10% fastest frames (potential outliers), the frames where the speed is 0 (person probably out of frame), the frames where the average knee and hip flexion angles are above 45° (pose estimation is not precise when the person is crouching) and the 20% most extreme segment values after the previous operations (potential outliers). All these parameters can be edited in your Config.toml file.
 
 In your Config.toml file, set `use_augmentation = false` is you don't want to use the results with augmented marker (this is sometimes better).\
+Set `use_contacts_muscles = false` if you do not need contact spheres or muscles in your model.\
 Set `right_left_symmetry = false` if you have good reasons to think the participant is not symmetrical (e.g. if they wear a prosthetic limb).
 
 Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
@@ -925,6 +964,8 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Pose:** Define custom model in config.toml rather than in skeletons.py.
 &#10004; **Pose:** Integrate pose estimation within Pose2Sim (via RTMlib).
 &#9634; **Pose:** Support [MMPose](https://github.com/open-mmlab/mmpose), [SLEAP](https://sleap.ai/), etc.
+&#9634; **Pose:** Optionally let user select the person of interest in single_person mode:
+&nbsp; multiperson = true # true, or 'single_auto', or 'single_click'. 'single_auto' selects the person with lowest reprojection error, and 'single_click' lets the user manually select the person of interest.
 &#9634; **Pose:** Implement [RTMPoseW3D](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose3d) and monocular 3D kinematics
 &#9634; **Pose:** Directly reading from DeepLabCut .csv or .h5 files instead of converting to .json (triangulation, person association, calibration, synchronization...) 
 &#9634; **Pose:** GUI help for DeepLabCut model creation.

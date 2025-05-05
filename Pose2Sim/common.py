@@ -14,15 +14,16 @@ Functions shared between modules, and other utilities
 import toml
 import json
 import numpy as np
+import pandas as pd
 import re
 import cv2
 import c3d
 import sys
 import itertools as it
+import logging
+from anytree import PreOrderIter
 
-import matplotlib as mpl
-mpl.use('qt5agg')
-mpl.rc('figure', max_open_warning=0)
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
@@ -41,7 +42,134 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
+## CONSTANTS
+angle_dict = { # lowercase!
+    # joint angles
+    'right ankle': [['RKnee', 'RAnkle', 'RBigToe', 'RHeel'], 'dorsiflexion', 90, 1],
+    'left ankle': [['LKnee', 'LAnkle', 'LBigToe', 'LHeel'], 'dorsiflexion', 90, 1],
+    'right knee': [['RAnkle', 'RKnee', 'RHip'], 'flexion', -180, 1],
+    'left knee': [['LAnkle', 'LKnee', 'LHip'], 'flexion', -180, 1],
+    'right hip': [['RKnee', 'RHip', 'Hip', 'Neck'], 'flexion', 0, -1],
+    'left hip': [['LKnee', 'LHip', 'Hip', 'Neck'], 'flexion', 0, -1],
+    # 'lumbar': [['Neck', 'Hip', 'RHip', 'LHip'], 'flexion', -180, -1],
+    # 'neck': [['Head', 'Neck', 'RShoulder', 'LShoulder'], 'flexion', -180, -1],
+    'right shoulder': [['RElbow', 'RShoulder', 'Hip', 'Neck'], 'flexion', 0, -1],
+    'left shoulder': [['LElbow', 'LShoulder', 'Hip', 'Neck'], 'flexion', 0, -1],
+    'right elbow': [['RWrist', 'RElbow', 'RShoulder'], 'flexion', 180, -1],
+    'left elbow': [['LWrist', 'LElbow', 'LShoulder'], 'flexion', 180, -1],
+    'right wrist': [['RElbow', 'RWrist', 'RIndex'], 'flexion', -180, 1],
+    'left wrist': [['LElbow', 'LIndex', 'LWrist'], 'flexion', -180, 1],
+
+    # segment angles
+    'right foot': [['RBigToe', 'RHeel'], 'horizontal', 0, -1],
+    'left foot': [['LBigToe', 'LHeel'], 'horizontal', 0, -1],
+    'right shank': [['RAnkle', 'RKnee'], 'horizontal', 0, -1],
+    'left shank': [['LAnkle', 'LKnee'], 'horizontal', 0, -1],
+    'right thigh': [['RKnee', 'RHip'], 'horizontal', 0, -1],
+    'left thigh': [['LKnee', 'LHip'], 'horizontal', 0, -1],
+    'pelvis': [['LHip', 'RHip'], 'horizontal', 0, -1],
+    'trunk': [['Neck', 'Hip'], 'horizontal', 0, -1],
+    'shoulders': [['LShoulder', 'RShoulder'], 'horizontal', 0, -1],
+    'head': [['Head', 'Neck'], 'horizontal', 0, -1],
+    'right arm': [['RElbow', 'RShoulder'], 'horizontal', 0, -1],
+    'left arm': [['LElbow', 'LShoulder'], 'horizontal', 0, -1],
+    'right forearm': [['RWrist', 'RElbow'], 'horizontal', 0, -1],
+    'left forearm': [['LWrist', 'LElbow'], 'horizontal', 0, -1],
+    'right hand': [['RIndex', 'RWrist'], 'horizontal', 0, -1],
+    'left hand': [['LIndex', 'LWrist'], 'horizontal', 0, -1]
+    }
+
+colors = [(255, 0, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255), (0, 0, 0), (255, 255, 255),
+            (125, 0, 0), (0, 125, 0), (0, 0, 125), (125, 125, 0), (125, 0, 125), (0, 125, 125), 
+            (255, 125, 125), (125, 255, 125), (125, 125, 255), (255, 255, 125), (255, 125, 255), (125, 255, 255), (125, 125, 125),
+            (255, 0, 125), (255, 125, 0), (0, 125, 255), (0, 255, 125), (125, 0, 255), (125, 255, 0), (0, 255, 0)]
+thickness = 2
+
+
+## CLASSES
+class plotWindow():
+    '''
+    Display several figures in tabs
+    Taken from https://github.com/superjax/plotWindow/blob/master/plotWindow.py
+
+    USAGE:
+    pw = plotWindow()
+    f = plt.figure()
+    plt.plot(x1, y1)
+    pw.addPlot("1", f)
+    f = plt.figure()
+    plt.plot(x2, y2)
+    pw.addPlot("2", f)
+    '''
+
+    def __init__(self, parent=None):
+        self.app = QApplication.instance()
+        if not self.app:
+            self.app = QApplication(sys.argv)
+        self.MainWindow = QMainWindow()
+        self.MainWindow.setWindowTitle("Multitabs figure")
+        self.canvases = []
+        self.figure_handles = []
+        self.toolbar_handles = []
+        self.tab_handles = []
+        self.current_window = -1
+        self.tabs = QTabWidget()
+        self.MainWindow.setCentralWidget(self.tabs)
+        self.MainWindow.resize(1280, 720)
+        self.MainWindow.show()
+
+    def addPlot(self, title, figure):
+        new_tab = QWidget()
+        layout = QVBoxLayout()
+        new_tab.setLayout(layout)
+
+        figure.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.91, wspace=0.2, hspace=0.2)
+        new_canvas = FigureCanvas(figure)
+        new_toolbar = NavigationToolbar(new_canvas, new_tab)
+
+        layout.addWidget(new_canvas)
+        layout.addWidget(new_toolbar)
+        self.tabs.addTab(new_tab, title)
+
+        self.toolbar_handles.append(new_toolbar)
+        self.canvases.append(new_canvas)
+        self.figure_handles.append(figure)
+        self.tab_handles.append(new_tab)
+
+    def show(self):
+        self.app.exec_() 
+
+
 ## FUNCTIONS
+def read_trc(trc_path):
+    '''
+    Read a TRC file and extract its contents.
+
+    INPUTS:
+    - trc_path (str): The path to the TRC file.
+
+    OUTPUTS:
+    - tuple: A tuple containing the Q coordinates, frames column, time column, marker names, and header.
+    '''
+
+    try:
+        with open(trc_path, 'r') as trc_file:
+            header = [next(trc_file) for _ in range(5)]
+        markers = header[3].split('\t')[2::3]
+        markers = [m.strip() for m in markers if m.strip()] # remove last \n character
+       
+        trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4, encoding='utf-8')
+        frames_col, time_col = trc_df.iloc[:, 0], trc_df.iloc[:, 1]
+        Q_coords = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
+        Q_coords = Q_coords.loc[:, ~Q_coords.columns.str.startswith('Unnamed')] # remove unnamed columns
+        Q_coords.columns = np.array([[m,m,m] for m in markers]).ravel().tolist()
+
+        return Q_coords, frames_col, time_col, markers, header
+    
+    except Exception as e:
+        raise ValueError(f"Error reading TRC file at {trc_path}: {e}")
+    
+    
 def common_items_in_list(list1, list2):
     '''
     Do two lists have any items in common at the same index?
@@ -281,7 +409,7 @@ def euclidean_distance(q1, q2):
     q2 = np.array(q2)
     dist = q2 - q1
     if np.isnan(dist).all():
-        dist =  np.empty_like(dist)
+        dist = np.empty_like(dist)
         dist[...] = np.inf
     
     if len(dist.shape)==1:
@@ -637,6 +765,10 @@ def points_to_angles(points_list):
     If parameters are arrays, returns an array of floats between 0.0 and 360.0
 
     INPUTS:
+    - points_list: list of arrays of points
+
+    OUTPUTS:
+    - ang_deg: float or array of floats. The angle(s) in degrees.
     '''
 
     if len(points_list) < 2: # if not enough points, return None
@@ -678,55 +810,497 @@ def points_to_angles(points_list):
     return ang_deg
 
 
-## CLASSES
-class plotWindow():
+def fixed_angles(points_list, ang_name):
     '''
-    Display several figures in tabs
-    Taken from https://github.com/superjax/plotWindow/blob/master/plotWindow.py
+    Add offset and multiplying factor to angles
 
-    USAGE:
-    pw = plotWindow()
-    f = plt.figure()
-    plt.plot(x1, y1)
-    pw.addPlot("1", f)
-    f = plt.figure()
-    plt.plot(x2, y2)
-    pw.addPlot("2", f)
+    INPUTS:
+    - points_list: list of arrays of points
+    - ang_name: str. The name of the angle to consider.
+
+    OUTPUTS:
+    - ang: float. The angle in degrees.
     '''
 
-    def __init__(self, parent=None):
-        self.app = QApplication.instance()
-        if not self.app:
-            self.app = QApplication(sys.argv)
-        self.MainWindow = QMainWindow()
-        self.MainWindow.setWindowTitle("Multitabs figure")
-        self.canvases = []
-        self.figure_handles = []
-        self.toolbar_handles = []
-        self.tab_handles = []
-        self.current_window = -1
-        self.tabs = QTabWidget()
-        self.MainWindow.setCentralWidget(self.tabs)
-        self.MainWindow.resize(1280, 720)
-        self.MainWindow.show()
+    ang_params = angle_dict[ang_name]
+    ang = points_to_angles(points_list)
+    ang += ang_params[2]
+    ang *= ang_params[3]
+    if ang_name in ['pelvis', 'shoulders']:
+        ang = np.where(ang>90, ang-180, ang)
+        ang = np.where(ang<-90, ang+180, ang)
+    else:
+        ang = np.where(ang>180, ang-360, ang)
+        ang = np.where(ang<-180, ang+360, ang)
 
-    def addPlot(self, title, figure):
-        new_tab = QWidget()
-        layout = QVBoxLayout()
-        new_tab.setLayout(layout)
+    return ang
 
-        figure.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.91, wspace=0.2, hspace=0.2)
-        new_canvas = FigureCanvas(figure)
-        new_toolbar = NavigationToolbar(new_canvas, new_tab)
 
-        layout.addWidget(new_canvas)
-        layout.addWidget(new_toolbar)
-        self.tabs.addTab(new_tab, title)
+def mean_angles(Q_coords, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']):
+    '''
+    Compute the mean angle time series from 3D points for a given list of angles.
 
-        self.toolbar_handles.append(new_toolbar)
-        self.canvases.append(new_canvas)
-        self.figure_handles.append(figure)
-        self.tab_handles.append(new_tab)
+    INPUTS:
+    - Q_coords (DataFrame): The triangulated coordinates of the markers.
+    - ang_to_consider (list): The list of angles to consider (requires angle_dict).
 
-    def show(self):
-        self.app.exec_() 
+    OUTPUTS:
+    - ang_mean: The mean angle time series.
+    '''
+
+    ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']
+
+    angs = []
+    for ang_name in ang_to_consider:
+        ang_params = angle_dict[ang_name]
+        ang_mk = ang_params[0]
+        if 'Neck' not in Q_coords.columns:
+            df_MidShoulder = pd.DataFrame((Q_coords['RShoulder'].values + Q_coords['LShoulder'].values) /2)
+            df_MidShoulder.columns = ['Neck']*3
+            Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_MidShoulder), axis=1)
+
+        pts_for_angles = []
+        for pt in ang_mk:
+            # pts_for_angles.append(Q_coords.iloc[:,markers.index(pt)*3:markers.index(pt)*3+3])
+            pts_for_angles.append(Q_coords[pt])
+
+        ang = fixed_angles(pts_for_angles, ang_name)
+        ang = np.abs(ang)
+        angs.append(ang)
+
+    ang_mean = np.mean(angs, axis=0)
+
+    return ang_mean
+
+
+def add_neck_hip_coords(kpt_name, p_X, p_Y, p_scores, kpt_ids, kpt_names):
+    '''
+    Add neck (midshoulder) and hip (midhip) coordinates if neck and hip are not available
+    
+    INPUTS:
+    - kpt_name: name of the keypoint to add (neck, hip)
+    - p_X: list of x coordinates after flipping if needed
+    - p_Y: list of y coordinates
+    - p_scores: list of confidence scores
+    - kpt_ids: list of keypoint ids (see skeletons.py)
+    - kpt_names: list of keypoint names (see skeletons.py)
+    
+    OUTPUTS:
+    - p_X: list of x coordinates with added missing coordinate
+    - p_Y: list of y coordinates with added missing coordinate
+    - p_scores: list of confidence scores with added missing score
+    '''
+
+    names, ids = kpt_names.copy(), kpt_ids.copy()
+    names.append(kpt_name)
+    ids.append(len(p_X))
+    if kpt_name == 'Neck':
+        mid_X = (np.abs(p_X[ids[names.index('LShoulder')]]) + np.abs(p_X[ids[names.index('RShoulder')]])) /2
+        mid_Y = (p_Y[ids[names.index('LShoulder')]] + p_Y[ids[names.index('RShoulder')]])/2
+        mid_score = (p_scores[ids[names.index('LShoulder')]] + p_scores[ids[names.index('RShoulder')]])/2
+    elif kpt_name == 'Hip':
+        mid_X = (np.abs(p_X[ids[names.index('LHip')]]) + np.abs(p_X[ids[names.index('RHip')]]) ) /2
+        mid_Y = (p_Y[ids[names.index('LHip')]] + p_Y[ids[names.index('RHip')]])/2
+        mid_score = (p_scores[ids[names.index('LHip')]] + p_scores[ids[names.index('RHip')]])/2
+    else:
+        raise ValueError("kpt_name must be 'Neck' or 'Hip'")
+    p_X = np.append(p_X, mid_X)
+    p_Y = np.append(p_Y, mid_Y)
+    p_scores = np.append(p_scores, mid_score)
+
+    return p_X, p_Y, p_scores
+
+
+def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, close_to_zero_speed=0.2, large_hip_knee_angles=45):
+    '''
+    Compute the best coordinates for measurements, after removing:
+    - 20% fastest frames (may be outliers)
+    - frames when speed is close to zero (person is out of frame): 0.2 m/frame, or 50 px/frame
+    - frames when hip and knee angle below 45° (imprecise coordinates when person is crouching)
+    
+    INPUTS:
+    - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
+    - keypoints_names: list. The list of marker names
+    - fastest_frames_to_remove_percent: float
+    - close_to_zero_speed: float (sum for all keypoints: about 50 px/frame or 0.2 m/frame)
+    - large_hip_knee_angles: int
+    - trimmed_extrema_percent
+
+    OUTPUT:
+    - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
+    '''
+
+    # Add MidShoulder column
+    df_MidShoulder = pd.DataFrame((Q_coords['RShoulder'].values + Q_coords['LShoulder'].values) /2)
+    df_MidShoulder.columns = ['MidShoulder']*3
+    Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_MidShoulder), axis=1)
+
+    # Add Hip column if not present
+    n_markers_init = len(keypoints_names)
+    if 'Hip' not in keypoints_names:
+        df_Hip = pd.DataFrame((Q_coords['RHip'].values + Q_coords['LHip'].values) /2)
+        df_Hip.columns = ['Hip']*3
+        Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_Hip), axis=1)
+    n_markers = len(keypoints_names)
+
+    # Using 80% slowest frames
+    sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords.iloc[:,kpt:kpt+3].diff(), axis=1) for kpt in range(n_markers)], axis=0))
+    sum_speeds = sum_speeds[sum_speeds>close_to_zero_speed] # Removing when speeds close to zero (out of frame)
+    if len(sum_speeds)==0:
+        logging.warning('All frames have speed close to zero. Make sure the person is moving and correctly detected, or change close_to_zero_speed to a lower value. Not restricting the speeds to be above any threshold.')
+        Q_coords_low_speeds = Q_coords
+    else:
+        min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
+        Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
+    
+    # Only keep frames with hip and knee flexion angles below 45% 
+    # (if more than 50 of them, else take 50 smallest values)
+    try:
+        ang_mean = mean_angles(Q_coords_low_speeds, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
+        Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
+        if len(Q_coords_low_speeds_low_angles) < 50:
+            Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
+    except:
+        Q_coords_low_speeds_low_angles = Q_coords_low_speeds
+        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}°.")
+
+    if n_markers_init < n_markers:
+        Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
+
+    return Q_coords_low_speeds_low_angles
+
+
+def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+    '''
+    Compute the height of the person from the trc data.
+
+    INPUTS:
+    - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
+    - keypoints_names: list. The list of marker names
+    - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
+    - close_to_zero_speed: float. Sum for all keypoints: about 50 px/frame or 0.2 m/frame
+    - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
+    - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
+    
+    OUTPUT:
+    - height: float. The estimated height of the person
+    '''
+    
+    # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
+    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, keypoints_names, 
+                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, close_to_zero_speed=close_to_zero_speed, large_hip_knee_angles=large_hip_knee_angles)
+
+    # Automatically compute the height of the person
+    feet_pairs = [['RHeel', 'RAnkle'], ['LHeel', 'LAnkle']]
+    try:
+        rfoot, lfoot = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in feet_pairs]
+    except:
+        rfoot, lfoot = 0.10, 0.10
+        logging.warning('The Heel marker is missing from your model. Considering Foot to Heel size as 10 cm.')
+
+    ankle_to_shoulder_pairs =  [['RAnkle', 'RKnee'], ['RKnee', 'RHip'], ['RHip', 'RShoulder'],
+                                ['LAnkle', 'LKnee'], ['LKnee', 'LHip'], ['LHip', 'LShoulder']]
+    try:
+        rshank, rfemur, rback, lshank, lfemur, lback = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in ankle_to_shoulder_pairs]
+    except:
+        logging.error('At least one of the following markers is missing for computing the height of the person:\
+                            RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder.\n\
+                            Make sure that the person is entirely visible, or use a calibration file instead, or set "to_meters=false".')
+        raise ValueError('At least one of the following markers is missing for computing the height of the person:\
+                         RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder.\
+                         Make sure that the person is entirely visible, or use a calibration file instead, or set "to_meters=false".')
+
+    try:
+        head_pair = [['MidShoulder', 'Head']]
+        head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]
+    except:
+        head_pair = [['MidShoulder', 'Nose']]
+        head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]\
+                *1.33
+        logging.warning('The Head marker is missing from your model. Considering Neck to Head size as 1.33 times Neck to MidShoulder size.')
+    
+    heights = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2 + (rback + lback)/2 + head
+    
+    # Remove the 20% most extreme values
+    height = trimmed_mean(heights, trimmed_extrema_percent=trimmed_extrema_percent)
+
+    return height
+
+
+def sort_people_sports2d(keyptpre, keypt, scores=None):
+    '''
+    Associate persons across frames (Sports2D method)
+    Persons' indices are sometimes swapped when changing frame
+    A person is associated to another in the next frame when they are at a small distance
+    
+    N.B.: Requires min_with_single_indices and euclidian_distance function (see common.py)
+
+    INPUTS:
+    - keyptpre: (K, L, M) array of 2D coordinates for K persons in the previous frame, L keypoints, M 2D coordinates
+    - keypt: idem keyptpre, for current frame
+    - score: (K, L) array of confidence scores for K persons, L keypoints (optional) 
+    
+    OUTPUTS:
+    - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
+    - sorted_keypoints: array with reordered persons --> if scores is not None
+    - sorted_scores: array with reordered scores     --> if scores is not None
+    - associated_tuples: list of tuples with correspondences between persons across frames --> if scores is None (for Pose2Sim.triangulation())
+    '''
+    
+    # Generate possible person correspondences across frames
+    max_len = max(len(keyptpre), len(keypt))
+    keyptpre = pad_shape(keyptpre, max_len, fill_value=np.nan)
+    keypt = pad_shape(keypt, max_len, fill_value=np.nan)
+    if scores is not None:
+        scores = pad_shape(scores, max_len, fill_value=np.nan)
+    
+    # Compute distance between persons from one frame to another
+    personsIDs_comb = sorted(list(it.product(range(len(keyptpre)), range(len(keypt)))))
+    frame_by_frame_dist = [euclidean_distance(keyptpre[comb[0]],keypt[comb[1]]) for comb in personsIDs_comb]
+    frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
+    
+    # Sort correspondences by distance
+    _, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
+    
+    # Associate points to same index across frames, nan if no correspondence
+    sorted_keypoints = []
+    for i in range(len(keyptpre)):
+        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+        if len(id_in_old) > 0:      sorted_keypoints += [keypt[id_in_old[0]]]
+        else:                       sorted_keypoints += [keypt[i]]
+    sorted_keypoints = np.array(sorted_keypoints)
+
+    if scores is not None:
+        sorted_scores = []
+        for i in range(len(keyptpre)):
+            id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
+            if len(id_in_old) > 0:  sorted_scores += [scores[id_in_old[0]]]
+            else:                   sorted_scores += [scores[i]]
+        sorted_scores = np.array(sorted_scores)
+
+    # Keep track of previous values even when missing for more than one frame
+    sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints) & ~np.isnan(keyptpre), keyptpre, sorted_keypoints)
+    
+    if scores is not None:
+        return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+    else: # For Pose2Sim.triangulation()
+        return sorted_keypoints, associated_tuples
+
+
+def sort_people_rtmlib(pose_tracker, keypoints, scores):
+    '''
+    Associate persons across frames (RTMLib method)
+
+    INPUTS:
+    - pose_tracker: PoseTracker. The initialized RTMLib pose tracker object
+    - keypoints: array of shape K, L, M with K the number of detected persons,
+    L the number of detected keypoints, M their 2D coordinates
+    - scores: array of shape K, L with K the number of detected persons,
+    L the confidence of detected keypoints
+
+    OUTPUT:
+    - sorted_keypoints: array with reordered persons
+    - sorted_scores: array with reordered scores
+    '''
+    
+    try:
+        desired_size = max(pose_tracker.track_ids_last_frame)+1
+        sorted_keypoints = np.full((desired_size, keypoints.shape[1], 2), np.nan)
+        sorted_keypoints[pose_tracker.track_ids_last_frame] = keypoints[:len(pose_tracker.track_ids_last_frame), :, :]
+        sorted_scores = np.full((desired_size, scores.shape[1]), np.nan)
+        sorted_scores[pose_tracker.track_ids_last_frame] = scores[:len(pose_tracker.track_ids_last_frame), :]
+    except:
+        sorted_keypoints, sorted_scores = keypoints, scores
+
+    return sorted_keypoints, sorted_scores
+
+
+def sort_people_deepsort(keypoints, scores, deepsort_tracker, frame,frame_count):
+    '''
+    Associate persons across frames (DeepSort method)
+
+    INPUTS:
+    - keypoints: array of shape K, L, M with K the number of detected persons,
+    L the number of detected keypoints, M their 2D coordinates
+    - scores: array of shape K, L with K the number of detected persons,
+    L the confidence of detected keypoints
+    - deepsort_tracker: The initialized DeepSort tracker object
+    - frame: np.array. The current image opened with cv2.imread
+
+    OUTPUT:
+    - sorted_keypoints: array with reordered persons
+    - sorted_scores: array with reordered scores
+    '''
+
+    try:
+        # Compute bboxes from keypoints and create detections (bboxes, scores, class_ids)
+        bboxes_ltwh = bbox_ltwh_compute(keypoints, padding=20)
+        bbox_scores = np.mean(scores, axis=1)
+        class_ids = np.array(['person']*len(bboxes_ltwh))
+        detections = list(zip(bboxes_ltwh, bbox_scores, class_ids))
+
+        # Estimates the tracks and retrieve indexes of the original detections
+        det_ids = [i for i in range(len(detections))]
+        tracks = deepsort_tracker.update_tracks(detections, frame=frame, others=det_ids)
+        track_ids_frame, orig_det_ids = [], []
+        for track in tracks:
+            if not track.is_confirmed():
+                continue
+            track_ids_frame.append(int(track.track_id)-1)       # ID of people
+            orig_det_ids.append(track.get_det_supplementary())  # ID of detections
+
+        # Correspondence between person IDs and original detection IDs
+        desired_size = max(track_ids_frame) + 1
+        sorted_keypoints = np.full((desired_size, keypoints.shape[1], 2), np.nan)
+        sorted_scores = np.full((desired_size, scores.shape[1]), np.nan)
+        for i,v in enumerate(track_ids_frame):
+            if orig_det_ids[i] is not None:    
+                sorted_keypoints[v] = keypoints[orig_det_ids[i]]
+                sorted_scores[v] = scores[orig_det_ids[i]]
+
+    except Exception as e:
+        sorted_keypoints, sorted_scores = keypoints, scores
+        if frame_count > deepsort_tracker.tracker.n_init:
+            logging.warning(f"Tracking error: {e}. Sorting persons with DeepSort method failed for this frame.")
+
+    return sorted_keypoints, sorted_scores
+
+
+def bbox_ltwh_compute(keypoints, padding=0):
+    '''
+    Compute bounding boxes in (x_min, y_min, width, height) format
+    Optionally add padding to the bounding boxes 
+    as a percentage of the bounding box size (+padding% horizontally, +padding/2% vertically)
+
+    INPUTS:
+    - keypoints: array of shape K, L, M with K the number of detected persons,
+                    L the number of detected keypoints, M their 2D coordinates
+    - padding: int. The padding to add to the bounding boxes, in perceptage
+    '''
+
+    x_coords = keypoints[:, :, 0]
+    y_coords = keypoints[:, :, 1]
+
+    x_min, x_max = np.min(x_coords, axis=1), np.max(x_coords, axis=1)
+    y_min, y_max = np.min(y_coords, axis=1), np.max(y_coords, axis=1)
+    width = x_max - x_min
+    height = y_max - y_min
+
+    if padding > 0:
+        x_min = x_min - width*padding/100
+        y_min = y_min - height/2*padding/100
+        width = width + 2*width*padding/100
+        height = height + height*padding/100
+
+    bbox_ltwh = np.stack((x_min, y_min, width, height), axis=1)
+
+    return bbox_ltwh
+
+
+def draw_bounding_box(img, X, Y, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)], fontSize=0.3, thickness=1):
+    '''
+    Draw bounding boxes and person ID around list of lists of X and Y coordinates.
+    Bounding boxes have a different color for each person.
+    
+    INPUTS:
+    - img: opencv image
+    - X: list of list of x coordinates
+    - Y: list of list of y coordinates
+    - colors: list of colors to cycle through
+    
+    OUTPUT:
+    - img: image with rectangles and person IDs
+    '''
+   
+    color_cycle = it.cycle(colors)
+
+    for i,(x,y) in enumerate(zip(X,Y)):
+        color = next(color_cycle)
+        if not np.isnan(x).all():
+            x_min, y_min = np.nanmin(x).astype(int), np.nanmin(y).astype(int)
+            x_max, y_max = np.nanmax(x).astype(int), np.nanmax(y).astype(int)
+            if x_min < 0: x_min = 0
+            if x_max > img.shape[1]: x_max = img.shape[1]
+            if y_min < 0: y_min = 0
+            if y_max > img.shape[0]: y_max = img.shape[0]
+
+            # Draw rectangles
+            cv2.rectangle(img, (x_min-25, y_min-25), (x_max+25, y_max+25), color, thickness) 
+        
+            # Write person ID
+            cv2.putText(img, str(i), (x_min-30, y_min-30), cv2.FONT_HERSHEY_SIMPLEX, fontSize, color, 2, cv2.LINE_AA) 
+    
+    return img
+
+
+def draw_skel(img, X, Y, model):
+    '''
+    Draws keypoints and skeleton for each person.
+    Skeletons have a different color for each person.
+
+    INPUTS:
+    - img: opencv image
+    - X: list of list of x coordinates
+    - Y: list of list of y coordinates
+    - model: skeleton model (from skeletons.py)
+    - colors: list of colors to cycle through
+    
+    OUTPUT:
+    - img: image with keypoints and skeleton
+    '''
+    
+    # Get (unique) pairs between which to draw a line
+    id_pairs, name_pairs = [], []
+    for data_i in PreOrderIter(model.root, filter_=lambda node: node.is_leaf):
+        node_branch_ids = [node_i.id for node_i in data_i.path]
+        node_branch_names = [node_i.name for node_i in data_i.path]
+        id_pairs += [[node_branch_ids[i],node_branch_ids[i+1]] for i in range(len(node_branch_ids)-1)]
+        name_pairs += [[node_branch_names[i],node_branch_names[i+1]] for i in range(len(node_branch_names)-1)]
+    node_pairs = {tuple(name_pair): id_pair for (name_pair,id_pair) in zip(name_pairs,id_pairs)}
+
+    
+    # Draw lines
+    for (x,y) in zip(X,Y):
+        if not np.isnan(x).all():
+            for names, ids in node_pairs.items():
+                if not None in ids and not (np.isnan(x[ids[0]]) or np.isnan(y[ids[0]]) or np.isnan(x[ids[1]]) or np.isnan(y[ids[1]])):
+                    if any(n.startswith('R') for n in names) and not any(n.startswith('L') for n in names):
+                        c = (255,128,0)
+                    elif any(n.startswith('L') for n in names) and not any(n.startswith('R') for n in names):
+                        c = (0,255,0)
+                    else:
+                        c = (51, 153, 255)
+                    cv2.line(img, (int(x[ids[0]]), int(y[ids[0]])), (int(x[ids[1]]), int(y[ids[1]])), c, thickness)
+
+    return img
+
+
+def draw_keypts(img, X, Y, scores, cmap_str='RdYlGn'):
+    '''
+    Draws keypoints and skeleton for each person.
+    Keypoints' colors depend on their score.
+
+    INPUTS:
+    - img: opencv image
+    - X: list of list of x coordinates
+    - Y: list of list of y coordinates
+    - scores: list of list of scores
+    - cmap_str: colormap name
+    
+    OUTPUT:
+    - img: image with keypoints and skeleton
+    '''
+    
+    scores = np.where(np.isnan(scores), 0, scores)
+    # scores = (scores - 0.4) / (1-0.4) # to get a red color for scores lower than 0.4
+    scores = np.where(scores>0.99, 0.99, scores)
+    scores = np.where(scores<0, 0, scores)
+    
+    cmap = plt.get_cmap(cmap_str)
+    for (x,y,s) in zip(X,Y,scores):
+        c_k = np.array(cmap(s))[:,:-1]*255
+        [cv2.circle(img, (int(x[i]), int(y[i])), thickness+4, c_k[i][::-1], -1)
+            for i in range(len(x))
+            if not (np.isnan(x[i]) or np.isnan(y[i]))]
+
+    return img

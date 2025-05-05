@@ -154,7 +154,7 @@ def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
             cap.read()
             if cap.read()[0] == False:
                 raise
-            frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
+            frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
             frame_rate = 60
 
@@ -673,6 +673,14 @@ def triangulate_all(config_dict):
         
     # Retrieve keypoints from model
     try: # from skeletons.py
+        if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
+        elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
+        elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
+        elif pose_model.upper() == 'HAND': pose_model = 'HAND_21'
+        elif pose_model.upper() == 'FACE': pose_model = 'FACE_106'
+        elif pose_model.upper() == 'ANIMAL': pose_model = 'ANIMAL2D_17'
+        else: pass
         model = eval(pose_model)
     except:
         try: # from Config.toml
@@ -680,7 +688,8 @@ def triangulate_all(config_dict):
             if model.id == 'None':
                 model.id = None
         except:
-            raise NameError('Model not found in skeletons.py nor in Config.toml')
+            raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
+            
     keypoints_ids = [node.id for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_idx = list(range(len(keypoints_ids)))
@@ -689,7 +698,7 @@ def triangulate_all(config_dict):
     #     print(f'{pre}{node.name} id={node.id}')
     
     # left/right swapped keypoints
-    keypoints_names_swapped = [keypoint_name.replace('R', 'L') if keypoint_name.startswith('R') else keypoint_name.replace('L', 'R') if keypoint_name.startswith('L') else keypoint_name for keypoint_name in keypoints_names]
+    keypoints_names_swapped = ['L'+keypoint_name[1:] if keypoint_name.startswith('R') else 'R'+keypoint_name[1:] if keypoint_name.startswith('L') else keypoint_name for keypoint_name in keypoints_names]
     keypoints_names_swapped = [keypoint_name_swapped.replace('right', 'left') if keypoint_name_swapped.startswith('right') else keypoint_name_swapped.replace('left', 'right') if keypoint_name_swapped.startswith('left') else keypoint_name_swapped for keypoint_name_swapped in keypoints_names_swapped]
     keypoints_idx_swapped = [keypoints_names.index(keypoint_name_swapped) for keypoint_name_swapped in keypoints_names_swapped] # find index of new keypoint_name
     
@@ -722,9 +731,7 @@ def triangulate_all(config_dict):
     
     # Check that camera number is consistent between calibration file and pose folders
     if n_cams != len(P):
-        raise Exception(f'Error: The number of cameras is not consistent:\
-                    Found {len(P)} cameras in the calibration file,\
-                    and {n_cams} cameras based on the number of pose folders.')
+        raise Exception(f'Error: The number of cameras is not consistent: Found {len(P)} cameras in the calibration file, and {n_cams} cameras based on the number of pose folders.')
     
     # Triangulation
     if multi_person:

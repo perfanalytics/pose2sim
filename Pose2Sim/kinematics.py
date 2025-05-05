@@ -44,7 +44,8 @@ from anytree import PreOrderIter
 
 import opensim
 
-from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean, points_to_angles
+from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean, read_trc, \
+                            best_coords_for_measurements, compute_height
 from Pose2Sim.skeletons import *
 
 
@@ -59,71 +60,7 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
-## CONSTANTS
-angle_dict = { # lowercase!
-    # joint angles
-    'right ankle': [['RKnee', 'RAnkle', 'RBigToe', 'RHeel'], 'dorsiflexion', 90, 1],
-    'left ankle': [['LKnee', 'LAnkle', 'LBigToe', 'LHeel'], 'dorsiflexion', 90, 1],
-    'right knee': [['RAnkle', 'RKnee', 'RHip'], 'flexion', -180, 1],
-    'left knee': [['LAnkle', 'LKnee', 'LHip'], 'flexion', -180, 1],
-    'right hip': [['RKnee', 'RHip', 'Hip', 'Neck'], 'flexion', 0, -1],
-    'left hip': [['LKnee', 'LHip', 'Hip', 'Neck'], 'flexion', 0, -1],
-    # 'lumbar': [['Neck', 'Hip', 'RHip', 'LHip'], 'flexion', -180, -1],
-    # 'neck': [['Head', 'Neck', 'RShoulder', 'LShoulder'], 'flexion', -180, -1],
-    'right shoulder': [['RElbow', 'RShoulder', 'Hip', 'Neck'], 'flexion', 0, -1],
-    'left shoulder': [['LElbow', 'LShoulder', 'Hip', 'Neck'], 'flexion', 0, -1],
-    'right elbow': [['RWrist', 'RElbow', 'RShoulder'], 'flexion', 180, -1],
-    'left elbow': [['LWrist', 'LElbow', 'LShoulder'], 'flexion', 180, -1],
-    'right wrist': [['RElbow', 'RWrist', 'RIndex'], 'flexion', -180, 1],
-    'left wrist': [['LElbow', 'LIndex', 'LWrist'], 'flexion', -180, 1],
-
-    # segment angles
-    'right foot': [['RBigToe', 'RHeel'], 'horizontal', 0, -1],
-    'left foot': [['LBigToe', 'LHeel'], 'horizontal', 0, -1],
-    'right shank': [['RAnkle', 'RKnee'], 'horizontal', 0, -1],
-    'left shank': [['LAnkle', 'LKnee'], 'horizontal', 0, -1],
-    'right thigh': [['RKnee', 'RHip'], 'horizontal', 0, -1],
-    'left thigh': [['LKnee', 'LHip'], 'horizontal', 0, -1],
-    'pelvis': [['LHip', 'RHip'], 'horizontal', 0, -1],
-    'trunk': [['Neck', 'Hip'], 'horizontal', 0, -1],
-    'shoulders': [['LShoulder', 'RShoulder'], 'horizontal', 0, -1],
-    'head': [['Head', 'Neck'], 'horizontal', 0, -1],
-    'right arm': [['RElbow', 'RShoulder'], 'horizontal', 0, -1],
-    'left arm': [['LElbow', 'LShoulder'], 'horizontal', 0, -1],
-    'right forearm': [['RWrist', 'RElbow'], 'horizontal', 0, -1],
-    'left forearm': [['LWrist', 'LElbow'], 'horizontal', 0, -1],
-    'right hand': [['RIndex', 'RWrist'], 'horizontal', 0, -1],
-    'left hand': [['LIndex', 'LWrist'], 'horizontal', 0, -1]
-    }
-
-
 ## FUNCTIONS
-def read_trc(trc_path):
-    '''
-    Read a TRC file and extract its contents.
-
-    INPUTS:
-    - trc_path (str): The path to the TRC file.
-
-    OUTPUTS:
-    - tuple: A tuple containing the Q coordinates, frames column, time column, marker names, and header.
-    '''
-
-    try:
-        with open(trc_path, 'r') as trc_file:
-            header = [next(trc_file) for _ in range(5)]
-        markers = header[3].split('\t')[2::3]
-        
-        trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4, encoding='utf-8')
-        frames_col, time_col = trc_df.iloc[:, 0], trc_df.iloc[:, 1]
-        Q_coords = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
-
-        return Q_coords, frames_col, time_col, markers, header
-    
-    except Exception as e:
-        raise ValueError(f"Error reading TRC file at {trc_path}: {e}")
-
-
 def get_opensim_setup_dir():
     '''
     Locate the OpenSim setup directory within the Pose2Sim package.
@@ -140,120 +77,142 @@ def get_opensim_setup_dir():
     return setup_dir
 
 
-def get_model_path(model_name, osim_setup_dir):
+def get_model_path(use_contact_muscles, osim_setup_dir):
     '''
     Retrieve the path of the OpenSim model file.
 
     INPUTS:
-    - model_name (str): Name of the model
+    - pose_model (str): Name of the model
     - osim_setup_dir (Path): Path to the OpenSim setup directory.
 
     OUTPUTS:
     - pose_model_path: (Path) Path to the OpenSim model file.
     '''
 
-    if model_name == 'BODY_25B':
-        pose_model_file = 'Model_Setup_Pose2Sim_Body25b.osim'
-    elif model_name == 'BODY_25':
-        pose_model_file = 'Model_Pose2Sim_Body25.osim'
-    elif model_name == 'BODY_135':
-        pose_model_file = 'Model_Pose2Sim_Body135.osim'
-    elif model_name == 'BLAZEPOSE':
-        pose_model_file = 'Model_Pose2Sim_Blazepose.osim'
-    elif model_name == 'HALPE_26':
-        pose_model_file = 'Model_Pose2Sim_Halpe26.osim'
-    elif model_name == 'HALPE_68' or model_name == 'HALPE_136':
-        pose_model_file = 'Model_Pose2Sim_Halpe68_136.osim'
-    elif model_name == 'COCO_133':
-        pose_model_file = 'Model_Pose2Sim_Coco133.osim'
-    # elif model_name == 'COCO' or model_name == 'MPII':
-    #     pose_model_file = 'Model_Pose2Sim_Coco.osim'
-    elif model_name == 'COCO_17':
-        pose_model_file = 'Model_Pose2Sim_Coco17.osim'
-    elif model_name == 'LSTM':
-        pose_model_file = 'Model_Pose2Sim_LSTM.osim'
+    if use_contact_muscles:
+        pose_model_file = 'Model_Pose2Sim_contacts_muscles.osim'
     else:
-        raise ValueError(f"Pose model '{model_name}' not found.")
+        pose_model_file = 'Model_Pose2Sim.osim'
 
     unscaled_model_path = osim_setup_dir / pose_model_file
 
     return unscaled_model_path
 
 
-def get_scaling_setup(model_name, osim_setup_dir):
+def get_markers_path(pose_model, osim_setup_dir):
+    '''
+    Retrieve the path of the marker file.
+
+    INPUTS:
+    - pose_model (str): Name of the model
+    - osim_setup_dir (Path): Path to the OpenSim setup directory.
+
+    OUTPUTS:
+    - markers_path: (Path) Path to the marker file.
+    '''
+
+    if pose_model == 'BODY_25B':
+        marker_file = 'Markers_Body25b.xml'
+    elif pose_model == 'BODY_25':
+        marker_file = 'Markers_Body25.xml'
+    elif pose_model == 'BODY_135':
+        marker_file = 'Markers_Body135.xml'
+    elif pose_model == 'BLAZEPOSE':
+        marker_file = 'Markers_Blazepose.xml'
+    elif pose_model == 'HALPE_26':
+        marker_file = 'Markers_Halpe26.xml'
+    elif pose_model == 'HALPE_68' or pose_model == 'HALPE_136':
+        marker_file = 'Markers_Halpe68_136.xml'
+    elif pose_model == 'COCO_133' or pose_model == 'COCO_133_WRIST':
+        marker_file = 'Markers_Coco133.xml'
+    # elif pose_model == 'COCO' or pose_model == 'MPII':
+    #     marker_file = 'Markers_Coco.xml'
+    elif pose_model == 'COCO_17':
+        marker_file = 'Markers_Coco17.xml'
+    elif pose_model == 'LSTM':
+        marker_file = 'Markers_LSTM.xml'
+    else:
+        raise ValueError(f"Pose model '{pose_model}' not supported yet.")
+
+    markers_path = osim_setup_dir / marker_file
+
+    return markers_path
+
+
+def get_scaling_setup(pose_model, osim_setup_dir):
     '''
     Retrieve the path of the OpenSim scaling setup file.
 
     INPUTS:
-    - model_name (str): Name of the model
+    - pose_model (str): Name of the model
     - osim_setup_dir (Path): Path to the OpenSim setup directory.
 
     OUTPUTS:
     - scaling_setup_path: (Path) Path to the OpenSim scaling setup file.
     '''
 
-    if model_name == 'BODY_25B':
+    if pose_model == 'BODY_25B':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Body25b.xml'
-    elif model_name == 'BODY_25':
+    elif pose_model == 'BODY_25':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Body25.xml'
-    elif model_name == 'BODY_135':
+    elif pose_model == 'BODY_135':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Body135.xml'
-    elif model_name == 'BLAZEPOSE':
+    elif pose_model == 'BLAZEPOSE':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Blazepose.xml'
-    elif model_name == 'HALPE_26':
+    elif pose_model == 'HALPE_26':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Halpe26.xml'
-    elif model_name == 'HALPE_68' or model_name == 'HALPE_136':
+    elif pose_model == 'HALPE_68' or pose_model == 'HALPE_136':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Halpe68_136.xml'
-    elif model_name == 'COCO_133':
+    elif pose_model == 'COCO_133' or pose_model == 'COCO_133_WRIST':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco133.xml'
-    # elif model_name == 'COCO' or model_name == 'MPII':
+    # elif pose_model == 'COCO' or pose_model == 'MPII':
     #     scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco.xml'
-    elif model_name == 'COCO_17':
+    elif pose_model == 'COCO_17':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco17.xml'
-    elif model_name == 'LSTM':
+    elif pose_model == 'LSTM':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_LSTM.xml'
     else:
-        raise ValueError(f"Pose model '{model_name}' not found.")
+        raise ValueError(f"Pose model '{pose_model}' not supported yet.")
 
     scaling_setup_path = osim_setup_dir / scaling_setup_file
 
     return scaling_setup_path
 
 
-def get_IK_Setup(model_name, osim_setup_dir):
+def get_IK_Setup(pose_model, osim_setup_dir):
     '''
     Retrieve the path of the OpenSim inverse kinematics setup file.
 
     INPUTS:
-    - model_name (str): Name of the model
+    - pose_model (str): Name of the model
     - osim_setup_dir (Path): Path to the OpenSim setup directory.
 
     OUTPUTS:
     - ik_setup_path: (Path) Path to the OpenSim IK setup file.
     '''
     
-    if model_name == 'BODY_25B':
+    if pose_model == 'BODY_25B':
         ik_setup_file = 'IK_Setup_Pose2Sim_Body25b.xml'
-    elif model_name == 'BODY_25':
+    elif pose_model == 'BODY_25':
         ik_setup_file = 'IK_Setup_Pose2Sim_Body25.xml'
-    elif model_name == 'BODY_135':
+    elif pose_model == 'BODY_135':
         ik_setup_file = 'IK_Setup_Pose2Sim_Body135.xml'
-    elif model_name == 'BLAZEPOSE':
+    elif pose_model == 'BLAZEPOSE':
         ik_setup_file = 'IK_Setup_Pose2Sim_Blazepose.xml'
-    elif model_name == 'HALPE_26':
+    elif pose_model == 'HALPE_26':
         ik_setup_file = 'IK_Setup_Pose2Sim_Halpe26.xml'
-    elif model_name == 'HALPE_68' or model_name == 'HALPE_136':
+    elif pose_model == 'HALPE_68' or pose_model == 'HALPE_136':
         ik_setup_file = 'IK_Setup_Pose2Sim_Halpe68_136.xml'
-    elif model_name == 'COCO_133':
+    elif pose_model == 'COCO_133' or pose_model == 'COCO_133_WRIST':
         ik_setup_file = 'IK_Setup_Pose2Sim_Coco133.xml'
-    # elif model_name == 'COCO' or model_name == 'MPII':
+    # elif pose_model == 'COCO' or pose_model == 'MPII':
     #     ik_setup_file = 'IK_Setup_Pose2Sim_Coco.xml'
-    elif model_name == 'COCO_17':
+    elif pose_model == 'COCO_17':
         ik_setup_file = 'IK_Setup_Pose2Sim_Coco17.xml'
-    elif model_name == 'LSTM':
+    elif pose_model == 'LSTM':
         ik_setup_file = 'IK_Setup_Pose2Sim_withHands_LSTM.xml'
     else:
-        raise ValueError(f"Pose model '{model_name}' not found.")
+        raise ValueError(f"Pose model '{pose_model}' not supported yet.")
 
     ik_setup_path = osim_setup_dir / ik_setup_file
     return ik_setup_path
@@ -297,126 +256,6 @@ def get_kpt_pairs_from_scaling(scaling_root):
              for pair in scaling_root[0].findall(".//MarkerPair")]
 
     return pairs
-
-
-def mean_angles(Q_coords, markers, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']):
-    '''
-    Compute the mean angle time series from 3D points for a given list of angles.
-
-    INPUTS:
-    - Q_coords (DataFrame): The triangulated coordinates of the markers.
-    - markers (list): The list of marker names.
-    - ang_to_consider (list): The list of angles to consider (requires angle_dict).
-
-    OUTPUTS:
-    - ang_mean: The mean angle time series.
-    '''
-
-    ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']
-
-    angs = []
-    for ang_name in ang_to_consider:
-        ang_params = angle_dict[ang_name]
-        ang_mk = ang_params[0]
-        
-        pts_for_angles = []
-        for pt in ang_mk:
-            pts_for_angles.append(Q_coords.iloc[:,markers.index(pt)*3:markers.index(pt)*3+3])
-        ang = points_to_angles(pts_for_angles)
-
-        ang += ang_params[2]
-        ang *= ang_params[3]
-        ang = np.abs(ang)
-
-        angs.append(ang)
-
-    ang_mean = np.mean(angs, axis=0)
-
-    return ang_mean
-
-
-def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, close_to_zero_speed=0.2, large_hip_knee_angles=45):
-    '''
-    Compute the best coordinates for measurements, after removing:
-    - 20% fastest frames (may be outliers)
-    - frames when speed is close to zero (person is out of frame): 0.2 m/frame, or 50 px/frame
-    - frames when hip and knee angle below 45° (imprecise coordinates when person is crouching)
-    
-    INPUTS:
-    - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
-    - keypoints_names: list. The list of marker names
-    - fastest_frames_to_remove_percent: float
-    - close_to_zero_speed: float (sum for all keypoints: about 50 px/frame or 0.2 m/frame)
-    - large_hip_knee_angles: int
-    - trimmed_extrema_percent
-
-    OUTPUT:
-    - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
-    '''
-
-    n_markers = len(keypoints_names)
-
-    # Using 80% slowest frames
-    sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords.iloc[:,kpt:kpt+3].diff(), axis=1) for kpt in range(n_markers)], axis=0))
-    sum_speeds = sum_speeds[sum_speeds>close_to_zero_speed] # Removing when speeds close to zero (out of frame)
-    min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
-    Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)    
-    
-    # Only keep frames with hip and knee flexion angles below 45% 
-    # (if more than 50 of them, else take 50 smallest values)
-    ang_mean = mean_angles(Q_coords_low_speeds, keypoints_names, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
-    Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
-    if len(Q_coords_low_speeds_low_angles) < 50:
-        Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
-
-    return Q_coords_low_speeds_low_angles
-
-
-def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
-    '''
-    Compute the height of the person from the trc data.
-
-    INPUTS:
-    - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
-    - keypoints_names: list. The list of marker names
-    - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
-    - close_to_zero_speed: float. Sum for all keypoints: about 50 px/frame or 0.2 m/frame
-    - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
-    - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
-    
-    OUTPUT:
-    - height: float. The estimated height of the person
-    '''
-    
-    # Retrieve most reliable coordinates
-    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, keypoints_names, 
-                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, close_to_zero_speed=close_to_zero_speed, large_hip_knee_angles=large_hip_knee_angles)
-    Q_coords_low_speeds_low_angles.columns = np.array([[m]*3 for m in keypoints_names]).flatten()
-
-    # Add MidShoulder column
-    df_MidShoulder = pd.DataFrame((Q_coords_low_speeds_low_angles['RShoulder'].values + Q_coords_low_speeds_low_angles['LShoulder'].values) /2)
-    df_MidShoulder.columns = ['MidShoulder']*3
-    Q_coords_low_speeds_low_angles = pd.concat((Q_coords_low_speeds_low_angles.reset_index(drop=True), df_MidShoulder), axis=1)
-
-    # Automatically compute the height of the person
-    pairs_up_to_shoulders = [['RHeel', 'RAnkle'], ['RAnkle', 'RKnee'], ['RKnee', 'RHip'], ['RHip', 'RShoulder'],
-                            ['LHeel', 'LAnkle'], ['LAnkle', 'LKnee'], ['LKnee', 'LHip'], ['LHip', 'LShoulder']]
-    try:
-        rfoot, rshank, rfemur, rback, lfoot, lshank, lfemur, lback = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in pairs_up_to_shoulders]
-    except:
-        raise ValueError('At least one of the following markers is missing for computing the height of the person:\
-                         RHeel, RAnkle, RKnee, RHip, RShoulder, LHeel, LAnkle, LKnee, LHip, LShoulder.\
-                         Make sure that the person is entirely visible, or use a calibration file instead, or set "to_meters=false".')
-    if 'Head' in keypoints_names:
-        head = euclidean_distance(Q_coords_low_speeds_low_angles['MidShoulder'], Q_coords_low_speeds_low_angles['Head'])
-    else:
-        head = euclidean_distance(Q_coords_low_speeds_low_angles['MidShoulder'], Q_coords_low_speeds_low_angles['Nose'])*1.33
-    heights = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2 + (rback + lback)/2 + head
-    
-    # Remove the 20% most extreme values
-    height = trimmed_mean(heights, trimmed_extrema_percent=trimmed_extrema_percent)
-
-    return height
 
 
 def dict_segment_marker_pairs(scaling_root, right_left_symmetry=True):
@@ -474,7 +313,7 @@ def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, 
     - segment_ratio_dict: A dictionary of segment names and their corresponding X, Y, and Z ratios.
     '''
 
-    # segment_pairs = get_kpt_pairs_from_tree(eval(model_name))
+    # segment_pairs = get_kpt_pairs_from_tree(eval(pose_model))
     segment_pairs = get_kpt_pairs_from_scaling(scaling_root)
 
     # Get median segment lengths from Q_coords_scaling. Trimmed mean works better than mean or median
@@ -562,7 +401,8 @@ def update_scale_values(scaling_root, segment_ratio_dict):
         scale_set.append(new_scale)
         
 
-def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_left_symmetry=True, subject_height=1.75, subject_mass=70, 
+def perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir, 
+                    use_contacts_muscles=False, right_left_symmetry=True, subject_height=1.75, subject_mass=70, 
                     remove_scaling_setup=True, fastest_frames_to_remove_percent=0.1,close_to_zero_speed_m=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Perform model scaling based on the (not necessarily static) TRC file:
@@ -575,32 +415,38 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
     - trc_file (Path): The path to the TRC file.
     - kinematics_dir (Path): The directory where the kinematics files are saved.
     - osim_setup_dir (Path): The directory where the OpenSim setup and model files are stored.
-    - model_name (str): The name of the model.
+    - pose_model (str): The name of the model.
+    - use_contacts_muscles (bool): Whether to use the model with contact spheres and muscles.
     - right_left_symmetry (bool): Whether to consider right and left side of equal size.
     - subject_height (float): The height of the subject.
     - subject_mass (float): The mass of the subject.
     - remove_scaling_setup (bool): Whether to remove the scaling setup file after scaling.
+    - fastest_frames_to_remove_percent (float): Fasters frames may be outliers
+    - large_hip_knee_angles (float): Imprecise coordinates when person is crouching
+    - trimmed_extrema_percent (float): Proportion of the most extreme segment values to remove before calculating their mean
     
     OUTPUTS:
     - A scaled OpenSim model file.
     '''
 
-    fastest_frames_to_remove_percent = 0.1 # fasters frames may be outliers
-    large_hip_knee_angles = 45 # imprecise coordinates when person is crouching
-    trimmed_extrema_percent = 0.2 # proportion of the most extreme segment values to remove before calculating their mean
-
     try:
         # Load model
         opensim.ModelVisualizer.addDirToGeometrySearchPaths(str(osim_setup_dir / 'Geometry'))
-        unscaled_model_path = get_model_path(model_name, osim_setup_dir)
+        unscaled_model_path = get_model_path(use_contacts_muscles, osim_setup_dir)
         if not unscaled_model_path:
             raise ValueError(f"Unscaled OpenSim model not found at: {unscaled_model_path}")
         unscaled_model = opensim.Model(str(unscaled_model_path))
+        # Add markers to model
+        markers_path = get_markers_path(pose_model, osim_setup_dir)
+        markerset = opensim.MarkerSet(str(markers_path))
+        unscaled_model.set_MarkerSet(markerset)
+        # Initialize and save model with markers
         unscaled_model.initSystem()
-        scaled_model_path = (kinematics_dir / (trc_file.stem + '.osim')).resolve()
+        scaled_model_path = str((kinematics_dir / (trc_file.stem + '.osim')).resolve())
+        unscaled_model.printToXML(scaled_model_path)
 
         # Load scaling setup
-        scaling_path = get_scaling_setup(model_name, osim_setup_dir)
+        scaling_path = get_scaling_setup(pose_model, osim_setup_dir)
         scaling_tree = etree.parse(scaling_path)
         scaling_root = scaling_tree.getroot()
         scaling_path_temp = str(kinematics_dir / (trc_file.stem + '_scaling_setup.xml'))
@@ -609,6 +455,11 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
         Q_coords, _, _, markers, _ = read_trc(trc_file)
         Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, close_to_zero_speed=close_to_zero_speed_m)
 
+        if Q_coords_low_speeds_low_angles.size == 0:
+            logging.warning(f"\nNo frames left after removing fastest frames, frames with null speed, and frames with large hip and knee angles for {trc_file}. The person may be static, or crouched, or incorrectly detected.")
+            logging.warning(f"Running with fastest_frames_to_remove_percent=0, close_to_zero_speed_m=0, large_hip_knee_angles=0, trimmed_extrema_percent=0. You can edit these parameters in your Config.toml file.\n")
+            Q_coords_low_speeds_low_angles = Q_coords
+
         # Get manual scale values (mean from remaining frames after trimming the 20% most extreme values)
         segment_ratio_dict = dict_segment_ratio(scaling_root, unscaled_model, Q_coords_low_speeds_low_angles, markers, 
                                                 trimmed_extrema_percent=trimmed_extrema_percent, right_left_symmetry=right_left_symmetry)
@@ -616,16 +467,16 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
         # Update scaling setup file
         scaling_root[0].find('mass').text = str(subject_mass)
         scaling_root[0].find('height').text = str(subject_height)
-        scaling_root[0].find('GenericModelMaker').find('model_file').text = str(unscaled_model_path)
+        scaling_root[0].find('GenericModelMaker').find('model_file').text = scaled_model_path
         scaling_root[0].find(".//scaling_order").text = ' manualScale measurements'
         deactivate_measurements(scaling_root)
         update_scale_values(scaling_root, segment_ratio_dict)
         for mk_f in scaling_root[0].findall(".//marker_file"): mk_f.text = "Unassigned"
-        scaling_root[0].find('ModelScaler').find('output_model_file').text = str(scaled_model_path)
+        scaling_root[0].find('ModelScaler').find('output_model_file').text = scaled_model_path
 
         etree.indent(scaling_tree, space='\t', level=0)
         scaling_tree.write(scaling_path_temp, pretty_print=True, xml_declaration=True, encoding='utf-8')
-    
+
         # Run scaling
         opensim.ScaleTool(scaling_path_temp).run()
 
@@ -634,11 +485,11 @@ def perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_
             Path(scaling_path_temp).unlink()
 
     except Exception as e:
-        logging.error(f"Error during scaling for {trc_file}: {e}")
+        logging.error(f"Error during scaling for {trc_file}: {e}\.")
         raise
 
 
-def perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_setup=True):
+def perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_setup=True):
     '''
     Perform inverse kinematics based on a TRC file and a scaled OpenSim model:
     - Model markers follow the triangulated markers while respecting the model kinematic constraints
@@ -648,7 +499,7 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_s
     - trc_file (Path): The path to the TRC file.
     - kinematics_dir (Path): The directory where the kinematics files are saved.
     - osim_setup_dir (Path): The directory where the OpenSim setup and model files are stored.
-    - model_name (str): The name of the model.
+    - pose_model (str): The name of the model.
     - remove_IK_setup (bool): Whether to remove the IK setup file after running IK.
 
     OUTPUTS:
@@ -657,7 +508,7 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_s
 
     try:
         # Retrieve data
-        ik_path = get_IK_Setup(model_name, osim_setup_dir)
+        ik_path = get_IK_Setup(pose_model, osim_setup_dir)
         ik_path_temp =  str(kinematics_dir / (trc_file.stem + '_ik_setup.xml'))
         scaled_model_path = (kinematics_dir / (trc_file.stem + '.osim')).resolve()
         output_motion_file = Path(kinematics_dir, trc_file.stem + '.mot').resolve()
@@ -720,18 +571,20 @@ def kinematics_all(config_dict):
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     use_augmentation = config_dict.get('kinematics').get('use_augmentation')
-    if use_augmentation: model_name = 'LSTM'
-    else: model_name = config_dict.get('pose').get('pose_model').upper()
+    use_contacts_muscles = config_dict.get('kinematics').get('use_contacts_muscles')
+
     right_left_symmetry = config_dict.get('kinematics').get('right_left_symmetry')
     subject_height = config_dict.get('project').get('participant_height')
     subject_mass = config_dict.get('project').get('participant_mass')
 
-    remove_scaling_setup = config_dict.get('kinematics').get('remove_individual_scaling_setup')
-    remove_IK_setup = config_dict.get('kinematics').get('remove_individual_IK_setup')
     fastest_frames_to_remove_percent = config_dict.get('kinematics').get('fastest_frames_to_remove_percent')
     large_hip_knee_angles = config_dict.get('kinematics').get('large_hip_knee_angles')
     trimmed_extrema_percent = config_dict.get('kinematics').get('trimmed_extrema_percent')
-    close_to_zero_speed_m = config_dict.get('kinematics').get('close_to_zero_speed_m')
+    close_to_zero_speed = config_dict.get('kinematics').get('close_to_zero_speed_m')
+    default_height = config_dict.get('kinematics').get('default_height')
+
+    remove_scaling_setup = config_dict.get('kinematics').get('remove_individual_scaling_setup')
+    remove_IK_setup = config_dict.get('kinematics').get('remove_individual_ik_setup')
 
     pose3d_dir = Path(project_dir) / 'pose-3d'
     kinematics_dir = Path(project_dir) / 'kinematics'
@@ -749,7 +602,8 @@ def kinematics_all(config_dict):
     if use_augmentation:
         trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' in f.name]
         if len(trc_files) == 0:
-            model_name = config_dict.get('pose').get('pose_model').upper()
+            pose_model = config_dict.get('pose').get('pose_model').upper()
+            use_augmentation = False
             logging.warning("No LSTM trc files found. Using non augmented trc files instead.")
     if len(trc_files) == 0: # filtered files by default
         trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' not in f.name and '_filt' in f.name and '_scaling' not in f.name]
@@ -759,22 +613,61 @@ def kinematics_all(config_dict):
         raise ValueError(f'No trc files found in {pose3d_dir}.')
     sorted(trc_files, key=natural_sort_key)
 
-    # Get subject heights and masses
+    if use_augmentation: 
+        pose_model = 'LSTM'
+    else: 
+        pose_model = config_dict.get('pose').get('pose_model').upper()
+        if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
+        elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
+        elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
+        elif pose_model.upper() == 'HAND': pose_model = 'HAND_21'
+        elif pose_model.upper() == 'FACE': pose_model = 'FACE_106'
+        elif pose_model.upper() == 'ANIMAL': pose_model = 'ANIMAL2D_17'
+        # else:
+        #     raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
+
+    # Calculate subject heights
     if subject_height is None or subject_height == 0:
         subject_height = [1.75] * len(trc_files)
         logging.warning("No subject height found in Config.toml. Using default height of 1.75m.")
+    elif isinstance(subject_height, str) and subject_height.lower() == 'auto':
+        subject_height = []
+        for trc_file in trc_files:
+            try:
+                trc_data, _, _, markers, _ = read_trc(trc_file)
+                height = compute_height(
+                    trc_data,
+                    markers,
+                    fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
+                    close_to_zero_speed=close_to_zero_speed,
+                    large_hip_knee_angles=large_hip_knee_angles,
+                    trimmed_extrema_percent=trimmed_extrema_percent
+                )
+                if not np.isnan(height):
+                    logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m\n")
+                else:
+                    logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
+                    logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, close_to_zero_speed_m, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
+                    height = default_height
+            except Exception as e:
+                logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
+                logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, close_to_zero_speed_m, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
+                height = default_height
+            subject_height.append(height)
     elif not type(subject_height) == list: # int or float
         subject_height = [subject_height]
-    elif len(subject_height) < len(trc_files):
-        logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to 1.75m.")
+    if len(subject_height) < len(trc_files):
+        logging.warning("\nNumber of subject heights does not match number of TRC files. Missing heights are set to 1.75m.")
         subject_height += [1.75] * (len(trc_files) - len(subject_height))
 
+    # Get subject masses
     if subject_mass is None or subject_mass == 0:
         subject_mass = [70] * len(trc_files)
         logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
     elif not type(subject_mass) == list:
         subject_mass = [subject_mass]
-    elif len(subject_mass) < len(trc_files):
+    if len(subject_mass) < len(trc_files):
         logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.\n")
         subject_mass += [70] * (len(trc_files) - len(subject_mass))
 
@@ -782,13 +675,13 @@ def kinematics_all(config_dict):
     for p, trc_file in enumerate(trc_files):
         logging.info(f"Processing TRC file: {trc_file.resolve()}")
 
-        logging.info("Scaling...")
-        perform_scaling(trc_file, kinematics_dir, osim_setup_dir, model_name, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], 
-                        remove_scaling_setup=remove_scaling_setup, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, trimmed_extrema_percent=trimmed_extrema_percent,close_to_zero_speed_m=close_to_zero_speed_m)
+        logging.info("\nScaling...")
+        perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir, use_contacts_muscles, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], 
+                        remove_scaling_setup=remove_scaling_setup, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, trimmed_extrema_percent=trimmed_extrema_percent,close_to_zero_speed_m=close_to_zero_speed)
         logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
         logging.info(f"\tScaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
         
-        logging.info("Inverse Kinematics...")
-        perform_IK(trc_file, kinematics_dir, osim_setup_dir, model_name, remove_IK_setup=remove_IK_setup)
+        logging.info("\nInverse Kinematics...")
+        perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_setup=remove_IK_setup)
         logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
         logging.info(f"\tJoint angle data saved to {(kinematics_dir / (trc_file.stem + '.mot')).resolve()}\n")

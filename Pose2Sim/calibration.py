@@ -610,7 +610,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
         img = cv2.imread(str(img_path))
         objpoints = np.array(objpoints)
         ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
-                                    None, None, flags=(cv2.CALIB_FIX_K3))# + cv2.CALIB_FIX_PRINCIPAL_POINT))
+                                    None, None, flags=(cv2.CALIB_FIX_K3+cv2.CALIB_USE_LU))# + cv2.CALIB_FIX_PRINCIPAL_POINT))
         h, w = [np.float32(i) for i in img.shape[:-1]]
         ret.append(ret_cam)
         C.append(cam)
@@ -690,8 +690,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
 
             # Find corners or label by hand
             if extrinsics_method == 'board':
-                imgp = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=object_coords_3d, show=show_reprojection_error)
-                objp = object_coords_3d
+                imgp, objp = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=object_coords_3d, show=show_reprojection_error)
                 if len(imgp) == 0:
                     logging.exception('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
                     raise ValueError('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
@@ -1277,7 +1276,7 @@ def calibrate_cams_all(config_dict):
     '''
 
     # Read config_dict
-    project_dir = config_dict.get('project').get('project_dir')
+    project_dir = config_dict.get('project').get('session_dir')
     calib_dir = [os.path.join(project_dir, c) for c in os.listdir(project_dir) if ('Calib' in c or 'calib' in c)][0]
     calib_type = config_dict.get('calibration').get('calibration_type')
 
