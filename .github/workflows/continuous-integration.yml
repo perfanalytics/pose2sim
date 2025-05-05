@@ -27,11 +27,13 @@ jobs:
         python-version: ["3.10", "3.11"]
         include:
           - os: ubuntu-latest
-            path: ~/.cache/pip
-          - os: macos-latest
-            path: ~/Library/Caches/pip
+            cache-path: ~/.cache/pip
           - os: windows-latest
-            path: ~\AppData\Local\pip\Cache
+            cache-path: C:\Users\runneradmin\AppData\Local\pip\Cache
+          - os: macos-latest
+            cache-path: /Library/Caches/pip
+          - os: macos-13
+            cache-path: ~/Library/Caches/pip
 
     steps:
       - name: Checkout code
@@ -40,7 +42,7 @@ jobs:
       - name: Cache conda environment
         uses: actions/cache@v4
         with:
-          path: ${{ matrix.os == 'windows-latest' && 'C:\\Users\\runneradmin\\.conda' || '~/.conda' }}
+          path: ~/.conda
           key: ${{ runner.os }}-conda-${{ matrix.python-version }}-${{ hashFiles('**/environment.yml') }}
           restore-keys: ${{ runner.os }}-conda-${{ matrix.python-version }}-
 
@@ -52,40 +54,41 @@ jobs:
           activate-environment: pose2sim
 
       - name: Install OpenSim with conda
+        shell: bash -l {0}
         run: |
           conda install -n pose2sim -c conda-forge -c defaults pip
           conda install -n pose2sim opensim-org::opensim -y
-        timeout-minutes: 5
 
       - name: Cache pip dependencies
         uses: actions/cache@v4
         with:
-          path: ${{ matrix.os == 'windows-latest' && 'C:\\Users\\runneradmin\\AppData\\Local\\pip\\Cache' || '~/.cache/pip' }}
+          path: ${{ matrix.cache-path }}
           key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt') }}
           restore-keys: ${{ runner.os }}-pip-${{ matrix.python-version }}-
 
       - name: Install pip dependencies
+        shell: bash -l {0}
         run: |
-          conda run -n pose2sim python -m pip install --upgrade pip
+          conda run -n pose2sim python -m ensurepip --upgrade
+          conda run -n pose2sim python -m pip install --upgrade pip setuptools wheel
           conda run -n pose2sim python -m pip install flake8 pytest
           conda run -n pose2sim python -m pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
-          # conda run -n pose2sim python -m pip install torch torchvision
-        timeout-minutes: 10
 
       - name: Lint with flake8
+        shell: bash -l {0}
         run: |
+          conda activate pose2sim
           # stop the build if there are Python syntax errors or undefined names
-          conda run -n pose2sim flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-          conda run -n pose2sim flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-        timeout-minutes: 5
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Test with pytest
+        shell: bash -l {0}
         env: 
           PYTHONIOENCODING: utf-8
           PYTHONUNBUFFERED: "1"
           KMP_DUPLICATE_LIB_OK: TRUE
         run: |
-          cd Pose2Sim/Utilities
-          conda run -n pose2sim pytest -v tests.py --capture=sys
-        timeout-minutes: 45
+          conda activate pose2sim
+          pytest -v Pose2Sim/Utilities/tests.py --capture=sys

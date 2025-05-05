@@ -4,8 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pose2sim"
-version = "0.10.21"
+dynamic = ["version"] # Generate version from git tags
 authors = [
+    {name = "David Pagnon", email = "contact@david-pagnon.com"},
+]
+maintainers = [
     {name = "David Pagnon", email = "contact@david-pagnon.com"},
 ]
 description = "Markerless kinematics with any cameras — From 2D Pose estimation to 3D OpenSim motion"
@@ -31,7 +34,6 @@ classifiers = [
 urls = {Homepage = "https://github.com/perfanalytics/pose2sim", "Bug Tracker" = "https://github.com/perfanalytics/pose2sim/issues"}
 dependencies = [
     "toml",
-    "psutil",
     "numpy>=1.19",
     "lxml==4.9.4",
     "matplotlib",
@@ -45,9 +47,9 @@ dependencies = [
     "filterpy",
     "ipython",
     "c3d",
-    "tensorflow",
     "rtmlib",
     "openvino",
+    "onnxruntime",
     "opencv-python",
     "deep-sort-realtime",
 ]
@@ -59,14 +61,6 @@ packages = {find = {}}
 "*" = ["OpenSim_Setup/**", "MarkerAugmenter/**", "Demo_SinglePerson/**", "Demo_SinglePerson/**/.*", "Demo_SinglePerson/**/**/.*", "Demo_SinglePerson/**/**/**/.*", "Demo_MultiPerson/**", "Demo_MultiPerson/**/.*", "Demo_Batch/**", "Demo_Batch/**/.*", "Demo_Batch/**/**/.*"]
 
 [project.scripts]
-"calibration" = "Pose2Sim.stages.calibration:CalibrationStage"
-"pose_estimation" = "Pose2Sim.stages.pose_estimation:PoseEstimationStage"
-"sync"             = "Pose2Sim.stages.sync:SyncStage"
-"tracking"         = "Pose2Sim.stages.tracking:TrackingStage"
-"triangulation"    = "Pose2Sim.stages.triangulation:TriangulationStage"
-"filtering"        = "Pose2Sim.stages.filtering:FilteringStage"
-"markeraugmentation" = "Pose2Sim.stages.markeraugmentation:MarkerAugmentationStage"
-"ik"               = "Pose2Sim.stages.ik:IKStage"
 AlphaPose_to_OpenPose = "Pose2Sim.Utilities.AlphaPose_to_OpenPose:main"
 Blazepose_runsave = "Pose2Sim.Utilities.Blazepose_runsave:main"
 bodykin_from_mot_osim = "Pose2Sim.Utilities.bodykin_from_mot_osim:main"
