@@ -49,6 +49,7 @@ dependencies = [
     "c3d",
     "rtmlib",
     "openvino",
+    "onnxruntime",
     "opencv-python",
     "deep-sort-realtime",
 ]
