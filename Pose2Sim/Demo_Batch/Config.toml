@@ -87,15 +87,15 @@ deepsort_params = """{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosi
                   # More robust in crowded scenes but Can be tricky to parametrize. More information there: https://github.com/levan92/deep_sort_realtime/blob/master/deep_sort_realtime/deepsort_tracker.py#L51
                   # Note: For faster and more robust tracking, use {'embedder_gpu': True, embedder':'torchreid'}, which uses the GPU and runs osnet_ain_x1_0 by default. requires `pip install torch torchvision torchreid gdown tensorboard`
 
-display_detection = true
+display_detection = false
 overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
 save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 
 [synchronization]
-synchronization_gui = true # true or false. If true, a player will popup and let the user determine synchronization parameters. If false, it will be done automatically based on the parameters below
-display_sync_plots = true # true or false (lowercase)
+synchronization_gui = false # true or false. If true, a player will popup and let the user determine synchronization parameters. If false, it will be done automatically based on the parameters below
+display_sync_plots = false # true or false (lowercase)
 keypoints_to_consider = 'all' # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
@@ -197,7 +197,7 @@ make_c3d = true # save triangulated data in c3d format in addition to trc
 
 [filtering]
 type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
-display_figures = true # true or false (lowercase) 
+display_figures = false # true or false (lowercase) 
 make_c3d = true # also save triangulated data in c3d format
 
    [filtering.butterworth]
