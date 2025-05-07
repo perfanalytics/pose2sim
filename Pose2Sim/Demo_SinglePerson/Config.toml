@@ -20,10 +20,11 @@
 [project]
 multi_person = false # true for trials with multiple participants. If false, only the person with lowest reprojection error is analyzed.
 participant_height = 'auto' # 'auto', float (eg 1.72), or list of floats (eg [1.72, 1.40])  # meters  # Only used for marker augmentation 
-participant_mass = 70.0             # float (eg 70.0), or list of floats (eg [70.0, 63.5])  # kg      # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces rather than only kinematics 
+participant_mass = 70.0             # float (eg 70.0), or list of floats (eg [70.0, 63.5])  # kg      # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces
 
 frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
-frame_range = [] # For example [10,300], or [] for all frames. 
+frame_range = 'auto' # 'auto', 'all', or range like [10,300]. If 'auto', will trim around the frames with low reprojection error (useful if a person enters/exits the scene)
+
 ## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
@@ -107,7 +108,7 @@ filter_order = 4
 
 # Take heart, calibration is not that complicated once you get the hang of it!
 [calibration]
-calibration_type = 'convert' # 'convert' or 'calculate'
+calibration_type = 'calculate' # 'convert' or 'calculate'
 
    [calibration.convert]
    convert_from = 'qualisys' # 'caliscope', 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
@@ -153,6 +154,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
          extrinsics_extension = 'png' # any video or image extension
          # list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
          # in m -> unlike for intrinsics, NOT in mm!
+         # [X,Y,Z], which becomes [Z,X,Y] in the TRC reference frame, and [-Y,X,Z] in the Blender one
          object_coords_3d =   [[-2.0,  0.3,  0.0], 
                               [-2.0 , 0.0,  0.0], 
                               [-2.0, 0.0,  0.05], 

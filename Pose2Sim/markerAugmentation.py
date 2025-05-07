@@ -153,7 +153,7 @@ def augment_markers_all(config_dict):
                 trc_data, frames_col, time_col, markers, header = read_trc(trc_file)
 
                 # frame range selection
-                f_range = [[frames_col.iloc[0], frames_col.iloc[-1]]+1 if frame_range==[] else frame_range][0]
+                f_range = [[frames_col.iloc[0], frames_col.iloc[-1]]+1 if frame_range in ('all', 'auto', []) else frame_range][0]
                 f_index = [frames_col[frames_col==f_range[0]].index[0], frames_col[frames_col==f_range[1]-1].index[0]+1]
                 trc_data = trc_data.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
 
@@ -215,7 +215,7 @@ def augment_markers_all(config_dict):
         trc_data, markers, header = add_neck_hip_data(trc_data, markers, header)
 
         # frame range selection
-        f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if frame_range==[] else frame_range][0]
+        f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if frame_range in ('all', 'auto', []) else frame_range][0]
         frame_nb = f_range[1] - f_range[0]
         f_index = [frames_col[frames_col==f_range[0]].index[0], frames_col[frames_col==f_range[1]-1].index[0]+1]
         trc_data = trc_data.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
@@ -317,7 +317,7 @@ def augment_markers_all(config_dict):
             trc_data.insert(0, 'Frame#', frames_col)
             trc_data.insert(1, 'Time', time_col)
             trc_data.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
-        logging.info(f'Augmented marker coordinates are stored at {trc_file_out}.')
+        logging.info(f'Augmented marker coordinates are stored at {trc_path_out}.')
 
         # Save c3d
         if make_c3d:

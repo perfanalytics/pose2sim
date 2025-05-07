@@ -720,7 +720,7 @@ def interpolate_zeros_nans(col, *args):
     
     # Interpolate nans
     mask = ~(np.isnan(col) | col.eq(0)) # true where nans or zeros
-    idx_good = np.where(mask)[0]
+    idx_good = mask.index[mask].tolist()
     if len(idx_good) <= 4:
         return col
     
@@ -731,7 +731,7 @@ def interpolate_zeros_nans(col, *args):
     col_interp = np.where(mask, col, f_interp(col.index)) #replace at false index with interpolated values
     
     # Reintroduce nans if length of sequence > N
-    idx_notgood = np.where(~mask)[0]
+    idx_notgood = mask.index[~mask].tolist()
     gaps = np.where(np.diff(idx_notgood) > 1)[0] + 1 # where the indices of true are not contiguous
     sequences = np.split(idx_notgood, gaps)
     if sequences[0].size>0:

@@ -238,7 +238,7 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     frame_idx = 0
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    f_range = [[total_frames] if frame_range==[] else frame_range][0]
+    f_range = [[total_frames] if frame_range in ('all', 'auto', []) else frame_range][0]
     with tqdm(iterable=range(*f_range), desc=f'Processing {os.path.basename(video_path)}') as pbar:
         frame_count = 0
         while cap.isOpened():
@@ -351,7 +351,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
     if display_detection:
         cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
     
-    f_range = [[len(image_files)] if frame_range==[] else frame_range][0]
+    f_range = [[len(image_files)] if frame_range in ('all', 'auto', []) else frame_range][0]
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
         if frame_idx in range(*f_range):
             try:

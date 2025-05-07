@@ -69,10 +69,60 @@ __status__ = "Development"
 
 ## FUNCTIONS
 def count_persons_in_json(file_path):
+    '''
+    Count the number of persons in a json file.
+
+    INPUT:
+    - file_path: path to the json file
+
+    OUTPUT:
+    - int: number of persons in the json file
+    '''
+
     with open(file_path, 'r') as file:
         data = json.load(file)
         return len(data.get('people', []))
     
+
+def indices_of_first_last_non_nan_chunks(series, min_chunk_size=10):
+    '''
+    Find indices of the first and last chunks of at least min_chunk_size consecutive non-NaN values.
+
+    INPUT:
+    - series: pandas Series to trim
+    - min_chunk_size: minimum size of consecutive non-NaN values to consider (default: 5)
+
+    OUTPUT:
+    - tuple: (start_index, end_index) of the first and last valid chunks
+    '''
+    
+    non_nan_mask = ~np.isnan(series.values)
+    
+    # Find runs of consecutive non-NaN values (eg [(8, 15), (16, 17), (19, 26)])
+    runs = []
+    run_start = None
+    for i, bool_val in enumerate(non_nan_mask):
+        if bool_val and run_start is None:
+            run_start = i
+        elif not bool_val and run_start is not None:
+            run_end = i
+            runs.append((run_start, run_end))
+            run_start = None
+    if run_start is not None:
+        runs.append((run_start, len(non_nan_mask)))
+    
+    # Find runs that have at least min_chunk_size consecutive non-NaN values
+    valid_runs = [(start, end) for start, end in runs if end - start >= min_chunk_size]
+    if not valid_runs:
+        return(0,0)
+    
+    # Get the start of the first valid run and the end of the last valid run
+    first_run_start = valid_runs[0][0]
+    last_run_end = valid_runs[-1][1]
+    
+    # Return the trimmed series
+    return first_run_start, last_run_end
+
 
 def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
     '''
@@ -179,7 +229,7 @@ def retrieve_right_trc_order(trc_paths):
     return trc_id
 
 
-def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, trc_path):
+def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, f_range_trimmed, trc_path):
     '''
     Print a message giving statistics on reprojection errors (in pixel and in m)
     as well as the number of cameras that had to be excluded to reach threshold 
@@ -253,7 +303,7 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
         mean_error_mm = np.around(mean_error_px * Dm / fm *1000, decimals=1)
         mean_cam_excluded = np.around(nb_cams_excluded[n]['mean'].mean(), decimals=2)
 
-        logging.info(f'\n--> Mean reprojection error for all points on all frames is {mean_error_px} px, which roughly corresponds to {mean_error_mm} mm. ')
+        logging.info(f'\n--> Mean reprojection error for all points on frames {f_range_trimmed[n][0]} to {f_range_trimmed[n][1]} is {mean_error_px} px, which roughly corresponds to {mean_error_mm} mm. ')
         logging.info(f'Cameras were excluded if likelihood was below {likelihood_threshold} and if the reprojection error was above {error_threshold_triangulation} px.') 
         if interpolation_kind != 'none':
             logging.info(f'Gaps were interpolated with {interpolation_kind} method if smaller than {interp_gap_smaller_than} frames. Larger gaps were filled with {["the last valid value" if fill_large_gaps_with == "last_value" else "zeros" if fill_large_gaps_with == "zeros" else "NaNs"][0]}.') 
@@ -682,7 +732,7 @@ def triangulate_all(config_dict):
     json_files_names = [sort_stringlist_by_last_number(js) for js in json_files_names]    
 
     # frame range selection
-    f_range = [[0,min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
+    f_range = [[0,min([len(j) for j in json_files_names])] if frame_range in ('all', 'auto', []) else frame_range][0]
     frame_nb = f_range[1] - f_range[0]
     
     # Check that camera number is consistent between calibration file and pose folders
@@ -700,7 +750,7 @@ def triangulate_all(config_dict):
     error = [[] for n in range(nb_persons_to_detect)]
     nb_cams_excluded = [[] for n in range(nb_persons_to_detect)]
     id_excluded_cams = [[] for n in range(nb_persons_to_detect)]
-    Q_tot, error_tot, nb_cams_excluded_tot,id_excluded_cams_tot = [], [], [], []
+    Q_tot, error_tot, nb_cams_excluded_tot, id_excluded_cams_tot, f_range_trimmed = [], [], [], [], []
     for f in tqdm(range(*f_range)):
         # print(f'\nFrame {f}:')        
         # Get x,y,likelihood values from files
@@ -797,8 +847,8 @@ def triangulate_all(config_dict):
     id_excluded_cams_tot = [pd.DataFrame([id_excluded_cams_tot_f[n] for id_excluded_cams_tot_f in id_excluded_cams_tot]) for n in range(nb_persons_to_detect)]
     
     for n in range(nb_persons_to_detect):
-        error_tot[n]['mean'] = error_tot[n].mean(axis = 1)
-        nb_cams_excluded_tot[n]['mean'] = nb_cams_excluded_tot[n].mean(axis = 1)
+        error_tot[n]['mean'] = error_tot[n].mean(axis=1,skipna=False)
+        nb_cams_excluded_tot[n]['mean'] = nb_cams_excluded_tot[n].mean(axis=1)
     
     # Delete participants with less than 4 valid triangulated frames
     # for each person, for each keypoint, frames to interpolate
@@ -813,24 +863,24 @@ def triangulate_all(config_dict):
     id_excluded_cams_tot = [id_excluded_cams_tot[n] for n in range(len(id_excluded_cams_tot)) if n not in deleted_person_id]
     nb_persons_to_detect = len(Q_tot)
 
-    if nb_persons_to_detect ==0:
+    if nb_persons_to_detect == 0:
         raise Exception('No persons have been triangulated. Please check your calibration and your synchronization, or the triangulation parameters in Config.toml.')
 
-    # IDs of excluded cameras
-    # id_excluded_cams_tot = [np.concatenate([id_excluded_cams_tot[f][k] for f in range(frames_nb)]) for k in range(keypoints_nb)]
-    id_excluded_cams_tot = [np.hstack(np.hstack(np.array(id_excluded_cams_tot[n]))) for n in range(nb_persons_to_detect)]
-    cam_excluded_count = [dict(Counter(k)) for k in id_excluded_cams_tot]
-    [cam_excluded_count[n].update((x, y/frame_nb/keypoints_nb) for x, y in cam_excluded_count[n].items()) for n in range(nb_persons_to_detect)]
-    
-    # Optionally, for each person, for each keypoint, show indices of frames that should be interpolated
-    if show_interp_indices:
-        gaps = [[np.where(np.diff(zero_nan_frames_per_kpt[n][k]) > 1)[0] + 1 for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
-        sequences = [[np.split(zero_nan_frames_per_kpt[n][k], gaps[n][k]) for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
-        interp_frames = [[[f'{seq[0]}:{seq[-1]}' for seq in seq_kpt if len(seq)<=interp_gap_smaller_than and len(seq)>0] for seq_kpt in sequences[n]] for n in range(nb_persons_to_detect)]
-        non_interp_frames = [[[f'{seq[0]}:{seq[-1]}' for seq in seq_kpt if len(seq)>interp_gap_smaller_than] for seq_kpt in sequences[n]] for n in range(nb_persons_to_detect)]
-    else:
-        interp_frames = None
-        non_interp_frames = []
+    # import pickle
+    # with open(os.path.join(session_dir, 'all.pkl'), 'wb') as f:
+    #     pickle.dump([Q_tot, error_tot, nb_cams_excluded_tot, id_excluded_cams_tot, zero_nan_frames_per_kpt], f)
+    ## with open(os.path.join(session_dir, 'all.pkl'), 'rb') as f:
+    ##     Q_tot, error_tot, nb_cams_excluded_tot, id_excluded_cams_tot, zero_nan_frames_per_kpt = pickle.load(f)
+    # Q_tot[0].to_csv(os.path.join(session_dir, 'Q_tot.csv'), index=False, sep='\t')
+    # error_tot[0].to_csv(os.path.join(session_dir, 'error_tot.csv'), index=False, sep='\t')
+
+    # Trim around good frames
+    f_range_trimmed = [indices_of_first_last_non_nan_chunks(err['mean'], interp_gap_smaller_than) for err in error_tot]
+    Q_tot = [Q_tot[n].iloc[f_range_trimmed[n][0]:f_range_trimmed[n][1]] for n in range(nb_persons_to_detect)]
+    error_tot = [error_tot[n].iloc[f_range_trimmed[n][0]:f_range_trimmed[n][1]] for n in range(nb_persons_to_detect)]
+    nb_cams_excluded_tot = [nb_cams_excluded_tot[n].iloc[f_range_trimmed[n][0]:f_range_trimmed[n][1]] for n in range(nb_persons_to_detect)]
+    id_excluded_cams_tot = [id_excluded_cams_tot[n].iloc[f_range_trimmed[n][0]:f_range_trimmed[n][1]] for n in range(nb_persons_to_detect)]
+    zero_nan_frames_per_kpt = [[z[(f_range_trimmed[n][0] < z) & (f_range_trimmed[n][1] > z)] for z in zero_nan_frames_per_kpt[n]] for n in range(nb_persons_to_detect)]
 
     # Interpolate missing values
     if interpolation_kind != 'none':
@@ -839,6 +889,7 @@ def triangulate_all(config_dict):
                 Q_tot[n] = Q_tot[n].apply(interpolate_zeros_nans, axis=0, args=[interp_gap_smaller_than, interpolation_kind])
             except:
                 logging.info(f'Interpolation was not possible for person {n}. This means that not enough points are available, which is often due to a bad calibration.')
+
     # Fill non-interpolated values with last valid one
     if fill_large_gaps_with == 'last_value':
         for n in range(nb_persons_to_detect): 
@@ -846,9 +897,9 @@ def triangulate_all(config_dict):
     elif fill_large_gaps_with == 'zeros':
         for n in range(nb_persons_to_detect): 
             Q_tot[n].replace(np.nan, 0, inplace=True)
-    
+
     # Create TRC file
-    trc_paths = [make_trc(config_dict, Q_tot[n], keypoints_names, f_range, id_person=n) for n in range(len(Q_tot))]
+    trc_paths = [make_trc(config_dict, Q_tot[n], keypoints_names, f_range_trimmed[n], id_person=n) for n in range(len(Q_tot))]
     if make_c3d:
         c3d_paths = [convert_to_c3d(t) for t in trc_paths]
         
@@ -865,9 +916,23 @@ def triangulate_all(config_dict):
     #     cam_excluded_count = [cam_excluded_count[i] for i in trc_id]
     #     interp_frames = [interp_frames[i] for i in trc_id]
     #     non_interp_frames = [non_interp_frames[i] for i in trc_id]
-        
     #     logging.info('\nThe trc and c3d files have been renamed to match the order of the static sequences.')
 
+    # IDs of excluded cameras
+    # id_excluded_cams_tot = [np.concatenate([id_excluded_cams_tot[f][k] for f in range(frames_nb)]) for k in range(keypoints_nb)]
+    id_excluded_cams_tot = [np.hstack(np.hstack(np.array(id_excluded_cams_tot[n]))) for n in range(nb_persons_to_detect)]
+    cam_excluded_count = [dict(Counter(k)) for k in id_excluded_cams_tot]
+    [cam_excluded_count[n].update((x, y/frame_nb/keypoints_nb) for x, y in cam_excluded_count[n].items()) for n in range(nb_persons_to_detect)]
+
+    # Optionally, for each person, for each keypoint, show indices of frames that should be interpolated
+    if show_interp_indices:
+        gaps = [[np.where(np.diff(zero_nan_frames_per_kpt[n][k]) > 1)[0] + 1 for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
+        sequences = [[np.split(zero_nan_frames_per_kpt[n][k], gaps[n][k]) for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
+        interp_frames = [[[f'{seq[0]}:{seq[-1]}' for seq in seq_kpt if len(seq)<=interp_gap_smaller_than and len(seq)>0] for seq_kpt in sequences[n]] for n in range(nb_persons_to_detect)]
+        non_interp_frames = [[[f'{seq[0]}:{seq[-1]}' for seq in seq_kpt if len(seq)>interp_gap_smaller_than] for seq_kpt in sequences[n]] for n in range(nb_persons_to_detect)]
+    else:
+        interp_frames = None
+        non_interp_frames = []
 
     # Recap message
-    recap_triangulate(config_dict, error_tot, nb_cams_excluded_tot, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, trc_paths)
+    recap_triangulate(config_dict, error_tot, nb_cams_excluded_tot, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, f_range_trimmed, trc_paths)

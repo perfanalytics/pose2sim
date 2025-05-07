@@ -174,7 +174,7 @@ class Pose2SimPipeline:
         project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
         seq_name = os.path.basename(project_dir)
         frame_range = config_dict.get('project').get('frame_range')
-        frames = "all frames" if not frame_range or frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"
+        frames = "all frames" if not frame_range or frame_range in ('all','auto') else f"frames {frame_range[0]} to {frame_range[1]}"
         logging.info("\n---------------------------------------------------------------------")
         logging.info(f"{step_name} for {seq_name}, for {frames}.")
         logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")

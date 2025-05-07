@@ -20,10 +20,11 @@
 [project]
 multi_person = true # true for trials with multiple participants. If false, only the person with lowest reprojection error is analyzed.
 participant_height = 'auto' # 'auto', float (eg 1.72), or list of floats (eg [1.72, 1.40])  # meters  # Only used for marker augmentation 
-participant_mass = [70.0, 63.5]     # float (eg 70.0), or list of floats (eg [70.0, 63.5])  # kg      # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces rather than only kinematics 
+participant_mass = [70.0, 63.5]     # float (eg 70.0), or list of floats (eg [70.0, 63.5])  # kg      # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces
 
 frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
-frame_range = [] # For example [10,300], or [] for all frames. 
+frame_range = 'auto' # 'auto', 'all', or range like [10,300]. If 'auto', will trim around the frames with low reprojection error (useful if a person enters/exits the scene)
+
 ## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
@@ -75,7 +76,7 @@ mode = 'balanced' # 'lightweight', 'balanced', 'performance',
 #          'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.zip',
 #          'pose_input_size':[256,256]}"""
 
-det_frequency = 1 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
+det_frequency = 4 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
                   # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
 device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
@@ -152,6 +153,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
          extrinsics_extension = 'png' # any video or image extension
          # list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
          # in m -> unlike for intrinsics, NOT in mm!
+         # [X,Y,Z], which becomes [Z,X,Y] in the TRC reference frame, and [-Y,X,Z] in the Blender one
          object_coords_3d =   [[-2.0,  0.3,  0.0], 
                               [-2.0 , 0.0,  0.0], 
                               [-2.0, 0.0,  0.05], 
@@ -232,10 +234,10 @@ default_height = 1.7 # meters # If automatic height calculation did not work, th
 remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
 remove_individual_ik_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
 
-fastest_frames_to_remove_percent = 0.2 # Frames with high speed are considered as outliers
-close_to_zero_speed_m = 0.1 # Sum for all keypoints: about 0.1 m/frame
+fastest_frames_to_remove_percent = 0.1 # Frames with high speed are considered as outliers
+close_to_zero_speed_m = 0.12 # Sum for all keypoints: about 0.1 m/frame
 large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
-trimmed_extrema_percent = 0.25 # Proportion of the most extreme segment values to remove before calculating their mean)
+trimmed_extrema_percent = 0.5 # Proportion of the most extreme segment values to remove before calculating their mean)
 
 
 [logging]
@@ -257,7 +259,8 @@ use_custom_logging = false # if integrated in an API that already has logging
 # Check your model hierarchy with:  
 # from anytree import Node, RenderTree
 # for pre, _, node in RenderTree(model): 
-#     print(f'{pre}{node.name} id={node.id}')[pose.CUSTOM]
+#     print(f'{pre}{node.name} id={node.id}')
+[pose.CUSTOM]
 name = "Hip"
 id = 19
   [[pose.CUSTOM.children]]
