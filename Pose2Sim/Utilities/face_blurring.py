@@ -16,12 +16,13 @@
         OR face_blurring -i input_video_file
         OR face_blurring -i input_video_file -o output_video_file
 
-        If you want to blur faces many videos in a root folder:
-        from Pose2Sim.Utilities import face_blurring; face_blurring.face_blurring_func(r'<root_folder>')
-        OR face_blurring -r root_folder
-
         Other arguments are available, type face_blurring -h for a list.
 
+
+        # TODO: Add support for batch processing of multiple videos in a root folder.
+        If you want to blur faces many videos in a root folder:
+        from Pose2Sim.Utilities import face_blurring; face_blurring.face_blurring_func(r'<root_folder>')
+        OR face_blurring -d video_directory
 '''
 
 
@@ -75,8 +76,8 @@ def face_blurring_func(**args):
     Takes arguments as a dictionary.
     """
 
-    root_path = args.get('root')
-    input_video_path = args.get('input')
+    input_vid_path = args.get('input_vid')
+    input_dir_path = args.get('input_dir')
     output_video_path = args.get('output', None) # Use .get for defaults
     visualize = args.get('visualize', DEFAULT_VISUALIZE)
     blur_type = args.get('blur_type', DEFAULT_BLUR_TYPE)
@@ -97,21 +98,20 @@ def face_blurring_func(**args):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     # Determine input videos
-    if root_path:
-        root_path = Path(root_path)
+    if input_dir_path:
         # Find vide files recursively, excluding those starting with '_blurred' <- to avoid processing already processed videos
-        video_files = [file for file in Path('.').glob('**/*')
+        video_files = [file for file in Path(input_dir_path).glob('**/*')
                         if file.is_file() and file.suffix.lower() in VIDEO_EXTENSIONS]
        
         # Filter out videos whose stem ends with _blurred
         input_videos = [v for v in video_files if not v.stem.endswith('_blurred')]
         if not input_videos:
-            logging.error(f"Error: No video files found in {root_path}")
+            logging.error(f"Error: No video files found in {input_dir_path}")
             return
-        logging.info(f"Found {len(input_videos)} videos in {root_path}. Processing...")
-    elif input_video_path:
-        input_videos = [Path(input_video_path)]
-        logging.info(f"Processing single video: {input_video_path}")
+        logging.info(f"Found {len(input_videos)} videos in {input_dir_path}. Processing...")
+    elif input_vid_path:
+        input_videos = [Path(input_vid_path)]
+        logging.info(f"Processing single video: {input_vid_path}")
     else:
         logging.error("Error: Neither root path nor input video path was provided.")
         return
@@ -139,14 +139,14 @@ def face_blurring_func(**args):
         raise ValueError(f"Unknown model_type '{model_type}'. Please use 'rtmpose' or 'rtmo'.")
 
     # --- Loop through each input video --- 
-    for current_input_video_path in input_videos:
-        logging.info(f"--- Processing video: {current_input_video_path} ---")
+    for current_input_vid_path in input_videos:
+        logging.info(f"--- Processing video: {current_input_vid_path} ---")
         start_time_video = time.time()
 
         # Open video capture for the current video
-        cap = cv2.VideoCapture(str(current_input_video_path)) # Should be str
+        cap = cv2.VideoCapture(str(current_input_vid_path)) # Should be str
         if not cap.isOpened():
-            logging.error(f"Error: Could not open video file {current_input_video_path}. Skipping.")
+            logging.error(f"Error: Could not open video file {current_input_vid_path}. Skipping.")
             continue # Skip to the next video
 
         # Get video properties
@@ -159,12 +159,12 @@ def face_blurring_func(**args):
         # Determine output path based on whether an explicit output was given
         if output_video_path is None:
             # Default: save next to input video with '_blurred' prefix
-            current_output_video_path = current_input_video_path.parent / f"{current_input_video_path.stem}_blurred{current_input_video_path.suffix}"
-        elif len(input_videos) > 1 and root_path:
+            current_output_video_path = current_input_vid_path.parent / f"{current_input_vid_path.stem}_blurred{current_input_vid_path.suffix}"
+        elif len(input_videos) > 1 and input_dir_path:
             # Multiple videos from root, explicit output is a directory
             output_dir = Path(output_video_path)
             output_dir.mkdir(parents=True, exist_ok=True)
-            current_output_video_path = output_dir / f"{current_input_video_path.stem}_blurred{current_input_video_path.suffix}"
+            current_output_video_path = output_dir / f"{current_input_vid_path.stem}_blurred{current_input_vid_path.suffix}"
         else:
             # Single video or specific output file provided
             current_output_video_path = Path(output_video_path)
@@ -184,12 +184,12 @@ def face_blurring_func(**args):
             logging.info(f"Face keypoints JSON will be saved to: {current_json_output_dir}")
 
         if visualize:
-            window_name = f"Face Blurring - {current_input_video_path.name}"
+            window_name = f"Face Blurring - {current_input_vid_path.name}"
             cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
         # Process frames for the current video
         frame_idx = 0
-        with tqdm(total=total_frames, desc=f"Blurring {current_input_video_path.name}") as pbar:
+        with tqdm(total=total_frames, desc=f"Blurring {current_input_vid_path.name}") as pbar:
             while cap.isOpened():
                 success, frame = cap.read()
                 if not success:
@@ -314,9 +314,9 @@ def face_blurring_func(**args):
         if visualize:
             cv2.destroyWindow(window_name)
 
-        logging.info(f"Finished processing {current_input_video_path}.")
+        logging.info(f"Finished processing {current_input_vid_path}.")
         end_time_video = time.time()
-        logging.info(f"Processing {current_input_video_path.name} took {end_time_video - start_time_video:.2f} seconds.")
+        logging.info(f"Processing {current_input_vid_path.name} took {end_time_video - start_time_video:.2f} seconds.")
     # --- End loop through videos ---
 
     logging.info("Face blurring process finished.")
@@ -428,10 +428,10 @@ def apply_face_obscuration(frame: np.ndarray, face_keypoints: np.ndarray, blur_t
 
 def main():
     parser = argparse.ArgumentParser(description='Detect and blur faces in a video.')
-    parser.add_argument('-r', '--root', required=False, help='Path to the root directory (string).')
-    parser.add_argument('-i', '--input', required=False, help='Path to the input video file (string).')
+    parser.add_argument('-i', '--input_vid', required=False, help='Path to the input video file if single video edit (string).')
+    parser.add_argument('-d', '--input_dir', required=False, help='Path to the input video directory if multiple video edit (string).')
     parser.add_argument('-o', '--output', default=None, help='Path to the output video file (string). Defaults to "blurred_<input_name>".')
-    parser.add_argument('--visualize', action='store_true', help=f'Enable real-time visualization (boolean, default: {DEFAULT_VISUALIZE}).')
+    parser.add_argument('-v', '--visualize', action='store_true', help=f'Enable real-time visualization (boolean, default: {DEFAULT_VISUALIZE}).')
     parser.add_argument('--blur_type', default=DEFAULT_BLUR_TYPE, choices=['blur', 'black'], help=f'Type of obscuration (string, default: {DEFAULT_BLUR_TYPE}).')
     parser.add_argument('--blur_intensity', default=DEFAULT_BLUR_INTENSITY, choices=['low', 'medium', 'high'], help=f'Intensity of Gaussian blur (string: low, medium, high. default: {DEFAULT_BLUR_INTENSITY}).')
     parser.add_argument('--blur_size', default=DEFAULT_BLUR_SIZE, choices=['small', 'medium', 'large'], help=f'Size of the estimated face area for padding (string, default: {DEFAULT_BLUR_SIZE}).')
@@ -447,10 +447,10 @@ def main():
     args = vars(parser.parse_args())
 
     # Confirm that exactly one of root or input is provided
-    if not (args['root'] or args['input']):
-        parser.error('Either --root or --input must be provided.')
-    if args['root'] and args['input']:
-        parser.error('Provide either --root or --input, not both.')
+    if not (args['input_dir'] or args['input_vid']):
+        parser.error('Either --input_dir or --input_vid must be provided.')
+    if args['input_dir'] and args['input_vid']:
+        parser.error('Provide either --input_dir or --input_vid, not both.')
 
     face_blurring_func(**args)
 

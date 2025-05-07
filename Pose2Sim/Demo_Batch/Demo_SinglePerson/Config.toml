@@ -19,7 +19,8 @@
 
 [project]
 frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video and webcam (Don't work with images) 
-frame_range = [] # For example [10,300], or [] for all frames. 
+frame_range = 'auto' # 'auto', 'all', or range like [10,300]. If 'auto', will trim around the frames with low reprojection error (useful if a person enters/exits the scene)
+
 ## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
 ## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
 ## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
@@ -31,7 +32,7 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 [[subjects]]
 id = 1
 height = "auto"
-mass = 70
+mass = 70   # kg # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces
 
 [[subjects]]
 id = 2

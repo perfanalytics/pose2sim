@@ -1351,7 +1351,7 @@ def synchronize_cams_all(config):
     cam_names = [os.path.basename(j_dir).split('_')[0] for j_dir in json_dirs]
     
     # frame range selection
-    f_range = [[0, min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
+    f_range = [[0, min([len(j) for j in json_files_names])] if frame_range in ('all', 'auto', []) else frame_range][0]
     # json_files_names = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*f_range)] for json_files_cam in json_files_names]
 
     # Determine frames to consider for synchronization

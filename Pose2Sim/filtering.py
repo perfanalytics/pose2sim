@@ -477,10 +477,9 @@ def filter_all(config_dict):
         Q_coords, frames_col, time_col, markers, header = read_trc(t_path_in)
 
         # frame range selection
-        f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if frame_range==[] else frame_range][0]
+        f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if frame_range in ('all', 'auto', []) else frame_range][0]
         frame_nb = f_range[1] - f_range[0]
         f_index = [frames_col[frames_col==f_range[0]].index[0], frames_col[frames_col==f_range[1]-1].index[0]+1]
-        print(f_range, frame_nb, f_index)
         Q_coords = Q_coords.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
         frames_col = frames_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
         time_col = time_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)

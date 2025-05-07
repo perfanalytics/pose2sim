@@ -99,6 +99,8 @@ class Config:
             return None
         if len(frame_range) == 2 and all(isinstance(x, int) for x in frame_range):
             return set(range(frame_range))
+        if isinstance(frame_range, str):
+            return frame_range
         return set(frame_range)
 
     # Pose

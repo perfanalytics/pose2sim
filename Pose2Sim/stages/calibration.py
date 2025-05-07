@@ -771,7 +771,9 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                 ax_3d.set_ylabel('Y')
                 ax_3d.set_zlabel('Z')
                 if np.all(objp[:,2] == 0):
-                    ax_3d.view_init(elev=-90, azim=0)
+                    ax_3d.view_init(elev=90, azim=-90)
+                else:
+                    ax_3d.view_init(vertical_axis='z')
                 fig_3d.show()
 
         if event.key == 'h':
