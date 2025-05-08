@@ -1019,6 +1019,50 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     return height
 
 
+def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+    '''
+    Compute the leg length of the person from the trc data.
+
+    INPUTS:
+    - Q_coords: path to the trc file (can be in m or px)
+    - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
+    - close_to_zero_speed: float. Sum for all keypoints: about 50 px/frame or 0.2 m/frame
+    - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
+    - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
+
+    OUTPUT:
+    - leg_length: float. The estimated leg length of the person
+    '''
+
+    Q_coords, frames_col, time_col, markers, header = read_trc(trc_path)
+
+    # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
+    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers,
+                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
+                                                                  close_to_zero_speed=close_to_zero_speed,
+                                                                  large_hip_knee_angles=large_hip_knee_angles)
+
+    # leg length will be considered as the distance from the hip joint centre to the ankle joint centre
+    hip_to_ankle_pairs = [['RAnkle', 'RKnee'], ['LAnkle', 'LKnee'], ['RKnee', 'RHip'], ['LKnee', 'LHip']]
+
+    # calculate the distance between each of the pairs of points
+    try:
+        rshank, lshank, rthigh, lthigh = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]], Q_coords_low_speeds_low_angles[pair[1]]) for pair in hip_to_ankle_pairs]
+    except:
+        logging.error('At least one of the following markers is missing for computing the leg length of the person:\
+                                    RAnkle, RKnee, RHip, LAnkle, LKnee, LHip.')
+        raise ValueError('At least one of the following markers is missing for computing the leg length of the person:\
+                                 RAnkle, RKnee, RHip, LAnkle, LKnee, LHip.')
+
+    # calculate the average leg length
+    lengths = (rshank + lshank)/2 + (rthigh + lthigh)/2
+
+    # Remove the most extreme values
+    leg_length = trimmed_mean(lengths, trimmed_extrema_percent)
+
+    return leg_length
+
+
 def sort_people_sports2d(keyptpre, keypt, scores=None):
     '''
     Associate persons across frames (Sports2D method)
