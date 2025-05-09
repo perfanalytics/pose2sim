@@ -205,7 +205,7 @@ def augment_markers_all(config_dict):
         augmenterModelType_all = [augmenterModelType_lower, augmenterModelType_upper]
         feature_markers_all = [feature_markers_lower, feature_markers_upper]
         response_markers_all = [response_markers_lower, response_markers_upper]
-        logging.info(f'Using Stanford {augmenterModelName} {augmenter_model} augmenter model. Feet are {"not " if feet_on_floor else ""}vertically offset to be at floor level.\n')
+        logging.info(f'Using Stanford {augmenterModelName} {augmenter_model} augmenter model. Feet are {"" if feet_on_floor else "not "}vertically offset to be at floor level.\n')
         
         # %% Process data.
         # Import TRC file
