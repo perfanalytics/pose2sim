@@ -1,12 +1,11 @@
 # This is a beta version of the GUI, improvements should be made as soon as possible.
 import os
+from pathlib import Path
 import shutil
 import threading
-import tkinter as tk
 import customtkinter as ctk  
 from tkinter import messagebox, filedialog, simpledialog, ttk  # Import ttk for Notebook
-import tomlkit
-from tomlkit import parse, dumps
+import toml
 import numpy as np
 import cv2
 from PIL import Image
@@ -14,6 +13,7 @@ from customtkinter import CTkImage
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import ast
+from Pose2Sim import Pose2Sim
 
 class App:
     def __init__(self, root):
@@ -28,274 +28,7 @@ class App:
         self.language = None  # Will hold 'en' for English or 'fr'
         self.process_mode = None  # 'single' or 'batch'
         self.num_trials = 0  # Number of trials in batch mode
-        self.config_template= r"""###############################################################################
-## PROJECT PARAMETERS                                                        ##
-###############################################################################
-
-
-# Configure your project parameters here. 
-# 
-# IMPORTANT:
-# If a parameter is not found here, Pose2Sim will look for its value in the 
-# Config.toml file of the level above. This way, you can set global 
-# instructions for the Session and alter them for specific Participants or Trials.
-#
-# If you wish to overwrite a parameter for a specific trial or participant,  
-# edit its Config.toml file by uncommenting its key (e.g., [project])
-# and editing its value (e.g., frame_range = [10,300]). Or else, uncomment 
-# [filtering.butterworth] and set cut_off_frequency = 10, etc.
-
-
-
-[project]
-multi_person = false # true for trials with multiple participants. If false, only the main person in scene is analyzed (and it run much faster). 
-participant_height = 1.72 # m # float if single person, list of float if multi-person (same order as the Static trials) # Only used for marker augmentation
-participant_mass = 70.0 # kg # Only used for marker augmentation and scaling
-
-frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
-frame_range = [] # For example [10,300], or [] for all frames. 
-## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
-## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
-## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
-## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
-
-exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
-# e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
-
-[pose]
-vid_img_extension = 'mp4' # any video or image extension
-pose_model = 'HALPE_26'  #With RTMLib: HALPE_26 (body and feet, default), COCO_133 (body, feet, hands), COCO_17 (body)
-                         # /!\ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the files if needed
-                         #With MMPose: HALPE_26, COCO_133, COCO_17, CUSTOM. See CUSTOM example at the end of the file
-                         #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
-                         #With mediapipe: BLAZEPOSE
-                         #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133
-                         #With deeplabcut: CUSTOM. See example at the end of the file
-mode = 'balanced' # 'lightweight', 'balanced', 'performance'
-det_frequency = 1 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
-                  # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
-display_detection = true
-overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
-save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
-output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
-
-
-[synchronization]
-display_sync_plots = true # true or false (lowercase)
-keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
-                           # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
-approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
-                           # [10.0, 2.0, 8.0, 11.0] list of times (seconds) if you want to specify the approximate time of a clear vertical event for each camera
-time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
-likelihood_threshold = 0.4 # Keypoints whose likelihood is below likelihood_threshold are filtered out
-filter_cutoff = 6 # time series are smoothed to get coherent time-lagged correlation
-filter_order = 4
-
-
-# Take heart, calibration is not that complicated once you get the hang of it!
-[calibration]
-calibration_type = 'convert' # 'convert' or 'calculate'
-
-   [calibration.convert]
-   convert_from = 'qualisys' # 'caliscope', 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
-      [calibration.convert.caliscope]  # No parameter needed
-      [calibration.convert.qualisys]
-      binning_factor = 1 # Usually 1, except when filming in 540p where it usually is 2
-      [calibration.convert.optitrack]  # See readme for instructions
-      [calibration.convert.vicon]      # No parameter needed
-      [calibration.convert.opencap]    # No parameter needed
-      [calibration.convert.easymocap]  # No parameter needed
-      [calibration.convert.biocv]      # No parameter needed
-      [calibration.convert.anipose]    # No parameter needed
-      [calibration.convert.freemocap]  # No parameter needed
-  
-
-   [calibration.calculate] 
-      # Camera properties, theoretically need to be calculated only once in a camera lifetime
-      [calibration.calculate.intrinsics]
-      overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
-      show_detection_intrinsics = true # true or false (lowercase)
-      intrinsics_extension = 'jpg' # any video or image extension
-      extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
-      intrinsics_corners_nb = [4,7] 
-      intrinsics_square_size = 60 # mm
-
-      # Camera placements, need to be done before every session
-      [calibration.calculate.extrinsics]
-      calculate_extrinsics = true # true or false (lowercase) 
-      extrinsics_method = 'scene' # 'board', 'scene', 'keypoints'
-      # 'board' should be large enough to be detected when laid on the floor. Not recommended.
-      # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out.
-      # 'keypoints' uses automatic pose estimation of a person freely walking and waving arms in the scene. Slighlty less accurate, requires synchronized cameras.
-      moving_cameras = false # Not implemented yet
-
-         [calibration.calculate.extrinsics.board]
-         show_reprojection_error = true # true or false (lowercase)
-         extrinsics_extension = 'png' # any video or image extension
-         extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
-         extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
-
-         [calibration.calculate.extrinsics.scene]
-         show_reprojection_error = true # true or false (lowercase)
-         extrinsics_extension = 'png' # any video or image extension
-         # list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
-         # in m -> unlike for intrinsics, NOT in mm!
-         object_coords_3d =   [[-2.0,  0.3,  0.0], 
-                              [-2.0 , 0.0,  0.0], 
-                              [-2.0, 0.0,  0.05], 
-                              [-2.0, -0.3 ,  0.0], 
-                              [0.0,  0.3,  0.0], 
-                              [0.0, 0.0,  0.0], 
-                              [0.0, 0.0,  0.05], 
-                              [0.0, -0.3,  0.0]]
-        
-         [calibration.calculate.extrinsics.keypoints]
-         # Coming soon!
-
-
-[personAssociation]
-   likelihood_threshold_association = 0.3
-
-   [personAssociation.single_person]
-   reproj_error_threshold_association = 20 # px
-   tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
-               # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' or 'RShoulder')
-   
-   [personAssociation.multi_person]
-   reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
-   min_affinity = 0.2 # affinity below which a correspondence is ignored
-
-
-[triangulation]
-reproj_error_threshold_triangulation = 15 # px
-likelihood_threshold_triangulation= 0.3
-min_cameras_for_triangulation = 2
-interpolation = 'linear' #linear, slinear, quadratic, cubic, or none
-                        # 'none' if you don't want to interpolate missing points
-interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
-show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
-fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
-handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
-undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
-make_c3d = true # save triangulated data in c3d format in addition to trc
-
-
-[filtering]
-type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
-display_figures = true # true or false (lowercase) 
-make_c3d = true # also save triangulated data in c3d format
-
-   [filtering.butterworth]
-   order = 4 
-   cut_off_frequency = 6 # Hz
-   [filtering.kalman]
-   # How much more do you trust triangulation results (measurements), than previous data (process assuming constant acceleration)?
-   trust_ratio = 100 # = measurement_trust/process_trust ~= process_noise/measurement_noise
-   smooth = true # should be true, unless you need real-time filtering
-   [filtering.butterworth_on_speed]
-   order = 4 
-   cut_off_frequency = 10 # Hz
-   [filtering.gaussian]
-   sigma_kernel = 2 #px
-   [filtering.LOESS]
-   nb_values_used = 30 # = fraction of data used * nb frames
-   [filtering.median]
-   kernel_size = 9
-
-
-[markerAugmentation] 
-## Requires the following markers: ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
-##        "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
-##        "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
-make_c3d = true # save triangulated data in c3d format in addition to trc
-
-
-[kinematics]
-use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
-right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)
-remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
-remove_individual_IK_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
-
-
-
-# CUSTOM skeleton, if you trained your own model from DeepLabCut or MMPose for example. 
-# Make sure the node ids correspond to the column numbers of the 2D pose file, starting from zero.
-# 
-# If you want to perform inverse kinematics, you will also need to create an OpenSim model
-# and add to its markerset the location where you expect the triangulated keypoints to be detected.
-# 
-# In this example, CUSTOM reproduces the HALPE_26 skeleton (default skeletons are stored in skeletons.py).
-# You can create as many custom skeletons as you want, just add them further down and rename them.
-# 
-# Check your model hierarchy with:  for pre, _, node in RenderTree(model): 
-#                                      print(f'{pre}{node.name} id={node.id}')
-[pose.CUSTOM]
-name = "Hip"
-id = "19"
-  [[pose.CUSTOM.children]]
-  name = "RHip"
-  id = 12
-     [[pose.CUSTOM.children.children]]
-     name = "RKnee"
-     id = 14
-        [[pose.CUSTOM.children.children.children]]
-        name = "RAnkle"
-        id = 16
-           [[pose.CUSTOM.children.children.children.children]]
-           name = "RBigToe"
-           id = 21
-              [[pose.CUSTOM.children.children.children.children.children]]
-              name = "RSmallToe"
-              id = 23
-           [[pose.CUSTOM.children.children.children.children]]
-           name = "RHeel"
-           id = 25
-  [[pose.CUSTOM.children]]
-  name = "LHip"
-  id = 11
-     [[pose.CUSTOM.children.children]]
-     name = "LKnee"
-     id = 13
-        [[pose.CUSTOM.children.children.children]]
-        name = "LAnkle"
-        id = 15
-           [[pose.CUSTOM.children.children.children.children]]
-           name = "LBigToe"
-           id = 20
-              [[pose.CUSTOM.children.children.children.children.children]]
-              name = "LSmallToe"
-              id = 22
-           [[pose.CUSTOM.children.children.children.children]]
-           name = "LHeel"
-           id = 24
-  [[pose.CUSTOM.children]]
-  name = "Neck"
-  id = 18
-     [[pose.CUSTOM.children.children]]
-     name = "Head"
-     id = 17
-        [[pose.CUSTOM.children.children.children]]
-        name = "Nose"
-        id = 0
-     [[pose.CUSTOM.children.children]]
-     name = "RShoulder"
-     id = 6
-        [[pose.CUSTOM.children.children.children]]
-        name = "RElbow"
-        id = 8
-           [[pose.CUSTOM.children.children.children.children]]
-           name = "RWrist"
-           id = 10
-     [[pose.CUSTOM.children.children]]
-     name = "LShoulder"
-     id = 5
-        [[pose.CUSTOM.children.children.children]]
-        name = "LElbow"
-        id = 7
-           [[pose.CUSTOM.children.children.children.children]]
-           name = "LWrist"
-           id = 9 """
-
+        self.config_template = toml.load(Path(Pose2Sim.__file__).parent / 'Demo_SinglePerson' / 'Config.toml')
         # Initialize language selection
         self.select_language()
         
@@ -326,7 +59,7 @@ id = "19"
         # Initialize dictionaries to hold content and border frames
         self.tab_frames = {}
         self.tab_border_frames = {}
-   
+
         # Initialize progress tracking
         self.progress_var = ctk.DoubleVar()
         self.progress_var.set(0)
@@ -352,6 +85,7 @@ id = "19"
         self.camera_image_list = []
         self.image_vars = []
 
+
     def select_language(self):
         # Create a frame for language selection
         lang_frame = ctk.CTkFrame(self.root)
@@ -374,11 +108,12 @@ id = "19"
 
         # Language selection buttons
         ctk.CTkLabel(lang_frame, text="Select Language / Choisir la langue",
-                     font=('Helvetica', 20, 'bold')).pack(pady=40)
+                    font=('Helvetica', 20, 'bold')).pack(pady=40)
         ctk.CTkButton(lang_frame, text="English", command=lambda: set_language('en'),
-                      width=200, height=50, font=('Helvetica', 18)).pack(pady=20)
+                    width=200, height=50, font=('Helvetica', 18)).pack(pady=20)
         ctk.CTkButton(lang_frame, text="Français (coming soon)", command=lambda: set_language('fr'),
-                      width=200, height=50, font=('Helvetica', 18)).pack(pady=20)
+                    width=200, height=50, font=('Helvetica', 18)).pack(pady=20)
+
 
     def choose_process_mode(self, lang_frame):
         # Clear language selection frame
@@ -398,20 +133,21 @@ id = "19"
 
         # Process mode selection buttons
         ctk.CTkLabel(mode_frame, text="Select Process Mode / Sélectionnez le mode de traitement",
-                     font=('Helvetica', 20, 'bold')).pack(pady=40)
+                    font=('Helvetica', 20, 'bold')).pack(pady=40)
         ctk.CTkButton(mode_frame, text="Single", command=lambda: set_mode('single'),
-                      width=200, height=50, font=('Helvetica', 18)).pack(pady=20)
+                    width=200, height=50, font=('Helvetica', 18)).pack(pady=20)
         ctk.CTkButton(mode_frame, text="Batch", command=lambda: set_mode('batch'),
-                      width=200, height=50, font=('Helvetica', 18)).pack(pady=20)
+                    width=200, height=50, font=('Helvetica', 18)).pack(pady=20)
+
 
     def initial_config_check(self):
-        config_file_path = os.path.join(self.participant_name, 'Config.toml')
+        config_file_path = Path(self.participant_name) / 'Config.toml'
         if self.process_mode == 'single':
             # Create single process folder structure
             self.create_single_folder_structure()
-            if os.path.exists(config_file_path):
+            if config_file_path.exists():
                 response = messagebox.askyesno("Configuration Exists",
-                                               "Configuration already exists, would you like to configure Pose2Sim again?")
+                                            "Configuration already exists, would you like to configure Pose2Sim again?")
                 if response:
                     self.init_app()  # Proceed with reconfiguration
                 else:
@@ -423,10 +159,11 @@ id = "19"
             # Prompt for number of trials
             self.prompt_number_of_trials()
 
+
     def prompt_number_of_trials(self):
         num_trials = simpledialog.askinteger("Batch Processing",
-                                             "Enter the number of trials:",
-                                             minvalue=1)
+                                            "Enter the number of trials:",
+                                            minvalue=1)
         if not num_trials:
             messagebox.showerror("Input Error", "Number of trials must be at least 1.")
             self.root.destroy()
@@ -435,28 +172,30 @@ id = "19"
         self.create_batch_folder_structure()
         self.init_app()
 
+
     def create_single_folder_structure(self):
         # Create participant directory directly
-        participant_path = os.path.join(self.participant_name)
-    
+        participant_path = Path(self.participant_name)
+        
         # Create calibration and videos subdirectories in the participant folder
-        calibration_path = os.path.join(participant_path, 'calibration')
-        videos_path = os.path.join(participant_path, 'videos')
-    
+        calibration_path = participant_path / 'calibration'
+        videos_path = participant_path / 'videos'
+        
         # Create all directories
-        os.makedirs(calibration_path, exist_ok=True)
-        os.makedirs(videos_path, exist_ok=True)
-    
-          
+        calibration_path.mkdir(parents=True, exist_ok=True)
+        videos_path.mkdir(parents=True, exist_ok=True)
+
+
     def create_batch_folder_structure(self):
         # Create participant directory
-        participant_path = os.path.join(self.participant_name)
-        os.makedirs(participant_path, exist_ok=True)
+        participant_path = Path(self.participant_name)
+        participant_path.mkdir(parents=True, exist_ok=True)
         
         # Create calibration directory
-        calibration_path = os.path.join(participant_path, 'calibration')
-        os.makedirs(calibration_path, exist_ok=True)
-                
+        calibration_path = participant_path / 'calibration'
+        calibration_path.mkdir(parents=True, exist_ok=True)
+
+
     def init_app(self, skip_to_pose_estimation=False):
         # Initialize variables
         self.init_variables()
@@ -472,25 +211,25 @@ id = "19"
                 if response:
                     # Delete all trial folders if they exist
                     for i in range(1, self.num_trials + 1):
-                        trial_path = os.path.join(self.participant_name, f'Trial_{i}')
-                        if os.path.exists(trial_path):
+                        trial_path = Path(self.participant_name) / f'Trial_{i}'
+                        if trial_path.exists():
                             shutil.rmtree(trial_path)
     
                     # Recreate trial structure
                     for i in range(1, self.num_trials + 1):
-                        trial_path = os.path.join(self.participant_name, f'Trial_{i}')
-                        os.makedirs(trial_path, exist_ok=True)
-                        videos_path = os.path.join(trial_path, 'videos')
-                        os.makedirs(videos_path, exist_ok=True)
+                        trial_path = Path(self.participant_name) / f'Trial_{i}'
+                        videos_path = trial_path / 'videos'
+                        trial_path.mkdir(parents=True, exist_ok=True)
+                        videos_path.mkdir(parents=True, exist_ok=True)
     
             else:
                 # Single mode handling
-                videos_path = os.path.join(self.participant_name, 'videos')
-                if os.path.exists(videos_path):
+                videos_path = Path(self.participant_name) / 'videos'
+                if videos_path.exists():
                     if messagebox.askyesno("Delete Old Videos?",
                                         "Would you like to delete old Pose videos?"):
                         shutil.rmtree(videos_path)
-                os.makedirs(videos_path, exist_ok=True)
+                videos_path.mkdir(parents=True, exist_ok=True)
     
             # Switch to Pose Estimation tab
             self.notebook.select(self.pose_model_frame)
@@ -508,11 +247,11 @@ id = "19"
                 # For single mode, proceed directly to video input
                 num_cameras = int(self.num_cameras_var.get()) if self.num_cameras_var.get() else 0
                 video_extension = self.video_extension_var.get()
-                if not self.input_videos(os.path.join(self.participant_name, 'videos')):
+                if not self.input_videos(Path(self.participant_name) / 'videos'):
                     return
         else:
             # Normal initialization without skipping
-            config_file_path = os.path.join(self.participant_name, 'Config.toml')
+            config_file_path = Path(self.participant_name) / 'Config.toml'
             if self.process_mode == 'batch':
                 # Create batch session structure
                 self.create_batch_folder_structure()
@@ -531,7 +270,8 @@ id = "19"
             self.progress_var.set(0)
             self.progress_bar.set(0)
             self.progress_label.configure(text="Progress: 0%")
-    
+
+
     def get_text(self, key):
         texts = {
             'en': {
@@ -783,16 +523,14 @@ id = "19"
             return texts[self.language].get(key, key)
         else:
             return key
-    
+
 
     def init_variables(self):
         # Initialize variables to hold user inputs
         # Load from Config.toml if exists
-        config_file_path = os.path.join(self.participant_name, 'Config.toml')
-        if os.path.exists(config_file_path):
-            with open(config_file_path, 'r', encoding='utf-8') as f:
-                config_content = f.read()
-            config = parse(config_content)
+        config_file_path = Path(self.participant_name) / 'Config.toml'
+        if config_file_path.exists():
+            config = toml.load(config_file_path)
         else:
             config = {}
 
@@ -814,7 +552,7 @@ id = "19"
         self.participant_mass_var = ctk.StringVar(
             value=str(config.get('project', {}).get('participant_mass', 70.0)))
         self.pose_model_var = ctk.StringVar(
-            value=config.get('pose', {}).get('pose_model', 'HALPE_26'))
+            value=config.get('pose', {}).get('pose_model', 'Body_with_feet'))
         self.mode_var = ctk.StringVar(value=config.get('pose', {}).get('mode', 'balanced'))
         self.convert_from_var = ctk.StringVar(
             value=config.get('calibration', {}).get('convert', {}).get('convert_from', 'qualisys'))
@@ -905,6 +643,7 @@ id = "19"
         self.num_people_var = ctk.StringVar(value='2')  
         self.time_interval_var = ctk.StringVar(value='1') 
 
+
     def create_tabs(self):
         # Create a notebook for tabs
         self.notebook = ttk.Notebook(self.root)
@@ -952,6 +691,7 @@ id = "19"
     
         self.notebook.bind('<<NotebookTabChanged>>', self.handle_tab_change)
 
+
     def update_tab_indicator(self, tab_key, saved=True):
         """
         Update the tab title indicator based on whether the step is completed.
@@ -970,7 +710,8 @@ id = "19"
 
         # Update the tab text in the notebook
         self.notebook.tab(tab_index, text=self.tab_names[tab_key])
-        
+
+
     def build_calibration_tab(self):
         frame = ctk.CTkFrame(self.calibration_frame)
         frame.pack(expand=True, fill='both', padx=10, pady=10)
@@ -1056,7 +797,8 @@ id = "19"
     
         # Initialize with current calibration type
         self.on_calibration_type_change()
-    
+
+
     def confirm_calibration_type(self):
         """Confirm the calibration type selection and lock inputs"""
         try:
@@ -1106,7 +848,8 @@ id = "19"
             
         except ValueError:
             messagebox.showerror("Error", "Invalid number of cameras")
-        
+
+
     def on_calibration_type_change(self):
         # If already confirmed, ask user if they want to modify settings
         if hasattr(self, 'type_confirmed') and self.type_confirmed:
@@ -1143,6 +886,8 @@ id = "19"
         else:
             self.calculate_options_frame.grid_remove()
             self.convert_frame.grid()
+
+
     def handle_tab_change(self, event):
         """Handle tab change events"""
         current_tab = self.notebook.select()
@@ -1157,11 +902,13 @@ id = "19"
                 next_tab_index = current_tab_index + 1
                 if next_tab_index < len(self.tab_order):
                     self.notebook.select(next_tab_index)
+
+
     def proceed_calibration(self):
         if not self.type_confirmed:
             messagebox.showerror("Error", "Please confirm your configuration first")
             return
-      
+    
         calibration_type = self.calibration_type_var.get()
         try:
             num_cameras = int(self.num_cameras_var.get()) if self.num_cameras_var.get() else 0
@@ -1185,18 +932,18 @@ id = "19"
     
                 # Handle folder creation based on process mode
                 if self.process_mode == 'single':
-                    calibration_path = os.path.join(self.participant_name, 'calibration')
+                    calibration_path = Path(self.participant_name) / 'calibration'
                 else:
-                    calibration_path = os.path.join(self.participant_name,'calibration')
+                    calibration_path = Path(self.participant_name) / 'calibration'
     
                 # Create calibration folders
                 for cam in range(1, num_cameras + 1):
                     intrinsics_folder_name = f'int_cam{cam}_img'
                     extrinsics_folder_name = f'ext_cam{cam}_img'
-                    intrinsics_path = os.path.join(calibration_path, 'intrinsics', intrinsics_folder_name)
-                    extrinsics_path = os.path.join(calibration_path, 'extrinsics', extrinsics_folder_name)
-                    os.makedirs(intrinsics_path, exist_ok=True)
-                    os.makedirs(extrinsics_path, exist_ok=True)
+                    intrinsics_path = calibration_path / 'intrinsics' / intrinsics_folder_name
+                    extrinsics_path = calibration_path / 'extrinsics' / extrinsics_folder_name
+                    intrinsics_path.mkdir(parents=True, exist_ok=True)
+                    extrinsics_path.mkdir(parents=True, exist_ok=True)
     
                 if not self.input_checkerboard_videos(num_cameras, video_extension):
                     return
@@ -1207,9 +954,9 @@ id = "19"
                 if not self.input_scene_coordinates():
                     return
     
-                config_file_path = os.path.join(self.participant_name, 'Config.toml')
+                config_file_path = Path(self.participant_name) / 'Config.toml'
                 if self.process_mode == 'batch':
-                    config_file_path = os.path.join(self.participant_name,'Config.toml')
+                    config_file_path = Path(self.participant_name) / 'Config.toml'
     
                 self.generate_config_toml()
                 self.update_config_toml(config_file_path, section='calibration')
@@ -1227,17 +974,18 @@ id = "19"
     
                 # Copy file to appropriate calibration folder
                 if self.process_mode == 'single':
-                    dest_dir = os.path.join(self.participant_name, 'calibration')
+                    dest_dir = Path(self.participant_name) / 'calibration'
                 else:
-                    dest_dir = os.path.join(self.participant_name,'calibration')
-                os.makedirs(dest_dir, exist_ok=True)
-                dest_path = os.path.join(dest_dir, os.path.basename(file_path))
-                shutil.copy(file_path, dest_path)
+                    dest_dir = Path(self.participant_name) / 'calibration'
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                dest_path = dest_dir / Path(file_path).name
+                if dest_path.exists(): dest_path.unlink()
+                dest_path.symlink_to(file_path)
     
                 # Update Config.toml
-                config_file_path = os.path.join(self.participant_name, 'Config.toml')
+                config_file_path = Path(self.participant_name) / 'Config.toml'
                 if self.process_mode == 'batch':
-                    config_file_path = os.path.join(self.participant_name,'Config.toml')
+                    config_file_path = Path(self.participant_name) / 'Config.toml'
                 self.generate_config_toml()
                 self.update_config_toml(config_file_path, section='calibration')
                 messagebox.showinfo("Calibration Complete",
@@ -1252,50 +1000,55 @@ id = "19"
             messagebox.showerror("Input Error", f"Invalid input: {ve}")
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {str(e)}")
-    
+                
+
     def input_checkerboard_videos(self, num_cameras, video_extension):
         messagebox.showinfo("Input Videos",
                         "Please select the checkerboard videos for each camera.")
-        base_path = self.participant_name
+        base_path = Path(self.participant_name)
         if self.process_mode == 'batch':
-            base_path = os.path.join(self.participant_name)
-    
+            base_path = Path(self.participant_name)
+        
         for cam in range(1, num_cameras + 1):
             file_path = filedialog.askopenfilename(
                 title=f"Select Checkerboard Video for Camera {cam}")
             if not file_path:
                 messagebox.showerror("Error", f"No file selected for camera {cam}")
                 return False
-    
+        
             intrinsics_folder_name = f'int_cam{cam}_img'
-            dest_dir = os.path.join(base_path, 'calibration', 'intrinsics', intrinsics_folder_name)
-            dest_path = os.path.join(dest_dir, os.path.basename(file_path))
-            shutil.copy(file_path, dest_path)
-    
+            dest_dir = base_path / 'calibration' / 'intrinsics' / intrinsics_folder_name
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest_path = dest_dir / Path(file_path).name
+            if dest_path.exists(): dest_path.unlink()
+            dest_path.symlink_to(file_path)
+
         return True
-    
+
+
     def input_scene_images(self, num_cameras, video_extension):
         messagebox.showinfo("Scene Images", 
                         "Please select scene images for each camera.")
-        base_path = self.participant_name
+        base_path = Path(self.participant_name)
         if self.process_mode == 'batch':
-            base_path = os.path.join(self.participant_name)
-    
+            base_path = Path(self.participant_name)
+        
         for cam in range(1, num_cameras + 1):
             file_path = filedialog.askopenfilename(
                 title=f"Select Scene Image for Camera {cam}")
             if not file_path:
                 messagebox.showerror("Error", f"No file selected for camera {cam}")
                 return False
-    
+        
             extrinsics_folder_name = f'ext_cam{cam}_img'
-            dest_dir = os.path.join(base_path, 'calibration', 'extrinsics', extrinsics_folder_name)
-            dest_path = os.path.join(dest_dir, os.path.basename(file_path))
-            shutil.copy(file_path, dest_path)
-    
+            dest_dir = base_path / 'calibration' / 'extrinsics' / extrinsics_folder_name
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest_path = dest_dir / Path(file_path).name
+            if dest_path.exists(): dest_path.unlink()
+            dest_path.symlink_to(file_path)
+        
         return True
-    
-    
+
     
     def display_checkerboard_image(self, image):
         max_size = 300
@@ -1326,7 +1079,8 @@ id = "19"
         button_frame.pack(pady=5)
         ctk.CTkButton(button_frame, text="Save as PDF", 
                     command=save_as_pdf).pack(padx=5, pady=5)
-    
+
+
     def generate_checkerboard_image(self, checkerboard_width, checkerboard_height, square_size):
         num_rows = checkerboard_height + 1
         num_cols = checkerboard_width + 1
@@ -1340,7 +1094,8 @@ id = "19"
                         col*square_size:(col+1)*square_size] = 255
     
         return Image.fromarray(pattern)
-    
+
+
     def input_scene_coordinates(self):
         """Handle scene coordinate input with color-coded points"""
         messagebox.showinfo("Scene Coordinates", 
@@ -1399,7 +1154,8 @@ id = "19"
         cid = self.fig.canvas.mpl_connect('button_press_event', onclick)
         
         return True
-    
+
+
     def input_coordinates(self, points_2d):
         self.object_coords_3d = []
         self.current_point_index = 0
@@ -1559,14 +1315,14 @@ id = "19"
                         
     def generate_config_toml(self):
         """Only generates template if config file doesn't exist"""
-        config_file_path = os.path.join(self.participant_name, 'Config.toml')
+        config_file_path = Path(self.participant_name) / 'Config.toml'
         if self.process_mode == 'batch':
-            config_file_path = os.path.join(self.participant_name,'Config.toml')
-    
+            config_file_path = Path(self.participant_name) / 'Config.toml'
+        
         # Only generate template if file doesn't exist
-        if not os.path.exists(config_file_path):
-            with open(config_file_path, 'w', encoding='utf-8') as f:
-                f.write(self.config_template)
+        if not config_file_path.exists():
+            with config_file_path.open('w') as config_file:
+                toml.dump(self.config_template, config_file)
 
     
     def on_calibration_type_change(self):
@@ -1601,7 +1357,8 @@ id = "19"
         else:
             self.calculate_options_frame.grid_remove()
             self.convert_frame.grid()
-                
+
+
     def build_prepare_video_tab(self):
         frame = ctk.CTkFrame(self.prepare_video_frame)
         frame.pack(expand=True, fill='both', padx=10, pady=10)
@@ -1653,7 +1410,8 @@ id = "19"
         
         # Initially hide the proceed button
         self.proceed_prepare_video_button.pack_forget()
-    
+
+
     def update_config_toml(self, config_file_path, section=None):
         """
         Update specific sections of the config file without overwriting others.
@@ -1662,11 +1420,10 @@ id = "19"
         try:
             # Read existing config if it exists
             if os.path.exists(config_file_path):
-                with open(config_file_path, 'r', encoding='utf-8') as f:
-                    config = parse(f.read())
+                config = toml.load(config_file_path)
             else:
                 # If file doesn't exist, start with template
-                config = parse(self.config_template)
+                config = self.config_template
     
             # Update only specific sections based on what's being configured
             if section == 'calibration':
@@ -1736,7 +1493,7 @@ id = "19"
                     'pose_model': self.pose_model_var.get()
                 })
                 
-                if self.pose_model_var.get() == 'HALPE_26':
+                if self.pose_model_var.get() == 'Body_with_feet':
                     config['pose']['mode'] = self.mode_var.get()
     
                 # Update project section for participant details
@@ -1898,11 +1655,12 @@ id = "19"
     
             # Write back to file
             with open(config_file_path, 'w', encoding='utf-8') as f:
-                f.write(dumps(config))
+                toml.dump(config, f)
     
         except Exception as e:
             messagebox.showerror("Error", f"Failed to update Config.toml: {str(e)}")
-    
+
+
     def confirm_checkerboard_only(self):
         """Handle confirmation when 'Yes' is selected for checkerboard-only option"""
         # Keep existing extension for both intrinsics and extrinsics
@@ -1923,7 +1681,8 @@ id = "19"
         next_tab_index = self.tab_order.index('prepare_video') + 1
         if next_tab_index < len(self.tab_order):
             self.notebook.select(next_tab_index)
-    
+
+
     def proceed_prepare_video(self):
         """Handle video preparation when 'No' is selected"""
         if self.only_checkerboard_var.get() == 'no':
@@ -1952,7 +1711,8 @@ id = "19"
             except ValueError:
                 messagebox.showerror("Error", "Please enter a valid time interval.")
                 return
-        
+
+
     def on_only_checkerboard_change(self):
         if self.only_checkerboard_var.get() == 'no':
             self.time_extraction_frame.pack(fill='x', pady=10)
@@ -1962,86 +1722,83 @@ id = "19"
             self.time_extraction_frame.pack_forget()
             self.proceed_prepare_video_button.pack_forget()  # Hide proceed button
             self.confirm_button.pack(pady=20)  # Show confirm button
-    
   
         
     def extract_frames(self, time_interval):
-        base_path = os.path.join(self.participant_name, 'calibration', 'intrinsics')
+        base_path = Path(self.participant_name) / 'calibration' / 'intrinsics'
         if self.process_mode == 'batch':
-            base_path = os.path.join(self.participant_name,'calibration', 'intrinsics')
-    
-        if not os.path.exists(base_path):
+            base_path = Path(self.participant_name) / 'calibration' / 'intrinsics'
+        
+        if not base_path.exists():
             messagebox.showerror("Error", f"Directory '{base_path}' does not exist.")
             self.proceed_prepare_video_button.configure(state='normal')
             return
-    
+        
         video_extensions = ('.mp4', '.avi', '.mov', '.mpeg')
         extracted_images = []
         total_videos = 0
-    
+        
         # Collect all video files
         video_files = []
-        for root, _, files in os.walk(base_path):
-            for file in files:
-                if file.lower().endswith(video_extensions):
-                    video_files.append(os.path.join(root, file))
-    
+        for video_file in base_path.rglob('*'):
+            if video_file.suffix.lower() in video_extensions:
+                video_files.append(video_file)
+        
         total_videos = len(video_files)
-    
+        
         if not video_files:
             messagebox.showwarning("Warning", "No video files found.")
             self.progress_bar.set(0)
             self.proceed_prepare_video_button.configure(state='normal')
             return
-    
+        
         try:
             for idx, video_path in enumerate(video_files):
-                video_dir = os.path.dirname(video_path)
-                cap = cv2.VideoCapture(video_path)
+                video_dir = video_path.parent
+                cap = cv2.VideoCapture(str(video_path))
                 
                 if not cap.isOpened():
                     messagebox.showerror("Error", f"Failed to open video: {video_path}")
                     continue
-    
+        
                 fps = cap.get(cv2.CAP_PROP_FPS)
                 if fps <= 0:
                     fps = 30
                 interval_frames = int(fps * time_interval)
-    
+        
                 frame_count = 0
                 while True:
                     ret, frame = cap.read()
                     if not ret:
                         break
-    
+        
                     if frame_count % interval_frames == 0:
-                        image_name = f"{os.path.splitext(os.path.basename(video_path))[0]}_frame{frame_count}.png"
-                        save_path = os.path.join(video_dir, image_name)
-                        cv2.imwrite(save_path, frame)
+                        image_name = f"{video_path.stem}_frame{frame_count}.png"
+                        save_path = video_dir / image_name
+                        cv2.imwrite(str(save_path), frame)
                         extracted_images.append(save_path)
-    
+        
                     frame_count += 1
-    
+        
                 cap.release()
                 
-              
                 # Update progress to 50%
                 progress = ((idx + 1) / total_videos)
                 self.progress_bar.set(progress)
                 self.root.update_idletasks()
-    
+        
             if extracted_images:
                 self.review_extracted_images(extracted_images, base_path)
             else:
                 messagebox.showinfo("Complete", "No frames were extracted.")
-    
+        
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {str(e)}")
         finally:
             self.progress_bar.set(0)
             self.proceed_prepare_video_button.configure(state='normal')
             
-        
+
     def review_extracted_images(self, image_paths, base_path):
         images_by_camera = {}
         for img_path in image_paths:
@@ -2058,7 +1815,8 @@ id = "19"
             self.process_camera_images(camera_dir, imgs)
         else:
             messagebox.showinfo("Complete", "No images to review.")    
-        
+
+
     def process_camera_images(self, camera_dir, image_paths):
         """
         Creates a review window for a specific camera's images, allowing the user to keep or delete images.
@@ -2157,6 +1915,8 @@ id = "19"
         delete_button.pack(pady=10)
         
         self.update_progress('prepare_video')
+
+
     def build_pose_model_tab(self):
         """
         Build the Pose Estimation tab.
@@ -2190,7 +1950,7 @@ id = "19"
         ctk.CTkLabel(frame, text="Pose Model Selection:").grid(
             row=3, column=0, sticky='w', pady=5)
         pose_model_options = [
-            'BODY_25B', 'BODY_135', 'COCO_133', 'COCO_17', 'MPII', 'HALPE_26', 'CUSTOM'
+            'Body_with_feet', 'Whole_body_wrist', 'Whole_body', 'Body', 'CUSTOM'
         ]
         self.pose_model_menu = ctk.CTkOptionMenu(
             frame, variable=self.pose_model_var, values=pose_model_options, width=150, command=self.on_pose_model_change)
@@ -2218,6 +1978,7 @@ id = "19"
 
         # Adjust the pose model change
         self.on_pose_model_change(self.pose_model_var.get())
+
 
     def build_synchronization_tab(self):
         """
@@ -2296,7 +2057,6 @@ id = "19"
 
         self.on_sync_option_change()
 
-    
 
     def build_advanced_configuration_tab(self):
         frame = ctk.CTkFrame(self.advanced_configuration_frame)
@@ -2474,7 +2234,8 @@ id = "19"
             height=40
         )
         save_button.pack(pady=20)
-    
+
+
     def on_filter_type_change(self, selected_filter):
         # Clear existing widgets in filter_specific_frame
         for widget in self.filter_specific_frame.winfo_children():
@@ -2523,6 +2284,7 @@ id = "19"
             # Handle unexpected filter types
             ctk.CTkLabel(self.filter_specific_frame, text='No additional parameters.').grid(row=0, column=0, sticky='w', pady=2)
 
+
     def on_multiple_persons_change(self):
         # Clear current person details
         for widget in self.person_details_frame.winfo_children():
@@ -2532,6 +2294,7 @@ id = "19"
             self.build_single_person_inputs()
         else:
             self.build_multiple_persons_inputs()
+
 
     def build_single_person_inputs(self):
         # Single person inputs for height and mass
@@ -2545,6 +2308,7 @@ id = "19"
         ctk.CTkEntry(self.person_details_frame, textvariable=self.participant_mass_var, width=100).grid(
             row=1, column=1, sticky='w')
 
+
     def build_multiple_persons_inputs(self):
         # Ask for the number of people of interest
         ctk.CTkLabel(self.person_details_frame, text="Number of People:").grid(
@@ -2554,6 +2318,7 @@ id = "19"
         ctk.CTkButton(self.person_details_frame, text="Submit",
                      command=self.build_people_details_inputs, width=100, height=30).grid(
             row=0, column=2, padx=5)
+
 
     def build_people_details_inputs(self):
         try:
@@ -2593,6 +2358,7 @@ id = "19"
                                 command=self.submit_people_details, width=100, height=30)
         submit_button.grid(row=num_people*2, column=0, columnspan=2, pady=10)
 
+
     def submit_people_details(self, event=None):
         heights = []
         masses = []
@@ -2630,10 +2396,9 @@ id = "19"
         try:
             # Read existing config
             if os.path.exists(config_file_path):
-                with open(config_file_path, 'r', encoding='utf-8') as f:
-                    config = parse(f.read())
+                config = toml.load(config_file_path)
             else:
-                config = parse(self.config_template)
+                config = self.config_template
     
             # Update project section
             if 'project' not in config:
@@ -2647,14 +2412,15 @@ id = "19"
     
             # Write back to file
             with open(config_file_path, 'w', encoding='utf-8') as f:
-                f.write(dumps(config))
+                toml.dump(config,f)
     
             # Show success message
             messagebox.showinfo("Submitted", "Participant details have been saved successfully.")
     
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save configuration: {str(e)}")
-    
+
+
     def save_synchronization_settings(self):
         # Update the synchronization settings in the Config.toml file
         config_file_path = os.path.join(self.participant_name, 'Config.toml')
@@ -2664,6 +2430,7 @@ id = "19"
         # Update the Synchronization tab indicator to green
         self.update_tab_indicator('synchronization', saved=True)
 
+
     def save_advanced_settings(self):
         # Update the advanced settings in the Config.toml file
         config_file_path = os.path.join(self.participant_name, 'Config.toml')
@@ -2672,13 +2439,13 @@ id = "19"
         # Update the Advanced Configuration tab indicator to green
         self.update_tab_indicator('advanced_configuration', saved=True)
 
-   
 
     def on_pose_model_change(self, value):
-        if value == 'HALPE_26':
+        if value == 'Body_with_feet':
             self.mode_frame.grid()
         else:
             self.mode_frame.grid_remove()
+
 
     def on_sync_option_change(self):
         if self.sync_videos_var.get() == 'yes':
@@ -2689,6 +2456,7 @@ id = "19"
             self.sync_options_frame.grid()
             # Set Synchronization tab indicator to red since synchronization needs to be configured
             self.update_tab_indicator('synchronization', saved=False)
+
 
     def on_approx_time_change(self):
         """Handle time input for each camera when 'yes' is selected"""
@@ -2737,7 +2505,8 @@ id = "19"
         else:
             # Hide the frame in auto mode
             self.approx_time_frame.grid_remove()
-    
+
+
     def confirm_camera_times(self):
         """Validate and save camera times"""
         try:
@@ -2756,8 +2525,7 @@ id = "19"
             # Update Config.toml
             config_file_path = os.path.join(self.participant_name, 'Config.toml')
             try:
-                with open(config_file_path, 'r', encoding='utf-8') as f:
-                    config = parse(f.read())
+                config = toml.load(config_file_path)
                 
                 # Update synchronization section
                 if 'synchronization' not in config:
@@ -2767,8 +2535,8 @@ id = "19"
                 
                 # Write back to file
                 with open(config_file_path, 'w', encoding='utf-8') as f:
-                    f.write(dumps(config))
-                
+                    toml.dump(config,f)
+            
                 # Show success message
                 messagebox.showinfo("Success", "Camera times have been saved successfully")
                 
@@ -2782,7 +2550,8 @@ id = "19"
                 
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {str(e)}")
-        
+
+
     def proceed_pose_estimation(self):
         """
         Handle pose estimation configuration and video input for both single and batch modes.
@@ -2910,7 +2679,8 @@ id = "19"
         finally:
             # Ensure progress bar is updated even if an error occurs
             self.update_progress('pose')
-        
+
+
     def update_progress(self, section):
         """
         Update the progress bar and label
@@ -2945,6 +2715,8 @@ id = "19"
                 status_text = f"Progress: {int(progress * 100)}%"
             
             self.progress_label.configure(text=status_text)
+
+
     def activate_pose2sim(self):
         # Determine if synchronization should be enabled based on the user's choice
         do_synchronization = self.sync_videos_var.get().lower() == 'no'
@@ -2994,6 +2766,7 @@ endlocal
         # Run the CMD script
         os.system(f'start cmd /k "{cmd_script_path}"')
 
+
     def generate_checkerboard_image(self, checkerboard_width, checkerboard_height, square_size):
         """
         Generates a full checkerboard image including the outer borders.
@@ -3016,6 +2789,7 @@ endlocal
         image = Image.fromarray(pattern)
 
         return image
+
 
     def display_checkerboard_image(self, image):
         # Resize image for display if it's too large
@@ -3051,9 +2825,6 @@ endlocal
         ctk.CTkButton(button_frame, text="Save as PDF", command=save_as_pdf,
                      fg_color="#4CAF50", text_color='white', width=150, height=40).pack(side='left', padx=5)
 
-    
-
-    
             
     def build_activation_tab(self):
         """
@@ -3104,7 +2875,8 @@ endlocal
             height=40
         )
         powershell_button.pack(pady=10)
-    
+
+
     def activate_pose2sim_with(self, type='cmd'):
         """
         Activate Pose2Sim with specified terminal type
@@ -3114,15 +2886,14 @@ endlocal
         pose_model = None
         config_file_path = os.path.join(self.participant_name, 'Config.toml')
         try:
-            with open(config_file_path, 'r', encoding='utf-8') as f:
-                config = parse(f.read())
-                pose_model = config.get('pose', {}).get('pose_model', 'HALPE_26')
+            config = toml.load(config_file_path)
+            pose_model = config.get('pose', {}).get('pose_model', 'Body_with_feet')
         except Exception:
-            pose_model = 'HALPE_26'  # default if can't read config
+            pose_model = 'Body_with_feet'  # default if can't read config
     
         # Show warning if not using HALPE_26
         do_pose_estimation = True
-        if pose_model != 'HALPE_26':
+        if pose_model not in ('Body_with_feet', 'Whole_body', 'Whole_body_wrist', 'Body'):
             response = messagebox.showwarning(
                 "Pose Model Warning",
                 f"The selected pose model '{pose_model}' is not yet integrated in Pose2Sim. "
@@ -3228,6 +2999,8 @@ Pose2Sim.runAll(do_calibration=True,
             num_cameras = int(self.num_cameras_var.get())
             video_extension = self.video_extension_var.get()
             
+            target_path = Path(target_path)
+            
             for cam in range(1, num_cameras + 1):
                 file_path = filedialog.askopenfilename(
                     title=f"Select video for Camera {cam}",
@@ -3236,48 +3009,49 @@ Pose2Sim.runAll(do_calibration=True,
                 if not file_path:
                     messagebox.showerror("Error", f"No file selected for camera {cam}")
                     return False
-    
+
                 # Copy and rename the file
                 dest_filename = f"cam{cam}.{video_extension}"
-                dest_path = os.path.join(target_path, dest_filename)
+                dest_path = target_path / dest_filename
                 
                 # Create directory if it doesn't exist
-                os.makedirs(target_path, exist_ok=True)
+                target_path.mkdir(parents=True, exist_ok=True)
                 
                 # Copy the file
-                shutil.copy(file_path, dest_path)
-    
+                if dest_path.exists(): dest_path.unlink()
+                dest_path.symlink_to(file_path)
+
             return True
-    
+
         except Exception as e:
             messagebox.showerror("Error", f"Error processing videos: {str(e)}")
             return False
-    
-   
-    
-   
+
+
     def finalize_configuration(self):
         """Create Config.toml files for trials based on parent configuration"""
-        participant_path = os.path.join(self.participant_name)
+        participant_path = Path(self.participant_name)
         
         # Get the parent Config.toml content
-        parent_config_path = os.path.join(participant_path, 'Config.toml')
-        if os.path.exists(parent_config_path):
-            with open(parent_config_path, 'r', encoding='utf-8') as f:
-                parent_config = f.read()
+        parent_config_path = participant_path / 'Config.toml'
+        try:
+            parent_config = parent_config_path.read_text(encoding='utf-8')
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not read parent configuration: {str(e)}")
+            return
+        
+        # Copy the parent config to each trial
+        for i in range(1, self.num_trials + 1):
+            trial_path = participant_path / f'Trial_{i}'
+            trial_config_path = trial_path / 'Config.toml'
             
-            # Copy the parent config to each trial
-            for i in range(1, self.num_trials + 1):
-                trial_path = os.path.join(participant_path, f'Trial_{i}')
-                trial_config_path = os.path.join(trial_path, 'Config.toml')
-                
-                # Create trial folder if it doesn't exist
-                os.makedirs(trial_path, exist_ok=True)
-                
-                # Copy the parent config to the trial
-                with open(trial_config_path, 'w', encoding='utf-8') as f:
-                    f.write(parent_config)
-    
+            # Create trial folder if it doesn't exist
+            trial_path.mkdir(exist_ok=True)
+            
+            # Copy the parent config to the trial
+            trial_config_path.write_text(parent_config, encoding='utf-8')
+
+
     def build_batch_configuration_tab(self):
         """Build the batch configuration tab with trial-specific settings only"""
         if self.process_mode != 'batch':
@@ -3313,6 +3087,8 @@ Pose2Sim.runAll(do_calibration=True,
                 height=40
             )
             trial_button.pack(pady=5)
+
+
     def get_config_value(self, config, setting):
         """Helper function to get value from nested config"""
         try:
@@ -3360,7 +3136,8 @@ Pose2Sim.runAll(do_calibration=True,
             return ''
         except:
             return ''
-            
+
+
     def configure_trial(self, trial_number):
         """Open configuration window for trial-specific settings"""
         config_window = ctk.CTkToplevel(self.root)
@@ -3376,8 +3153,7 @@ Pose2Sim.runAll(do_calibration=True,
         # Load trial configuration
         config_path = os.path.join(self.participant_name, f'Trial_{trial_number}', 'Config.toml')
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = parse(f.read())
+            config = toml.load(config_path)
         except Exception as e:
             messagebox.showerror("Error", f"Could not load configuration for Trial_{trial_number}: {str(e)}")
             return
@@ -3462,7 +3238,7 @@ Pose2Sim.runAll(do_calibration=True,
                 elif setting in ['pose_model', 'mode', 'type', 'interpolation']:
                     var = ctk.StringVar(value=current_value)
                     options = {
-                        'pose_model': ['HALPE_26', 'COCO_133', 'COCO_17', 'BODY_25B', 'BODY_25', 'BODY_135'],
+                        'pose_model': ['Body_with_feet', 'Whole_body_wrist', 'Whole_body', 'Body'],
                         'mode': ['lightweight', 'balanced', 'performance'],
                         'type': ['butterworth', 'kalman', 'gaussian', 'LOESS', 'median', 'butterworth_on_speed'],
                         'interpolation': ['linear', 'slinear', 'quadratic', 'cubic', 'none']
@@ -3558,7 +3334,7 @@ Pose2Sim.runAll(do_calibration=True,
     
                     # Save the updated configuration
                     with open(config_path, 'w', encoding='utf-8') as f:
-                        f.write(dumps(config))
+                        toml.dump(config,f)
     
                     messagebox.showinfo("Success", f"Configuration for Trial_{trial_number} has been saved successfully!")
                     config_window.destroy()
@@ -3579,6 +3355,8 @@ Pose2Sim.runAll(do_calibration=True,
             height=40
         )
         save_button.pack(pady=10)
+
+
     def set_config_value(self, config, setting, value):
         """Helper function to set value in nested config"""
         try:
@@ -3605,11 +3383,13 @@ Pose2Sim.runAll(do_calibration=True,
                 config['filtering'][setting] = value
         except Exception as e:
             print(f"Error setting {setting}: {str(e)}")
-    
+
+
 def main():
     root = ctk.CTk()
     app = App(root)
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()
