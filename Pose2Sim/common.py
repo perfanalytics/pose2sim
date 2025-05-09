@@ -15,6 +15,7 @@ import toml
 import json
 import numpy as np
 import pandas as pd
+from scipy import interpolate
 import re
 import cv2
 import c3d
@@ -36,7 +37,8 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Maya-Mocap"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
@@ -169,7 +171,31 @@ def read_trc(trc_path):
     except Exception as e:
         raise ValueError(f"Error reading TRC file at {trc_path}: {e}")
     
-    
+
+def extract_trc_data(trc_path):
+    '''
+    Extract marker names and coordinates from a trc file.
+
+    INPUTS:
+    - trc_path: Path to the trc file
+
+    OUTPUTS:
+    - marker_names: List of marker names
+    - marker_coords: Array of marker coordinates (n_frames, t+3*n_markers)
+    '''
+
+    # marker names
+    with open(trc_path, 'r') as file:
+        lines = file.readlines()
+        marker_names_line = lines[3]
+        marker_names = marker_names_line.strip().split('\t')[2::3]
+
+    # time and marker coordinates
+    trc_data_np = np.genfromtxt(trc_path, skip_header=5, delimiter = '\t')[:,1:] 
+
+    return marker_names, trc_data_np
+
+
 def common_items_in_list(list1, list2):
     '''
     Do two lists have any items in common at the same index?
@@ -441,66 +467,6 @@ def pad_shape(arr, target_len, fill_value=np.nan):
     return arr
 
 
-def sort_people_sports2d(keyptpre, keypt, scores=None):
-    '''
-    Associate persons across frames (Sports2D method)
-    Persons' indices are sometimes swapped when changing frame
-    A person is associated to another in the next frame when they are at a small distance
-    
-    N.B.: Requires min_with_single_indices and euclidian_distance function (see common.py)
-
-    INPUTS:
-    - keyptpre: (K, L, M) array of 2D coordinates for K persons in the previous frame, L keypoints, M 2D coordinates
-    - keypt: idem keyptpre, for current frame
-    - score: (K, L) array of confidence scores for K persons, L keypoints (optional) 
-    
-    OUTPUTS:
-    - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
-    - sorted_keypoints: array with reordered persons --> if scores is not None
-    - sorted_scores: array with reordered scores     --> if scores is not None
-    - associated_tuples: list of tuples with correspondences between persons across frames --> if scores is None (for Pose2Sim.triangulation())
-    '''
-    
-    # Generate possible person correspondences across frames
-    max_len = max(len(keyptpre), len(keypt))
-    keyptpre = pad_shape(keyptpre, max_len, fill_value=np.nan)
-    keypt = pad_shape(keypt, max_len, fill_value=np.nan)
-    if scores is not None:
-        scores = pad_shape(scores, max_len, fill_value=np.nan)
-    
-    # Compute distance between persons from one frame to another
-    personsIDs_comb = sorted(list(it.product(range(len(keyptpre)), range(len(keypt)))))
-    frame_by_frame_dist = [euclidean_distance(keyptpre[comb[0]],keypt[comb[1]]) for comb in personsIDs_comb]
-    frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
-    
-    # Sort correspondences by distance
-    _, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
-    
-    # Associate points to same index across frames, nan if no correspondence
-    sorted_keypoints = []
-    for i in range(len(keyptpre)):
-        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
-        if len(id_in_old) > 0:      sorted_keypoints += [keypt[id_in_old[0]]]
-        else:                       sorted_keypoints += [keypt[i]]
-    sorted_keypoints = np.array(sorted_keypoints)
-
-    if scores is not None:
-        sorted_scores = []
-        for i in range(len(keyptpre)):
-            id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
-            if len(id_in_old) > 0:  sorted_scores += [scores[id_in_old[0]]]
-            else:                   sorted_scores += [scores[i]]
-        sorted_scores = np.array(sorted_scores)
-
-    # Keep track of previous values even when missing for more than one frame
-    sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints) & ~np.isnan(keyptpre), keyptpre, sorted_keypoints)
-    
-    if scores is not None:
-        return sorted_prev_keypoints, sorted_keypoints, sorted_scores
-    else: # For Pose2Sim.triangulation()
-        return sorted_keypoints, associated_tuples
-
-
 def trimmed_mean(arr, trimmed_extrema_percent=0.5):
     '''
     Trimmed mean calculation for an array.
@@ -676,30 +642,6 @@ def zup2yup(Q):
     return Q
     
 
-def extract_trc_data(trc_path):
-    '''
-    Extract marker names and coordinates from a trc file.
-
-    INPUTS:
-    - trc_path: Path to the trc file
-
-    OUTPUTS:
-    - marker_names: List of marker names
-    - marker_coords: Array of marker coordinates (n_frames, t+3*n_markers)
-    '''
-
-    # marker names
-    with open(trc_path, 'r') as file:
-        lines = file.readlines()
-        marker_names_line = lines[3]
-        marker_names = marker_names_line.strip().split('\t')[2::3]
-
-    # time and marker coordinates
-    trc_data_np = np.genfromtxt(trc_path, skip_header=5, delimiter = '\t')[:,1:] 
-
-    return marker_names, trc_data_np
-
-
 def create_c3d_file(c3d_path, marker_names, trc_data_np):
     '''
     Create a c3d file from the data extracted from a trc file.
@@ -752,6 +694,52 @@ def convert_to_c3d(trc_path):
     create_c3d_file(c3d_path, marker_names, trc_data_np)
 
     return c3d_path
+
+
+def interpolate_zeros_nans(col, *args):
+    '''
+    Interpolate missing points (of value zero),
+    unless more than N contiguous values are missing.
+
+    INPUTS:
+    - col: pandas column of coordinates
+    - args[0] = N: max number of contiguous bad values, above which they won't be interpolated
+    - args[1] = kind: 'linear', 'slinear', 'quadratic', 'cubic'. Default: 'cubic'
+
+    OUTPUT:
+    - col_interp: interpolated pandas column
+    '''
+
+    if len(args)==2:
+        N, kind = args
+    if len(args)==1:
+        N = np.inf
+        kind = args[0]
+    if not args:
+        N = np.inf
+    
+    # Interpolate nans
+    mask = ~(np.isnan(col) | col.eq(0)) # true where nans or zeros
+    idx_good = mask.index[mask].tolist()
+    if len(idx_good) <= 4:
+        return col
+    
+    if 'kind' not in locals(): # 'linear', 'slinear', 'quadratic', 'cubic'
+        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind="linear", bounds_error=False)
+    else:
+        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, fill_value='extrapolate', bounds_error=False)
+    col_interp = np.where(mask, col, f_interp(col.index)) #replace at false index with interpolated values
+    
+    # Reintroduce nans if length of sequence > N
+    idx_notgood = mask.index[~mask].tolist()
+    gaps = np.where(np.diff(idx_notgood) > 1)[0] + 1 # where the indices of true are not contiguous
+    sequences = np.split(idx_notgood, gaps)
+    if sequences[0].size>0:
+        for seq in sequences:
+            if len(seq) > N: # values to exclude from interpolation are set to false when they are too long 
+                col_interp[seq] = np.nan
+    
+    return col_interp
 
 
 def points_to_angles(points_list):
@@ -944,7 +932,7 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     n_markers = len(keypoints_names)
 
     # Using 80% slowest frames
-    sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords.iloc[:,kpt:kpt+3].diff(), axis=1) for kpt in range(n_markers)], axis=0))
+    sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords[kpt].diff(), axis=1) for kpt in keypoints_names], axis=0))
     sum_speeds = sum_speeds[sum_speeds>close_to_zero_speed] # Removing when speeds close to zero (out of frame)
     if len(sum_speeds)==0:
         logging.warning('All frames have speed close to zero. Make sure the person is moving and correctly detected, or change close_to_zero_speed to a lower value. Not restricting the speeds to be above any threshold.')
@@ -964,6 +952,10 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds
         logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}°.")
 
+    if Q_coords_low_speeds_low_angles.empty:
+        logging.warning('The selected person might not move, or is crouching for the whole sequence, or is not well detected. Taking all available data instead of filtering them.')
+        Q_coords_low_speeds_low_angles = Q_coords.copy()
+    
     if n_markers_init < n_markers:
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
 
@@ -1025,6 +1017,50 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     height = trimmed_mean(heights, trimmed_extrema_percent=trimmed_extrema_percent)
 
     return height
+
+
+def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+    '''
+    Compute the leg length of the person from the trc data.
+
+    INPUTS:
+    - Q_coords: path to the trc file (can be in m or px)
+    - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
+    - close_to_zero_speed: float. Sum for all keypoints: about 50 px/frame or 0.2 m/frame
+    - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
+    - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
+
+    OUTPUT:
+    - leg_length: float. The estimated leg length of the person
+    '''
+
+    Q_coords, frames_col, time_col, markers, header = read_trc(trc_path)
+
+    # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
+    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers,
+                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
+                                                                  close_to_zero_speed=close_to_zero_speed,
+                                                                  large_hip_knee_angles=large_hip_knee_angles)
+
+    # leg length will be considered as the distance from the hip joint centre to the ankle joint centre
+    hip_to_ankle_pairs = [['RAnkle', 'RKnee'], ['LAnkle', 'LKnee'], ['RKnee', 'RHip'], ['LKnee', 'LHip']]
+
+    # calculate the distance between each of the pairs of points
+    try:
+        rshank, lshank, rthigh, lthigh = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]], Q_coords_low_speeds_low_angles[pair[1]]) for pair in hip_to_ankle_pairs]
+    except:
+        logging.error('At least one of the following markers is missing for computing the leg length of the person:\
+                                    RAnkle, RKnee, RHip, LAnkle, LKnee, LHip.')
+        raise ValueError('At least one of the following markers is missing for computing the leg length of the person:\
+                                 RAnkle, RKnee, RHip, LAnkle, LKnee, LHip.')
+
+    # calculate the average leg length
+    lengths = (rshank + lshank)/2 + (rthigh + lthigh)/2
+
+    # Remove the most extreme values
+    leg_length = trimmed_mean(lengths, trimmed_extrema_percent)
+
+    return leg_length
 
 
 def sort_people_sports2d(keyptpre, keypt, scores=None):

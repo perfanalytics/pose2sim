@@ -55,7 +55,8 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
@@ -127,7 +128,7 @@ def read_qca(qca_path, binning_factor):
     for i, tag in enumerate(root.findall('cameras/camera')):
         ret += [float(tag.attrib.get('avg-residual'))]
         C += [tag.attrib.get('serial')]
-        res += [int(tag.attrib.get('video_resolution')[:-1]) if tag.attrib.get('video_resolution') is not None else 1080]
+        res += [int(tag.attrib.get('video_resolution')[:-1]) if tag.attrib.get('video_resolution') not in (None, "N/A") else 1080]
         if tag.attrib.get('model') in ('Miqus Video', 'Miqus Video UnderWater', 'none'):
             vid_id += [i]
     
@@ -492,13 +493,13 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
 
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
     try:
-        calib_file = glob.glob(os.path.join(calib_dir, f'Calib*.toml'))[0]
+        calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
+        calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
     except:
         pass
     if not overwrite_intrinsics and 'calib_file' in locals():
         logging.info(f'\nPreexisting calibration file found: \'{calib_file}\'.')
         logging.info(f'\nRetrieving intrinsic parameters from file. Set "overwrite_intrinsics" to true in Config.toml to recalculate them.')
-        calib_file = glob.glob(os.path.join(calib_dir, f'Calib*.toml'))[0]
         calib_data = toml.load(calib_file)
 
         ret, C, S, D, K, R, T = [], [], [], [], [], [], []
@@ -552,7 +553,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
     '''
 
     try:
-        intrinsics_cam_listdirs_names = next(os.walk(os.path.join(calib_dir, 'intrinsics')))[1]
+        intrinsics_cam_listdirs_names = sorted(next(os.walk(os.path.join(calib_dir, 'intrinsics')))[1])
     except StopIteration:
         logging.exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
         raise Exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
@@ -641,7 +642,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
     '''
 
     try:
-        extrinsics_cam_listdirs_names = next(os.walk(os.path.join(calib_dir, 'extrinsics')))[1]
+        extrinsics_cam_listdirs_names = sorted(next(os.walk(os.path.join(calib_dir, 'extrinsics')))[1])
     except StopIteration:
         logging.exception(f'Error: No {os.path.join(calib_dir, "extrinsics")} folder found.')
         raise Exception(f'Error: No {os.path.join(calib_dir, "extrinsics")} folder found.')
@@ -932,7 +933,9 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                 ax_3d.set_ylabel('Y')
                 ax_3d.set_zlabel('Z')
                 if np.all(objp[:,2] == 0):
-                    ax_3d.view_init(elev=-90, azim=0)
+                    ax_3d.view_init(elev=90, azim=-90)
+                else:
+                    ax_3d.view_init(vertical_axis='z')
                 fig_3d.show()
 
         if event.key == 'h':
@@ -970,7 +973,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
         If right click, last point is removed
         '''
         
-        global imgp_confirmed, objp_confirmed, objp_confirmed_notok, scat, ax_3d, fig_3d, events, count, xydata
+        global imgp_confirmed, objp_confirmed, objp_confirmed_notok, events, count, xydata
         
         # Left click: Add clicked point to imgp_confirmed
         # Display it on image and on 3D plot

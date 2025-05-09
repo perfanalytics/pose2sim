@@ -38,7 +38,6 @@ import json
 import re
 import logging
 import ast
-import numpy as np
 from functools import partial
 from tqdm import tqdm
 from anytree.importer import DictImporter
@@ -46,7 +45,7 @@ import cv2
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
 from deep_sort_realtime.deepsort_tracker import DeepSort
-from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort, sort_people_rtmlib,\
+from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort,\
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel
 from Pose2Sim.skeletons import *
 
@@ -56,7 +55,8 @@ __author__ = "HunMin Kim, David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["HunMin Kim", "David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
@@ -238,7 +238,7 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     frame_idx = 0
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    f_range = [[total_frames] if frame_range==[] else frame_range][0]
+    f_range = [[total_frames] if frame_range in ('all', 'auto', []) else frame_range][0]
     with tqdm(iterable=range(*f_range), desc=f'Processing {os.path.basename(video_path)}') as pbar:
         frame_count = 0
         while cap.isOpened():
@@ -351,7 +351,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
     if display_detection:
         cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
     
-    f_range = [[len(image_files)] if frame_range==[] else frame_range][0]
+    f_range = [[len(image_files)] if frame_range in ('all', 'auto', []) else frame_range][0]
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
         if frame_idx in range(*f_range):
             try:
@@ -590,7 +590,7 @@ def estimate_pose_all(config_dict):
             tracking_mode = 'sports2d'
         logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
         logging.info(f'Mode: {mode}.')
-        logging.info(f'Tracking is done with {tracking_mode}{" " if not tracking_mode=="deepsort" else f" with parameters: {deepsort_params}"}.\n')
+        logging.info(f'Tracking is performed with {tracking_mode}{"" if not tracking_mode=="deepsort" else f" with parameters: {deepsort_params}"}.\n')
 
         video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
         if not len(video_files) == 0: 

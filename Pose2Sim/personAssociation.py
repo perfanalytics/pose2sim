@@ -55,7 +55,8 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
@@ -580,7 +581,8 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
     min_affinity = config_dict.get('personAssociation').get('multi_person').get('min_affinity')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
-    calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
+    calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
+    calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
     
     if not multi_person:
         # Error
@@ -603,7 +605,7 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
         logging.info(f'--> In average, {mean_cam_off_count} cameras had to be excluded to reach the demanded {error_threshold_tracking} px error threshold after excluding points with likelihood below {likelihood_threshold_association}.')
     
     else:
-        logging.info(f'\n--> A person was reconstructed if the lines from cameras to their keypoints intersected within {reconstruction_error_threshold} m and if the calculated affinity stayed below {min_affinity} after excluding points with likelihood below {likelihood_threshold_association}.')
+        logging.info(f'\n--> A person was reconstructed if the lines from cameras to their keypoints intersected within {reconstruction_error_threshold} m and if the calculated affinity stayed above {min_affinity} after excluding points with likelihood below {likelihood_threshold_association}.')
         logging.info(f'--> Beware that people were sorted across cameras, but not across frames. This will be done in the triangulation stage.')
 
     logging.info(f'\nTracked json files are stored in {os.path.realpath(poseTracked_dir)}.')
@@ -649,7 +651,8 @@ def associate_all(config_dict):
     except:
         raise Exception(f'No .toml calibration direcctory found.')
     try:
-        calib_file = glob.glob(os.path.join(calib_dir, '*.toml'))[0] # lastly created calibration file
+        calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
+        calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
     except:
         raise Exception(f'No .toml calibration file found in the {calib_dir}.')
     pose_dir = os.path.join(project_dir, 'pose')
@@ -702,7 +705,7 @@ def associate_all(config_dict):
     except: pass
     
     error_min_tot, cameras_off_tot = [], []
-    f_range = [[0,max([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
+    f_range = [[0,max([len(j) for j in json_files_names])] if frame_range in ('all', 'auto', []) else frame_range][0]
     n_cams = len(json_dirs_names)
 
     # Check that camera number is consistent between calibration file and pose folders

@@ -90,7 +90,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
    4. [Camera calibration](#camera-calibration)
       1. [Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-caliscope-anipose-freemocap-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
-   5. [Synchronizing, Associatiating, Triangulating, Filtering](#synchronizing-associating-triangulating-filtering)
+   5. [Synchronizing, Associating, Triangulating, Filtering](#synchronizing-associating-triangulating-filtering)
       1. [Synchronization](#synchronization)
       2. [Associate persons across cameras](#associate-persons-across-cameras)
       3. [Triangulating keypoints](#triangulating-keypoints)
@@ -168,8 +168,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.1
   <!-- print(f'torch version: {torch.__version__}, cuda version: {torch.version.cuda}, cudnn version: {torch.backends.cudnn.version()}, onnxruntime version: {ort.__version__}') -->
 
 > **Note on storage use:**\
-     A full installation takes up to 11 GB of storage spate. However, GPU support is not mandatory and takes about 6 GB. Moreover, [marker augmentation](#marker-augmentation) requires Tensorflow and does not necessarily yield better results. You can save an additional 1.3 GB by uninstalling it: `pip uninstall tensorflow`.\
-     A minimal installation with carefully chosen pose models and without GPU support, Tensorflow, PyQt5 **would take less than 3 GB**.\
+     A full installation takes up to 10 GB of storage spate. However, GPU support is not mandatory and takes about 6 GB. A minimal installation with carefully chosen pose models and without GPU support **would take less than 3 GB**.\
     <img src="Content/Storage.png" width="760">
 
 
@@ -410,7 +409,7 @@ Pose2Sim.poseEstimation()
 1. Train your DeepLabCut model and run it on your images or videos (more instruction on their repository)
 2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)). Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json': 
    ``` cmd
-   python -m DLC_to_OpenPose -i input_h5_file
+   DLC_to_OpenPose -i input_h5_file
    ```
 3. Edit `pose.CUSTOM` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), and edit the node IDs so that they correspond to the column numbers of the 2D pose file, starting from zero. Make sure you also changed the `pose_model` and the `tracked_keypoint`.\
    You can visualize your skeleton's hierarchy by changing pose_model to CUSTOM and writing these lines: 
@@ -449,9 +448,9 @@ Make sure you modify the [Config.toml](https://github.com/perfanalytics/pose2sim
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 * Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
   ``` cmd
-  python -m Blazepose_runsave -i input_file -dJs
+  Blazepose_runsave -i input_file -dJs
   ```
-  Type in `python -m Blazepose_runsave -h` for explanation on parameters.
+  Type in `Blazepose_runsave -h` for explanation on parameters.
 * Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
 ### With AlphaPose *(legacy)*:
@@ -462,7 +461,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 * Install and run AlphaPose on your videos (more instruction on their repository)
 * Translate the AlphaPose single json file to OpenPose frame-by-frame files (with `AlphaPose_to_OpenPose.py` script, see [Utilities](#utilities)): 
    ``` cmd
-   python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
+   AlphaPose_to_OpenPose -i input_alphapose_json_file
    ```
 * Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
@@ -498,7 +497,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
   - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
   - Calibration can be skipped since these formats are natively supported by Pose2Sim.
 - **From [Qualisys](https://www.qualisys.com):**
-  - Export calibration to `.qca.txt` within QTM.
+  - Export calibration to `.qca.txt` within QTM (see [there](https://github.com/perfanalytics/pose2sim/issues/56#issuecomment-1855933754)).
   - Copy it in the `Calibration` Pose2Sim folder.
   - set `convert_from` to 'qualisys' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
   - If you set your cameras vertically and the videos are rendered sideways, you need to rotate them and the calibration file before running pose estimation. [Use this script](https://github.com/perfanalytics/pose2sim/issues/136#issuecomment-2398110061).
@@ -804,6 +803,15 @@ A list of standalone tools (see [Utilities](https://github.com/perfanalytics/pos
 
 
 <details>
+   <summary><b>Video editing</b> (CLICK TO SHOW)</summary>
+     <pre>
+     
+ [face_blurring.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/face_blurring.py)
+ Blurs or masks faces on a video.
+    </pre>
+ </details>
+ 
+<details>
   <summary><b>Converting pose files</b> (CLICK TO SHOW)</summary>
     <pre>
 
@@ -979,7 +987,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Calibration:** Easier and clearer calibration procedure: separate intrinsic and extrinsic parameter calculation, edit corner detection if some are wrongly detected (or not visible). 
 &#10004; **Calibration:** Possibility to evaluate extrinsic parameters from cues on scene.
 &#9634; **Calibration:** Automatic calibration based on [keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
-&#9634; **Calibration:** Calibration of moving cameras. Detect or click points, and then track them for live calibration of moving cameras. Propose to click again when they are lost.
+&#9634; **Calibration:** Calibration of moving cameras. Detect or click points, and then track them for live calibration of moving cameras. Propose to click again when they are lost. Alternatively, use [DVPO](https://github.com/princeton-vl/DPVO) (see its implementation in [GVHMR](https://github.com/zju3dv/GVHMR/blob/main/hmr4d/utils/preproc/slam.py))
 &#9634; **Calibration:** Support vertical checkerboard.
 &#9634; **Calibration:** Calibrate cameras by pairs and compute average extrinsic calibration with [aniposelib](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/utils.py#L167). 
 &#9634; **Calibration:** Fine-tune calibration with bundle adjustment.
@@ -1057,10 +1065,6 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 
 **Acknowledgements:**
 - Supervised my PhD: [@lreveret](https://github.com/lreveret) (INRIA, Université Grenoble Alpes), and [@mdomalai](https://github.com/mdomalai) (Université de Poitiers).
-- Provided the Demo data: [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
-- Tested the code and provided feedback: [@simonozan](https://github.com/simonozan), [@daeyongyang](https://github.com/daeyongyang), [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals)
-- Submitted various accepted pull requests: [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals), [@peterlololsss](https://github.com/peterlololsss)
-- Provided a code snippet for Optitrack calibration: [@claraaudap](https://github.com/claraaudap) (Université Bretagne Sud).
-- Issued MPP2SOS, a (non-free) Blender extension based on Pose2Sim: [@carlosedubarreto](https://github.com/carlosedubarreto)
-
-
+- Post-doc at the [University of Bath (UK)](https://www.bath.ac.uk/) and engineer at [ForceTeck](https://forceteck.com/).
+- Demo data from [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
+- Thanks to [all the contributors](https://github.com/perfanalytics/pose2sim/graphs/contributors), past and to come! Thanks to everyone who gave feedback and contributed to making this software program better.

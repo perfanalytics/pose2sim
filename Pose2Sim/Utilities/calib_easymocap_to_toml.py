@@ -15,8 +15,8 @@
     
     Usage: 
         import calib_easymocap_to_toml; calib_yml_to_toml.calib_easymocap_to_toml_func(r'<intrinsic_yml_file>', r'<extrinsic_yml_file>')
-        OR python -m calib_easymocap_to_toml -i intrinsic_yml_file -e extrinsic_yml_file
-        OR python -m calib_easymocap_to_toml -i intrinsic_yml_file -e extrinsic_yml_file -o output_toml_file
+        OR calib_easymocap_to_toml -i intrinsic_yml_file -e extrinsic_yml_file
+        OR calib_easymocap_to_toml -i intrinsic_yml_file -e extrinsic_yml_file -o output_toml_file
 '''
 
 
@@ -32,13 +32,28 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    '''
+    Main function for command line use
+    '''
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--intrinsic_file', required = True, help='EasyMocap intrinsic .yml calibration file')
+    parser.add_argument('-e', '--extrinsic_file', required = True, help='EasyMocap extrinsic .yml calibration file')
+    parser.add_argument('-t', '--toml_file', required=False, help='OpenCV .toml output calibration file')
+    args = vars(parser.parse_args())
+    
+    calib_easymocap_to_toml_func(args)
+
+
 def read_intrinsic_yml(intrinsic_path):
     '''
     Reads an intrinsic .yml calibration file
@@ -123,8 +138,8 @@ def calib_easymocap_to_toml_func(*args):
     
     Usage: 
         import calib_yml_to_toml; calib_yml_to_toml.calib_yml_to_toml_func(r'<intrinsic_yml_file>', r'<extrinsic_yml_file>')
-        OR python -m calib_yml_to_toml -i intrinsic_yml_file -e extrinsic_yml_file
-        OR python -m calib_yml_to_toml -i intrinsic_yml_file -e extrinsic_yml_file -o output_toml_file
+        OR calib_yml_to_toml -i intrinsic_yml_file -e extrinsic_yml_file
+        OR calib_yml_to_toml -i intrinsic_yml_file -e extrinsic_yml_file -o output_toml_file
     '''
     try:
         intrinsic_path = os.path.realpath(args[0].get('intrinsic_file')) # invoked with argparse
@@ -145,11 +160,4 @@ def calib_easymocap_to_toml_func(*args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--intrinsic_file', required = True, help='EasyMocap intrinsic .yml calibration file')
-    parser.add_argument('-e', '--extrinsic_file', required = True, help='EasyMocap extrinsic .yml calibration file')
-    parser.add_argument('-t', '--toml_file', required=False, help='OpenCV .toml output calibration file')
-    args = vars(parser.parse_args())
-    
-    calib_easymocap_to_toml_func(args)
-    
+    main()

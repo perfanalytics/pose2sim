@@ -37,7 +37,6 @@ import os
 import sys
 from pathlib import Path
 import numpy as np
-import pandas as pd
 from lxml import etree
 import logging
 from anytree import PreOrderIter
@@ -570,6 +569,7 @@ def kinematics_all(config_dict):
     session_dir = Path(project_dir) / '..'
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
+
     use_augmentation = config_dict.get('kinematics').get('use_augmentation')
     use_contacts_muscles = config_dict.get('kinematics').get('use_contacts_muscles')
 

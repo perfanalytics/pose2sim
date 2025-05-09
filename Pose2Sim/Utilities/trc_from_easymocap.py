@@ -20,8 +20,8 @@
     N.B.: Trc framerate is set to 1 by default.
 
     Usage: 
-    python -m trc_from_easymocap -i input_keypoint_dir
-    python -m trc_from_easymocap -i input_keypoint_dir -o output_trc_dir
+    trc_from_easymocap -i input_keypoint_dir
+    trc_from_easymocap -i input_keypoint_dir -o output_trc_dir
     import trc_from_easymocap; trc_from_easymocap.trc_from_easymocap_func(input_keypoint_dir=r'<input_keypoint_dir>', output_trc_dir=r'<output_trc_dir>')
 '''
 
@@ -44,13 +44,23 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input_keypoint_dir', required = True, help='directory on input keypoints3D folder with EasyMocap json files')
+    parser.add_argument('-o', '--output_trc_dir', required = False, help='direction of the gait. If negative, you need to include an equal sign in the argument, eg -d=-Z')
+    
+    kwargs = vars(parser.parse_args())
+    trc_from_easymocap_func(**kwargs)
+
+
 def zup2yup(Q):
     '''
     X->Y, Y->Z, Z->X
@@ -156,13 +166,9 @@ def trc_from_easymocap_func(**kwargs):
     max_id = max_persons(keypoint_files)
     Q_df = df_from_easymocap(keypoint_files, max_id)
     write_trc(Q_df, output_trc_dir=output_trc_dir, trc_root_name=trc_root_name)
-       
+
+    print(f"TRC files written in {output_trc_dir}")
+
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input_keypoint_dir', required = True, help='directory on input keypoints3D folder with EasyMocap json files')
-    parser.add_argument('-o', '--output_trc_dir', required = False, help='direction of the gait. If negative, you need to include an equal sign in the argument, eg -d=-Z')
-    
-    kwargs = vars(parser.parse_args())
-    trc_from_easymocap_func(**kwargs)
-
+    main()

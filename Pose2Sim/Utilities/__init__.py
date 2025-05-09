@@ -3,5 +3,6 @@
 
 import sys
 
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 VERSION = __version__

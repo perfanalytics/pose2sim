@@ -14,16 +14,16 @@
     Butterworth filter, low-pass, 4th order, cut off frequency 6 Hz:
         from Pose2Sim.Utilities import trc_filter; trc_filter.trc_filter_func(input_file = input_trc_file, output_file = output_trc_file, 
             display=True, type='butterworth', pass_type = 'low', order=4, cut_off_frequency=6)
-        OR python -m trc_filter -i input_trc_file -o output_trc_file -d True -t butterworth -p low -n 4 -f 6
-        OR python -m trc_filter -i input_trc_file -t butterworth -p low -n 4 -f 6
+        OR trc_filter -i input_trc_file -o output_trc_file -d True -t butterworth -p low -n 4 -f 6
+        OR trc_filter -i input_trc_file -t butterworth -p low -n 4 -f 6
     Butterworth filter on speed, low-pass, 4th order, cut off frequency 6 Hz:
-        python -m trc_filter -i input_trc_file -t butterworth_on_speed -p low -n 4 -f 6
+        trc_filter -i input_trc_file -t butterworth_on_speed -p low -n 4 -f 6
     Gaussian filter, kernel 5:
-        python -m trc_filter -i input_trc_file -t gaussian, -k 5
+        trc_filter -i input_trc_file -t gaussian, -k 5
     LOESS filter, kernel 5: NB: frac = kernel * frames_number
-        python -m trc_filter -i input_trc_file -t loess, -k 5
+        trc_filter -i input_trc_file -t loess, -k 5
     Median filter, kernel 5:
-        python -m trc_filter -i input_trc_file -t gaussian, -k 5
+        trc_filter -i input_trc_file -t gaussian, -k 5
 '''
 
 
@@ -48,13 +48,32 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## CLASSES
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input_file', required = True, help='trc input file')
+    parser.add_argument('-t', '--type', required=True, help='type of filter. "butterworth", \
+        "butterworth_on_speed", "loess"/"lowess", "gaussian", or "median"')
+    parser.add_argument('-d', '--display', required = False, default = True, help='display plots')
+    parser.add_argument('-o', '--output_file', required=False, help='filtered trc output file')
+    
+    parser.add_argument('-p', '--pass_type', required=False, help='"low" or "high" pass filter')
+    parser.add_argument('-n', '--order', required=False, help='filter order')
+    parser.add_argument('-f', '--cut_off_frequency', required=False, help='cut-off frequency')
+    parser.add_argument('-k', '--kernel', required=False, help='kernel of the median, gaussian, or loess filter')
+
+    args = vars(parser.parse_args())
+    
+    trc_filter_func(**args)
+
+
 class plotWindow():
     '''
     Display several figures in tabs
@@ -300,16 +319,16 @@ def trc_filter_func(**args):
     Butterworth filter, low-pass, 4th order, cut off frequency 6 Hz:
         import trc_filter; trc_filter.trc_filter_func(input_file = input_trc_file, output_file = output_trc_file, 
             display=True, type='butterworth', pass_type = 'low', order=4, cut_off_frequency=6)
-        OR python -m trc_filter -i input_trc_file -o output_trc_file -d True -t butterworth -p low -n 4 -f 6
-        OR python -m trc_filter -i input_trc_file -t butterworth, -p low -n 4 -f 6
+        OR trc_filter -i input_trc_file -o output_trc_file -d True -t butterworth -p low -n 4 -f 6
+        OR trc_filter -i input_trc_file -t butterworth, -p low -n 4 -f 6
     Butterworth filter on speed, low-pass, 4th order, cut off frequency 6 Hz:
-        python -m trc_filter -i input_trc_file -t butterworth_on_speed, -p low -n 4 -f 6
+        trc_filter -i input_trc_file -t butterworth_on_speed, -p low -n 4 -f 6
     Gaussian filter, kernel 5:
-        python -m trc_filter -i input_trc_file -t gaussian, -k 5
+        trc_filter -i input_trc_file -t gaussian, -k 5
     LOESS filter, kernel 5: NB: frac = kernel * frames_number
-        python -m trc_filter -i input_trc_file -t loess, -k 5
+        trc_filter -i input_trc_file -t loess, -k 5
     Median filter, kernel 5:
-        python -m trc_filter -i input_trc_file -t gaussian, -k 5
+        trc_filter -i input_trc_file -t gaussian, -k 5
     '''
 
     # Read trc header
@@ -342,23 +361,8 @@ def trc_filter_func(**args):
         Q_filt.insert(1, 'Time', time_col)
         Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
 
+    print(f"trc file filtered: {trc_path_out}")
+    
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input_file', required = True, help='trc input file')
-    parser.add_argument('-t', '--type', required=True, help='type of filter. "butterworth", \
-        "butterworth_on_speed", "loess"/"lowess", "gaussian", or "median"')
-    parser.add_argument('-d', '--display', required = False, default = True, help='display plots')
-    parser.add_argument('-o', '--output_file', required=False, help='filtered trc output file')
-    
-    parser.add_argument('-p', '--pass_type', required=False, help='"low" or "high" pass filter')
-    parser.add_argument('-n', '--order', required=False, help='filter order')
-    parser.add_argument('-f', '--cut_off_frequency', required=False, help='cut-off frequency')
-    parser.add_argument('-k', '--kernel', required=False, help='kernel of the median, gaussian, or loess filter')
-
-    args = vars(parser.parse_args())
-    
-    try:
-        trc_filter_func(**args)
-    except:
-        print('ERROR: You probably passed bad arguments. See examples in trc_filter.py module header or with "help(trc_filter_func)"')
+    main()

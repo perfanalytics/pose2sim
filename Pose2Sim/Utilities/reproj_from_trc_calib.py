@@ -18,10 +18,10 @@
     
     Usage: 
     from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', '<output_format>', r'<output_file_root>')
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -odm
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -odm --markerset halpe26
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file --openpose --deeplabcut --mmpose --undistort
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -d -o output_file_root
+    reproj_from_trc_calib -t input_trc_file -c input_calib_file -odm
+    reproj_from_trc_calib -t input_trc_file -c input_calib_file -odm --markerset halpe26
+    reproj_from_trc_calib -t input_trc_file -c input_calib_file --openpose --deeplabcut --mmpose --undistort
+    reproj_from_trc_calib -t input_trc_file -c input_calib_file -d -o output_file_root
 '''
 
 
@@ -43,7 +43,8 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
@@ -56,6 +57,21 @@ biocvplus_markers = ['ACROM_R', 'ACROM_L', 'C7', 'T10', 'CLAV', 'XIP_PROC', 'UA_
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', '--input_trc_file', required = True, help='trc 3D coordinates input file path')
+    parser.add_argument('-c', '--input_calib_file', required = True, help='toml calibration input file path')
+    parser.add_argument('-o', '--openpose', required=False, action='store_true', help='output format in the openpose json format')
+    parser.add_argument('-d', '--deeplabcut', required=False, action='store_true', help='output format in the deeplabcut csv and h5 formats')
+    parser.add_argument('-m', '--mmpose', required=False, action='store_true', help='output format in the Coco/MMpose json format')
+    parser.add_argument('-s', '--markerset', required=False, help='markerset name, e.g. halpe26, halpeplus, biocvplus')
+    parser.add_argument('-u', '--undistort_points', required=False, action='store_true', help='takes distortion into account if True')
+    parser.add_argument('-O', '--output_file_root', required=False, help='output file root path, without extension')
+    args = vars(parser.parse_args())
+
+    reproj_from_trc_calib_func(**args)
+
+
 def str_to_id(string, length=12):
     '''
     Convert a string to an integer id
@@ -373,9 +389,9 @@ def reproj_from_trc_calib_func(**args):
     
     Usage: 
     from Pose2Sim.Utilities import reproj_from_trc_calib; reproj_from_trc_calib.reproj_from_trc_calib_func(r'<input_trc_file>', r'<input_calib_file>', '<output_format>', r'<output_file_root>')
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -odm
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file --openpose --deeplabcut --mmpose --undistort
-    python -m reproj_from_trc_calib -t input_trc_file -c input_calib_file -d -o output_file_root
+    reproj_from_trc_calib -t input_trc_file -c input_calib_file -odm
+    reproj_from_trc_calib -t input_trc_file -c input_calib_file --openpose --deeplabcut --mmpose --undistort
+    reproj_from_trc_calib -t input_trc_file -c input_calib_file -d -o output_file_root
     '''
 
     input_trc_file = os.path.realpath(args.get('input_trc_file')) # invoked with argparse
@@ -498,15 +514,4 @@ def reproj_from_trc_calib_func(**args):
     
     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--input_trc_file', required = True, help='trc 3D coordinates input file path')
-    parser.add_argument('-c', '--input_calib_file', required = True, help='toml calibration input file path')
-    parser.add_argument('-o', '--openpose', required=False, action='store_true', help='output format in the openpose json format')
-    parser.add_argument('-d', '--deeplabcut', required=False, action='store_true', help='output format in the deeplabcut csv and h5 formats')
-    parser.add_argument('-m', '--mmpose', required=False, action='store_true', help='output format in the Coco/MMpose json format')
-    parser.add_argument('-s', '--markerset', required=False, help='markerset name, e.g. halpe26, halpeplus, biocvplus')
-    parser.add_argument('-u', '--undistort_points', required=False, action='store_true', help='takes distortion into account if True')
-    parser.add_argument('-O', '--output_file_root', required=False, help='output file root path, without extension')
-    args = vars(parser.parse_args())
-
-    reproj_from_trc_calib_func(**args)
+    main()

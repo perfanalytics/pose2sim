@@ -12,8 +12,8 @@
 
     Usage: 
         from Pose2Sim.Utilities import calib_qca_to_toml; calib_qca_to_toml.calib_qca_to_toml_func(r'<input_qca_file>')
-        OR python -m calib_qca_to_toml -i input_qca_file
-        OR python -m calib_qca_to_toml -i input_qca_file --binning_factor 2 -o output_toml_file
+        OR calib_qca_to_toml -i input_qca_file
+        OR calib_qca_to_toml -i input_qca_file --binning_factor 2 -o output_toml_file
 '''
 
 
@@ -31,13 +31,24 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input_file', required = True, help='Qualisys .qca.txt input calibration file')
+    parser.add_argument('-b', '--binning_factor', required = False, default = 1, help='Binning factor if applied')
+    parser.add_argument('-o', '--output_file', required=False, help='OpenCV .toml output calibration file')
+    args = vars(parser.parse_args())
+    
+    calib_qca_to_toml_func(args)
+
+    
 def natural_sort_key(s):
     '''
     Key for natural sorting of strings containing numbers.
@@ -223,15 +234,9 @@ def calib_qca_to_toml_func(*args):
     
     toml_write(toml_path, C, S, D, K, R, T)
 
-    print('Calibration file generated.\n')
+    print(f'Calibration file generated at {toml_path}.\n')
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input_file', required = True, help='Qualisys .qca.txt input calibration file')
-    parser.add_argument('-b', '--binning_factor', required = False, default = 1, help='Binning factor if applied')
-    parser.add_argument('-o', '--output_file', required=False, help='OpenCV .toml output calibration file')
-    args = vars(parser.parse_args())
-    
-    calib_qca_to_toml_func(args)
+    main()
     

@@ -12,8 +12,8 @@
 
     Usage: 
         from Pose2Sim.Utilities import calib_toml_to_easymocap; calib_toml_to_easymocap.calib_toml_to_easymocap_func(r'<input_toml_file>')
-        OR python -m calib_easymocap_to_toml -t input_toml_file
-        OR python -m calib_easymocap_to_toml -t input_toml_file -i intrinsic_yml_file -e extrinsic_yml_file
+        OR calib_easymocap_to_toml -t input_toml_file
+        OR calib_easymocap_to_toml -t input_toml_file -i intrinsic_yml_file -e extrinsic_yml_file
 '''
 
 ## INIT
@@ -29,14 +29,24 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', '--toml_file', required = True, help='Input OpenCV .toml calibration file')
+    parser.add_argument('-i', '--intrinsic_yml_file', required = False, help='OpenCV intrinsic .yml calibration file')
+    parser.add_argument('-e', '--extrinsic_yml_file', required = False, help='OpenCV extrinsic .yml calibration file')
+    args = vars(parser.parse_args())
+    
+    calib_toml_to_easymocap_func(args)
 
+    
 def read_toml(toml_path):
     '''
     Read an OpenCV .toml calibration file
@@ -118,8 +128,8 @@ def calib_toml_to_easymocap_func(*args):
 
     Usage: 
         from Pose2Sim.Utilities import calib_toml_to_easymocap; calib_toml_to_easymocap.calib_toml_to_easymocap_func(r'<input_toml_file>')
-        OR python -m calib_easymocap_to_toml -t input_toml_file
-        OR python -m calib_easymocap_to_toml -t input_toml_file -i intrinsic_yml_file -e extrinsic_yml_file
+        OR calib_easymocap_to_toml -t input_toml_file
+        OR calib_easymocap_to_toml -t input_toml_file -i intrinsic_yml_file -e extrinsic_yml_file
     '''
     
     try:
@@ -143,11 +153,5 @@ def calib_toml_to_easymocap_func(*args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--toml_file', required = True, help='Input OpenCV .toml calibration file')
-    parser.add_argument('-i', '--intrinsic_yml_file', required = False, help='OpenCV intrinsic .yml calibration file')
-    parser.add_argument('-e', '--extrinsic_yml_file', required = False, help='OpenCV extrinsic .yml calibration file')
-    args = vars(parser.parse_args())
-    
-    calib_toml_to_easymocap_func(args)
+    main()
 

@@ -11,8 +11,8 @@
     
     Usage: 
     from Pose2Sim.Utilities import trc_to_c3d; trc_to_c3d.trc_to_c3d_func(r'<input_trc_file>')
-    python -m trc_to_c3d -t <path_to_trc_path>
-    python -m trc_to_c3d --trc_path <path_to_trc_path> --c3d_path <output_c3d_file>
+    trc_to_c3d -t <path_to_trc_path>
+    trc_to_c3d --trc_path <path_to_trc_path> --c3d_path <output_c3d_file>
 '''
 
 
@@ -27,13 +27,23 @@ __author__ = "HunMin Kim, David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["HuMin Kim, David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser(description='Convert TRC files to C3D files.')
+    parser.add_argument('-t', '--trc_path', type=str, required=True, help='trc input file path')
+    parser.add_argument('-c', '--c3d_path', type=str, required=False, help='c3d output file path')
+    args = vars(parser.parse_args())
+
+    trc_to_c3d_func(args)
+
+
 def extract_trc_data(trc_path):
     '''
     Extract marker names and coordinates from a trc file.
@@ -100,8 +110,8 @@ def trc_to_c3d_func(*args):
     
     Usage: 
     from Pose2Sim.Utilities import trc_to_c3d; trc_to_c3d.trc_to_c3d_func(r'<input_trc_file>')
-    python -m trc_to_c3d -t <path_to_trc_path>
-    python -m trc_to_c3d --trc_path <path_to_trc_path> --c3d_path <output_c3d_file>    
+    trc_to_c3d -t <path_to_trc_path>
+    trc_to_c3d --trc_path <path_to_trc_path> --c3d_path <output_c3d_file>    
     '''
 
     try:
@@ -121,9 +131,4 @@ def trc_to_c3d_func(*args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Convert TRC files to C3D files.')
-    parser.add_argument('-t', '--trc_path', type=str, required=True, help='trc input file path')
-    parser.add_argument('-c', '--c3d_path', type=str, required=False, help='c3d output file path')
-    args = vars(parser.parse_args())
-
-    trc_to_c3d_func(args)
+    main()

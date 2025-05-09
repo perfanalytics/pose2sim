@@ -12,8 +12,8 @@
 
     Usage: 
         from Pose2Sim.Utilities import calib_toml_to_qca; calib_toml_to_qca.calib_toml_to_qca_func(r'<input_toml_file>')
-        OR python -m calib_toml_to_qca -i input_toml_file
-        OR python -m calib_toml_to_qca -i input_toml_file --binning_factor 2 --pixel_size 5.54e-3 -o output_qca_file
+        OR calib_toml_to_qca -i input_toml_file
+        OR calib_toml_to_qca -i input_toml_file --binning_factor 2 --pixel_size 5.54e-3 -o output_qca_file
 '''
 
 
@@ -31,13 +31,25 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input_file', required = True, help='OpenCV .toml output calibration file')
+    parser.add_argument('-b', '--binning_factor', required = False, default = 1, help='Binning factor if applied')
+    parser.add_argument('-p', '--pixel_size', required = False, default = 5.54e-3, help='Pixel size in mm, 5.54e-3 mm by default (CMOS CMV2000)')
+    parser.add_argument('-o', '--output_file', required=False, help='Qualisys .qca.txt input calibration file')
+    args = vars(parser.parse_args())
+    
+    calib_toml_to_qca_func(**args)
+
+
 def read_toml(toml_path):
     '''
     Read an OpenCV .toml calibration file
@@ -186,16 +198,9 @@ def calib_toml_to_qca_func(**args):
 
     qca_write(qca_path, C, S, D, K, R, T, binning_factor, pixel_size)
 
-    print('Calibration file generated.\n')
+    print(f'Calibration file generated at {qca_path}.')
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input_file', required = True, help='OpenCV .toml output calibration file')
-    parser.add_argument('-b', '--binning_factor', required = False, default = 1, help='Binning factor if applied')
-    parser.add_argument('-p', '--pixel_size', required = False, default = 5.54e-3, help='Pixel size in mm, 5.54e-3 mm by default (CMOS CMV2000)')
-    parser.add_argument('-o', '--output_file', required=False, help='Qualisys .qca.txt input calibration file')
-    args = vars(parser.parse_args())
-    
-    calib_toml_to_qca_func(**args)
+    main()
     
