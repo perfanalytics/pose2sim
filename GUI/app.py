@@ -30,7 +30,21 @@ class Pose2SimApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Pose2Sim Configuration Tool")
-        self.root.geometry("1300x800")
+        
+        # Get screen dimensions
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # Set window size
+        window_width = 1300
+        window_height = 800
+        
+        # Calculate position for center of screen
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        # Set window size and position
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
         
         # Initialize variables
         self.language = None  # Will be 'en' or 'fr'
