@@ -237,7 +237,7 @@
 # fastest_frames_to_remove_percent = 0.1 # Frames with high speed are considered as outliers
 # close_to_zero_speed_m = 0.2 # Sum for all keypoints: about 0.1 m/frame
 # large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
-# trimmed_extrema_percent = 0.25 # Proportion of the most extreme segment values to remove before calculating their mean)
+# trimmed_extrema_percent = 0.5 # Proportion of the most extreme segment values to remove before calculating their mean)
 
 
 # [logging]
