@@ -103,7 +103,8 @@ class IntroWindow:
         
         # Store animation parameters
         self.opacity = 0
-        self.fade_step = 0.0018
+        self.fadein_step = 0.008 # Time step for fade-in/out
+        self.fadeout_step = 0.0018
         self.current_group = 0  # Track current group (0: Pose, 1: 2, 2: Sim)
         self.animation_done = False
         self.after_id = None
@@ -159,7 +160,7 @@ class IntroWindow:
             return
         if self.current_group < len(self.groups):
             if self.opacity < 1:
-                self.opacity += self.fade_step
+                self.opacity += self.fadein_step
                 # Make current group visible and set opacity
                 for text_id, shadow_id in self.groups[self.current_group]:
                     self.canvas.itemconfig(shadow_id, state='normal')
@@ -195,7 +196,7 @@ class IntroWindow:
         if not self.root.winfo_exists():
             return
         if self.opacity > 0:
-            self.opacity -= self.fade_step
+            self.opacity -= self.fadeout_step
             # Update all letters opacity together
             
             # Calculate color values based on mode

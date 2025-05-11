@@ -535,7 +535,7 @@ class TutorialTab:
                 
             except Exception as e:
                 # Show error
-                self.frame.after(0, lambda: status_label.configure(
+                self.frame.after(0, lambda e=e: status_label.configure(
                     text=f"Error: {str(e)}",
                     text_color="#F44336"
                 ))
