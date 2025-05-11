@@ -1,13 +1,11 @@
-import os
+from pathlib import Path
 import sys
-import tkinter as tk
 import customtkinter as ctk
 from tkinter import messagebox
 import subprocess
 import threading
 import webbrowser
-import cv2
-from PIL import Image, ImageTk
+from PIL import Image
 
 class TutorialTab:
     def __init__(self, parent, app):
@@ -18,7 +16,7 @@ class TutorialTab:
         self.frame = ctk.CTkFrame(parent)
         
         # Initialize variables
-        self.marker_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tutorial_completed")
+        self.marker_file = Path(__file__).parent.parent / "tutorial_completed"
         
         # Video links
         self.video_links = {
@@ -115,9 +113,8 @@ class TutorialTab:
         self.tutorial_img_frame.pack(fill='x', pady=10)
         
         # Load a placeholder image or tutorial screenshot if available
-        tutorial_img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "tutorial_preview.png")
-        
-        if os.path.exists(tutorial_img_path):
+        tutorial_img_path = Path(__file__).parent.parent / "assets" / "tutorial_preview.png"
+        if tutorial_img_path.exists():
             try:
                 # Load and display image
                 img = Image.open(tutorial_img_path)
@@ -263,7 +260,7 @@ class TutorialTab:
     
     def check_tutorial_status(self):
         """Check if the tutorial has been completed before"""
-        if os.path.exists(self.marker_file):
+        if Path(self.marker_file).exists():
             # Tutorial has been completed before, only show skip button
             self.complete_button.pack_forget()
         else:

@@ -1,5 +1,3 @@
-import os
-import tkinter as tk
 import customtkinter as ctk
 from tkinter import messagebox
 import ast
@@ -100,9 +98,6 @@ class AdvancedTab:
         if self.simplified:
             # 2D mode settings
             settings = {
-                'project': {
-                    'frame_rate': self.frame_rate_var.get()
-                },
                 'pose': {
                     'slowmo_factor': int(self.slowmo_factor_var.get()),
                     'keypoint_likelihood_threshold': float(self.keypoint_likelihood_threshold_var.get()),
@@ -116,6 +111,8 @@ class AdvancedTab:
                     'filter': self.filter_var.get(),
                     'show_graphs': self.show_graphs_var.get(),
                     'filter_type': self.filter_type_2d_var.get()
+                },
+                'logging': {'use_custom_logging':False
                 }
             }
             
@@ -178,6 +175,8 @@ class AdvancedTab:
                     'right_left_symmetry': self.right_left_symmetry_var.get(),
                     'remove_individual_scaling_setup': self.remove_individual_scaling_setup_var.get(),
                     'remove_individual_IK_setup': self.remove_individual_IK_setup_var.get()
+                },
+                'logging': {'use_custom_logging':False
                 }
             }
             

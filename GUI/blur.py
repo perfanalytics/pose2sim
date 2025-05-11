@@ -2,12 +2,10 @@ import cv2
 import os
 import numpy as np
 import tkinter as tk
-from tkinter import filedialog, ttk, Scale, IntVar, StringVar, BooleanVar, colorchooser
+from tkinter import filedialog, ttk, IntVar, StringVar, BooleanVar, colorchooser
 from PIL import Image, ImageTk
 import time
 import json
-import sys
-import threading
 
 # Try to import RTMLib and DeepSort
 try:

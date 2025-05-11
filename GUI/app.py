@@ -1,30 +1,25 @@
 import os
-import shutil
-import tkinter as tk
 import customtkinter as ctk
-from tkinter import ttk, messagebox, filedialog, simpledialog
-import threading
-from PIL import Image
 
 # Import language manager
-from language_manager import LanguageManager
+from GUI.language_manager import LanguageManager
 
 # Import tabs
-from tabs.welcome_tab import WelcomeTab
-from tabs.calibration_tab import CalibrationTab
-from tabs.prepare_video_tab import PrepareVideoTab
-from tabs.pose_model_tab import PoseModelTab
-from tabs.synchronization_tab import SynchronizationTab
-from tabs.activation_tab import ActivationTab
-from tabs.advanced_tab import AdvancedTab
-from tabs.batch_tab import BatchTab
-from tabs.visualization_tab import VisualizationTab
-from tabs.tutorial_tab import TutorialTab
-from tabs.about_tab import AboutTab
+from GUI.tabs.welcome_tab import WelcomeTab
+from GUI.tabs.calibration_tab import CalibrationTab
+from GUI.tabs.prepare_video_tab import PrepareVideoTab
+from GUI.tabs.pose_model_tab import PoseModelTab
+from GUI.tabs.synchronization_tab import SynchronizationTab
+from GUI.tabs.activation_tab import ActivationTab
+from GUI.tabs.advanced_tab import AdvancedTab
+from GUI.tabs.batch_tab import BatchTab
+from GUI.tabs.visualization_tab import VisualizationTab
+from GUI.tabs.tutorial_tab import TutorialTab
+from GUI.tabs.about_tab import AboutTab
 
 
 # Import config generator
-from config_generator import ConfigGenerator
+from GUI.config_generator import ConfigGenerator
 
 class Pose2SimApp:
     def __init__(self, root):
@@ -208,7 +203,7 @@ class Pose2SimApp:
                 ('pose_model', PoseModelTab, "Pose Estimation", "👤"),
                 ('synchronization', SynchronizationTab, "Synchronization", "⏱️"),
                 ('advanced', AdvancedTab, "Advanced Settings", "⚙️"),
-                ('activation', ActivationTab, "Activation", "▶️")
+                ('activation', ActivationTab, "Run Analysis", "▶️")
             ]
             
             if self.process_mode == 'batch':
@@ -225,7 +220,7 @@ class Pose2SimApp:
                 ('tutorial', TutorialTab, "Tutorial", "📚"),
                 ('pose_model', PoseModelTab, "Pose Estimation", "👤"),
                 ('advanced', AdvancedTab, "Advanced Settings", "⚙️"),
-                ('activation', ActivationTab, "Activation", "▶️"),
+                ('activation', ActivationTab, "Run Analysis", "▶️"),
                 ('visualization', VisualizationTab, "Data Visualization", "📊"),
                 ('about', AboutTab, "About Us", "ℹ️")  # Add about tab at the end
             ]

@@ -1,8 +1,5 @@
-import os
-import sys
-import tkinter as tk
 import customtkinter as ctk
-from app import Pose2SimApp
+from GUI.app import Pose2SimApp
 
 def main():
     # Set appearance mode and color theme
