@@ -39,6 +39,8 @@ import pandas as pd
 import cv2
 from lxml import etree
 import warnings
+import tkinter as tk
+from tkinter import messagebox
 import matplotlib.pyplot as plt
 from PIL import Image
 from mpl_interactions import zoom_factory, panhandler
@@ -582,13 +584,14 @@ class PointCalibration(Calibration):
         # P_cam = Kh_cam @ H_cam
         # proj_obj = [ ( P_cam[0] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)),  P_cam[1] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)) ) for o in objp]
         proj_obj = np.squeeze(cv2.projectPoints(objp, r, t, mtx, dist)[0])
+        proj_obj_all = np.squeeze(cv2.projectPoints(object_coords_3d,r,t,mtx,dist)[0])
 
         if self.settings.show_reprojection_error:
             # Reopen image, otherwise 2 sets of text are overlaid
             img = cv2.imread(source.extrinsic_files[0])
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            for o in proj_obj:
+            for o in proj_obj_all:
                 cv2.circle(img, (int(o[0]), int(o[1])), 8, (0,0,255), -1) 
             for i in imgp:
                 cv2.drawMarker(img, (int(i[0][0]), int(i[0][1])), (0,255,0), cv2.MARKER_CROSS, 15, 2)
@@ -781,20 +784,38 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
             # Displays it in red on 3D plot
             if len(objp) != 0  and 'ax_3d' in globals():
                 count = [0 if 'count' not in globals() else count+1][0]
+                objp_confirmed_notok = objp[count]
                 if 'events' not in globals():
                     # retrieve first objp_confirmed_notok and plot 3D
                     events = [event]
-                    objp_confirmed_notok = objp[count]
+                    # Plot 3D
                     ax_3d.scatter(*objp_confirmed_notok, marker='o', color='r')
                     fig_3d.canvas.draw()
                 elif count == len(objp)-1:
-                    # if all objp have been clicked or indicated as not visible, close all
-                    objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])[:-1]
-                    imgp_confirmed = np.array(np.expand_dims(scat.get_offsets(), axis=1), np.float32) 
-                    plt.close('all')
-                    for var_to_delete in ['events', 'count', 'scat', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
-                        if var_to_delete in globals():
-                            del globals()[var_to_delete]
+                    # Plot 3D
+                    ax_3d.scatter(*objp_confirmed_notok, marker='o', color='r')
+                    fig_3d.canvas.draw()
+
+                    # Ask for confirmation
+                    root = tk.Tk()
+                    root.withdraw()
+                    response = messagebox.askyesno("Confirmation", "Confirm and go to next image")
+                    # Confirmed
+                    if response == True:
+                        plt.close('all')
+                        # if all objp have been clicked or indicated as not visible, close all
+                        objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])[:-1]
+                        imgp_confirmed = np.array(np.expand_dims(scat.get_offsets(), axis=1), np.float32) 
+                        for var_to_delete in ['events', 'count', 'scat', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
+                            if var_to_delete in globals():
+                                del globals()[var_to_delete]
+                    # Not confirmed
+                    else:
+                        root.destroy()
+                        # remove from plot 
+                        ax_3d.collections[-1].remove()
+                        fig_3d.canvas.draw()
+                        count -= 1
                 else:
                     # retrieve other objp_confirmed_notok and plot 3D
                     events.append(event)
@@ -838,22 +859,43 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     ax_3d.scatter(*objp[count], marker='o', color='g')
                     fig_3d.canvas.draw()
                 elif count == len(objp)-1:
-                    # close all
-                    plt.close('all')
-                    # retrieve objp_confirmed
-                    objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])
-                    imgp_confirmed = np.array(imgp_confirmed, np.float32)
-                    # delete all
-                    for var_to_delete in ['events', 'count', 'scat', 'scat_3d', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
-                        if var_to_delete in globals():
-                            del globals()[var_to_delete]
+
+                    # plot 3D
+                    ax_3d.scatter(*objp[count], marker='o', color='g')
+                    fig_3d.canvas.draw()
+                    # Ask for confirmation
+                    root = tk.Tk()
+                    root.withdraw()
+                    response = messagebox.askyesno("Confirmation", "Confirm and go to next image")
+                    # Confirmed
+                    if response == True:
+                        plt.close('all')
+                        # retrieve objp_confirmed
+                        objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])
+                        imgp_confirmed = np.array(imgp_confirmed, np.float32)
+                        # delete all
+                        for var_to_delete in ['events', 'count', 'scat', 'scat_3d', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
+                            if var_to_delete in globals():
+                                del globals()[var_to_delete]
+                    # Not confirmed
+                    else:
+                        root.destroy()
+                        # Remove lastpoint from image
+                        new_xydata = scat.get_offsets()[:-1]
+                        scat.set_offsets(new_xydata)
+                        plt.draw()
+                        # Remove last point from imgp_confirmed
+                        imgp_confirmed = imgp_confirmed[:-1]
+                        # remove from plot 
+                        ax_3d.collections[-1].remove()
+                        fig_3d.canvas.draw()
+                        count -= 1
                 else:
                     # retrieve objp_confirmed and plot 3D
                     objp_confirmed = [[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0]
                     ax_3d.scatter(*objp[count], marker='o', color='g')
                     fig_3d.canvas.draw()
                 
-
         # Right click: 
         # If last event was left click, remove last point and if objp given, from objp_confirmed
         # If last event was 'H' and objp given, remove last point from objp_confirmed_notok
