@@ -91,4 +91,4 @@ trc_to_c3d = "Pose2Sim.Utilities.trc_to_c3d:main"
 trc_Zup_to_Yup = "Pose2Sim.Utilities.trc_Zup_to_Yup:main"
 
 tests_pose2sim = "Pose2Sim.Utilities.tests:main"
-pose2sim = "GUI.main:main"
+Pose2Sim = "GUI.main:main"

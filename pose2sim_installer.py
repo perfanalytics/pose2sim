@@ -4,8 +4,11 @@ import platform
 import subprocess
 import tempfile
 import urllib.request
-import shutil
 from pathlib import Path
+import tkinter as tk
+from tkinter import ttk
+import threading
+import io
 
 class Pose2SimInstaller:
     def __init__(self):
@@ -126,6 +129,7 @@ class Pose2SimInstaller:
                 f.write(f"call {self.home_dir}\\Miniconda3\\Scripts\\activate.bat Pose2Sim\n")
                 f.write(f"echo Pose2Sim environment activated!\n")
                 f.write(f"cmd /k\n")
+                f.write(f"pose2sim\n")
         else:  # macOS/Linux
             launcher_path = os.path.join(self.home_dir, "Desktop", "Pose2Sim.sh")
             with open(launcher_path, "w") as f:
@@ -133,6 +137,7 @@ class Pose2SimInstaller:
                 f.write(f"source {self.home_dir}/miniconda3/bin/activate Pose2Sim\n")
                 f.write("echo 'Pose2Sim environment activated!'\n")
                 f.write("exec $SHELL\n")
+                f.write(f"pose2sim\n")
             
             # Make executable
             os.chmod(launcher_path, 0o755)
@@ -169,14 +174,153 @@ class Pose2SimInstaller:
         print("\n=== Installation Complete! ===")
         print("You can now use Pose2Sim by running the created launcher.")
 
-if __name__ == "__main__":
-    installer = Pose2SimInstaller()
-    
-    try:
-        installer.install()
-    except Exception as e:
-        print(f"ERROR: Installation failed: {e}")
-        print("Please check the error message and try again.")
-        sys.exit(1)
+
+class InstallerGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Pose2Sim Installer")
+        self.root.geometry("600x400")
+        self.root.resizable(True, True)
         
-    input("Press Enter to exit...")
+        # Store original stdout before any redirection
+        self.original_stdout = sys.stdout
+        
+        # Create main frame
+        main_frame = ttk.Frame(root, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Add title
+        title_label = ttk.Label(main_frame, text="Pose2Sim Installer", font=("Helvetica", 16, "bold"))
+        title_label.pack(pady=(0, 20))
+        
+        # Add description
+        desc_text = "This installer will set up Pose2Sim with all required dependencies."
+        desc_label = ttk.Label(main_frame, text=desc_text, wraplength=500)
+        desc_label.pack(pady=(0, 20))
+        
+        # Create text box for logs
+        self.log_box = tk.Text(main_frame, height=15, width=70, state="disabled")
+        self.log_box.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
+        
+        # Add scrollbar to text box
+        scrollbar = ttk.Scrollbar(self.log_box, command=self.log_box.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.log_box.config(yscrollcommand=scrollbar.set)
+        
+        # Add progress bar
+        self.progress = ttk.Progressbar(main_frame, orient="horizontal", length=500, mode="indeterminate")
+        self.progress.pack(fill=tk.X, pady=(0, 20))
+        
+        # Add buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X)
+        
+        self.install_button = ttk.Button(button_frame, text="Install", command=self.start_installation)
+        self.install_button.pack(side=tk.LEFT, padx=5)
+        
+        self.exit_button = ttk.Button(button_frame, text="Exit", command=self.cleanup_and_exit)
+        self.exit_button.pack(side=tk.RIGHT, padx=5)
+        
+        # Set up output redirection
+        sys.stdout = self.RedirectText(self)
+    
+    def cleanup_and_exit(self):
+        """Restore stdout and exit"""
+        sys.stdout = self.original_stdout
+        self.root.destroy()
+    
+    class RedirectText:
+        def __init__(self, gui):
+            self.gui = gui
+            
+        def write(self, string):
+            if self.gui.original_stdout:
+                self.gui.original_stdout.write(string)
+            self.gui.update_log(string)
+            
+        def flush(self):
+            if self.gui.original_stdout:
+                self.gui.original_stdout.flush()
+    
+    def update_log(self, text):
+        """Update the log box with new text"""
+        self.root.after(0, self._update_log, text)
+    
+    def _update_log(self, text):
+        """Actually update the log box (must be called from main thread)"""
+        self.log_box.config(state="normal")
+        self.log_box.insert(tk.END, text)
+        self.log_box.see(tk.END)
+        self.log_box.config(state="disabled")
+    
+    def start_installation(self):
+        """Start the installation process in a separate thread"""
+        self.install_button.config(state="disabled")
+        self.progress.start()
+        print("Starting installation...\n")
+        
+        # Create and start installation thread
+        install_thread = threading.Thread(target=self.run_installation)
+        install_thread.daemon = True
+        install_thread.start()
+    
+    def run_installation(self):
+        """Run the actual installation process"""
+        try:
+            installer = Pose2SimInstaller()
+            installer.install()
+            
+            # Update UI on completion
+            self.root.after(0, self.installation_complete, True)
+        except Exception as e:
+            error_msg = f"ERROR: Installation failed: {str(e)}\n"
+            print(error_msg)
+            # Update UI on failure
+            self.root.after(0, self.installation_complete, False)
+    
+    def installation_complete(self, success):
+        """Handle installation completion"""
+        self.progress.stop()
+        
+        if success:
+            print("\nInstallation completed successfully!")
+        else:
+            print("\nInstallation failed. Please check the log for details.")
+        
+        self.install_button.config(state="normal")
+        self.install_button.config(text="Close")
+        self.install_button.config(command=self.cleanup_and_exit)
+
+
+if __name__ == "__main__":
+    # Check if we should use GUI or console mode
+    use_gui = True
+    
+    # Use console mode if --console argument is provided
+    if len(sys.argv) > 1 and "--console" in sys.argv:
+        use_gui = False
+    
+    if use_gui:
+        # Run with GUI
+        root = tk.Tk()
+        app = InstallerGUI(root)
+        root.mainloop()
+    else:
+        # Run in console mode
+        installer = Pose2SimInstaller()
+        try:
+            installer.install()
+            print("\nInstallation completed successfully!")
+        except Exception as e:
+            print(f"ERROR: Installation failed: {e}")
+            print("Please check the error message and try again.")
+            sys.exit(1)
+        finally:
+            # Keep the window open when double-clicked in Windows
+            if platform.system() == "Windows":
+                # Only ask for input if it's not being run from a terminal
+                if not os.environ.get("PROMPT"):
+                    print("\nPress Enter to exit...")
+                    input()
+            else:
+                input("\nPress Enter to exit...")
