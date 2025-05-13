@@ -1094,7 +1094,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                         if count >= 0: 
                             count -= 1
                         # Remove last point from objp_confirmed_notok
-                        objp_confirmed_notok = objp_confirmed_notok[:-1]
+                        objp_confirmed_notok = []
                         # remove from plot  
                         if len(ax_3d.collections) > len(objp):
                             ax_3d.collections[-1].remove()
