@@ -834,9 +834,9 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
         
         global imgp_confirmed, objp_confirmed, objp_confirmed_notok, events, count, xydata
         
-        # Left click: Add clicked point to imgp_confirmed
+        # Left click, in the image: Add clicked point to imgp_confirmed
         # Display it on image and on 3D plot
-        if event.button == 1: 
+        if event.button == 1 and event.inaxes == ax: 
             # To remember the event to cancel after right click
             if 'events' in globals():
                 events.append(event)
