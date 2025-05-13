@@ -923,7 +923,8 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                 # If last event was 'h' key
                 elif events[-1].key == 'h':
                     if len(objp) != 0:
-                        if count >= 1: count -= 1
+                        if count >= 0: 
+                            count -= 1
                         # Remove last point from objp_confirmed_notok
                         objp_confirmed_notok = objp_confirmed_notok[:-1]
                         # remove from plot  
