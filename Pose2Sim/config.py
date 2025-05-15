@@ -517,7 +517,7 @@ class Config:
                     raise ValueError("Could not read frame.")
                 frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
             except:
-                frame_rate = 60
+                frame_rate = 30  
 
         if not os.path.exists(pose3d_dir):
             os.mkdir(pose3d_dir)

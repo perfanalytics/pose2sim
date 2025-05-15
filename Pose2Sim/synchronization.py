@@ -40,10 +40,12 @@ from matplotlib import patheffects
 from scipy import signal
 import json
 import os
+import glob
 import fnmatch
 import re
 import shutil
 from anytree import RenderTree
+from anytree.importer import DictImporter
 from matplotlib.widgets import TextBox, Button
 import logging
 
@@ -95,6 +97,20 @@ TEXTBOX_WIDTH = 0.09
 BTN_WIDTH_PERSON = 0.04
 CONTROL_HEIGHT = 0.04
 Y_POSITION = 0.1
+
+# Simple cache for frames and bounding boxes
+_frame_bbox_cache = {}
+
+def get_frame_and_bboxes_cached(cap, frame_number, frame_to_json, pose_dir, json_dir_name):
+    """
+    Cached version of load_frame_and_bounding_boxes to avoid reloading the same frame repeatedly.
+    """
+    key = (id(cap), frame_number)
+    if key in _frame_bbox_cache:
+        return _frame_bbox_cache[key]
+    frame_rgb, bboxes = load_frame_and_bounding_boxes(cap, frame_number, frame_to_json, pose_dir, json_dir_name)
+    _frame_bbox_cache[key] = (frame_rgb, bboxes)
+    return frame_rgb, bboxes
 
 
 def reset_styles(rect, annotation):
@@ -678,6 +694,11 @@ def update_play(cap, image, frame_number, frame_to_json, pose_dir, json_dir_name
     - fig: The figure object to update
     '''
 
+    # Initialize background once
+    if not hasattr(ax, '_blit_background'):
+        fig.canvas.draw()
+        ax._blit_background = fig.canvas.copy_from_bbox(ax.bbox)
+
     # Store the currently selected box index if any
     selected_idx = None
     for idx, rect in enumerate(rects):
@@ -689,8 +710,12 @@ def update_play(cap, image, frame_number, frame_to_json, pose_dir, json_dir_name
     if frame_rgb is None:
         return
 
-    # Update image
+    # Restore saved background
+    fig.canvas.restore_region(ax._blit_background)
+
+    # Update image and adopt draw artist
     image.set_array(frame_rgb)
+    ax.draw_artist(image)
     
     # Clear existing boxes and annotations
     for rect in rects:
@@ -704,14 +729,21 @@ def update_play(cap, image, frame_number, frame_to_json, pose_dir, json_dir_name
     bounding_boxes_list.clear()
     bounding_boxes_list.extend(bounding_boxes_list_new)
     
-    # Draw new boxes and annotations
+    # Draw new boxes and annotations, then draw artists
     draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations)
+    for rect in rects:
+        ax.draw_artist(rect)
+    for ann in annotations:
+        ax.draw_artist(ann)
     
     # Restore highlight on the selected box if it still exists
     if selected_idx is not None and selected_idx < len(rects):
         highlight_selected_box(rects[selected_idx], annotations[selected_idx])
-    
-    fig.canvas.draw_idle()
+        ax.draw_artist(rects[selected_idx])
+        ax.draw_artist(annotations[selected_idx])
+
+    # Blit updated region to screen
+    fig.canvas.blit(ax.bbox)
 
 
 def keypoints_ui(keypoints_to_consider, keypoints_names):
@@ -1413,7 +1445,7 @@ def synchronize_cams_all(config):
     kpt_id_in_df = np.array([[keypoints_ids.index(k)*2,keypoints_ids.index(k)*2+1]  for k in kpt_indices]).ravel()
     
     # Handle manual selection if synchronization_gui is True
-    if synchronization_gui:
+    if synchronization_gui and vid_or_img_files:
         selected_id_list, keypoints_to_consider, approx_time_maxspeed, time_RAM_list = select_person(
             vid_or_img_files, cam_names, json_files_names_range, search_around_frames, 
             pose_dir, json_dirs_names, keypoints_names, keypoints_to_consider, time_range_around_maxspeed, fps)
@@ -1436,6 +1468,8 @@ def synchronize_cams_all(config):
                                
     else:
         selected_id_list = [None] * cam_nb
+        if not vid_or_img_files:
+            logging.warning('No video files found. Synchronization GUI will not be available.')
 
     padlen = 3 * (max(len(a), len(b)) - 1)
     
@@ -1494,6 +1528,7 @@ def synchronize_cams_all(config):
     offset.insert(ref_cam_id, 0)
 
     # rename json files according to the offset and copy them to pose-sync
+    logging.info('Saving synchronized json files to the pose-sync folder.')
     sync_dir = os.path.abspath(os.path.join(pose_dir, '..', 'pose-sync'))
     os.makedirs(sync_dir, exist_ok=True)
     for d, j_dir in enumerate(json_dirs):

@@ -490,7 +490,12 @@ def trimmed_mean(arr, trimmed_extrema_percent=0.5):
     trimmed_arr = sorted_arr[lower_idx:upper_idx]
     
     # Return the mean of the remaining values
-    return np.mean(trimmed_arr)
+    if len(trimmed_arr) == 0:
+        trimmed_mean_arr = np.mean(arr)
+    else:
+        trimmed_mean_arr = np.mean(trimmed_arr)
+    
+    return trimmed_mean_arr
 
 
 def world_to_camera_persp(r, t):
