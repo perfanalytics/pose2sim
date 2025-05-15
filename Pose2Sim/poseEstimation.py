@@ -238,24 +238,24 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     frame_idx = 0
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    f_range = [[total_frames] if frame_range in ('all', 'auto', []) else frame_range][0]
+    f_range = [[0,total_frames] if frame_range in ('all', 'auto', []) else frame_range][0]
+    cap.set(cv2.CAP_PROP_POS_FRAMES, f_range[0])
+    frame_idx = f_range[0]
     with tqdm(iterable=range(*f_range), desc=f'Processing {os.path.basename(video_path)}') as pbar:
-        frame_count = 0
         while cap.isOpened():
-            # print('\nFrame ', frame_idx)
-            success, frame = cap.read()
-            frame_count += 1
-            if not success:
-                break
-            
             if frame_idx in range(*f_range):
+                # print('\nFrame ', frame_idx)
+                success, frame = cap.read()
+                if not success:
+                    break
+            
                 # Detect poses
                 keypoints, scores = pose_tracker(frame)
 
                 # Track poses across frames
                 if multi_person:
                     if tracking_mode == 'deepsort':
-                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count)
+                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
                     if tracking_mode == 'sports2d': 
                         if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
                         prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
@@ -296,8 +296,11 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                     if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
                     cv2.imwrite(os.path.join(img_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.jpg'), img_show)
 
-            frame_idx += 1
-            pbar.update(1)
+                frame_idx += 1
+                pbar.update(1)
+
+            if frame_idx >= f_range[1]:
+                break
 
     cap.release()
     if save_video:
@@ -351,7 +354,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
     if display_detection:
         cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
     
-    f_range = [[len(image_files)] if frame_range in ('all', 'auto', []) else frame_range][0]
+    f_range = [[0,len(image_files)] if frame_range in ('all', 'auto', []) else frame_range][0]
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
         if frame_idx in range(*f_range):
             try:
@@ -482,14 +485,13 @@ def estimate_pose_all(config_dict):
     if frame_rate == 'auto': 
         try:
             cap = cv2.VideoCapture(video_files[0])
-            if not cap.isOpened():
-                raise FileNotFoundError(f'Error: Could not open {video_files[0]}. Check that the file exists.')
+            cap.read()
+            if cap.read()[0] == False:
+                raise
             frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
-            if frame_rate == 0:
-                frame_rate = 30
-                logging.warning(f'Error: Could not retrieve frame rate from {video_files[0]}. Defaulting to 30fps.')
         except:
-            frame_rate = 30
+            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            frame_rate = 30  
 
     # Set detection frequency
     if det_frequency>1:

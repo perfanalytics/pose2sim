@@ -117,8 +117,8 @@ def indices_of_first_last_non_nan_chunks(series, min_chunk_size=10):
         return(0,0)
     
     # Get the start of the first valid run and the end of the last valid run
-    first_run_start = valid_runs[0][0]
-    last_run_end = valid_runs[-1][1]
+    first_run_start = valid_runs[0][0] + series.index.start
+    last_run_end = valid_runs[-1][1] + series.index.start
     
     # Return the trimmed series
     return first_run_start, last_run_end
@@ -160,9 +160,10 @@ def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
                 raise
             frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
-            frame_rate = 60
+            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            frame_rate = 30  
 
-    trc_f = f'{seq_name}_{f_range[0]}-{f_range[1]}.trc'
+    trc_f = f'{seq_name}_{f_range[0]}-{f_range[1]-1}.trc'
 
     #Header
     DataRate = CameraRate = OrigDataRate = frame_rate
@@ -170,7 +171,7 @@ def make_trc(config_dict, Q, keypoints_names, f_range, id_person=-1):
     NumMarkers = len(keypoints_names)
     header_trc = ['PathFileType\t4\t(X/Y/Z)\t' + trc_f, 
             'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames', 
-            '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, f_range[0], f_range[1]])),
+            '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, f_range[0], NumFrames])),
             'Frame#\tTime\t' + '\t\t\t'.join(keypoints_names) + '\t\t\t',
             '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(keypoints_names))]) + '\t']
     
@@ -841,31 +842,15 @@ def triangulate_all(config_dict):
     id_excluded_cams_tot = [list(tpl) for tpl in zip(*it.zip_longest(*id_excluded_cams_tot, fillvalue=[np.nan]*keypoints_nb*3))]
 
     # dataframes for each person
-    Q_tot = [pd.DataFrame([Q_tot_f[n] for Q_tot_f in Q_tot]) for n in range(nb_persons_to_detect)]
-    error_tot = [pd.DataFrame([error_tot_f[n] for error_tot_f in error_tot]) for n in range(nb_persons_to_detect)]
-    nb_cams_excluded_tot = [pd.DataFrame([nb_cams_excluded_tot_f[n] for nb_cams_excluded_tot_f in nb_cams_excluded_tot]) for n in range(nb_persons_to_detect)]
-    id_excluded_cams_tot = [pd.DataFrame([id_excluded_cams_tot_f[n] for id_excluded_cams_tot_f in id_excluded_cams_tot]) for n in range(nb_persons_to_detect)]
-    
+    Q_tot = [pd.DataFrame([Q_tot_f[n] for Q_tot_f in Q_tot], index=range(*f_range)) for n in range(nb_persons_to_detect)]
+    error_tot = [pd.DataFrame([error_tot_f[n] for error_tot_f in error_tot], index=range(*f_range)) for n in range(nb_persons_to_detect)]
+    nb_cams_excluded_tot = [pd.DataFrame([nb_cams_excluded_tot_f[n] for nb_cams_excluded_tot_f in nb_cams_excluded_tot], index=range(*f_range)) for n in range(nb_persons_to_detect)]
+    id_excluded_cams_tot = [pd.DataFrame([id_excluded_cams_tot_f[n] for id_excluded_cams_tot_f in id_excluded_cams_tot], index=range(*f_range)) for n in range(nb_persons_to_detect)]
+
     for n in range(nb_persons_to_detect):
         error_tot[n]['mean'] = error_tot[n].mean(axis=1,skipna=False)
         nb_cams_excluded_tot[n]['mean'] = nb_cams_excluded_tot[n].mean(axis=1)
     
-    # Delete participants with less than 4 valid triangulated frames
-    # for each person, for each keypoint, frames to interpolate
-    zero_nan_frames = [np.where( Q_tot[n].iloc[:,::3].T.eq(0) | ~np.isfinite(Q_tot[n].iloc[:,::3].T) ) for n in range(nb_persons_to_detect)]
-    zero_nan_frames_per_kpt = [[zero_nan_frames[n][1][np.where(zero_nan_frames[n][0]==k)[0]] for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
-    non_nan_nb_first_kpt = [frame_nb - len(zero_nan_frames_per_kpt[n][0]) for n in range(nb_persons_to_detect)]
-    deleted_person_id = [n for n in range(len(non_nan_nb_first_kpt)) if non_nan_nb_first_kpt[n]<4]
-
-    Q_tot = [Q_tot[n] for n in range(len(Q_tot)) if n not in deleted_person_id]
-    error_tot = [error_tot[n] for n in range(len(error_tot)) if n not in deleted_person_id]
-    nb_cams_excluded_tot = [nb_cams_excluded_tot[n] for n in range(len(nb_cams_excluded_tot)) if n not in deleted_person_id]
-    id_excluded_cams_tot = [id_excluded_cams_tot[n] for n in range(len(id_excluded_cams_tot)) if n not in deleted_person_id]
-    nb_persons_to_detect = len(Q_tot)
-
-    if nb_persons_to_detect == 0:
-        raise Exception('No persons have been triangulated. Please check your calibration and your synchronization, or the triangulation parameters in Config.toml.')
-
     # import pickle
     # with open(os.path.join(session_dir, 'all.pkl'), 'wb') as f:
     #     pickle.dump([Q_tot, error_tot, nb_cams_excluded_tot, id_excluded_cams_tot, zero_nan_frames_per_kpt], f)
@@ -874,12 +859,24 @@ def triangulate_all(config_dict):
     # Q_tot[0].to_csv(os.path.join(session_dir, 'Q_tot.csv'), index=False, sep='\t')
     # error_tot[0].to_csv(os.path.join(session_dir, 'error_tot.csv'), index=False, sep='\t')
 
-    # Trim around good frames
+    # Trim around good frames and remove persons with too few frames
     f_range_trimmed = [indices_of_first_last_non_nan_chunks(err['mean'], interp_gap_smaller_than) for err in error_tot]
-    Q_tot = [Q_tot[n].iloc[f_range_trimmed[n][0]:f_range_trimmed[n][1]] for n in range(nb_persons_to_detect)]
-    error_tot = [error_tot[n].iloc[f_range_trimmed[n][0]:f_range_trimmed[n][1]] for n in range(nb_persons_to_detect)]
-    nb_cams_excluded_tot = [nb_cams_excluded_tot[n].iloc[f_range_trimmed[n][0]:f_range_trimmed[n][1]] for n in range(nb_persons_to_detect)]
-    id_excluded_cams_tot = [id_excluded_cams_tot[n].iloc[f_range_trimmed[n][0]:f_range_trimmed[n][1]] for n in range(nb_persons_to_detect)]
+    deleted_person_id = [n for n, f_range in enumerate(f_range_trimmed) if len(range(*f_range))<4]
+    Q_tot = [Q_tot[n] for n in range(len(Q_tot)) if n not in deleted_person_id]
+    error_tot = [error_tot[n] for n in range(len(error_tot)) if n not in deleted_person_id]
+    nb_cams_excluded_tot = [nb_cams_excluded_tot[n] for n in range(len(nb_cams_excluded_tot)) if n not in deleted_person_id]
+    id_excluded_cams_tot = [id_excluded_cams_tot[n] for n in range(len(id_excluded_cams_tot)) if n not in deleted_person_id]
+    nb_persons_to_detect = len(Q_tot)
+    if nb_persons_to_detect == 0:
+        raise Exception('No persons have been triangulated. Please check your calibration and your synchronization, or the triangulation parameters in Config.toml.')
+
+    logging.info("Trimming " + ", ".join([f"Participant {n} around frames {f_range_trimmed[n]}" for n in range(nb_persons_to_detect)])+".")
+    Q_tot = [Q_tot[n].loc[f_range_trimmed[n][0]:f_range_trimmed[n][1]-1] for n in range(nb_persons_to_detect)]
+    error_tot = [error_tot[n].loc[f_range_trimmed[n][0]:f_range_trimmed[n][1]-1] for n in range(nb_persons_to_detect)]
+    nb_cams_excluded_tot = [nb_cams_excluded_tot[n].loc[f_range_trimmed[n][0]:f_range_trimmed[n][1]-1] for n in range(nb_persons_to_detect)]
+    id_excluded_cams_tot = [id_excluded_cams_tot[n].loc[f_range_trimmed[n][0]:f_range_trimmed[n][1]-1] for n in range(nb_persons_to_detect)]
+    zero_nan_frames = [np.where( Q_tot[n].loc[:,::3].T.eq(0) | ~np.isfinite(Q_tot[n].iloc[:,::3].T) ) for n in range(nb_persons_to_detect)]
+    zero_nan_frames_per_kpt = [[zero_nan_frames[n][1][np.where(zero_nan_frames[n][0]==k)[0]] for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
     zero_nan_frames_per_kpt = [[z[(f_range_trimmed[n][0] < z) & (f_range_trimmed[n][1] > z)] for z in zero_nan_frames_per_kpt[n]] for n in range(nb_persons_to_detect)]
 
     # Interpolate missing values

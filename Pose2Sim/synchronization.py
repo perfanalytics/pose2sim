@@ -1383,9 +1383,12 @@ def synchronize_cams_all(config_dict):
     vid_img_extension = config_dict['pose']['vid_img_extension']
     vid_or_img_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
     if not vid_or_img_files: # video_files is then img_dirs
-        image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
-        for image_folder in image_folders:
-            vid_or_img_files.append(glob.glob(os.path.join(video_dir, image_folder, '*'+vid_img_extension)))
+        try:
+            image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
+            for image_folder in image_folders:
+                vid_or_img_files.append(glob.glob(os.path.join(video_dir, image_folder, '*'+vid_img_extension)))
+        except:
+            logging.warning(f'No video files nor image directories found in {video_dir}.')
 
     if fps == 'auto': 
         try:
@@ -1395,7 +1398,8 @@ def synchronize_cams_all(config_dict):
                 raise
             fps = round(cap.get(cv2.CAP_PROP_FPS))
         except:
-            fps = 60  
+            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            fps = 30  
     lag_range = time_range_around_maxspeed*fps # frames
 
     # Retrieve keypoints from model
@@ -1498,7 +1502,7 @@ def synchronize_cams_all(config_dict):
     kpt_id_in_df = np.array([[keypoints_ids.index(k)*2,keypoints_ids.index(k)*2+1]  for k in kpt_indices]).ravel()
     
     # Handle manual selection if synchronization_gui is True
-    if synchronization_gui:
+    if synchronization_gui and vid_or_img_files:
         selected_id_list, keypoints_to_consider, approx_time_maxspeed, time_RAM_list = select_person(
             vid_or_img_files, cam_names, json_files_names_range, search_around_frames, 
             pose_dir, json_dirs_names, keypoints_names, keypoints_to_consider, time_range_around_maxspeed, fps)
@@ -1521,6 +1525,8 @@ def synchronize_cams_all(config_dict):
                                
     else:
         selected_id_list = [None] * cam_nb
+        if not vid_or_img_files:
+            logging.warning('No video files found. Synchronization GUI will not be available.')
 
     padlen = 3 * (max(len(a), len(b)) - 1)
     
@@ -1579,6 +1585,7 @@ def synchronize_cams_all(config_dict):
     offset.insert(ref_cam_id, 0)
 
     # rename json files according to the offset and copy them to pose-sync
+    logging.info('Saving synchronized json files to the pose-sync folder.')
     sync_dir = os.path.abspath(os.path.join(pose_dir, '..', 'pose-sync'))
     os.makedirs(sync_dir, exist_ok=True)
     for d, j_dir in enumerate(json_dirs):
