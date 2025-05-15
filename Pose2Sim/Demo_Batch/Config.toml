@@ -145,6 +145,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 
          [calibration.calculate.extrinsics.board]
          show_reprojection_error = true # true or false (lowercase)
+         board_position = 'vertical' # 'vertical' or 'horizontal'
          extrinsics_extension = 'png' # any video or image extension
          extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
          extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
@@ -222,7 +223,7 @@ make_c3d = true # also save triangulated data in c3d format
 ## Requires the following markers: ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
 ##        "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
 ##        "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
-feet_on_floor = true # true or false (lowercase) # If true, markers will be translated so that the feet are on the floor (assuming that the floor is flat). Useful if you want to estimate ground reaction forces or joint loads.
+feet_on_floor = false # true or false (lowercase) # If true, markers will be translated so that the feet are on the floor (assuming that the floor is flat). Useful if you want to estimate ground reaction forces or joint loads.
 make_c3d = true # save triangulated data in c3d format in addition to trc
 
 

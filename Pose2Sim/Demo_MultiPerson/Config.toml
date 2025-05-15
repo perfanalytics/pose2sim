@@ -136,6 +136,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
       # Camera placements, need to be done before every session
       [calibration.calculate.extrinsics]
       calculate_extrinsics = true # true or false (lowercase) 
+      board_position = 'vertical' # 'vertical' or 'horizontal'
       extrinsics_method = 'scene' # 'board', 'scene', 'keypoints'
       # 'board' should be large enough to be detected when laid on the floor. Not recommended.
       # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out.
@@ -221,7 +222,7 @@ make_c3d = false # also save triangulated data in c3d format
 ## Requires the following markers: ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
 ##        "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
 ##        "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
-feet_on_floor = true # true or false (lowercase) # If true, markers will be translated so that the feet are on the floor (assuming that the floor is flat). Useful if you want to estimate ground reaction forces or joint loads.
+feet_on_floor = false # true or false (lowercase) # If true, markers will be translated so that the feet are on the floor (assuming that the floor is flat). Useful if you want to estimate ground reaction forces or joint loads.
 make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
