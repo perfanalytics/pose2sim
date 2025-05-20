@@ -578,10 +578,15 @@ def triangulate_all(config):
     #     print(f'{pre}{node.name} id={node.id}')
     
     # left/right swapped keypoints
-    keypoints_names_swapped = ['L'+keypoint_name[1:] if keypoint_name.startswith('R') else 'R'+keypoint_name[1:] if keypoint_name.startswith('L') else keypoint_name for keypoint_name in keypoints_names]
-    keypoints_names_swapped = [keypoint_name_swapped.replace('right', 'left') if keypoint_name_swapped.startswith('right') else keypoint_name_swapped.replace('left', 'right') if keypoint_name_swapped.startswith('left') else keypoint_name_swapped for keypoint_name_swapped in keypoints_names_swapped]
-    keypoints_idx_swapped = [keypoints_names.index(keypoint_name_swapped) for keypoint_name_swapped in keypoints_names_swapped] # find index of new keypoint_name
-    
+    try:
+        keypoints_names_swapped = ['L'+keypoint_name[1:] if keypoint_name.startswith('R') else 'R'+keypoint_name[1:] if keypoint_name.startswith('L') else keypoint_name for keypoint_name in keypoints_names]
+        keypoints_names_swapped = [keypoint_name_swapped.replace('right', 'left') if keypoint_name_swapped.startswith('right') else keypoint_name_swapped.replace('left', 'right') if keypoint_name_swapped.startswith('left') else keypoint_name_swapped for keypoint_name_swapped in keypoints_names_swapped]
+        keypoints_idx_swapped = [keypoints_names.index(keypoint_name_swapped) for keypoint_name_swapped in keypoints_names_swapped] # find index of new keypoint_name
+    except:
+        keypoints_names_swapped = keypoints_names
+        keypoints_idx_swapped = keypoints_idx
+        logging.warning('No left/right swap was performed.')
+        
     # 2d-pose files selection
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
