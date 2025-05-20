@@ -705,9 +705,14 @@ def triangulate_all(config_dict):
     #     print(f'{pre}{node.name} id={node.id}')
     
     # left/right swapped keypoints
-    keypoints_names_swapped = ['L'+keypoint_name[1:] if keypoint_name.startswith('R') else 'R'+keypoint_name[1:] if keypoint_name.startswith('L') else keypoint_name for keypoint_name in keypoints_names]
-    keypoints_names_swapped = [keypoint_name_swapped.replace('right', 'left') if keypoint_name_swapped.startswith('right') else keypoint_name_swapped.replace('left', 'right') if keypoint_name_swapped.startswith('left') else keypoint_name_swapped for keypoint_name_swapped in keypoints_names_swapped]
-    keypoints_idx_swapped = [keypoints_names.index(keypoint_name_swapped) for keypoint_name_swapped in keypoints_names_swapped] # find index of new keypoint_name
+    try:
+        keypoints_names_swapped = ['L'+keypoint_name[1:] if keypoint_name.startswith('R') else 'R'+keypoint_name[1:] if keypoint_name.startswith('L') else keypoint_name for keypoint_name in keypoints_names]
+        keypoints_names_swapped = [keypoint_name_swapped.replace('right', 'left') if keypoint_name_swapped.startswith('right') else keypoint_name_swapped.replace('left', 'right') if keypoint_name_swapped.startswith('left') else keypoint_name_swapped for keypoint_name_swapped in keypoints_names_swapped]
+        keypoints_idx_swapped = [keypoints_names.index(keypoint_name_swapped) for keypoint_name_swapped in keypoints_names_swapped] # find index of new keypoint_name
+    except:
+        keypoints_names_swapped = keypoints_names
+        keypoints_idx_swapped = keypoints_idx
+        logging.warning('No left/right swap was performed.')
     
     # 2d-pose files selection
     try:
@@ -861,6 +866,7 @@ def triangulate_all(config_dict):
 
     # Trim around good frames and remove persons with too few frames
     f_range_trimmed = [indices_of_first_last_non_nan_chunks(err['mean'], interp_gap_smaller_than) for err in error_tot]
+    # f_range_trimmed = [f_range]*nb_persons_to_detect
     deleted_person_id = [n for n, f_range in enumerate(f_range_trimmed) if len(range(*f_range))<4]
     Q_tot = [Q_tot[n] for n in range(len(Q_tot)) if n not in deleted_person_id]
     error_tot = [error_tot[n] for n in range(len(error_tot)) if n not in deleted_person_id]
