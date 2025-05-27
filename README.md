@@ -47,7 +47,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
 
-<img src='Content/Activities_verylow.gif' title='Other more or less challenging tasks and conditions.' width="760">
+https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 
 </br>
 
