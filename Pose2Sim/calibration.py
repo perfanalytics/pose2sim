@@ -98,7 +98,7 @@ def calib_qca_fun(file_to_convert_path, binning_factor=1):
 
     R = [np.array(cv2.Rodrigues(r)[0]).flatten() for r in R]
     T = np.array(T)
-      
+
     return ret, C, S, D, K, R, T
 
     

@@ -502,10 +502,18 @@ def world_to_camera_persp(r, t):
     '''
     Converts rotation R and translation T 
     from Qualisys world centered perspective
-    to OpenCV camera centered perspective
+    to OpenCV camera centered perspective,
     and inversely.
 
     Qc = RQ+T --> Q = R-1.Qc - R-1.T
+
+    INPUTS:
+    - r: rotation matrix (3x3)
+    - t: translation vector (3x1)
+
+    OUTPUTS:
+    - r: rotation matrix (3x3)
+    - t: translation vector (3x1)
     '''
 
     r = r.T
