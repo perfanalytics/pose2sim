@@ -15,23 +15,7 @@
 
 # Pose2Sim
 
-
-##### N.B:. Please set undistort_points and handle_LR_swap to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
-
-> **_News_: Version 0.10.0:**\
-> **OpenSim scaling and inverse kinematics are now integrated in Pose2Sim!** No static trial needed.\
-> **Other recently added features**: Pose estimation, Automatic camera synchronization, Multi-person analysis, Blender visualization and rig, Marker augmentation, Batch processing.
-<!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
-and lens distortions are better taken into account.\ -->
-> To upgrade, type `pip install pose2sim --upgrade`
-
-<!-- GitHub Star Button -->
-<!-- 
-<a class="github-button" href="https://github.com/perfanalytics/pose2sim" data-color-scheme="no-preference: light; light: light; dark: dark;" data-icon="octicon-star" data-show-count="true" aria-label="Star perfanalytics/pose2sim on GitHub">Star</a>
-<script async defer src="https://buttons.github.io/buttons.js"></script>
--->
-
-<br>
+https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 
 `Pose2Sim` provides a workflow for 3D markerless kinematics (human or animal), as an alternative to traditional marker-based MoCap methods. 
 
@@ -39,15 +23,23 @@ and lens distortions are better taken into account.\ -->
 
 ***Note:*** For real-time analysis with a single camera, please consider **[Sports2D](https://github.com/davidpagnon/Sports2D)** (note that the motion must lie in the sagittal or frontal plane). 
 
-<br>
-
 *Fun fact:*\
 Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inputs (2D keypoints coordinates) and lead to an OpenSim result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose), and custom models (from [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut) for example) can also be used. 
 
 
+<br>
+
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
 
-https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
+
+
+<!-- GitHub Star Button -->
+<!-- 
+<a class="github-button" href="https://github.com/perfanalytics/pose2sim" data-color-scheme="no-preference: light; light: light; dark: dark;" data-icon="octicon-star" data-show-count="true" aria-label="Star perfanalytics/pose2sim on GitHub">Star</a>
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+-->
+
+
 
 </br>
 
@@ -67,7 +59,9 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 - [ ] v0.13: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
 - [ ] v1.0: First full release
 
-***N.B.:*** As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
+***N.B.:*** As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).\
+***N.B:*** Please set `undistort_points` and `handle_LR_swap` to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
+
 
 </br>
 
