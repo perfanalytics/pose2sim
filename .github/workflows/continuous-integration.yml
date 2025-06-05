@@ -30,10 +30,10 @@ jobs:
             cache-path: ~/.cache/pip
           - os: windows-latest
             cache-path: C:\Users\runneradmin\AppData\Local\pip\Cache
-          - os: macos-latest
+          - os: macos-latest #arm64
             cache-path: /Library/Caches/pip
-          - os: macos-13
-            cache-path: ~/Library/Caches/pip
+          # - os: macos-13 # opensim not supported on macos amd x64 beyond python 3.11
+          #   cache-path: ~/Library/Caches/pip
 
     steps:
       - name: Checkout code
