@@ -700,7 +700,8 @@ Pose2Sim.markerAugmentation()
 </br>
 
 ## OpenSim kinematics
-> _**Obtain a scaled model and 3D joint angles.**_
+> _**Obtain a scaled model and 3D joint angles.**_\
+> _**N.B.:**_ If you are not interested in muscles or having a flexible spine, set `use_simple_model` to true. This will make inverse kinematics at least 10 times faster.
 
 This can be either done fully automatically within Pose2Sim, or manually within OpenSim GUI.
 
