@@ -117,7 +117,7 @@
 				<!--Path to a Component that satisfies the Socket 'parent_frame' of type PhysicalFrame (description: The frame to which this station is fixed.).-->
 				<socket_parent_frame>/bodyset/tibia_l</socket_parent_frame>
 				<!--The fixed location of the station expressed in its parent frame.-->
-				<location>-0.00028630976101194031 -0.37683977416422021 -0.014959548491229383</location>
+				<location>-0.00028630976101194031 -0.414633 -0.014959548491229383</location>
 				<!--Flag (true or false) specifying whether the marker is fixed in its parent frame during the marker placement step of scaling.  If false, the marker is free to move within its parent Frame to match its experimental counterpart.-->
 				<fixed>true</fixed>
 			</Marker>
@@ -125,7 +125,7 @@
 				<!--Path to a Component that satisfies the Socket 'parent_frame' of type PhysicalFrame (description: The frame to which this station is fixed.).-->
 				<socket_parent_frame>/bodyset/tibia_r</socket_parent_frame>
 				<!--The fixed location of the station expressed in its parent frame.-->
-				<location>-0.00028630976101194031 -0.37683977416422021 0.014959548491229383</location>
+				<location>-0.00028630976101194031 -0.414633 0.014959548491229383</location>
 				<!--Flag (true or false) specifying whether the marker is fixed in its parent frame during the marker placement step of scaling.  If false, the marker is free to move within its parent Frame to match its experimental counterpart.-->
 				<fixed>true</fixed>
 			</Marker>
