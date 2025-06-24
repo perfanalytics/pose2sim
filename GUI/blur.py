@@ -7,7 +7,7 @@ from PIL import Image, ImageTk
 import time
 import json
 
-# Import face_blurring utilities for auto mode
+# NOTE: 23.06.2025:Import face_blurring utilities for auto mode
 try:
     from Pose2Sim.Utilities.face_blurring import face_blurring_func, apply_face_obscuration
     from Pose2Sim.poseEstimation import setup_backend_device
@@ -18,7 +18,7 @@ except ImportError:
     print("Warning: Face blurring utilities not available. Auto mode will be disabled.")
 
 # Try to import RTMLib and DeepSort for manual mode
-# Manual mode now uses the same Body model as auto mode for consistency
+# NOTE: 23.06.2025: Manual mode now uses the same Body model as auto mode for consistency (Wholebody -> Body)
 try:
     from rtmlib import PoseTracker, Body
     RTMPOSE_AVAILABLE = True
@@ -26,6 +26,7 @@ except ImportError:
     RTMPOSE_AVAILABLE = False
     print("Warning: RTMLib not available. Install with: pip install rtmlib")
 
+# NOTE for Question: Do we really need DeepSort for face blurring?
 try:
     from deep_sort_realtime.deepsort_tracker import DeepSort
     DEEPSORT_AVAILABLE = True
@@ -132,6 +133,75 @@ class VideoBlurApp:
         # Initialize UI state
         self.on_mode_change()
         
+    def _init_pose_tracker(self, det_frequency, tracker_attr_name, initialized_attr_name, mode_name):
+        """Common pose tracker initialization logic"""
+        try:
+            # Setup backend and device
+            backend, device = setup_backend_device('auto', 'auto')
+            print(f"Using Pose2Sim optimized settings: backend={backend}, device={device}")
+
+            # Map blur accuracy to RTMPose mode
+            accuracy_mapping = {
+                'low': 'lightweight',
+                'medium': 'balanced',
+                'high': 'performance'
+            }
+            mode = accuracy_mapping.get(self.auto_blur_accuracy.get(), 'balanced')
+
+            # Initialize pose tracker
+            tracker = PoseTracker(
+                Body,
+                det_frequency=det_frequency,
+                mode=mode,
+                backend=backend,
+                device=device,
+                tracking=False,
+                to_openpose=False
+            )
+
+            # Set tracker and initialized flag
+            setattr(self, tracker_attr_name, tracker)
+            setattr(self, initialized_attr_name, True)
+            print(f"{mode_name} initialized successfully")
+            return True
+
+        except Exception as e:
+            print(f"Error initializing {mode_name}: {e}")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Backend: {backend}, Device: {device}")
+            import traceback
+            traceback.print_exc()
+            print(f"{mode_name} initialization failed")
+            return False
+
+    def _init_deepsort(self):
+        """Initialize DeepSort tracker"""
+        if not DEEPSORT_AVAILABLE:
+            return False
+
+        try:
+            self.deepsort_tracker = DeepSort(
+                max_age=30,
+                n_init=3,
+                nms_max_overlap=1.0,
+                max_cosine_distance=0.2,
+                nn_budget=None,
+                embedder='mobilenet',
+                half=True,
+                bgr=True,
+                embedder_gpu=True
+            )
+            self.has_deepsort = True
+            print("DeepSort initialized successfully")
+            return True
+        except Exception as e:
+            print(f"Error initializing DeepSort: {e}")
+            print(f"Error type: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
+            print("DeepSort initialization failed - basic tracking will be used")
+            return False
+
     def init_face_detection(self):
         """Initialize face detection and tracking components"""
         self.rtmpose_initialized = False
@@ -144,104 +214,21 @@ class VideoBlurApp:
         print(f"RTMLib available: {RTMPOSE_AVAILABLE}")
         print(f"DeepSort available: {DEEPSORT_AVAILABLE}")
         print(f"Face blurring utilities available: {FACE_BLURRING_AVAILABLE}")
-        
+
         # Initialize RTMPose if available
         if RTMPOSE_AVAILABLE:
-            try:
-                # Setup backend and device using Pose2Sim's optimized function (same as auto mode)
-                print("Setting up backend and device for manual mode...")
-                backend, device = setup_backend_device('auto', 'auto')
-                print(f"Using Pose2Sim optimized settings: backend={backend}, device={device}")
-                
-                # Map blur accuracy to RTMPose mode (same as auto mode)
-                accuracy_mapping = {
-                    'low': 'lightweight',
-                    'medium': 'balanced',
-                    'high': 'performance'
-                }
-                mode = accuracy_mapping.get(self.auto_blur_accuracy.get(), 'balanced')
+            print("Setting up backend and device for manual mode...")
+            self._init_pose_tracker(2, 'pose_tracker', 'rtmpose_initialized', 'RTMPose for manual mode')
 
-                # Initialize with Body model (same as auto mode)
-                self.pose_tracker = PoseTracker(
-                    Body,
-                    det_frequency=2,
-                    mode=mode,
-                    backend=backend,
-                    device=device,
-                    tracking=False,
-                    to_openpose=False
-                )
-                self.rtmpose_initialized = True
-                print("RTMPose initialized successfully for manual mode")
-            except Exception as e:
-                print(f"Error initializing RTMPose: {e}")
-                print(f"Error type: {type(e).__name__}")
-                print(f"Backend: {backend}, Device: {device}")
-                import traceback
-                traceback.print_exc()
-                print("RTMPose initialization failed - face detection will not be available")
-        
-        # Initialize DeepSort if available
-        if DEEPSORT_AVAILABLE:
-            try:
-                self.deepsort_tracker = DeepSort(
-                    max_age=30,
-                    n_init=3,
-                    nms_max_overlap=1.0,
-                    max_cosine_distance=0.2,
-                    nn_budget=None,
-                    embedder='mobilenet',
-                    half=True,
-                    bgr=True,
-                    embedder_gpu=True
-                )
-                self.has_deepsort = True
-                print("DeepSort initialized successfully")
-            except Exception as e:
-                print(f"Error initializing DeepSort: {e}")
-                print(f"Error type: {type(e).__name__}")
-                import traceback
-                traceback.print_exc()
-                print("DeepSort initialization failed - basic tracking will be used")
+        # Initialize DeepSort
+        self._init_deepsort()
 
     def init_auto_mode(self):
         """Initialize auto mode pose tracker"""
         if not FACE_BLURRING_AVAILABLE:
             return False
 
-        try:
-            # Setup backend and device
-            backend, device = setup_backend_device('auto', 'auto')
-
-            # Map blur accuracy to RTMPose mode
-            accuracy_mapping = {
-                'low': 'lightweight',
-                'medium': 'balanced',
-                'high': 'performance'
-            }
-            mode = accuracy_mapping.get(self.auto_blur_accuracy.get(), 'balanced')
-
-            # Initialize pose tracker for auto mode
-            self.auto_pose_tracker = PoseTracker(
-                Body,
-                det_frequency=10,
-                mode=mode,
-                backend=backend,
-                device=device,
-                tracking=False,
-                to_openpose=False
-            )
-            self.auto_pose_initialized = True
-            print("Auto mode initialized successfully")
-            return True
-        except Exception as e:
-            print(f"Error initializing auto mode: {e}")
-            print(f"Error type: {type(e).__name__}")
-            print(f"Backend: {backend}, Device: {device}")
-            import traceback
-            traceback.print_exc()
-            print("Auto mode initialization failed")
-            return False
+        return self._init_pose_tracker(10, 'auto_pose_tracker', 'auto_pose_initialized', 'Auto mode')
     
     def create_ui(self):
         """Create the main UI layout with fixed positioning"""
@@ -284,7 +271,7 @@ class VideoBlurApp:
     def setup_control_panel(self, parent):
         """Set up the left control panel with all controls"""
         # Create a canvas with scrollbar for the control panel
-        canvas = tk.Canvas(parent, width=280)
+        canvas = tk.Canvas(parent, width=310) # NOTE: 24.06.2025: Adjust width for visibility because width of control_panel is 300.
         scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
         
@@ -1921,11 +1908,23 @@ class VideoBlurApp:
                            f"{width}x{height} | FPS: {fps:.2f} | Frames: {self.total_frames}")
     
     def set_output_path(self):
-        """Set output directory"""
-        path = filedialog.askdirectory()
+        """Set output directory with default as input folder"""
+        # Set default directory to input video folder if available
+        initial_dir = None
+        if self.input_video:
+            initial_dir = os.path.dirname(self.input_video)
+        else:
+            initial_dir = os.getcwd()  # Use current working directory as fallback
+
+        path = filedialog.askdirectory(initialdir=initial_dir)
         if path:
             self.output_path = path
             self.status_text.set(f"Output path set to: {path}")
+        else:
+            # If user cancels and no output path is set, use input folder as default
+            if not self.output_path and self.input_video:
+                self.output_path = os.path.dirname(self.input_video)
+                self.status_text.set(f"Using input folder as output: {self.output_path}")
     
     def get_video_writer(self, output_path, width, height, fps):
         """Create a video writer with appropriate codec"""
@@ -1967,6 +1966,10 @@ class VideoBlurApp:
         if self.input_video is None or self.output_path is None:
             self.status_text.set("Please select input video and output path")
             return
+        
+        # if self.input_video is None:
+        #     self.status_text.set("Please select input video")
+        #     return
 
         # Initialize auto mode if selected
         if self.blur_mode.get() == "auto":
