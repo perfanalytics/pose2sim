@@ -260,7 +260,7 @@ def perform_scaling(config, trc_file, scaled_model_path, scaling_path_temp, subj
     - kinematics_dir (Path): The directory where the kinematics files are saved.
     - osim_setup_dir (Path): The directory where the OpenSim setup and model files are stored.
     - pose_model (str): The name of the model.
-    - use_contacts_muscles (bool): Whether to use the model with contact spheres and muscles.
+    - use_simple_model (bool): Whether to use the simple model with no constraints or muscles (but much faster).
     - right_left_symmetry (bool): Whether to consider right and left side of equal size.
     - subject_height (float): The height of the subject.
     - subject_mass (float): The mass of the subject.

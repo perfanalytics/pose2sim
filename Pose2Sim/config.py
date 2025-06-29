@@ -297,11 +297,11 @@ class Config:
         '''
         geometry_path = str(self.osim_setup_dir / "Geometry")
 
-        use_contacts_muscles = self.kinematics.get("use_contacts_muscles")
-        if use_contacts_muscles:
-            pose_model_file = "Model_Pose2Sim_contacts_muscles.osim"
+        use_simple_model = self.kinematics.get("use_simple_model")
+        if use_simple_model:
+            pose_model_file = "Model_Pose2Sim_simple.osim"
         else:
-            pose_model_file = "Model_Pose2Sim.osim"
+            pose_model_file = "Model_Pose2Sim_muscles_flex.osim"
 
         unscaled_model_path = self.osim_setup_dir / pose_model_file
         if not unscaled_model_path:
