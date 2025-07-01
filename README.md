@@ -178,13 +178,16 @@ Type `ipython`, and try the following code:
 from Pose2Sim import Pose2Sim
 Pose2Sim.calibration()
 Pose2Sim.poseEstimation()
-Pose2Sim.synchronization()
+Pose2Sim.synchronization() # When the GUI is prompted, make sure only RWrist point is selected
 Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
 Pose2Sim.filtering()
 Pose2Sim.markerAugmentation()
 Pose2Sim.kinematics()
 ```
+
+When the Synchronization GUI is provided, Select the RWrist
+
 **3D marker locations** are stored as .trc files in each trial folder in the `pose-3d` directory.\
 **3D joint angles** are stored as .mot files in the `kinematics` directory. Scaled models are also stored in the same directory.
 
