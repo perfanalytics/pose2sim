@@ -1202,18 +1202,21 @@ def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], 
             try:
                 json_data_all = json.load(j_f)['people']
 
-                # # previous approach takes person #0
+                # # Read files in original order (not good if the person of interest appears later)
+                # json_data = np.array([p['pose_keypoints_2d'][3*i:3*i+3] if 'pose_keypoints_2d' in p else [np.nan, np.nan, np.nan] for p in json_data_all for i in keypoints_ids])
+
+                # # Or take person #0
                 # json_data = json_data_all[0]
                 # json_data = np.array([json_data['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
                 
-                # # approach based on largest mean confidence does not work if person in background is better detected
+                # # Or take largest mean confidence (does not work if person in background is better detected)
                 # p_conf = [np.mean(np.array([p['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])[:, 2])
                 #         if 'pose_keypoints_2d' in p else 0
                 #         for p in json_data_all]
                 # max_confidence_person = json_data_all[np.argmax(p_conf)]
                 # json_data = np.array([max_confidence_person['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
 
-                # latest approach: uses person with largest bounding box
+                # # Latest approach: uses person with largest bounding box
                 if not synchronization_gui:
                     bbox_area = [
                                 (keypoints[:, 0].max() - keypoints[:, 0].min()) * (keypoints[:, 1].max() - keypoints[:, 1].min())
