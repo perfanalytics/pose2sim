@@ -253,12 +253,11 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                 keypoints, scores = pose_tracker(frame)
 
                 # Track poses across frames
-                if multi_person:
-                    if tracking_mode == 'deepsort':
-                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
-                    if tracking_mode == 'sports2d': 
-                        if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                        prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+                if tracking_mode == 'deepsort':
+                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
+                if tracking_mode == 'sports2d': 
+                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
                     
                 # Save to json
                 if 'openpose' in output_format:
@@ -476,6 +475,7 @@ def estimate_pose_all(config_dict):
         deepsort_tracker = DeepSort(**deepsort_params)
     else:
         deepsort_tracker = None
+
     backend = config_dict['pose']['backend']
     device = config_dict['pose']['device']
 

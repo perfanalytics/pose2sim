@@ -1082,7 +1082,7 @@ def sort_people_sports2d(keyptpre, keypt, scores=None):
     Persons' indices are sometimes swapped when changing frame
     A person is associated to another in the next frame when they are at a small distance
     
-    N.B.: Requires min_with_single_indices and euclidian_distance function (see common.py)
+    N.B.: Requires min_with_single_indices, euclidian_distance, and pad_shape functions (see Pose2Sim/common.py)
 
     INPUTS:
     - keyptpre: (K, L, M) array of 2D coordinates for K persons in the previous frame, L keypoints, M 2D coordinates
