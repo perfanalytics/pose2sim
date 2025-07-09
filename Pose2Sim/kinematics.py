@@ -48,6 +48,9 @@ from Pose2Sim.common import (
     )
 from Pose2Sim.skeletons import *
 
+import locale 
+locale.setlocale(locale.LC_NUMERIC, 'C')
+
 
 ## AUTHORSHIP INFORMATION
 __author__ = "Ivan Sun, David Pagnon"
@@ -61,8 +64,6 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-
-
 def get_kpt_pairs_from_tree(root_node):
     '''
     Get marker pairs for all parent-child relationships in the tree.

@@ -191,6 +191,8 @@ class PoseEstimatorWorker(multiprocessing.Process):
                                 frame_data.keypoints,
                                 frame_data.scores
                                 )
+                    else:
+                        pass
             else:
                 frame_data.keypoints, frame_data.scores = None, None
 
