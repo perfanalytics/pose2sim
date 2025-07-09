@@ -258,6 +258,8 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                 if tracking_mode == 'sports2d': 
                     if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
                     prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+                else:
+                    pass
                     
                 # Save to json
                 if 'openpose' in output_format:

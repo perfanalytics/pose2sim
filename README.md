@@ -72,6 +72,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
    3. [Demonstration Part-2: Visualize your results with OpenSim or Blender](#demonstration-part-2-visualize-your-results-with-opensim-or-blender)
    4. [Demonstration Part-3: Try multi-person analysis](#demonstration-part-3-try-multi-person-analysis)
    5. [Demonstration Part-4: Try batch processing](#demonstration-part-4-try-batch-processing)
+   6. [Too slow for you?](#too-slow-for-you)
 2. [Use on your own data](#use-on-your-own-data)
    1. [Setting up your project](#setting-up-your-project)
    2. [2D pose estimation](#2d-pose-estimation)
@@ -178,7 +179,7 @@ Type `ipython`, and try the following code:
 from Pose2Sim import Pose2Sim
 Pose2Sim.calibration()
 Pose2Sim.poseEstimation()
-Pose2Sim.synchronization() # When the GUI is prompted, make sure only RWrist point is selected
+Pose2Sim.synchronization()
 Pose2Sim.personAssociation()
 Pose2Sim.triangulation()
 Pose2Sim.filtering()
@@ -313,6 +314,44 @@ Run Pose2Sim from the `BatchSession` folder if you want to batch process the who
 
 
 For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or uncomment `[pose]` and set `mode = 'lightweight'` in the `Config.toml` file of `Trial_2`.
+
+
+<br/>
+
+## Too slow for you?
+
+**Quick fixes:**
+- `Pose2Sim.calibration()`:\
+  Run it only when your cameras are moved or changed. If they are not, just copy a previous calibration.toml file into your new calibration folder.
+- `Pose2Sim.poseEstimation()`:
+  - Set `det_frequency = 100` in Config.toml. Do not run the person detector every frame. Run it once, and then track the bounding boxes, which is much faster (pose estimation will still be run every frame): .\
+  *150 s -> 30 s on my laptop with the Demo videos*
+  - Use `mode = 'lightweight'`: Will use a lighter version of RTMPose, which is faster but less accurate\
+  *30 s -> 20 s*
+  - Set `display_detection = false`. Do not display results in real time\
+  *20 s -> 15 s*
+  - Set `save_video = 'none'`. Do not save images and videos\
+  *15 s -> 9 s*
+  - Set `tracking_mode = 'sports2d'` or `tracking_mode = 'none'`. If several persons are in the scene, use the sports2d tracker or no tracker at all, but not 'deepsort' (sports2d tracking is almost instantaneous though).
+- `Pose2Sim.synchronization()`:\
+  Do not run if your cameras are natively synchronized.
+- `Pose2Sim.personAssociation()`:\
+  Do not run if there is only one person in the scene.
+- `Pose2Sim.triangulation()`:\
+  Not much to do here.
+- `Pose2Sim.filtering()`:\
+  You can skip this step, but it is quite fast already.
+- `Pose2Sim.markerAugmentation()`:\
+  Very fast, too. Note that marker augmentation won't necessarily improve results so you can consider skipping it.
+- `Pose2Sim.kinematics()`:\
+  Set `use_simple_model = true`. Use a simpler OpenSim model, without muscles and constraints. Note that the spine will be stiff and shoulders will be a simple ball joint, but this is accurate enough for most gait-related tasks\
+  9 s -> 0.7 s
+
+<br> 
+
+**Use your GPU**:\
+This would make pose estimation significantly faster, without any impact on accuracy. See [Installation](#installation) section for more information.
+
 
 
 </br></br>

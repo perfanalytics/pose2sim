@@ -47,6 +47,9 @@ from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean, 
                             best_coords_for_measurements, compute_height
 from Pose2Sim.skeletons import *
 
+import locale 
+locale.setlocale(locale.LC_NUMERIC, 'C')
+
 
 ## AUTHORSHIP INFORMATION
 __author__ = "Ivan Sun, David Pagnon"
@@ -110,30 +113,21 @@ def get_markers_path(pose_model, osim_setup_dir):
     - markers_path: (Path) Path to the marker file.
     '''
 
-    if pose_model == 'BODY_25B':
-        marker_file = 'Markers_Body25b.xml'
-    elif pose_model == 'BODY_25':
-        marker_file = 'Markers_Body25.xml'
-    elif pose_model == 'BODY_135':
-        marker_file = 'Markers_Body135.xml'
-    elif pose_model == 'BLAZEPOSE':
-        marker_file = 'Markers_Blazepose.xml'
-    elif pose_model == 'HALPE_26':
-        marker_file = 'Markers_Halpe26.xml'
-    elif pose_model == 'HALPE_68' or pose_model == 'HALPE_136':
-        marker_file = 'Markers_Halpe68_136.xml'
-    elif pose_model == 'COCO_133' or pose_model == 'COCO_133_WRIST':
-        marker_file = 'Markers_Coco133.xml'
-    # elif pose_model == 'COCO' or pose_model == 'MPII':
-    #     marker_file = 'Markers_Coco.xml'
-    elif pose_model == 'COCO_17':
-        marker_file = 'Markers_Coco17.xml'
-    elif pose_model == 'LSTM':
-        marker_file = 'Markers_LSTM.xml'
+    pose_model = ''.join(pose_model.split('_')).lower()
+    if pose_model == 'halpe68' or pose_model == 'halpe136':
+        marker_file = 'Markers_Halpe68_136.xml'.lower()
+    elif pose_model == 'coco133' or pose_model == 'coco133wrist':
+        marker_file = 'Markers_Coco133.xml'.lower()
     else:
-        raise ValueError(f"Pose model '{pose_model}' not supported yet.")
+        marker_file = f'Markers_{pose_model}.xml'.lower()
 
-    markers_path = osim_setup_dir / marker_file
+    try:
+        markers_path = [
+            f for f in osim_setup_dir.glob('Markers_*.xml')
+            if f.name.lower() == marker_file
+        ][0]
+    except:
+        raise ValueError(f"Pose model '{pose_model}' not supported yet.")
 
     return markers_path
 
@@ -150,30 +144,21 @@ def get_scaling_setup(pose_model, osim_setup_dir):
     - scaling_setup_path: (Path) Path to the OpenSim scaling setup file.
     '''
 
-    if pose_model == 'BODY_25B':
-        scaling_setup_file = 'Scaling_Setup_Pose2Sim_Body25b.xml'
-    elif pose_model == 'BODY_25':
-        scaling_setup_file = 'Scaling_Setup_Pose2Sim_Body25.xml'
-    elif pose_model == 'BODY_135':
-        scaling_setup_file = 'Scaling_Setup_Pose2Sim_Body135.xml'
-    elif pose_model == 'BLAZEPOSE':
-        scaling_setup_file = 'Scaling_Setup_Pose2Sim_Blazepose.xml'
-    elif pose_model == 'HALPE_26':
-        scaling_setup_file = 'Scaling_Setup_Pose2Sim_Halpe26.xml'
-    elif pose_model == 'HALPE_68' or pose_model == 'HALPE_136':
-        scaling_setup_file = 'Scaling_Setup_Pose2Sim_Halpe68_136.xml'
-    elif pose_model == 'COCO_133' or pose_model == 'COCO_133_WRIST':
-        scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco133.xml'
-    # elif pose_model == 'COCO' or pose_model == 'MPII':
-    #     scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco.xml'
-    elif pose_model == 'COCO_17':
-        scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco17.xml'
-    elif pose_model == 'LSTM':
-        scaling_setup_file = 'Scaling_Setup_Pose2Sim_LSTM.xml'
+    pose_model = ''.join(pose_model.split('_')).lower()
+    if pose_model == 'halpe68' or pose_model == 'halpe136':
+        scaling_setup_file = 'Scaling_Setup_Pose2Sim_Halpe68_136.xml'.lower()
+    elif pose_model == 'coco133' or pose_model == 'coco133wrist':
+        scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco133.xml'.lower()
     else:
-        raise ValueError(f"Pose model '{pose_model}' not supported yet.")
+        scaling_setup_file = f'Scaling_Setup_Pose2Sim_{pose_model}.xml'.lower()
 
-    scaling_setup_path = osim_setup_dir / scaling_setup_file
+    try:
+        scaling_setup_path = [
+            f for f in osim_setup_dir.glob('Scaling_Setup_Pose2Sim_*.xml')
+            if f.name.lower() == scaling_setup_file
+        ][0]
+    except:
+        raise ValueError(f"Pose model '{pose_model}' not supported yet.")
 
     return scaling_setup_path
 
@@ -190,30 +175,24 @@ def get_IK_Setup(pose_model, osim_setup_dir):
     - ik_setup_path: (Path) Path to the OpenSim IK setup file.
     '''
     
-    if pose_model == 'BODY_25B':
-        ik_setup_file = 'IK_Setup_Pose2Sim_Body25b.xml'
-    elif pose_model == 'BODY_25':
-        ik_setup_file = 'IK_Setup_Pose2Sim_Body25.xml'
-    elif pose_model == 'BODY_135':
-        ik_setup_file = 'IK_Setup_Pose2Sim_Body135.xml'
-    elif pose_model == 'BLAZEPOSE':
-        ik_setup_file = 'IK_Setup_Pose2Sim_Blazepose.xml'
-    elif pose_model == 'HALPE_26':
-        ik_setup_file = 'IK_Setup_Pose2Sim_Halpe26.xml'
-    elif pose_model == 'HALPE_68' or pose_model == 'HALPE_136':
-        ik_setup_file = 'IK_Setup_Pose2Sim_Halpe68_136.xml'
-    elif pose_model == 'COCO_133' or pose_model == 'COCO_133_WRIST':
-        ik_setup_file = 'IK_Setup_Pose2Sim_Coco133.xml'
-    # elif pose_model == 'COCO' or pose_model == 'MPII':
-    #     ik_setup_file = 'IK_Setup_Pose2Sim_Coco.xml'
-    elif pose_model == 'COCO_17':
-        ik_setup_file = 'IK_Setup_Pose2Sim_Coco17.xml'
-    elif pose_model == 'LSTM':
-        ik_setup_file = 'IK_Setup_Pose2Sim_withHands_LSTM.xml'
+    pose_model = ''.join(pose_model.split('_')).lower()
+    if pose_model == 'halpe68' or pose_model == 'halpe136':
+        ik_setup_file = 'IK_Setup_Pose2Sim_Halpe68_136.xml'.lower()
+    elif pose_model == 'coco133' or pose_model == 'coco133wrist':
+        ik_setup_file = 'IK_Setup_Pose2Sim_Coco133.xml'.lower()
+    elif pose_model == 'lstm':
+        ik_setup_file = 'IK_Setup_Pose2Sim_withHands_LSTM.xml'.lower()
     else:
+        ik_setup_file = f'IK_Setup_Pose2Sim_{pose_model}.xml'.lower()
+
+    try:
+        ik_setup_path = [
+            f for f in osim_setup_dir.glob('IK_Setup_Pose2Sim_*.xml')
+            if f.name.lower() == ik_setup_file
+        ][0]
+    except:
         raise ValueError(f"Pose model '{pose_model}' not supported yet.")
 
-    ik_setup_path = osim_setup_dir / ik_setup_file
     return ik_setup_path
 
 
@@ -681,6 +660,10 @@ def kinematics_all(config_dict):
         logging.info(f"\tScaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
         
         logging.info("\nInverse Kinematics...")
+        import time
+        start_time = time.time()
         perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_setup=remove_IK_setup)
+        end_time = time.time()
+        print(f"\tIK took {round(end_time - start_time, 2)} seconds for {trc_file.name}.")
         logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
         logging.info(f"\tJoint angle data saved to {(kinematics_dir / (trc_file.stem + '.mot')).resolve()}\n")
