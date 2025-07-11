@@ -320,10 +320,10 @@ For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or un
 
 ## Too slow for you?
 
-**Quick fixes:**
 - `Pose2Sim.calibration()`:\
   Run it only when your cameras are moved or changed. If they are not, just copy a previous calibration.toml file into your new calibration folder.
 - `Pose2Sim.poseEstimation()`:
+  - **Use your GPU**: This makes pose estimation significantly faster, without any impact on accuracy. See [Installation](#installation) section for more information.
   - Set `det_frequency = 100` in Config.toml. Do not run the person detector every frame. Run it once, and then track the bounding boxes, which is much faster (pose estimation will still be run every frame): .\
   *150 s -> 30 s on my laptop with the Demo videos*
   - Use `mode = 'lightweight'`: Will use a lighter version of RTMPose, which is faster but less accurate\
@@ -345,13 +345,7 @@ For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or un
   Very fast, too. Note that marker augmentation won't necessarily improve results so you can consider skipping it.
 - `Pose2Sim.kinematics()`:\
   Set `use_simple_model = true`. Use a simpler OpenSim model, without muscles and constraints. Note that the spine will be stiff and shoulders will be a simple ball joint, but this is accurate enough for most gait-related tasks\
-  9 s -> 0.7 s
-
-<br> 
-
-**Use your GPU**:\
-This would make pose estimation significantly faster, without any impact on accuracy. See [Installation](#installation) section for more information.
-
+  *9 s -> 0.7 s*
 
 
 </br></br>
