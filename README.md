@@ -324,7 +324,7 @@ For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or un
   Run it only when your cameras are moved or changed. If they are not, just copy a previous calibration.toml file into your new calibration folder.
 - `Pose2Sim.poseEstimation()`:
   - **Use your GPU**: This makes pose estimation significantly faster, without any impact on accuracy. See [Installation](#installation) section for more information.
-  - Set `det_frequency = 100` in Config.toml. Do not run the person detector every frame. Run it once, and then track the bounding boxes, which is much faster (pose estimation will still be run every frame): .\
+  - Set `det_frequency = 100` in Config.toml. Run the bounding box detector and the pose estimator on the first frame; for all subsequent frames, only run pose estimation: \
   *150 s -> 30 s on my laptop with the Demo videos*
   - Use `mode = 'lightweight'`: Will use a lighter version of RTMPose, which is faster but less accurate\
   *30 s -> 20 s*
@@ -384,15 +384,6 @@ Pose2Sim.poseEstimation()
 
 ***N.B.:* To analyse wrist motion:**\
 'Whole_body_wrist' or 'Whole_body' `pose_model` is required in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml). Note that these are slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints. 
-
-<br>
-
-***N.B.:* To speed up the process:**
-- Disable `display_detection` and `save_video` 
-- Increase the value of `det_frequency`. In this case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames)
-- Use your GPU (See [Installation](#installation)). Slightly more involved, but often worth it. Note that the optimal device _(CPU or GPU)_ and backend for your configuration will be automatically selected, but you can also manually select them in Config.toml.
-- Run pose estimation in `lightweight` mode instead of `balanced` or `performance`. However, this will reduce the quality of results. 
-- Use `tracking_mode = 'sports2d'`: Will use the default Sports2D tracker. Unlike DeepSort, it is faster, does not require any parametrization, and is as good in non-crowded scenes. 
 
 <br>
 
