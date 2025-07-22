@@ -84,13 +84,15 @@ def count_persons_in_json(file_path):
         return len(data.get('people', []))
     
 
-def indices_of_first_last_non_nan_chunks(series, min_chunk_size=10):
+def indices_of_first_last_non_nan_chunks(series, min_chunk_size=10, chunk_choice_method='largest'):
     '''
     Find indices of the first and last chunks of at least min_chunk_size consecutive non-NaN values.
 
     INPUT:
     - series: pandas Series to trim
     - min_chunk_size: minimum size of consecutive non-NaN values to consider (default: 5)
+    - chunk_choice_method: 'largest' to return the largest chunk, 'all' to return all of them, 
+                          'first' to return only the first one, 'last' to return only the last one
 
     OUTPUT:
     - tuple: (start_index, end_index) of the first and last valid chunks
@@ -116,9 +118,20 @@ def indices_of_first_last_non_nan_chunks(series, min_chunk_size=10):
     if not valid_runs:
         return(0,0)
     
-    # Get the start of the first valid run and the end of the last valid run
-    first_run_start = valid_runs[0][0] + series.index.start
-    last_run_end = valid_runs[-1][1] + series.index.start
+    if chunk_choice_method == 'largest':
+        # Choose the largest chunk
+        valid_runs.sort(key=lambda x: x[1] - x[0], reverse=True)
+        first_run_start, last_run_end = valid_runs[0]
+    elif chunk_choice_method == 'all':
+        # Get the start of the first valid run and the end of the last valid run
+        first_run_start = valid_runs[0][0]
+        last_run_end = valid_runs[-1][1]
+    elif chunk_choice_method == 'first':
+        # Get the start of the first valid run and the end of that run
+        first_run_start, last_run_end = valid_runs[0]
+    elif chunk_choice_method == 'last':
+        # Get the start of the last valid run and the end of that run
+        first_run_start, last_run_end = valid_runs[-1]
     
     # Return the trimmed series
     return first_run_start, last_run_end
@@ -876,7 +889,7 @@ def triangulate_all(config_dict):
     if nb_persons_to_detect == 0:
         raise Exception('No persons have been triangulated. Please check your calibration and your synchronization, or the triangulation parameters in Config.toml.')
 
-    logging.info("Trimming " + ", ".join([f"Participant {n} around frames {f_range_trimmed[n]}" for n in range(nb_persons_to_detect)])+".")
+    logging.info("Trimming " + ", ".join([f"Participant {n+1} around frames {f_range_trimmed[n]}" for n in range(nb_persons_to_detect)])+".")
     Q_tot = [Q_tot[n].loc[f_range_trimmed[n][0]:f_range_trimmed[n][1]-1] for n in range(nb_persons_to_detect)]
     error_tot = [error_tot[n].loc[f_range_trimmed[n][0]:f_range_trimmed[n][1]-1] for n in range(nb_persons_to_detect)]
     nb_cams_excluded_tot = [nb_cams_excluded_tot[n].loc[f_range_trimmed[n][0]:f_range_trimmed[n][1]-1] for n in range(nb_persons_to_detect)]
