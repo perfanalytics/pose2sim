@@ -86,12 +86,12 @@ def count_persons_in_json(file_path):
 
 def indices_of_first_last_non_nan_chunks(series, min_chunk_size=10, chunk_choice_method='largest'):
     '''
-    Find indices of the first and last chunks of at least min_chunk_size consecutive non-NaN values.
+    Find indices of the chunks of at least min_chunk_size consecutive non-NaN values.
 
     INPUT:
     - series: pandas Series to trim
-    - min_chunk_size: minimum size of consecutive non-NaN values to consider (default: 5)
-    - chunk_choice_method: 'largest' to return the largest chunk, 'all' to return all of them, 
+    - min_chunk_size: minimum size of consecutive non-NaN values to consider (default: 10)
+    - chunk_choice_method: 'largest' to return the largest chunk, 'all' to return everything between the first and last non-nan chunk, 
                           'first' to return only the first one, 'last' to return only the last one
 
     OUTPUT:
@@ -878,7 +878,7 @@ def triangulate_all(config_dict):
     # error_tot[0].to_csv(os.path.join(session_dir, 'error_tot.csv'), index=False, sep='\t')
 
     # Trim around good frames and remove persons with too few frames
-    f_range_trimmed = [indices_of_first_last_non_nan_chunks(err['mean'], interp_gap_smaller_than) for err in error_tot]
+    f_range_trimmed = [indices_of_first_last_non_nan_chunks(err['mean'], min_chunk_size=interp_gap_smaller_than, chunk_choice_method='all') for err in error_tot]
     # f_range_trimmed = [f_range]*nb_persons_to_detect
     deleted_person_id = [n for n, f_range in enumerate(f_range_trimmed) if len(range(*f_range))<4]
     Q_tot = [Q_tot[n] for n in range(len(Q_tot)) if n not in deleted_person_id]
