@@ -188,6 +188,8 @@ keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, f
 # interpolation = 'linear' #linear, slinear, quadratic, cubic, or none
                         # # 'none' if you don't want to interpolate missing points
 # interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
+# sections_to_keep = 'all' # 'all', 'largest', 'first', 'last'
+                       #  # keep 'all' valid sections even when they are interspersed with untriangulated chunks, or the 'largest' valid section, or the 'first' one, or the 'last' one
 # show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 # fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
 # handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower

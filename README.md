@@ -324,7 +324,7 @@ For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or un
   Run it only when your cameras are moved or changed. If they are not, just copy a previous calibration.toml file into your new calibration folder.
 - `Pose2Sim.poseEstimation()`:
   - **Use your GPU**: This makes pose estimation significantly faster, without any impact on accuracy. See [Installation](#installation) section for more information.
-  - Set `det_frequency = 100` in Config.toml. Run the bounding box detector and the pose estimator on the first frame; for all subsequent frames, only run pose estimation: \
+  - Set `det_frequency = 100` in Config.toml. Run the bounding box detector and the pose estimator on the first frame; for all subsequent frames, only run pose estimation: 
   *150 s -> 30 s on my laptop with the Demo videos*
   - Use `mode = 'lightweight'`: Will use a lighter version of RTMPose, which is faster but less accurate\
   *30 s -> 20 s*

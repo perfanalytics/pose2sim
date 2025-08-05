@@ -24,6 +24,7 @@ import itertools as it
 import logging
 from anytree import PreOrderIter
 
+import tkinter as tk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -1353,3 +1354,51 @@ def draw_keypts(img, X, Y, scores, cmap_str='RdYlGn'):
             if not (np.isnan(x[i]) or np.isnan(y[i]))]
 
     return img
+
+
+def get_screen_size():
+    '''
+    Get the screen dimensions
+
+    INPUTS:
+    - None
+
+    OUTPUTS:
+    - tuple of int: (screen_width, screen_height)
+    '''
+
+    root = tk.Tk()
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    root.destroy()
+    
+    return screen_width, screen_height
+
+
+def calculate_display_size(W, H, screen_width, screen_height, margin=100):
+    '''
+    Calculate the optimal display size for the image
+    
+    INPUTS:
+        W, H: Original image dimensions
+        screen_width, screen_height: Screen dimensions
+        margin: Margin to leave around the window (pixels)
+    
+    OUTPUTS:
+        tuple: (display_width, display_height)
+    '''
+    
+    # If image fits within screen, use original size
+    if W <= screen_width - margin and H <= screen_height - margin:
+        return W, H
+    
+    # Calculate scaling factor to fit within screen while maintaining aspect ratio
+    width_ratio = (screen_width - margin) / W
+    height_ratio = (screen_height - margin) / H
+    scale_factor = min(width_ratio, height_ratio)
+    
+    # Calculate new dimensions
+    new_width = int(W * scale_factor)
+    new_height = int(H * scale_factor)
+    
+    return new_width, new_height

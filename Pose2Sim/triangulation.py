@@ -669,6 +669,7 @@ def triangulate_all(config_dict):
     likelihood_threshold = config_dict.get('triangulation').get('likelihood_threshold_triangulation')
     interpolation_kind = config_dict.get('triangulation').get('interpolation')
     interp_gap_smaller_than = config_dict.get('triangulation').get('interp_if_gap_smaller_than')
+    sections_to_keep = config_dict.get('triangulation').get('sections_to_keep')
     fill_large_gaps_with = config_dict.get('triangulation').get('fill_large_gaps_with')
     show_interp_indices = config_dict.get('triangulation').get('show_interp_indices')
     undistort_points = config_dict.get('triangulation').get('undistort_points')
@@ -878,7 +879,7 @@ def triangulate_all(config_dict):
     # error_tot[0].to_csv(os.path.join(session_dir, 'error_tot.csv'), index=False, sep='\t')
 
     # Trim around good frames and remove persons with too few frames
-    f_range_trimmed = [indices_of_first_last_non_nan_chunks(err['mean'], min_chunk_size=interp_gap_smaller_than, chunk_choice_method='all') for err in error_tot]
+    f_range_trimmed = [indices_of_first_last_non_nan_chunks(err['mean'], min_chunk_size=interp_gap_smaller_than, chunk_choice_method=sections_to_keep) for err in error_tot]
     # f_range_trimmed = [f_range]*nb_persons_to_detect
     deleted_person_id = [n for n, f_range in enumerate(f_range_trimmed) if len(range(*f_range))<4]
     Q_tot = [Q_tot[n] for n in range(len(Q_tot)) if n not in deleted_person_id]

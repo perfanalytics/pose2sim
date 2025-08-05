@@ -46,7 +46,7 @@ import cv2
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
 from deep_sort_realtime.deepsort_tracker import DeepSort
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort,\
-                        colors, thickness, draw_bounding_box, draw_keypts, draw_skel
+                        colors, thickness, draw_bounding_box, draw_keypts, draw_skel, get_screen_size, calculate_display_size
 from Pose2Sim.skeletons import *
 
 
@@ -233,7 +233,10 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
         
     if display_detection:
-        cv2.namedWindow(f"Pose Estimation {os.path.basename(video_path)}", cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
+        screen_width, screen_height = get_screen_size()
+        display_width, display_height = calculate_display_size(W, H, screen_width, screen_height, margin=50)
+        cv2.namedWindow(f"Pose Estimation {os.path.basename(video_path)}", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(f"Pose Estimation {os.path.basename(video_path)}", display_width, display_height)
 
     frame_idx = 0
     cap = cv2.VideoCapture(video_path)
@@ -353,7 +356,10 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
 
     if display_detection:
+        screen_width, screen_height = get_screen_size()
+        display_width, display_height = calculate_display_size(W, H, screen_width, screen_height, margin=50)
         cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", display_width, display_height)
     
     f_range = [[0,len(image_files)] if frame_range in ('all', 'auto', []) else frame_range][0]
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
