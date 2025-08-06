@@ -118,6 +118,8 @@ def indices_of_first_last_non_nan_chunks(series, min_chunk_size=10, chunk_choice
     if not valid_runs:
         return(0,0)
     
+    if chunk_choice_method not in ['largest', 'all', 'first', 'last']:
+        chunk_choice_method = 'all'
     if chunk_choice_method == 'largest':
         # Choose the largest chunk
         valid_runs.sort(key=lambda x: x[1] - x[0], reverse=True)
