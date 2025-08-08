@@ -304,7 +304,7 @@ def read_vicon(vicon_path):
         T += [[float(t)/1000 for t in trans]]
 
     # Camera names by natural order
-    C_vid_id = [v for v in vid_id if ('VIDEO' or 'Video') in root.findall('Camera')[v].attrib.get('TYPE')]
+    C_vid_id = [v for v in vid_id if 'video' in root.findall('Camera')[v].attrib.get('TYPE', '').lower()]
     C_vid = [root.findall('Camera')[v].attrib.get('DEVICEID') for v in C_vid_id]
     C = sorted(C_vid, key=natural_sort_key)
     C_id_sorted = [i for v_sorted in C for i,v in enumerate(root.findall('Camera')) if v.attrib.get('DEVICEID')==v_sorted]
