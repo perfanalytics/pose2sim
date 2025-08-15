@@ -31,6 +31,11 @@ import matplotlib.pyplot as plt
 import logging
 
 from scipy import signal
+from scipy.interpolate._bsplines import _coeff_of_divided_diff, _compute_optimal_gcv_parameter
+from scipy._lib._array_api import array_namespace
+from scipy.interpolate import BSpline
+from scipy.linalg import solve_banded
+from numpy.core.multiarray import normalize_axis_index
 from scipy.ndimage import gaussian_filter1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from filterpy.kalman import KalmanFilter
@@ -52,6 +57,200 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
+def hampel_filter(col, window_size=7, n_sigma=2):
+    '''
+    Hampel filter for outlier rejection before other filtering methods.
+    Takes a sliding window of size 7, calculates its median and standard deviation, 
+    replaces value by median if difference is more than 2 times the standard deviation (95% confidence interval), 
+    else keeps the value.
+    '''
+
+    col_filtered = col.copy()
+    half_window = window_size // 2
+    
+    for i in range(half_window, len(col) - half_window):
+        window = col[i-half_window:i+half_window+1]
+        median = np.median(window)
+        mad = np.median(np.abs(window - median))  # Median Absolute Deviation
+        
+        if mad != 0:
+            modified_z_score = 0.6745 * (col[i] - median) / mad #75% percentile from median
+            if np.abs(modified_z_score) > n_sigma:
+                col_filtered[i] = median
+    
+    return col_filtered
+
+
+def make_smoothing_spline_with_bias(x, y, bias_factor=1.0, w=None, lam=None, *, axis=0):
+
+    '''
+    Reimplemented the full make_smoothing_spline function but make it accept a bias factor towards smoothing or fidelity to data.
+    Identical to https://github.com/scipy/scipy/blob/main/scipy/interpolate/_bsplines.py#L2210
+    but multiplies the automatically estimated optimal lambda value by the bias factor.
+
+    INPUTS:
+    - bias_factor > 1 for smoother output, < 1 for more fidelity to data
+    '''
+
+    xp = array_namespace(x, y)
+
+    x = np.ascontiguousarray(x, dtype=float)
+    y = np.ascontiguousarray(y, dtype=float)
+
+    if any(x[1:] - x[:-1] <= 0):
+        raise ValueError('``x`` should be an ascending array')
+
+    if x.ndim != 1 or x.shape[0] != y.shape[axis]:
+        raise ValueError(f'``x`` should be 1D and {x.shape = } == {y.shape = }')
+
+    if w is None:
+        w = np.ones(len(x))
+    else:
+        w = np.ascontiguousarray(w)
+        if any(w <= 0):
+            raise ValueError('Invalid vector of weights')
+
+    t = np.r_[[x[0]] * 3, x, [x[-1]] * 3]
+    n = x.shape[0]
+
+    if n <= 4:
+        raise ValueError('``x`` and ``y`` length must be at least 5')
+
+    axis = normalize_axis_index(axis, y.ndim)
+    y = np.moveaxis(y, axis, 0)
+    y_shape1 = y.shape[1:]
+    if y_shape1 != ():
+        y = y.reshape((n, -1))
+
+    # create design matrix in the B-spline basis
+    X_bspl = BSpline.design_matrix(x, t, 3)
+    X = np.zeros((5, n))
+    for i in range(1, 4):
+        X[i, 2: -2] = X_bspl[i: i - 4, 3: -3][np.diag_indices(n - 4)]
+
+    X[1, 1] = X_bspl[0, 0]
+    X[2, :2] = ((x[2] + x[1] - 2 * x[0]) * X_bspl[0, 0],
+                X_bspl[1, 1] + X_bspl[1, 2])
+    X[3, :2] = ((x[2] - x[0]) * X_bspl[1, 1], X_bspl[2, 2])
+    X[1, -2:] = (X_bspl[-3, -3], (x[-1] - x[-3]) * X_bspl[-2, -2])
+    X[2, -2:] = (X_bspl[-2, -3] + X_bspl[-2, -2],
+                 (2 * x[-1] - x[-2] - x[-3]) * X_bspl[-1, -1])
+    X[3, -2] = X_bspl[-1, -1]
+
+    wE = np.zeros((5, n))
+    wE[2:, 0] = _coeff_of_divided_diff(x[:3]) / w[:3]
+    wE[1:, 1] = _coeff_of_divided_diff(x[:4]) / w[:4]
+    for j in range(2, n - 2):
+        wE[:, j] = (x[j+2] - x[j-2]) * _coeff_of_divided_diff(x[j-2:j+3])\
+                   / w[j-2: j+3]
+    wE[:-1, -2] = -_coeff_of_divided_diff(x[-4:]) / w[-4:]
+    wE[:-2, -1] = _coeff_of_divided_diff(x[-3:]) / w[-3:]
+    wE *= 6
+
+    # MULTIPLY LAM BY BIAS FACTOR
+    if lam is None:
+        lam = _compute_optimal_gcv_parameter(X, wE, y, w)
+        lam *= bias_factor
+        # print(lam)
+    elif lam < 0.:
+        raise ValueError('Regularization parameter should be non-negative')
+
+    # solve the initial problem in the basis of natural splines
+    if np.ndim(lam) == 0:
+        c = solve_banded((2, 2), X + lam * wE, y)
+    elif np.ndim(lam) == 1:
+        # XXX: solve_banded does not suppport batched `ab` matrices; loop manually
+        c = np.empty((n, lam.shape[0]))
+        for i in range(lam.shape[0]):
+            c[:, i] = solve_banded((2, 2), X + lam[i] * wE, y[:, i])
+    else:
+        # this should not happen, ever
+        raise RuntimeError("Internal error, please report it to SciPy developers.")
+    c = c.reshape((c.shape[0], *y_shape1))
+
+    # hack: these are c[0], c[1] etc, shape-compatible with np.r_ below
+    c0, c1 = c[0:1, ...], c[1:2, ...]     # c[0], c[1]
+    cm0, cm1 = c[-1:-2:-1, ...], c[-2:-3:-1, ...]    # c[-1], c[-2]
+
+    c_ = np.r_[c0 * (t[5] + t[4] - 2 * t[3]) + c1,
+               c0 * (t[5] - t[3]) + c1,
+               c[1: -1, ...],
+               cm0 * (t[-4] - t[-6]) + cm1,
+               cm0 * (2 * t[-4] - t[-5] - t[-6]) + cm1]
+
+    t, c_ = xp.asarray(t), xp.asarray(c_)
+    return BSpline.construct_fast(t, c_, 3, axis=axis)
+
+
+def gcv_spline_filter_1d(config_dict, frame_rate, col):
+    '''
+    1D GCV Spline filter.
+    
+    If cutoff is a number, it is used as the cut-off frequency in Hz and behaves like a butterworth filter.
+    If cutoff is 'auto', it automatically evaluates the best trade-off between smoothness and fidelity to data.
+    If smoothing_factor is different to 1, it biases results towards smoothing if > 1, and towards fidelity to input data if <1.
+    smoothing_factor is ignored if cutoff is not 'auto'.
+    
+    INPUT:
+    - cutoff: 'auto' or int, cut-off frequency in Hz
+    - smoothing_factor: float, >=0. >1 to prioritize smoothing, <1 for fidelity to input data.
+    - col: Pandas dataframe column
+
+    OUTPUT:
+    - col_filtered: Filtered pandas dataframe column
+    '''
+
+    cutoff = config_dict.get('filtering').get('gcv_spline').get('cut_off_frequency', 'auto')
+    smoothing_factor = float(config_dict.get('filtering').get('gcv_spline').get('smoothing_factor', 1.0))
+
+    # Split into sequences of not nans
+    # print('\n', col.name)
+    col_filtered = col.copy()
+    mask = np.isnan(col_filtered)  | col_filtered.eq(0)
+    falsemask_indices = np.where(~mask)[0]
+    gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
+    idx_sequences = np.split(falsemask_indices, gaps)
+    if idx_sequences[0].size > 0:
+        idx_sequences_to_filter = [seq for seq in idx_sequences]
+    
+        # Filter each of the selected sequences
+        for seq_f in idx_sequences_to_filter:
+            x = np.arange(len(col_filtered[seq_f]))
+
+            # Automatically determine optimal lambda value when cutoff is 'auto'
+            if cutoff == 'auto': 
+                # Normalize x (0-1)
+                min_x, max_x = np.min(x), np.max(x)
+                range_x = max_x - min_x if max_x > min_x else 1.0
+                x_norm = (x - min_x) / range_x
+
+                # Normalize col around 1, because zero mean leads to unstabilitys in lam = _compute_optimal_gcv_parameter(X, wE, y, w)
+                median_col = np.median(col_filtered[seq_f]) # median of time series
+                mad_col = np.median(np.abs(col_filtered[seq_f] - median_col)) # median absolute deviation from median
+                mad_col = mad_col if mad_col > 0 else 1.0
+                col_norm = 1 + (col_filtered[seq_f] - median_col) / (1.4826 * mad_col) # 1.4826*mad_col equivalent to dividing by std (for col_norm to have a std of 1)
+                # mean_col = np.mean(col_filtered[seq_f])
+                # std_col = np.std(col_filtered[seq_f]) if np.std(col_filtered[seq_f]) > 0 else 1.0
+                # col_norm = (col_filtered[seq_f] - mean_col) / std_col
+
+                # Bias lambda value towards either smoothing or fidelity to data
+                spline = make_smoothing_spline_with_bias(x_norm, col_norm, bias_factor=smoothing_factor, lam=None)
+                col_filtered_norm = spline(x_norm)
+                
+                # Denormalize data
+                col_filtered[seq_f] = (col_filtered_norm - 1) * (1.4826 * mad_col) + median_col
+                # col_filtered[seq_f] = col_filtered_norm * std_col + mean_col
+
+            else:
+                # Estimate lam from cutoff frequency
+                lam = ((frame_rate / (2 * np.pi * float(cutoff))) ** 4)
+
+                spline = make_smoothing_spline_with_bias(x, col_filtered[seq_f], bias_factor=1.0, lam=lam)
+                col_filtered[seq_f] = spline(x)
+
+    return col_filtered
+
+
 def kalman_filter(coords, frame_rate, measurement_noise, process_noise, nb_dimensions=3, nb_derivatives=3, smooth=True):
     '''
     Filters coordinates with a Kalman filter or a Kalman smoother
@@ -70,6 +269,7 @@ def kalman_filter(coords, frame_rate, measurement_noise, process_noise, nb_dimen
     '''
 
     # Variables
+    coords = np.array(coords)
     dim_x = nb_dimensions * nb_derivatives # 9 state variables 
     dt = 1/frame_rate
     
@@ -283,7 +483,7 @@ def loess_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    kernel = config_dict.get('filtering').get('LOESS').get('nb_values_used')
+    kernel = config_dict.get('filtering').get('loess').get('nb_values_used')
 
     col_filtered = col.copy()
     mask = np.isnan(col_filtered) 
@@ -379,11 +579,12 @@ def filter1d(col, config_dict, filter_type, frame_rate):
 
     # Choose filter
     filter_mapping = {
-        'kalman': kalman_filter_1d,
         'butterworth': butterworth_filter_1d, 
+        'gcv_spline': gcv_spline_filter_1d,
+        'kalman': kalman_filter_1d,
         'butterworth_on_speed': butterworth_on_speed_filter_1d, 
         'gaussian': gaussian_filter_1d, 
-        'LOESS': loess_filter_1d, 
+        'loess': loess_filter_1d, 
         'median': median_filter_1d
         }
     filter_fun = filter_mapping[filter_type]
@@ -414,7 +615,7 @@ def recap_filter3d(config_dict, trc_path):
     butter_speed_filter_order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
     butter_speed_filter_cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
     gaussian_filter_sigma_kernel = int(config_dict.get('filtering').get('gaussian').get('sigma_kernel'))
-    loess_filter_nb_values = config_dict.get('filtering').get('LOESS').get('nb_values_used')
+    loess_filter_nb_values = config_dict.get('filtering').get('loess').get('nb_values_used')
     median_filter_kernel_size = config_dict.get('filtering').get('median').get('kernel_size')
     make_c3d = config_dict.get('filtering').get('make_c3d')
     
@@ -424,7 +625,7 @@ def recap_filter3d(config_dict, trc_path):
         'butterworth': f'--> Filter type: Butterworth {butterworth_filter_type}-pass. Order {butterworth_filter_order}, Cut-off frequency {butterworth_filter_cutoff} Hz.', 
         'butterworth_on_speed': f'--> Filter type: Butterworth on speed {butter_speed_filter_type}-pass. Order {butter_speed_filter_order}, Cut-off frequency {butter_speed_filter_cutoff} Hz.', 
         'gaussian': f'--> Filter type: Gaussian. Standard deviation kernel: {gaussian_filter_sigma_kernel}', 
-        'LOESS': f'--> Filter type: LOESS. Number of values used: {loess_filter_nb_values}', 
+        'loess': f'--> Filter type: LOESS. Number of values used: {loess_filter_nb_values}', 
         'median': f'--> Filter type: Median. Kernel size: {median_filter_kernel_size}'
     }
     logging.info(filter_mapping_recap[filter_type])
@@ -467,8 +668,7 @@ def filter_all(config_dict):
                 raise
             frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
-            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
-            frame_rate = 30  
+            frame_rate = 60
     
     # Trc paths
     trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in file]
@@ -478,21 +678,22 @@ def filter_all(config_dict):
         Q_coords, frames_col, time_col, markers, header = read_trc(t_path_in)
 
         # frame range selection
-        f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if (frame_range in ('all', 'auto', []) or frames_col.iloc[0]>frame_range[0] or frames_col.iloc[1]<frame_range[1]) else frame_range][0]
+        f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if frame_range in ('all', 'auto', []) else frame_range][0]
         frame_nb = f_range[1] - f_range[0]
         f_index = [frames_col[frames_col==f_range[0]].index[0], frames_col[frames_col==f_range[1]-1].index[0]+1]
         Q_coords = Q_coords.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
         frames_col = frames_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
         time_col = time_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
 
-        t_path_out = t_path_in.replace(t_path_in.split('_')[-1], f'{f_range[0]}-{f_range[1]-1}_filt_{filter_type}.trc')
+        t_path_out = t_path_in.replace(t_path_in.split('_')[-1], f'{f_range[0]}-{f_range[1]}_filt_{filter_type}.trc')
         t_file_out = os.path.basename(t_path_out)
         header[0] = header[0].replace(t_file_in, t_file_out)
         header[2] = '\t'.join(part if i != 2 else str(frame_nb) for i, part in enumerate(header[2].split('\t')))
         header[2] = '\t'.join(part if i != 7 else str(frame_nb)+'\n' for i, part in enumerate(header[2].split('\t')))
 
         # Filter coordinates
-        Q_filt = Q_coords.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
+        Q_filt = Q_coords.apply(hampel_filter, axis=0)
+        Q_filt = Q_filt.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
 
 
         # Display figures
