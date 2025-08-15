@@ -483,7 +483,7 @@ def loess_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    kernel = config_dict.get('filtering').get('loess').get('nb_values_used')
+    kernel = config_dict.get('filtering').get('loess', config_dict.get('filtering').get('LOESS')).get('nb_values_used')
 
     col_filtered = col.copy()
     mask = np.isnan(col_filtered) 
@@ -615,7 +615,7 @@ def recap_filter3d(config_dict, trc_path):
     butter_speed_filter_order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
     butter_speed_filter_cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
     gaussian_filter_sigma_kernel = int(config_dict.get('filtering').get('gaussian').get('sigma_kernel'))
-    loess_filter_nb_values = config_dict.get('filtering').get('loess').get('nb_values_used')
+    loess_filter_nb_values = config_dict.get('filtering').get('loess', config_dict.get('filtering').get('LOESS')).get('nb_values_used')
     median_filter_kernel_size = config_dict.get('filtering').get('median').get('kernel_size')
     make_c3d = config_dict.get('filtering').get('make_c3d')
     
