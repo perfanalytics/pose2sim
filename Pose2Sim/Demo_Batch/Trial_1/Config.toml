@@ -198,26 +198,38 @@
 
 
 # [filtering]
-# type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
-# display_figures = false # true or false (lowercase) 
+# reject_outliers = true      # Hampel filter for outlier rejection before other filtering methods. Can be slow. Rejects outliers that are outside of a 95% confidence interal from the median in a sliding window of size 7.
+# filter = true               # Proceed to further filtering after outlier rejection.
+# type = 'butterworth' # butterworth, gvc_spline, kalman, gaussian, LOESS, median, butterworth_on_speed
+
+# display_figures = true # true or false (lowercase) 
 # make_c3d = true # also save triangulated data in c3d format
 
-   # [filtering.butterworth]
-   # order = 4 
-   # cut_off_frequency = 6 # Hz
-   # [filtering.kalman]
-   # # How much more do you trust triangulation results (measurements), than previous data (process assuming constant acceleration)?
-   # trust_ratio = 100 # = measurement_trust/process_trust ~= process_noise/measurement_noise
-   # smooth = true # should be true, unless you need real-time filtering
-   # [filtering.butterworth_on_speed]
-   # order = 4 
-   # cut_off_frequency = 10 # Hz
-   # [filtering.gaussian]
-   # sigma_kernel = 2 #px
-   # [filtering.LOESS]
-   # nb_values_used = 30 # = fraction of data used * nb frames
-   # [filtering.median]
-   # kernel_size = 9
+#    # Most intuitive and standard filter in biomechanics
+#    [filtering.butterworth]
+#    order = 4 
+#    cut_off_frequency = 6 # Hz # Will be divided by slowmo_factor to be equivalent to non slowed-down video
+
+#    # Used in countless applications, this one is a simplified Kalman filter 
+#    [filtering.kalman]
+#    # How much more do you trust triangulation results (measurements), than the assumption of constant acceleration(process)?
+#    trust_ratio = 500 # = measurement_trust/process_trust ~= process_noise/measurement_noise
+#    smooth = true # should be true, unless you need real-time filtering
+
+#    # Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips).
+#    [filtering.gcv_spline]
+#    cut_off_frequency = 'auto' # 'auto' or int # If int, behaves like a Butterworth filter. 'auto' is sometimes unstable
+#    smoothing_factor = 0.1 # >=0, ignored if cut_off_frequency != 'auto'. Biases results towards more smoothing (>1) or more fidelity to data (<1) 
+
+#    [filtering.loess]
+#    nb_values_used = 5 # = fraction of data used * nb frames
+#    [filtering.gaussian]
+#    sigma_kernel = 1 #px
+#    [filtering.median]
+#    kernel_size = 3
+#    [filtering.butterworth_on_speed]
+#    order = 4 
+#    cut_off_frequency = 10 # Hz
 
 
 # [markerAugmentation] 

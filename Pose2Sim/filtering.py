@@ -200,8 +200,8 @@ def gcv_spline_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    cutoff = config_dict.get('filtering').get('gcv_spline').get('cut_off_frequency', 'auto')
-    smoothing_factor = float(config_dict.get('filtering').get('gcv_spline').get('smoothing_factor', 1.0))
+    cutoff = config_dict.get('filtering').get('gcv_spline', {}).get('cut_off_frequency', 'auto')
+    smoothing_factor = float(config_dict.get('filtering').get('gcv_spline', {}).get('smoothing_factor', 1.0))
 
     # Split into sequences of not nans
     # print('\n', col.name)
@@ -604,6 +604,8 @@ def recap_filter3d(config_dict, trc_path):
     '''
 
     # Read Config
+    do_filter = config_dict.get('filtering').get('filter', True)
+    reject_outliers = config_dict.get('filtering').get('reject_outliers', False)
     filter_type = config_dict.get('filtering').get('type')
     kalman_filter_trustratio = int(config_dict.get('filtering').get('kalman').get('trust_ratio'))
     kalman_filter_smooth = int(config_dict.get('filtering').get('kalman').get('smooth'))
@@ -611,6 +613,8 @@ def recap_filter3d(config_dict, trc_path):
     butterworth_filter_type = 'low' # config_dict.get('filtering').get('butterworth').get('type')
     butterworth_filter_order = int(config_dict.get('filtering').get('butterworth').get('order'))
     butterworth_filter_cutoff = int(config_dict.get('filtering').get('butterworth').get('cut_off_frequency'))
+    gcv_filter_cutoff = config_dict.get('filtering').get('gcv_spline', {}).get('cut_off_frequency', 'auto')
+    gcv_filter_smoothing_factor = float(config_dict.get('filtering').get('gcv_spline', {}).get('smoothing_factor', 1.0))
     butter_speed_filter_type = 'low' # config_dict.get('filtering').get('butterworth_on_speed').get('type')
     butter_speed_filter_order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
     butter_speed_filter_cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
@@ -620,15 +624,23 @@ def recap_filter3d(config_dict, trc_path):
     make_c3d = config_dict.get('filtering').get('make_c3d')
     
     # Recap
-    filter_mapping_recap = {
-        'kalman': f'--> Filter type: Kalman {kalman_filter_smooth_str}. Measurements trusted {kalman_filter_trustratio} times as much as previous data, assuming a constant acceleration process.', 
-        'butterworth': f'--> Filter type: Butterworth {butterworth_filter_type}-pass. Order {butterworth_filter_order}, Cut-off frequency {butterworth_filter_cutoff} Hz.', 
-        'butterworth_on_speed': f'--> Filter type: Butterworth on speed {butter_speed_filter_type}-pass. Order {butter_speed_filter_order}, Cut-off frequency {butter_speed_filter_cutoff} Hz.', 
-        'gaussian': f'--> Filter type: Gaussian. Standard deviation kernel: {gaussian_filter_sigma_kernel}', 
-        'loess': f'--> Filter type: LOESS. Number of values used: {loess_filter_nb_values}', 
-        'median': f'--> Filter type: Median. Kernel size: {median_filter_kernel_size}'
-    }
-    logging.info(filter_mapping_recap[filter_type])
+    if reject_outliers:
+        logging.info('--> Outliers rejected with a Hampel filter.')
+    else:
+        logging.info('--> No outlier rejection applied. Set reject_outliers to true in Config.toml to reject outliers.')
+    if do_filter:
+        filter_mapping_recap = {
+            'butterworth': f'--> Filter type: Butterworth {butterworth_filter_type}-pass. Order {butterworth_filter_order}, Cut-off frequency {butterworth_filter_cutoff} Hz.', 
+            'gcv_spline': f'--> Filter type: Generalized Cross-Validation Spline. {"Optimal parameters automatically estimated with smoothing factor {gcv_filter_smoothing_factor}" if gcv_filter_cutoff == "auto" else "Cut-off frequency {gcv_filter_cutoff} Hz"}.',
+            'kalman': f'--> Filter type: Kalman {kalman_filter_smooth_str}. Measurements trusted {kalman_filter_trustratio} times as much as previous data, assuming a constant acceleration process.', 
+            'butterworth_on_speed': f'--> Filter type: Butterworth on speed {butter_speed_filter_type}-pass. Order {butter_speed_filter_order}, Cut-off frequency {butter_speed_filter_cutoff} Hz.', 
+            'gaussian': f'--> Filter type: Gaussian. Standard deviation kernel: {gaussian_filter_sigma_kernel}', 
+            'loess': f'--> Filter type: LOESS. Number of values used: {loess_filter_nb_values}', 
+            'median': f'--> Filter type: Median. Kernel size: {median_filter_kernel_size}'
+        }
+        logging.info(filter_mapping_recap[filter_type])
+    else:
+        logging.info('--> No filtering applied. Set filtering to true in Config.toml to filter coordinates.')
     logging.info(f'Filtered 3D coordinates are stored at {trc_path}.\n')
     if make_c3d:
         logging.info('All filtered trc files have been converted to c3d.')
@@ -651,6 +663,8 @@ def filter_all(config_dict):
     project_dir = config_dict.get('project').get('project_dir')
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     display_figures = config_dict.get('filtering').get('display_figures')
+    do_filter = config_dict.get('filtering').get('filter', True)
+    reject_outliers = config_dict.get('filtering').get('reject_outliers', False)
     filter_type = config_dict.get('filtering').get('type')
     make_c3d = config_dict.get('filtering').get('make_c3d')
 
@@ -692,27 +706,33 @@ def filter_all(config_dict):
         header[2] = '\t'.join(part if i != 7 else str(frame_nb)+'\n' for i, part in enumerate(header[2].split('\t')))
 
         # Filter coordinates
-        Q_filt = Q_coords.apply(hampel_filter, axis=0)
-        Q_filt = Q_filt.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
+        if reject_outliers:
+            Q_coords = Q_coords.apply(hampel_filter, axis=0)  # Hampel filter for outlier rejection
+        
+        if do_filter:
+            Q_filt = Q_coords.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
 
+        if not do_filter and not reject_outliers:
+            logging.warning(f'reject_outliers and filter have been set to false. No further processing done on {t_path_in}.\n')
+        
+        else:
+            # Display figures
+            if display_figures:
+                # Retrieve keypoints
+                keypoints_names = pd.read_csv(t_path_in, sep="\t", skiprows=3, nrows=0).columns[2::3][:-1].to_numpy()
+                display_figures_fun(Q_coords, Q_filt, time_col, keypoints_names, person_id)
 
-        # Display figures
-        if display_figures:
-            # Retrieve keypoints
-            keypoints_names = pd.read_csv(t_path_in, sep="\t", skiprows=3, nrows=0).columns[2::3][:-1].to_numpy()
-            display_figures_fun(Q_coords, Q_filt, time_col, keypoints_names, person_id)
+            # Reconstruct trc file with filtered coordinates
+            with open(t_path_out, 'w') as trc_o:
+                [trc_o.write(line) for line in header]
+                Q_filt.insert(0, 'Frame#', frames_col)
+                Q_filt.insert(1, 'Time', time_col)
+                # Q_filt = Q_filt.fillna(' ')
+                Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
 
-        # Reconstruct trc file with filtered coordinates
-        with open(t_path_out, 'w') as trc_o:
-            [trc_o.write(line) for line in header]
-            Q_filt.insert(0, 'Frame#', frames_col)
-            Q_filt.insert(1, 'Time', time_col)
-            # Q_filt = Q_filt.fillna(' ')
-            Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+            # Save c3d
+            if make_c3d:
+                convert_to_c3d(t_path_out)
 
-        # Save c3d
-        if make_c3d:
-            convert_to_c3d(t_path_out)
-
-        # Recap
-        recap_filter3d(config_dict, t_path_out)
+            # Recap
+            recap_filter3d(config_dict, t_path_out)

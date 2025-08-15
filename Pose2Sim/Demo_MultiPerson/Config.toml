@@ -41,7 +41,7 @@ pose_model = 'Body_with_feet'  #With RTMLib:
                          # - Body_with_feet (default HALPE_26 model), 
                          # - Whole_body_wrist (COCO_133_WRIST: body + feet + 2 hand_points), 
                          # - Whole_body (COCO_133: body + feet + hands), 
-                         # - Body (COCO_17). Marker augmentation won't work, Kinematic analysis will work, 
+                         # - Body (COCO_17). Marker augmentation won't work, Kinematic analysis will work,
                          # - Hand (HAND_21, only lightweight mode. Potentially better results with Whole_body), 
                          # - Face (FACE_106), 
                          # - Animal (ANIMAL2D_17)
@@ -76,7 +76,8 @@ mode = 'balanced' # 'lightweight', 'balanced', 'performance',
 #          'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.zip',
 #          'pose_input_size':[256,256]}"""
 
-det_frequency = 4 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
+
+det_frequency = 4 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (pose estimation is still run on all frames). 
                   # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
 device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
@@ -136,7 +137,6 @@ calibration_type = 'convert' # 'convert' or 'calculate'
       # Camera placements, need to be done before every session
       [calibration.calculate.extrinsics]
       calculate_extrinsics = true # true or false (lowercase) 
-      board_position = 'vertical' # 'vertical' or 'horizontal'
       extrinsics_method = 'scene' # 'board', 'scene', 'keypoints'
       # 'board' should be large enough to be detected when laid on the floor. Not recommended.
       # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out.
@@ -146,6 +146,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
          [calibration.calculate.extrinsics.board]
          show_reprojection_error = true # true or false (lowercase)
          extrinsics_extension = 'png' # any video or image extension
+         board_position = 'vertical' # 'vertical' or 'horizontal'
          extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
          extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
 
@@ -194,30 +195,42 @@ sections_to_keep = 'all' # 'all', 'largest', 'first', 'last'
 show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
 undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
-make_c3d = false # save triangulated data in c3d format in addition to trc
+make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
 [filtering]
-type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
-display_figures = true # true or false (lowercase) 
-make_c3d = false # also save triangulated data in c3d format
+reject_outliers = true      # Hampel filter for outlier rejection before other filtering methods. Can be slow. Rejects outliers that are outside of a 95% confidence interal from the median in a sliding window of size 7.
+filter = true               # Proceed to further filtering after outlier rejection.
+type = 'butterworth' # butterworth, gvc_spline, kalman, gaussian, LOESS, median, butterworth_on_speed
 
+display_figures = true # true or false (lowercase) 
+make_c3d = true # also save triangulated data in c3d format
+
+   # Most intuitive and standard filter in biomechanics
    [filtering.butterworth]
    order = 4 
-   cut_off_frequency = 6 # Hz
+   cut_off_frequency = 6 # Hz # Will be divided by slowmo_factor to be equivalent to non slowed-down video
+
+   # Used in countless applications, this one is a simplified Kalman filter 
    [filtering.kalman]
-   # How much more do you trust triangulation results (measurements), than previous data (process assuming constant acceleration)?
-   trust_ratio = 100 # = measurement_trust/process_trust ~= process_noise/measurement_noise
+   # How much more do you trust triangulation results (measurements), than the assumption of constant acceleration(process)?
+   trust_ratio = 500 # = measurement_trust/process_trust ~= process_noise/measurement_noise
    smooth = true # should be true, unless you need real-time filtering
+
+   # Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips).
+   [filtering.gcv_spline]
+   cut_off_frequency = 'auto' # 'auto' or int # If int, behaves like a Butterworth filter. 'auto' is sometimes unstable
+   smoothing_factor = 0.1 # >=0, ignored if cut_off_frequency != 'auto'. Biases results towards more smoothing (>1) or more fidelity to data (<1) 
+
+   [filtering.loess]
+   nb_values_used = 5 # = fraction of data used * nb frames
+   [filtering.gaussian]
+   sigma_kernel = 1 #px
+   [filtering.median]
+   kernel_size = 3
    [filtering.butterworth_on_speed]
    order = 4 
    cut_off_frequency = 10 # Hz
-   [filtering.gaussian]
-   sigma_kernel = 2 #px
-   [filtering.LOESS]
-   nb_values_used = 30 # = fraction of data used * nb frames
-   [filtering.median]
-   kernel_size = 9
 
 
 [markerAugmentation] 
@@ -236,9 +249,8 @@ right_left_symmetry = true # true or false (lowercase) # Set to false only if yo
 default_height = 1.7 # meters # If automatic height calculation did not work, this value is used to scale the model
 remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
 remove_individual_ik_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
-
 fastest_frames_to_remove_percent = 0.1 # Frames with high speed are considered as outliers
-close_to_zero_speed_m = 0.2 # Sum for all keypoints: about 0.1 m/frame
+close_to_zero_speed_m = 0.2 # Sum for all keypoints: about 50 px/frame or 0.2 m/frame
 large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
 trimmed_extrema_percent = 0.5 # Proportion of the most extreme segment values to remove before calculating their mean)
 
