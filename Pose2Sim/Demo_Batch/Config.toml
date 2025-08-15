@@ -203,7 +203,7 @@ reject_outliers = true      # Hampel filter for outlier rejection before other f
 filter = true               # Proceed to further filtering after outlier rejection.
 type = 'butterworth' # butterworth, gvc_spline, kalman, gaussian, LOESS, median, butterworth_on_speed
 
-display_figures = true # true or false (lowercase) 
+display_figures = false # true or false (lowercase) 
 make_c3d = true # also save triangulated data in c3d format
 
    # Most intuitive and standard filter in biomechanics
