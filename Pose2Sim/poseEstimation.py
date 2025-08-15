@@ -570,7 +570,11 @@ def estimate_pose_all(config_dict):
                         det_class=det_class, det=det, det_input_size=det_input_size,
                         pose_class=pose_class, pose=pose, pose_input_size=pose_input_size,
                         backend=backend, device=device)
-            
+
+            if pose_class == 'RTMO' and model_name != 'COCO_17':
+                logging.warning("RTMO currently only supports 'Body' pose_model. Switching to 'Body'.")
+                pose_model = eval('COCO_17')
+                            
         except (json.JSONDecodeError, TypeError):
             logging.warning("\nInvalid mode. Must be 'lightweight', 'balanced', 'performance', or '''{dictionary}''' of parameters within triple quotes. Make sure input_sizes are within square brackets.")
             logging.warning('Using the default "balanced" mode.')
