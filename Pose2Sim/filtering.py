@@ -219,12 +219,13 @@ def gcv_spline_filter_1d(config_dict, frame_rate, col):
 
             # Automatically determine optimal lambda value when cutoff is 'auto'
             if cutoff == 'auto': 
-                # Normalize x (0-1)
+                # Normalize x (0-100), because (0-1) leads to instabilities in lam = _compute_optimal_gcv_parameter(X, wE, y, w)
+                # See https://stackoverflow.com/questions/79736522/automatic-smoothing-parameters-with-make-smoothing-spline-go-wrong
                 min_x, max_x = np.min(x), np.max(x)
                 range_x = max_x - min_x if max_x > min_x else 1.0
-                x_norm = (x - min_x) / range_x
+                x_norm = 100 * (x - min_x) / range_x
 
-                # Normalize col around 1, because zero mean leads to unstabilitys in lam = _compute_optimal_gcv_parameter(X, wE, y, w)
+                # Normalize col around 1, because zero mean leads to unstabilities
                 median_col = np.median(col_filtered[seq_f]) # median of time series
                 mad_col = np.median(np.abs(col_filtered[seq_f] - median_col)) # median absolute deviation from median
                 mad_col = mad_col if mad_col > 0 else 1.0
