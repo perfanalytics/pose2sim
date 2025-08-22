@@ -31,11 +31,10 @@ import matplotlib.pyplot as plt
 import logging
 
 from scipy import signal
+from scipy.interpolate import make_smoothing_spline
+
 from scipy.interpolate._bsplines import _coeff_of_divided_diff, _compute_optimal_gcv_parameter
-from scipy._lib._array_api import array_namespace
 from scipy.interpolate import BSpline
-from scipy.linalg import solve_banded
-from numpy.core.multiarray import normalize_axis_index
 from scipy.ndimage import gaussian_filter1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from filterpy.kalman import KalmanFilter
@@ -81,19 +80,35 @@ def hampel_filter(col, window_size=7, n_sigma=2):
     return col_filtered
 
 
-def make_smoothing_spline_with_bias(x, y, bias_factor=1.0, w=None, lam=None, *, axis=0):
-
+def _compute_optimal_gcv_parameter_numstable(x, y):
     '''
-    Reimplemented the full make_smoothing_spline function but make it accept a bias factor towards smoothing or fidelity to data.
-    Identical to https://github.com/scipy/scipy/blob/main/scipy/interpolate/_bsplines.py#L2210
-    but multiplies the automatically estimated optimal lambda value by the bias factor.
+    Makes x values spaced 1 apart, to make sure the optimal lambda value 
+    is correctly computed.
+    See https://stackoverflow.com/a/79740481/12196632
+    '''
+    
+    x_spacing = np.diff(x)
+    assert (x_spacing >= 0).all(), "x must be sorted"
+    x_spacing_avg = x_spacing.mean()
+    assert x_spacing_avg != 0, "div by zero"
 
-    INPUTS:
-    - bias_factor > 1 for smoother output, < 1 for more fidelity to data
+    # x values spaced 1 apart
+    new_x = x / x_spacing_avg
+    X, wE, y, w = get_smoothing_spline_intermediate_arrays(new_x, y)
+    
+    # Rescale the value of lambda we found back to the original problem
+    lam = _compute_optimal_gcv_parameter(X, wE, y, w) * x_spacing_avg ** 3
+    
+    return lam
+
+
+def get_smoothing_spline_intermediate_arrays(x, y, w=None):
+    '''
+    Used by _compute_optimal_gcv_parameter_numstable to compute the optimal lambda value for a smoothing spline.
+    See https://stackoverflow.com/a/79740481/12196632
     '''
 
-    xp = array_namespace(x, y)
-
+    axis = 0
     x = np.ascontiguousarray(x, dtype=float)
     y = np.ascontiguousarray(y, dtype=float)
 
@@ -116,7 +131,6 @@ def make_smoothing_spline_with_bias(x, y, bias_factor=1.0, w=None, lam=None, *, 
     if n <= 4:
         raise ValueError('``x`` and ``y`` length must be at least 5')
 
-    axis = normalize_axis_index(axis, y.ndim)
     y = np.moveaxis(y, axis, 0)
     y_shape1 = y.shape[1:]
     if y_shape1 != ():
@@ -146,40 +160,7 @@ def make_smoothing_spline_with_bias(x, y, bias_factor=1.0, w=None, lam=None, *, 
     wE[:-1, -2] = -_coeff_of_divided_diff(x[-4:]) / w[-4:]
     wE[:-2, -1] = _coeff_of_divided_diff(x[-3:]) / w[-3:]
     wE *= 6
-
-    # MULTIPLY LAM BY BIAS FACTOR
-    if lam is None:
-        lam = _compute_optimal_gcv_parameter(X, wE, y, w)
-        lam *= bias_factor
-        # print(lam)
-    elif lam < 0.:
-        raise ValueError('Regularization parameter should be non-negative')
-
-    # solve the initial problem in the basis of natural splines
-    if np.ndim(lam) == 0:
-        c = solve_banded((2, 2), X + lam * wE, y)
-    elif np.ndim(lam) == 1:
-        # XXX: solve_banded does not suppport batched `ab` matrices; loop manually
-        c = np.empty((n, lam.shape[0]))
-        for i in range(lam.shape[0]):
-            c[:, i] = solve_banded((2, 2), X + lam[i] * wE, y[:, i])
-    else:
-        # this should not happen, ever
-        raise RuntimeError("Internal error, please report it to SciPy developers.")
-    c = c.reshape((c.shape[0], *y_shape1))
-
-    # hack: these are c[0], c[1] etc, shape-compatible with np.r_ below
-    c0, c1 = c[0:1, ...], c[1:2, ...]     # c[0], c[1]
-    cm0, cm1 = c[-1:-2:-1, ...], c[-2:-3:-1, ...]    # c[-1], c[-2]
-
-    c_ = np.r_[c0 * (t[5] + t[4] - 2 * t[3]) + c1,
-               c0 * (t[5] - t[3]) + c1,
-               c[1: -1, ...],
-               cm0 * (t[-4] - t[-6]) + cm1,
-               cm0 * (2 * t[-4] - t[-5] - t[-6]) + cm1]
-
-    t, c_ = xp.asarray(t), xp.asarray(c_)
-    return BSpline.construct_fast(t, c_, 3, axis=axis)
+    return X, wE, y, w
 
 
 def gcv_spline_filter_1d(config_dict, frame_rate, col):
@@ -219,34 +200,35 @@ def gcv_spline_filter_1d(config_dict, frame_rate, col):
 
             # Automatically determine optimal lambda value when cutoff is 'auto'
             if cutoff == 'auto': 
-                # Normalize x (0-100), because (0-1) leads to instabilities in lam = _compute_optimal_gcv_parameter(X, wE, y, w)
-                # See https://stackoverflow.com/questions/79736522/automatic-smoothing-parameters-with-make-smoothing-spline-go-wrong
-                min_x, max_x = np.min(x), np.max(x)
-                range_x = max_x - min_x if max_x > min_x else 1.0
-                x_norm = 100 * (x - min_x) / range_x
-
                 # Normalize col around 1, because zero mean leads to unstabilities
                 median_col = np.median(col_filtered[seq_f]) # median of time series
                 mad_col = np.median(np.abs(col_filtered[seq_f] - median_col)) # median absolute deviation from median
                 mad_col = mad_col if mad_col > 0 else 1.0
                 col_norm = 1 + (col_filtered[seq_f] - median_col) / (1.4826 * mad_col) # 1.4826*mad_col equivalent to dividing by std (for col_norm to have a std of 1)
-                # mean_col = np.mean(col_filtered[seq_f])
-                # std_col = np.std(col_filtered[seq_f]) if np.std(col_filtered[seq_f]) > 0 else 1.0
-                # col_norm = (col_filtered[seq_f] - mean_col) / std_col
 
-                # Bias lambda value towards either smoothing or fidelity to data
-                spline = make_smoothing_spline_with_bias(x_norm, col_norm, bias_factor=smoothing_factor, lam=None)
-                col_filtered_norm = spline(x_norm)
+                # Compute optimal lam 
+                # See https://stackoverflow.com/a/79740481/12196632
+                lam =  _compute_optimal_gcv_parameter_numstable(x, col_norm)
                 
+                # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
+                lam *= smoothing_factor
+
+                # Compute spline
+                spline = make_smoothing_spline(x, col_norm, w=None, lam=lam)
+                col_filtered_norm = spline(x)
+                                
                 # Denormalize data
                 col_filtered[seq_f] = (col_filtered_norm - 1) * (1.4826 * mad_col) + median_col
-                # col_filtered[seq_f] = col_filtered_norm * std_col + mean_col
 
             else:
                 # Estimate lam from cutoff frequency
                 lam = ((frame_rate / (2 * np.pi * float(cutoff))) ** 4)
+                
+                # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
+                lam *= smoothing_factor
 
-                spline = make_smoothing_spline_with_bias(x, col_filtered[seq_f], bias_factor=1.0, lam=lam)
+                # Compute spline
+                spline = make_smoothing_spline(x, col_filtered[seq_f], w=None, lam=lam)
                 col_filtered[seq_f] = spline(x)
 
     return col_filtered

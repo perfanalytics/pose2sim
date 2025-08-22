@@ -201,15 +201,15 @@ make_c3d = true # save triangulated data in c3d format in addition to trc
 [filtering]
 reject_outliers = true      # Hampel filter for outlier rejection before other filtering methods. Can be slow. Rejects outliers that are outside of a 95% confidence interal from the median in a sliding window of size 7.
 filter = true               # Proceed to further filtering after outlier rejection.
-type = 'butterworth' # butterworth, gvc_spline, kalman, gaussian, LOESS, median, butterworth_on_speed
+type = 'butterworth' # butterworth, kalman, gvc_spline, gaussian, LOESS, median, butterworth_on_speed
 
 display_figures = true # true or false (lowercase) 
 make_c3d = true # also save triangulated data in c3d format
 
    # Most intuitive and standard filter in biomechanics
    [filtering.butterworth]
-   order = 4 
    cut_off_frequency = 6 # Hz # Will be divided by slowmo_factor to be equivalent to non slowed-down video
+   order = 4 
 
    # Used in countless applications, this one is a simplified Kalman filter 
    [filtering.kalman]
@@ -219,8 +219,8 @@ make_c3d = true # also save triangulated data in c3d format
 
    # Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips).
    [filtering.gcv_spline]
-   cut_off_frequency = 'auto' # 'auto' or int # If int, behaves like a Butterworth filter. 'auto' is sometimes unstable
-   smoothing_factor = 0.1 # >=0, ignored if cut_off_frequency != 'auto'. Biases results towards more smoothing (>1) or more fidelity to data (<1) 
+   cut_off_frequency = 'auto' # 'auto' or int # If int, behaves like a Butterworth filter. 'auto' is usually better, unless the signal is too short (noise can then be considered as signal -> trajectories not filtered)
+   smoothing_factor = 1.0 # >=0, ignored if cut_off_frequency != 'auto'. Biases results towards more smoothing (>1) or more fidelity to data (<1) 
 
    [filtering.loess]
    nb_values_used = 5 # = fraction of data used * nb frames

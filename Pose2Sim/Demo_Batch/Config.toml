@@ -208,8 +208,8 @@ make_c3d = true # also save triangulated data in c3d format
 
    # Most intuitive and standard filter in biomechanics
    [filtering.butterworth]
-   order = 4 
    cut_off_frequency = 6 # Hz # Will be divided by slowmo_factor to be equivalent to non slowed-down video
+   order = 4 
 
    # Used in countless applications, this one is a simplified Kalman filter 
    [filtering.kalman]
@@ -219,8 +219,8 @@ make_c3d = true # also save triangulated data in c3d format
 
    # Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips).
    [filtering.gcv_spline]
-   cut_off_frequency = 'auto' # 'auto' or int # If int, behaves like a Butterworth filter. 'auto' is sometimes unstable
-   smoothing_factor = 0.1 # >=0, ignored if cut_off_frequency != 'auto'. Biases results towards more smoothing (>1) or more fidelity to data (<1) 
+   cut_off_frequency = 'auto' # 'auto' or int # If int, behaves like a Butterworth filter. 'auto' is usually better, unless the signal is too short (noise can then be considered as signal -> trajectories not filtered)
+   smoothing_factor = 1.0 # >=0, ignored if cut_off_frequency != 'auto'. Biases results towards more smoothing (>1) or more fidelity to data (<1) 
 
    [filtering.loess]
    nb_values_used = 5 # = fraction of data used * nb frames
