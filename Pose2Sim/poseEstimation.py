@@ -49,6 +49,10 @@ from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel, get_screen_size, calculate_display_size
 from Pose2Sim.skeletons import *
 
+# Not safe, but to be used until OpenMMLab/RTMlib's SSL certificates are updated
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 
 ## AUTHORSHIP INFORMATION
 __author__ = "HunMin Kim, David Pagnon"
@@ -574,7 +578,7 @@ def estimate_pose_all(config_dict):
             if pose_class == 'RTMO' and model_name != 'COCO_17':
                 logging.warning("RTMO currently only supports 'Body' pose_model. Switching to 'Body'.")
                 pose_model = eval('COCO_17')
-                            
+
         except (json.JSONDecodeError, TypeError):
             logging.warning("\nInvalid mode. Must be 'lightweight', 'balanced', 'performance', or '''{dictionary}''' of parameters within triple quotes. Make sure input_sizes are within square brackets.")
             logging.warning('Using the default "balanced" mode.')
