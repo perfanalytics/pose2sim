@@ -303,23 +303,16 @@ def read_vicon(vicon_path):
         trans = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('POSITION').split()
         T += [[float(t)/1000 for t in trans]]
 
-    # Optical cameras to be ignored: ISDV=0
-    optical_idx = [i for i, cam in enumerate(root.findall('Camera')) if cam.attrib.get('ISDV', '0') == '0']
-    if not optical_idx:
-        optical_idx = list(range(len(root.findall('Camera'))))
-
     # Camera names by natural order
-    idx_sorted = sorted(optical_idx,
-                        key=lambda i: natural_sort_key(
-                            root.findall('Camera')[i].attrib['DEVICEID']))
-
-    C = [C[i] for i in idx_sorted]
-    ret = [ret[i] for i in idx_sorted]
-    S = [S[i] for i in idx_sorted]
-    D = [D[i] for i in idx_sorted]
-    K = [K[i] for i in idx_sorted]
-    R = [R[i] for i in idx_sorted]
-    T = [T[i] for i in idx_sorted]
+    C_vid_id = [v for v in vid_id if 'video' in root.findall('Camera')[v].attrib.get('TYPE', '').lower()]
+    C_vid = [root.findall('Camera')[v].attrib.get('DEVICEID') for v in C_vid_id]
+    C = sorted(C_vid, key=natural_sort_key)
+    C_id_sorted = [i for v_sorted in C for i,v in enumerate(root.findall('Camera')) if v.attrib.get('DEVICEID')==v_sorted]
+    S = [S[c] for c in C_id_sorted]
+    D = [D[c] for c in C_id_sorted]
+    K = [K[c] for c in C_id_sorted]
+    R = [R[c] for c in C_id_sorted]
+    T = [T[c] for c in C_id_sorted]
 
     return ret, C, S, D, K, R, T
 
