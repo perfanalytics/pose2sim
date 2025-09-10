@@ -1165,7 +1165,7 @@ def sort_people_rtmlib(pose_tracker, keypoints, scores):
     return sorted_keypoints, sorted_scores
 
 
-def sort_people_deepsort(keypoints, scores, deepsort_tracker, frame,frame_count):
+def sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count):
     '''
     Associate persons across frames (DeepSort method)
 

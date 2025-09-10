@@ -50,7 +50,7 @@ dependencies = [
     "rtmlib",
     "openvino",
     "onnxruntime",
-    "opencv-python",
+    "opencv-python<4.12", # otherwise forces numpy>=2.0, which is incompatible with some opensim/python combinations
     "deep-sort-realtime",
 ]
 

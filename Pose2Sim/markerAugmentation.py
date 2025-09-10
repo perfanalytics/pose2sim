@@ -179,7 +179,7 @@ def augment_markers_all(config_dict):
     elif not type(subject_height) == list: # int or float
         subject_height = [subject_height]
     if len(subject_height) < len(trc_files):
-        logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to {default_height}m.")
+        logging.warning(f"Number of subject heights does not match number of TRC files. Missing heights are set to {default_height}m.")
         subject_height += [default_height] * (len(trc_files) - len(subject_height))
 
     # Get subject masses
