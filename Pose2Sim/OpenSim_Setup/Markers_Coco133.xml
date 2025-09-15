@@ -207,7 +207,7 @@
 				<!--The fixed location of the station expressed in its parent frame.-->
 				<location>0.0031131181410346542 -0.073810317144973658 0.032544599634169884</location>
 				<!--Flag (true or false) specifying whether the marker is fixed in its parent frame during the marker placement step of scaling.  If false, the marker is free to move within its parent Frame to match its experimental counterpart.-->
-				<fixed>false</fixed>
+				<fixed>true</fixed>
 			</Marker>
 		</objects>
 		<groups />
