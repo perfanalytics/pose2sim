@@ -41,12 +41,15 @@ import ast
 from functools import partial
 from tqdm import tqdm
 from anytree.importer import DictImporter
+import numpy as np
 import cv2
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
+from rtmlib.tools.object_detection.post_processings import nms
 from deep_sort_realtime.deepsort_tracker import DeepSort
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort,\
-                        colors, thickness, draw_bounding_box, draw_keypts, draw_skel, get_screen_size, calculate_display_size
+                        colors, thickness, draw_bounding_box, draw_keypts, draw_skel, bbox_xyxy_compute, \
+                        get_screen_size, calculate_display_size
 from Pose2Sim.skeletons import *
 
 # Not safe, but to be used until OpenMMLab/RTMlib's SSL certificates are updated
@@ -258,6 +261,13 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
             
                 # Detect poses
                 keypoints, scores = pose_tracker(frame)
+
+                # Non maximum suppression (at pose level, not detection)
+                frame_shape = frame.shape
+                bboxes = bbox_xyxy_compute(frame_shape, keypoints, padding=0)
+                score_bboxes = np.array([np.mean(s) for s in scores])
+                keep = nms(bboxes, score_bboxes, nms_thr=0.45)
+                keypoints, scores = keypoints[keep], scores[keep]
 
                 # Track poses across frames
                 if tracking_mode == 'deepsort':

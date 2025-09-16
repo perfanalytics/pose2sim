@@ -1165,7 +1165,7 @@ def sort_people_rtmlib(pose_tracker, keypoints, scores):
     return sorted_keypoints, sorted_scores
 
 
-def sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count):
+def sort_people_deepsort(keypoints, scores, deepsort_tracker, frame,frame_count):
     '''
     Associate persons across frames (DeepSort method)
 
@@ -1233,10 +1233,10 @@ def bbox_ltwh_compute(keypoints, padding=0):
 
     x_min, x_max = np.min(x_coords, axis=1), np.max(x_coords, axis=1)
     y_min, y_max = np.min(y_coords, axis=1), np.max(y_coords, axis=1)
-    width = x_max - x_min
-    height = y_max - y_min
 
     if padding > 0:
+        width = x_max - x_min
+        height = y_max - y_min
         x_min = x_min - width*padding/100
         y_min = y_min - height/2*padding/100
         width = width + 2*width*padding/100
@@ -1245,6 +1245,47 @@ def bbox_ltwh_compute(keypoints, padding=0):
     bbox_ltwh = np.stack((x_min, y_min, width, height), axis=1)
 
     return bbox_ltwh
+
+
+def bbox_xyxy_compute(frame_shape, keypoints, padding=0):
+    '''
+    Compute bounding boxes in (x_min, y_min, x_max, y_max) format
+    Optionally add padding to the bounding boxes 
+    as a percentage of the bounding box size (+padding% horizontally, +padding/2% vertically)
+
+    INPUTS:
+    - frame_shape: tuple. The shape of the image (height, width, channels)
+    - keypoints: array of shape K, L, M with K the number of detected persons,
+                    L the number of detected keypoints, M their 2D coordinates
+    - padding: int. The padding to add to the bounding boxes, in perceptage
+    '''
+
+    x_coords = keypoints[:, :, 0]
+    y_coords = keypoints[:, :, 1]
+
+    if not np.isnan(x_coords).all():
+        x_min, x_max = np.nanmin(x_coords, axis=1), np.nanmax(x_coords, axis=1)
+        y_min, y_max = np.nanmin(y_coords, axis=1), np.nanmax(y_coords, axis=1)
+
+        width = x_max - x_min
+        height = y_max - y_min
+        x_min = np.clip(x_min, 0, frame_shape[1])
+        x_max = np.clip(x_max, 0, frame_shape[1])
+        y_min = np.clip(y_min, 0, frame_shape[0])
+        y_max = np.clip(y_max, 0, frame_shape[0])
+    
+        if padding > 0:
+            x_min = x_min - width*padding/100
+            y_min = y_min - height/2*padding/100
+            x_max = x_max + width*padding/100
+            y_max = y_max + height/2*padding/100
+
+        bbox_xyxy = np.stack((x_min, y_min, x_max, y_max), axis=1)
+
+    else:
+        bbox_xyxy = np.array([[np.nan, np.nan, np.nan, np.nan]]*keypoints.shape[0])
+
+    return bbox_xyxy
 
 
 def draw_bounding_box(img, X, Y, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)], fontSize=0.3, thickness=1):
