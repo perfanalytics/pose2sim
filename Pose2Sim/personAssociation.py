@@ -605,7 +605,7 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
         logging.info(f'--> In average, {mean_cam_off_count} cameras had to be excluded to reach the demanded {error_threshold_tracking} px error threshold after excluding points with likelihood below {likelihood_threshold_association}.')
     
     else:
-        logging.info(f'\n--> A person was reconstructed if the lines from cameras to their keypoints intersected within {reconstruction_error_threshold} m and if the calculated affinity stayed above {min_affinity} after excluding points with likelihood below {likelihood_threshold_association}.')
+        logging.info(f'\n--> A person was reconstructed if the lines from cameras to their keypoints intersected within {reconstruction_error_threshold} m and if the calculated affinity stayed above {min_affinity}.')
         logging.info(f'--> Beware that people were sorted across cameras, but not across frames. This will be done in the triangulation stage.')
 
     logging.info(f'\nTracked json files are stored in {os.path.realpath(poseTracked_dir)}.')

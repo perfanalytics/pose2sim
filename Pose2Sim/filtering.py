@@ -27,8 +27,10 @@ import glob
 import numpy as np
 import pandas as pd
 import cv2
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import logging
+import platform
 
 from scipy import signal
 from scipy.interpolate import make_smoothing_spline
@@ -502,7 +504,7 @@ def median_filter_1d(config_dict, frame_rate, col):
     return col_filtered
 
 
-def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0):
+def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0, show=True):
     '''
     Displays filtered and unfiltered data for comparison
 
@@ -511,10 +513,17 @@ def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0
     - Q_filt: pandas dataframe of filtered 3D coordinates
     - time_col: pandas column
     - keypoints_names: list of strings
+    - person_id: int, person number
+    - show: boolean, if True shows the figures    
 
     OUTPUT:
     - matplotlib window with tabbed figures for each keypoint
     '''
+
+    os_name = platform.system()
+    if os_name == 'Windows':
+        mpl.use('qt5agg') # windows
+    mpl.rc('figure', max_open_warning=0)
 
     pw = plotWindow()
     pw.MainWindow.setWindowTitle('Person '+ str(person_id) + ' coordinates')
@@ -544,7 +553,10 @@ def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0
 
         pw.addPlot(keypoint, f)
     
-    pw.show()
+    if show:
+        pw.show()
+
+    return pw
 
 
 def filter1d(col, config_dict, filter_type, frame_rate):
@@ -587,6 +599,10 @@ def recap_filter3d(config_dict, trc_path):
     '''
 
     # Read Config
+    project_dir = config_dict.get('project').get('project_dir')
+    pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
+    save_plots = config_dict.get('filtering').get('save_filt_plots', True)
+    plots_output_dir = os.path.join(pose3d_dir, 'filtering_plots')
     do_filter = config_dict.get('filtering').get('filter', True)
     reject_outliers = config_dict.get('filtering').get('reject_outliers', False)
     filter_type = config_dict.get('filtering').get('type')
@@ -624,9 +640,11 @@ def recap_filter3d(config_dict, trc_path):
         logging.info(filter_mapping_recap[filter_type])
     else:
         logging.info('--> No filtering applied. Set filtering to true in Config.toml to filter coordinates.')
-    logging.info(f'Filtered 3D coordinates are stored at {trc_path}.\n')
+    logging.info(f'Filtered 3D coordinates are stored at {trc_path}.')
     if make_c3d:
         logging.info('All filtered trc files have been converted to c3d.')
+    if save_plots:
+        logging.info(f'Filtering plots are saved in {plots_output_dir}.')
 
 
 def filter_all(config_dict):
@@ -645,11 +663,15 @@ def filter_all(config_dict):
     # Read config_dict
     project_dir = config_dict.get('project').get('project_dir')
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    display_figures = config_dict.get('filtering').get('display_figures')
+    display_figures = config_dict.get('filtering').get('display_figures', True)
+    save_plots = config_dict.get('filtering').get('save_filt_plots', True)
+    plots_output_dir = os.path.join(pose3d_dir, 'filtering_plots')
     do_filter = config_dict.get('filtering').get('filter', True)
     reject_outliers = config_dict.get('filtering').get('reject_outliers', False)
     filter_type = config_dict.get('filtering').get('type')
     make_c3d = config_dict.get('filtering').get('make_c3d')
+    if save_plots and not os.path.exists(plots_output_dir):
+        os.makedirs(plots_output_dir)
 
     # Get frame_rate
     video_dir = os.path.join(project_dir, 'videos')
@@ -670,6 +692,7 @@ def filter_all(config_dict):
     # Trc paths
     trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in file]
     for person_id, t_path_in in enumerate(trc_path_in):
+        logging.info(f'\nFiltering 3D coordinates for person {person_id}...')
         # Read trc coordinate values
         t_file_in = os.path.basename(t_path_in)
         Q_coords, frames_col, time_col, markers, header = read_trc(t_path_in)
@@ -700,10 +723,17 @@ def filter_all(config_dict):
         
         else:
             # Display figures
-            if display_figures:
+            if display_figures or save_plots:
                 # Retrieve keypoints
                 keypoints_names = pd.read_csv(t_path_in, sep="\t", skiprows=3, nrows=0).columns[2::3][:-1].to_numpy()
-                display_figures_fun(Q_coords, Q_filt, time_col, keypoints_names, person_id)
+                pw = display_figures_fun(Q_coords, Q_filt, time_col, keypoints_names, person_id, show=display_figures)
+                if save_plots:
+                    for n, f in enumerate(pw.figure_handles):
+                        dpi = pw.canvases[person_id].figure.dpi
+                        f.set_size_inches(1280/dpi, 720/dpi)
+                        title = pw.tabs.tabText(n)
+                        plot_path = os.path.join(plots_output_dir, f'person{person_id:02d}_{title.replace(" ","_").replace("/","_")}.png')
+                        f.savefig(plot_path, dpi=dpi, bbox_inches='tight')
 
             # Reconstruct trc file with filtered coordinates
             with open(t_path_out, 'w') as trc_o:

@@ -96,6 +96,7 @@ output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a lis
 [synchronization]
 synchronization_gui = true # true or false. If true, a player will popup and let the user determine synchronization parameters. If false, it will be done automatically based on the parameters below
 display_sync_plots = true # true or false (lowercase)
+save_sync_plots = true # true or false (lowercase) # save synchronization plots
 keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
@@ -204,6 +205,7 @@ filter = true               # Proceed to further filtering after outlier rejecti
 type = 'butterworth' # butterworth, kalman, gvc_spline, gaussian, LOESS, median, butterworth_on_speed
 
 display_figures = true # true or false (lowercase) 
+save_filt_plots = true # true or false (lowercase) # save filtering plots
 make_c3d = true # also save triangulated data in c3d format
 
    # Most intuitive and standard filter in biomechanics

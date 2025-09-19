@@ -29,7 +29,7 @@ OUTPUTS:
 
 
 ## INIT
-from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort_key, zup2yup
+from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort_key, zup2yup, set_always_on_top
 
 import os
 import logging
@@ -954,6 +954,8 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     ax_3d.view_init(elev=90, azim=-90)
                 else:
                     ax_3d.view_init(vertical_axis='z')
+                # Maintain 3D window on top
+                set_always_on_top(fig_3d)
                 fig_3d.show()
 
         if event.key == 'h':

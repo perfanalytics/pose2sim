@@ -1302,6 +1302,7 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_name='0', c
     OUTPUTS:
     - offset: int. The time offset for which the correlation is highest.
     - max_corr: float. The maximum correlation value.
+    - f: matplotlib figure. The figure containing the cross-correlation plot.
     '''
 
     if isinstance(lag_range, int):
@@ -1312,31 +1313,33 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_name='0', c
     if not np.isnan(pearson_r).all():
         max_corr = np.nanmax(pearson_r)
 
+        f, ax = plt.subplots(2,1, num='Synchronizing cameras')
+        # speed
+        camx.plot(ax=ax[0], label = f'Reference: {ref_cam_name}')
+        camy.plot(ax=ax[0], label = f'Compared: {cam_name}')
+        ax[0].set(xlabel='Frame', ylabel='Speed (px/frame)')
+        ax[0].legend()
+        # time lagged cross-correlation
+        ax[1].plot(list(range(lag_range[0], lag_range[1])), pearson_r)
+        ax[1].axvline(np.ceil(len(pearson_r)/2) + lag_range[0],color='k',linestyle='--')
+        ax[1].axvline(np.argmax(pearson_r) + lag_range[0],color='r',linestyle='--',label='Peak synchrony')
+        plt.annotate(f'Max correlation={np.round(max_corr,2)}', xy=(0.05, 0.9), xycoords='axes fraction')
+        ax[1].set(title=f'Offset = {offset} frames', xlabel='Offset (frames)',ylabel='Pearson r')
+        
+        plt.legend()
+        f.tight_layout()
+
         if show:
-            f, ax = plt.subplots(2,1, num='Synchronizing cameras')
-            # speed
-            camx.plot(ax=ax[0], label = f'Reference: {ref_cam_name}')
-            camy.plot(ax=ax[0], label = f'Compared: {cam_name}')
-            ax[0].set(xlabel='Frame', ylabel='Speed (px/frame)')
-            ax[0].legend()
-            # time lagged cross-correlation
-            ax[1].plot(list(range(lag_range[0], lag_range[1])), pearson_r)
-            ax[1].axvline(np.ceil(len(pearson_r)/2) + lag_range[0],color='k',linestyle='--')
-            ax[1].axvline(np.argmax(pearson_r) + lag_range[0],color='r',linestyle='--',label='Peak synchrony')
-            plt.annotate(f'Max correlation={np.round(max_corr,2)}', xy=(0.05, 0.9), xycoords='axes fraction')
-            ax[1].set(title=f'Offset = {offset} frames', xlabel='Offset (frames)',ylabel='Pearson r')
-            
-            plt.legend()
-            f.tight_layout()
             plt.show()
     else:
         max_corr = 0
         offset = 0
+        f = None
         if show:
             # print('No good values to interpolate')
             pass
 
-    return offset, max_corr
+    return offset, max_corr, f
 
 
 def synchronize_cams_all(config_dict):
@@ -1367,11 +1370,14 @@ def synchronize_cams_all(config_dict):
     # Get parameters from Config.toml
     project_dir = config_dict.get('project').get('project_dir')
     pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
+    sync_dir = os.path.abspath(os.path.join(pose_dir, '..', 'pose-sync'))
+    os.makedirs(sync_dir, exist_ok=True)
     pose_model = config_dict.get('pose').get('pose_model')
     # multi_person = config_dict.get('project').get('multi_person')
     fps =  config_dict.get('project').get('frame_rate')
     frame_range = config_dict.get('project').get('frame_range')
-    display_sync_plots = config_dict.get('synchronization').get('display_sync_plots')
+    display_sync_plots = config_dict.get('synchronization').get('display_sync_plots', True)
+    save_plots = config_dict.get('synchronization').get('save_sync_plots', True)
     keypoints_to_consider = config_dict.get('synchronization').get('keypoints_to_consider')
     approx_time_maxspeed = config_dict.get('synchronization').get('approx_time_maxspeed') 
     time_range_around_maxspeed = config_dict.get('synchronization').get('time_range_around_maxspeed')
@@ -1578,7 +1584,10 @@ def synchronize_cams_all(config_dict):
     offset = []
     logging.info('')
     for cam_id, cam_name in zip(cam_list, cam_names):
-        offset_cam_section, max_corr_cam = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=display_sync_plots, ref_cam_name=ref_cam_name, cam_name=cam_name)
+        offset_cam_section, max_corr_cam, fig = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=display_sync_plots, ref_cam_name=ref_cam_name, cam_name=cam_name)
+        if save_plots and fig is not None:
+            fig.savefig(os.path.join(sync_dir, f'sync_{ref_cam_name}_vs_{cam_name}.png'))
+            plt.close(fig)
         offset_cam = offset_cam_section - (search_around_frames[ref_cam_id][0] - search_around_frames[cam_id][0])
         if isinstance(approx_time_maxspeed, list):
             logging.info(f'--> Camera {ref_cam_name} and {cam_name}: {offset_cam} frames offset ({offset_cam_section} on the selected section), correlation {round(max_corr_cam, 2)}.')
@@ -1586,11 +1595,10 @@ def synchronize_cams_all(config_dict):
             logging.info(f'--> Camera {ref_cam_name} and {cam_name}: {offset_cam} frames offset, correlation {round(max_corr_cam, 2)}.')
         offset.append(offset_cam)
     offset.insert(ref_cam_id, 0)
+    if save_plots:
+        logging.info(f'Synchronization plots saved in {sync_dir}.')
 
     # rename json files according to the offset and copy them to pose-sync
-    logging.info('Saving synchronized json files to the pose-sync folder.')
-    sync_dir = os.path.abspath(os.path.join(pose_dir, '..', 'pose-sync'))
-    os.makedirs(sync_dir, exist_ok=True)
     for d, j_dir in enumerate(json_dirs):
         os.makedirs(os.path.join(sync_dir, os.path.basename(j_dir)), exist_ok=True)
         for j_file in json_files_names[d]:
