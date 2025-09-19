@@ -145,6 +145,7 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("pose").update({"overwrite_pose":True})
         config_dict.get("pose").update({"save_video":'none'})
         config_dict.get('synchronization').update({'keypoints_to_consider':['RWrist']})
+        config_dict.get('kinematics').update({'use_simple_model':True})
         Pose2Sim.runAll(config_dict)
         
 
@@ -169,7 +170,8 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("synchronization").update({"save_sync_plots":False})
         config_dict.get("filtering").update({"display_figures":False})
         config_dict.get("filtering").update({"save_filt_plots":False})
-
+        config_dict.get('kinematics').update({'use_simple_model':True})
+        
         # Step by step
         Pose2Sim.calibration(config_dict)
         Pose2Sim.poseEstimation(config_dict)
@@ -184,7 +186,8 @@ class TestWorkflow(unittest.TestCase):
         # No filtering, no marker augmentation
         config_dict.get("pose").update({"tracking_mode":'deepsort'})
         config_dict.get("pose").update({"deepsort_params":"""{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8, 'embedder':None}"""})
-        Pose2Sim.runAll(config_dict, do_synchronization=False, do_filtering=False)
+        config_dict.get('kinematics').update({'use_simple_model':True})
+        Pose2Sim.runAll(config_dict, do_synchronization=False, do_markerAugmentation=False, do_filtering=False)
 
 
         ####################
@@ -194,7 +197,7 @@ class TestWorkflow(unittest.TestCase):
         project_dir = '../Demo_Batch'
         os.chdir(project_dir)
 
-        Pose2Sim.runAll(do_synchronization=False, do_filtering=False, do_markerAugmentation=False)
+        Pose2Sim.runAll(do_synchronization=False, do_filtering=False)
 
 
 def main():
