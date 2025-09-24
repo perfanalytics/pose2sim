@@ -14,6 +14,7 @@ Functions shared between modules, and other utilities
 import toml
 import json
 import numpy as np
+np.set_printoptions(legacy='1.25') # otherwise prints np.float64(3.0) rather than 3.0
 import pandas as pd
 from scipy import interpolate
 import re

@@ -42,6 +42,7 @@ from functools import partial
 from tqdm import tqdm
 from anytree.importer import DictImporter
 import numpy as np
+np.set_printoptions(legacy='1.25') # otherwise prints np.float64(3.0) rather than 3.0
 import cv2
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton

@@ -36,6 +36,7 @@ import logging
 import pickle
 import numpy as np
 import pandas as pd
+np.set_printoptions(legacy='1.25') # otherwise prints np.float64(3.0) rather than 3.0
 os.environ["OPENCV_LOG_LEVEL"]="FATAL"
 import cv2
 import glob

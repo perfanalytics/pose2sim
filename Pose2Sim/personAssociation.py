@@ -36,6 +36,7 @@ import glob
 import fnmatch
 import re
 import numpy as np
+np.set_printoptions(legacy='1.25') # otherwise prints np.float64(3.0) rather than 3.0
 import json
 import itertools as it
 import toml
@@ -112,7 +113,7 @@ def triangulate_comb(comb, coords, P_all, calib_params, config_dict):
     ''' 
 
     undistort_points = config_dict.get('triangulation').get('undistort_points')
-    likelihood_threshold = config_dict.get('personAssociation').get('likelihood_threshold_association')
+    likelihood_threshold = config_dict.get('personAssociation').get('single_person').get('likelihood_threshold_association', 0.3)
 
     # Replace likelihood by 0. if under likelihood_threshold
     coords[:,2][coords[:,2] < likelihood_threshold] = 0.
@@ -574,7 +575,7 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     multi_person = config_dict.get('project').get('multi_person')
-    likelihood_threshold_association = config_dict.get('personAssociation').get('likelihood_threshold_association')
+    likelihood_threshold_association = config_dict.get('personAssociation').get('single_person').get('likelihood_threshold_association', 0.3)
     tracked_keypoint = config_dict.get('personAssociation').get('single_person').get('tracked_keypoint')
     error_threshold_tracking = config_dict.get('personAssociation').get('single_person').get('reproj_error_threshold_association')
     reconstruction_error_threshold = config_dict.get('personAssociation').get('multi_person').get('reconstruction_error_threshold')
