@@ -38,7 +38,7 @@ import glob
 import fnmatch
 import re
 import numpy as np
-np.set_printoptions(legacy='1.25') # otherwise prints np.float64(3.0) rather than 3.0
+np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import json
 import itertools as it
 import pandas as pd

@@ -37,7 +37,7 @@ import os
 import sys
 from pathlib import Path
 import numpy as np
-np.set_printoptions(legacy='1.25') # otherwise prints np.float64(3.0) rather than 3.0
+np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 from lxml import etree
 import logging
 from anytree import PreOrderIter

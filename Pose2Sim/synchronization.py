@@ -32,7 +32,7 @@
 
 ## INIT
 import numpy as np
-np.set_printoptions(legacy='1.25') # otherwise prints np.float64(3.0) rather than 3.0
+np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import pandas as pd
 import cv2
 import matplotlib.pyplot as plt

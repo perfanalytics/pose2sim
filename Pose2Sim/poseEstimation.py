@@ -42,7 +42,7 @@ from functools import partial
 from tqdm import tqdm
 from anytree.importer import DictImporter
 import numpy as np
-np.set_printoptions(legacy='1.25') # otherwise prints np.float64(3.0) rather than 3.0
+np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import cv2
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
@@ -632,10 +632,16 @@ def estimate_pose_all(config_dict):
 
         else:
             # Process image folders
-            logging.info(f'Found image folders with {vid_img_extension} extension.')
-            image_folders = sorted([f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
-            for image_folder in image_folders:
-                pose_tracker.reset()
-                image_folder_path = os.path.join(video_dir, image_folder)
-                if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()                
-                process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
+            image_folders = sorted([os.path.join(video_dir,f) for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
+            empty_folders = [folder for folder in image_folders if len(glob.glob(os.path.join(folder, '*'+vid_img_extension)))==0]
+            if len(empty_folders) != 0:
+                raise NameError(f'No image files with {vid_img_extension} extension found in {empty_folders}.')
+            elif len(image_folders) == 0:
+                raise NameError(f'No image folders found in {video_dir}.')
+            else:
+                logging.info(f'Found image folders with {vid_img_extension} extension.')
+                for image_folder in image_folders:
+                    pose_tracker.reset()
+                    image_folder_path = os.path.join(video_dir, image_folder)
+                    if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()                
+                    process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
