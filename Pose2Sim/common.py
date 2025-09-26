@@ -743,7 +743,7 @@ def interpolate_zeros_nans(col, *args):
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind="linear", bounds_error=False)
     else:
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, fill_value='extrapolate', bounds_error=False)
-    col_interp = np.where(mask, col, f_interp(col.index)) #replace at false index with interpolated values
+    col_interp = col.where(mask, f_interp(col.index)) #replace at false index with interpolated values
     
     # Reintroduce nans if length of sequence > N
     idx_notgood = mask.index[~mask].tolist()
@@ -752,7 +752,7 @@ def interpolate_zeros_nans(col, *args):
     if sequences[0].size>0:
         for seq in sequences:
             if len(seq) > N: # values to exclude from interpolation are set to false when they are too long 
-                col_interp[seq] = np.nan
+                col_interp.loc[seq] = np.nan
     
     return col_interp
 

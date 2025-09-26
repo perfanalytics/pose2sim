@@ -464,7 +464,7 @@ def perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir,
             Path(scaling_path_temp).unlink()
 
     except Exception as e:
-        logging.error(f"Error during scaling for {trc_file}: {e}\.")
+        logging.error(f"Error during scaling for {trc_file}: {e}.")
         raise
 
 

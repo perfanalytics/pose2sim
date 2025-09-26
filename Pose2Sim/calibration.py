@@ -667,8 +667,8 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
                 object_coords_3d[:, :2] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]].T.reshape(-1, 2)
                 object_coords_3d[:, :2] = object_coords_3d[:, 0:2] * extrinsics_square_size
             elif board_position == 'vertical':
-                object_coords_3d[:, 1:] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]][::-1].T.reshape(-1, 2)
-                object_coords_3d[:, 1:] = object_coords_3d[:, 1:] * extrinsics_square_size
+                object_coords_3d[:, [0,2]] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]][::-1].T.reshape(-1, 2)
+                object_coords_3d[:, [0,2]] = object_coords_3d[:, [0,2]] * extrinsics_square_size
             else:
                 logging.exception('board_position should be "horizontal" or "vertical".')
                 raise ValueError('board_position should be "horizontal" or "vertical".')

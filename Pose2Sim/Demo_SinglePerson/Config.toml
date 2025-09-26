@@ -83,9 +83,13 @@ device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
 
 tracking_mode = 'sports2d' # 'none', 'sports2d' or 'deepsort'. 'deepsort' is slower but more robust in difficult configurations
+frametoframe_px_dist_threshold = 50 # A jump larger than that is considered as a new person
 deepsort_params = """{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8}""" # """{dictionary between 3 double quotes}"""
                   # More robust in crowded scenes but Can be tricky to parametrize. More information there: https://github.com/levan92/deep_sort_realtime/blob/master/deep_sort_realtime/deepsort_tracker.py#L51
                   # Note: For faster and more robust tracking, use {'embedder_gpu': True, embedder':'torchreid'}, which uses the GPU and runs osnet_ain_x1_0 by default. requires `pip install torch torchvision torchreid gdown tensorboard`
+
+handle_LR_swap = false # Might be useful if cameras film from the sagittal plane and the right and left sides are hard to differenciate to your eye.
+undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
 
 display_detection = true
 overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
@@ -171,9 +175,8 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 
 
 [personAssociation]
-   likelihood_threshold_association = 0.3
-
    [personAssociation.single_person]
+   likelihood_threshold_association = 0.3
    reproj_error_threshold_association = 20 # px
    tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
                # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' or 'RShoulder')
@@ -187,15 +190,16 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 reproj_error_threshold_triangulation = 15 # px
 likelihood_threshold_triangulation= 0.3
 min_cameras_for_triangulation = 2
+interp_if_gap_smaller_than = 20 # do not interpolate larger gaps
+
 interpolation = 'linear' #linear, slinear, quadratic, cubic, or none
                         # 'none' if you don't want to interpolate missing points
-interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
-fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
+remove_incomplete_frames = false # true or false (lowercase) # If true, if any keypoint cannot be triangulated, the full time frame is removed
 sections_to_keep = 'all' # 'all', 'largest', 'first', 'last'
                         # keep 'all' valid sections even when they are interspersed with untriangulated chunks, or the 'largest' valid section, or the 'first' one, or the 'last' one
+fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
+
 show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
-handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
-undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
 make_c3d = true # save triangulated data in c3d format in addition to trc
 
 

@@ -110,7 +110,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
   Download and install [Miniconda](https://docs.conda.io/en/latest/miniconda.html).\
    Open an Anaconda prompt and create a virtual environment:
    ```
-   conda create -n Pose2Sim python=3.10 -y 
+   conda create -n Pose2Sim python=3.12 -y 
    conda activate Pose2Sim
    ```
 

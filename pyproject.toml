@@ -50,7 +50,7 @@ dependencies = [
     "rtmlib",
     "openvino",
     "onnxruntime",
-    "opencv-python<4.12", # otherwise forces numpy>=2.0, which is incompatible with some opensim/python combinations
+    "opencv-python != 4.11.*", # avoid 4.11 due to displaymatrix ignored (rotation metadata)
     "deep-sort-realtime",
 ]
 

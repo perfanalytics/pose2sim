@@ -1455,8 +1455,6 @@ def synchronize_cams_all(config_dict):
 
     # Determine frames to consider for synchronization
     if isinstance(approx_time_maxspeed, list): # search around max speed
-        logging.info(f'Synchronization is calculated around the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
-
         if len(approx_time_maxspeed) == 1 and cam_nb > 1:
             approx_time_maxspeed *= cam_nb
 
@@ -1477,26 +1475,17 @@ def synchronize_cams_all(config_dict):
 
     elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
         search_around_frames = [[f_range[0], f_range[0]+nb_frames_per_cam[i]] for i in range(cam_nb)]
-        logging.info('Synchronization is calculated on the whole sequence. This may take a while.')
-    else:
-        raise ValueError('approx_time_maxspeed should be a list of floats or "auto"')
-    
+
     if keypoints_to_consider == 'right':
         keypoints_to_consider = [keypoints_names[i] for i in range(len(keypoints_ids)) if keypoints_names[i].startswith('R') or keypoints_names[i].startswith('right')]
-        logging.info(f'Keypoints used to compute the best synchronization offset: right side.')
     elif keypoints_to_consider == 'left':
         keypoints_to_consider = [keypoints_names[i] for i in range(len(keypoints_ids)) if keypoints_names[i].startswith('L') or keypoints_names[i].startswith('left')]
-        logging.info(f'Keypoints used to compute the best synchronization offset: left side.')
-    elif isinstance(keypoints_to_consider, list):
-        logging.info(f'Keypoints used to compute the best synchronization offset: {keypoints_to_consider}.')
     elif keypoints_to_consider == 'all':
         keypoints_to_consider = [keypoints_names[i] for i in range(len(keypoints_ids))]
-        logging.info(f'All keypoints are used to compute the best synchronization offset.')
-    else:
+    elif not isinstance(keypoints_to_consider, list) and not synchronization_gui:
         raise ValueError('keypoints_to_consider should be "all", "right", "left", or a list of keypoint names.\n\
                         If you specified keypoints, make sure that they exist in your pose_model.')
-    logging.info(f'These keypoints are filtered with a Butterworth filter (cut-off frequency: {filter_cutoff} Hz, order: {filter_order}).')
-    logging.info(f'They are removed when their likelihood is below {likelihood_threshold}.\n')
+
 
     # Extract, interpolate, and filter keypoint coordinates
     logging.info('Synchronizing...')
@@ -1512,31 +1501,42 @@ def synchronize_cams_all(config_dict):
     kpt_id_in_df = np.array([[keypoints_ids.index(k)*2,keypoints_ids.index(k)*2+1]  for k in kpt_indices]).ravel()
     
     # Handle manual selection if synchronization_gui is True
-    if synchronization_gui and vid_or_img_files:
-        selected_id_list, keypoints_to_consider, approx_time_maxspeed, time_RAM_list = select_person(
-            vid_or_img_files, cam_names, json_files_names_range, search_around_frames, 
-            pose_dir, json_dirs_names, keypoints_names, keypoints_to_consider, time_range_around_maxspeed, fps)
-        
-        # Calculate lag_ranges using time_RAM_list
-        lag_ranges = [int(dt * fps) for dt in time_RAM_list]
-        
-        # Update search_around_frames if approx_time_maxspeed is a list
-        if isinstance(approx_time_maxspeed, list):
-            approx_frame_maxspeed = [int(fps * t) for t in approx_time_maxspeed]
-            search_around_frames = [[int(a-lag_ranges[i]) if a-lag_ranges[i]>0 else 0, 
-                                    int(a+lag_ranges[i]) if a+lag_ranges[i]<nb_frames_per_cam[i] else nb_frames_per_cam[i]+f_range[0]] 
-                                    for i,a in enumerate(approx_frame_maxspeed)]
+    if synchronization_gui:
+        if vid_or_img_files:
+            selected_id_list, keypoints_to_consider, approx_time_maxspeed, time_RAM_list = select_person(
+                vid_or_img_files, cam_names, json_files_names_range, search_around_frames, 
+                pose_dir, json_dirs_names, keypoints_names, keypoints_to_consider, time_range_around_maxspeed, fps)
             
-            # Recalculate json_files_names_range and json_files_range with updated search_around_frames
-            json_files_names_range = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*frames_cam)] 
-                                     for (json_files_cam, frames_cam) in zip(json_files_names,search_around_frames)]
-            json_files_range = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names_range[j]] 
+            # Calculate lag_ranges using time_RAM_list
+            lag_ranges = [int(dt * fps) for dt in time_RAM_list]
+            
+            # Update search_around_frames if approx_time_maxspeed is a list
+            if isinstance(approx_time_maxspeed, list):
+                approx_frame_maxspeed = [int(fps * t) for t in approx_time_maxspeed]
+                search_around_frames = [[int(a-lag_ranges[i]) if a-lag_ranges[i]>0 else 0, 
+                                        int(a+lag_ranges[i]) if a+lag_ranges[i]<nb_frames_per_cam[i] else nb_frames_per_cam[i]+f_range[0]] 
+                                        for i,a in enumerate(approx_frame_maxspeed)]
+                
+                # Recalculate json_files_names_range and json_files_range with updated search_around_frames
+                json_files_names_range = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*frames_cam)] 
+                                        for (json_files_cam, frames_cam) in zip(json_files_names,search_around_frames)]
+                json_files_range = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names_range[j]] 
                                for j, j_dir in enumerate(json_dirs_names)]
-                               
+
+        else:
+            logging.warning('No video files found. Synchronization GUI will not be available.')                               
     else:
         selected_id_list = [None] * cam_nb
-        if not vid_or_img_files:
-            logging.warning('No video files found. Synchronization GUI will not be available.')
+        if isinstance(approx_time_maxspeed, list): # search around max speed
+            logging.info(f'Synchronization is calculated around the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
+        elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
+            logging.info('Synchronization is calculated on the whole sequence. This may take a while.')
+        else:
+            raise ValueError('approx_time_maxspeed should be a list of floats or "auto"')
+
+    logging.info(f'\nKeypoints used to compute the best synchronization offset: {keypoints_to_consider}.')
+    logging.info(f'These keypoints are filtered with a Butterworth filter (cut-off frequency: {filter_cutoff} Hz, order: {filter_order}).')
+    logging.info(f'They are removed when their likelihood is below {likelihood_threshold}.\n')
 
     padlen = 3 * (max(len(a), len(b)) - 1)
     
