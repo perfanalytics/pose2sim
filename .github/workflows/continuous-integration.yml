@@ -53,6 +53,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
           activate-environment: pose2sim
 
+      - name: Install OpenSim with conda
+        shell: bash -l {0}
+        run: |
+          conda install -n pose2sim -c conda-forge -c defaults pip
+          conda install -n pose2sim opensim-org::opensim -y
+
       - name: Cache pip dependencies
         uses: actions/cache@v4
         with:
@@ -67,12 +73,6 @@ jobs:
           conda run -n pose2sim python -m pip install --upgrade pip setuptools wheel
           conda run -n pose2sim python -m pip install flake8 pytest
           conda run -n pose2sim python -m pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
-
-      - name: Install OpenSim with conda
-        shell: bash -l {0}
-        run: |
-          conda install -n pose2sim -c conda-forge -c defaults pip
-          conda install -n pose2sim opensim-org::opensim -y
 
       - name: Lint with flake8
         shell: bash -l {0}

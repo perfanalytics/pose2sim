@@ -34,7 +34,8 @@ classifiers = [
 urls = {Homepage = "https://github.com/perfanalytics/pose2sim", "Bug Tracker" = "https://github.com/perfanalytics/pose2sim/issues"}
 dependencies = [
     "toml",
-    "numpy",
+    "numpy<2.0; python_version<'3.12'",
+    "numpy>=2.0,<2.3; python_version>='3.12'",
     "lxml",
     "matplotlib",
     "mpl_interactions",
