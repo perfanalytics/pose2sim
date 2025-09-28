@@ -32,13 +32,13 @@
 
 ## INIT
 import numpy as np
+np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import pandas as pd
 import cv2
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib import patheffects
 from scipy import signal
-from scipy import interpolate
 import json
 import os
 import glob
@@ -50,7 +50,7 @@ from anytree.importer import DictImporter
 from matplotlib.widgets import TextBox, Button
 import logging
 
-from Pose2Sim.common import sort_stringlist_by_last_number, bounding_boxes
+from Pose2Sim.common import sort_stringlist_by_last_number, bounding_boxes, interpolate_zeros_nans
 from Pose2Sim.skeletons import *
 
 
@@ -59,7 +59,8 @@ __author__ = "David Pagnon, HunMin Kim"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
@@ -97,6 +98,20 @@ TEXTBOX_WIDTH = 0.09
 BTN_WIDTH_PERSON = 0.04
 CONTROL_HEIGHT = 0.04
 Y_POSITION = 0.1
+
+# Simple cache for frames and bounding boxes
+_frame_bbox_cache = {}
+
+def get_frame_and_bboxes_cached(cap, frame_number, frame_to_json, pose_dir, json_dir_name):
+    """
+    Cached version of load_frame_and_bounding_boxes to avoid reloading the same frame repeatedly.
+    """
+    key = (id(cap), frame_number)
+    if key in _frame_bbox_cache:
+        return _frame_bbox_cache[key]
+    frame_rgb, bboxes = load_frame_and_bounding_boxes(cap, frame_number, frame_to_json, pose_dir, json_dir_name)
+    _frame_bbox_cache[key] = (frame_rgb, bboxes)
+    return frame_rgb, bboxes
 
 
 def reset_styles(rect, annotation):
@@ -680,6 +695,11 @@ def update_play(cap, image, frame_number, frame_to_json, pose_dir, json_dir_name
     - fig: The figure object to update
     '''
 
+    # Initialize background once
+    if not hasattr(ax, '_blit_background'):
+        fig.canvas.draw()
+        ax._blit_background = fig.canvas.copy_from_bbox(ax.bbox)
+
     # Store the currently selected box index if any
     selected_idx = None
     for idx, rect in enumerate(rects):
@@ -687,12 +707,17 @@ def update_play(cap, image, frame_number, frame_to_json, pose_dir, json_dir_name
             selected_idx = idx
             break
 
-    frame_rgb, bounding_boxes_list_new = load_frame_and_bounding_boxes(cap, frame_number, frame_to_json, pose_dir, json_dir_name)
+    # Load frame and bounding boxes from cache
+    frame_rgb, bounding_boxes_list_new = get_frame_and_bboxes_cached(cap, frame_number, frame_to_json, pose_dir, json_dir_name)
     if frame_rgb is None:
         return
 
-    # Update image
+    # Restore saved background
+    fig.canvas.restore_region(ax._blit_background)
+
+    # Update image and adopt draw artist
     image.set_array(frame_rgb)
+    ax.draw_artist(image)
     
     # Clear existing boxes and annotations
     for rect in rects:
@@ -706,14 +731,21 @@ def update_play(cap, image, frame_number, frame_to_json, pose_dir, json_dir_name
     bounding_boxes_list.clear()
     bounding_boxes_list.extend(bounding_boxes_list_new)
     
-    # Draw new boxes and annotations
+    # Draw new boxes and annotations, then draw artists
     draw_bounding_boxes_and_annotations(ax, bounding_boxes_list, rects, annotations)
+    for rect in rects:
+        ax.draw_artist(rect)
+    for ann in annotations:
+        ax.draw_artist(ann)
     
     # Restore highlight on the selected box if it still exists
     if selected_idx is not None and selected_idx < len(rects):
         highlight_selected_box(rects[selected_idx], annotations[selected_idx])
-    
-    fig.canvas.draw_idle()
+        ax.draw_artist(rects[selected_idx])
+        ax.draw_artist(annotations[selected_idx])
+
+    # Blit updated region to screen
+    fig.canvas.blit(ax.bbox)
 
 
 def keypoints_ui(keypoints_to_consider, keypoints_names):
@@ -1171,18 +1203,21 @@ def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], 
             try:
                 json_data_all = json.load(j_f)['people']
 
-                # # previous approach takes person #0
+                # # Read files in original order (not good if the person of interest appears later)
+                # json_data = np.array([p['pose_keypoints_2d'][3*i:3*i+3] if 'pose_keypoints_2d' in p else [np.nan, np.nan, np.nan] for p in json_data_all for i in keypoints_ids])
+
+                # # Or take person #0
                 # json_data = json_data_all[0]
                 # json_data = np.array([json_data['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
                 
-                # # approach based on largest mean confidence does not work if person in background is better detected
+                # # Or take largest mean confidence (does not work if person in background is better detected)
                 # p_conf = [np.mean(np.array([p['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])[:, 2])
                 #         if 'pose_keypoints_2d' in p else 0
                 #         for p in json_data_all]
                 # max_confidence_person = json_data_all[np.argmax(p_conf)]
                 # json_data = np.array([max_confidence_person['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
 
-                # latest approach: uses person with largest bounding box
+                # # Latest approach: uses person with largest bounding box
                 if not synchronization_gui:
                     bbox_area = [
                                 (keypoints[:, 0].max() - keypoints[:, 0].min()) * (keypoints[:, 1].max() - keypoints[:, 1].min())
@@ -1253,29 +1288,6 @@ def vert_speed(df, axis='y'):
     return df_vert_speed
 
 
-def interpolate_zeros_nans(col, kind):
-    '''
-    Interpolate missing points (of value nan)
-
-    INPUTS:
-    - col: pandas column of coordinates
-    - kind: 'linear', 'slinear', 'quadratic', 'cubic'. Default 'cubic'
-
-    OUTPUTS:
-    - col_interp: interpolated pandas column
-    '''
-    
-    mask = ~(np.isnan(col) | col.eq(0)) # true where nans or zeros
-    idx_good = np.where(mask)[0]
-    try: 
-        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, bounds_error=False)
-        col_interp = np.where(mask, col, f_interp(col.index))
-        return col_interp 
-    except:
-        # print('No good values to interpolate')
-        return col
-
-
 def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_name='0', cam_name='1'):
     '''
     Compute the time-lagged cross-correlation between two pandas series.
@@ -1291,6 +1303,7 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_name='0', c
     OUTPUTS:
     - offset: int. The time offset for which the correlation is highest.
     - max_corr: float. The maximum correlation value.
+    - f: matplotlib figure. The figure containing the cross-correlation plot.
     '''
 
     if isinstance(lag_range, int):
@@ -1301,31 +1314,33 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_name='0', c
     if not np.isnan(pearson_r).all():
         max_corr = np.nanmax(pearson_r)
 
+        f, ax = plt.subplots(2,1, num='Synchronizing cameras')
+        # speed
+        camx.plot(ax=ax[0], label = f'Reference: {ref_cam_name}')
+        camy.plot(ax=ax[0], label = f'Compared: {cam_name}')
+        ax[0].set(xlabel='Frame', ylabel='Speed (px/frame)')
+        ax[0].legend()
+        # time lagged cross-correlation
+        ax[1].plot(list(range(lag_range[0], lag_range[1])), pearson_r)
+        ax[1].axvline(np.ceil(len(pearson_r)/2) + lag_range[0],color='k',linestyle='--')
+        ax[1].axvline(np.argmax(pearson_r) + lag_range[0],color='r',linestyle='--',label='Peak synchrony')
+        plt.annotate(f'Max correlation={np.round(max_corr,2)}', xy=(0.05, 0.9), xycoords='axes fraction')
+        ax[1].set(title=f'Offset = {offset} frames', xlabel='Offset (frames)',ylabel='Pearson r')
+        
+        plt.legend()
+        f.tight_layout()
+
         if show:
-            f, ax = plt.subplots(2,1, num='Synchronizing cameras')
-            # speed
-            camx.plot(ax=ax[0], label = f'Reference: {ref_cam_name}')
-            camy.plot(ax=ax[0], label = f'Compared: {cam_name}')
-            ax[0].set(xlabel='Frame', ylabel='Speed (px/frame)')
-            ax[0].legend()
-            # time lagged cross-correlation
-            ax[1].plot(list(range(lag_range[0], lag_range[1])), pearson_r)
-            ax[1].axvline(np.ceil(len(pearson_r)/2) + lag_range[0],color='k',linestyle='--')
-            ax[1].axvline(np.argmax(pearson_r) + lag_range[0],color='r',linestyle='--',label='Peak synchrony')
-            plt.annotate(f'Max correlation={np.round(max_corr,2)}', xy=(0.05, 0.9), xycoords='axes fraction')
-            ax[1].set(title=f'Offset = {offset} frames', xlabel='Offset (frames)',ylabel='Pearson r')
-            
-            plt.legend()
-            f.tight_layout()
             plt.show()
     else:
         max_corr = 0
         offset = 0
+        f = None
         if show:
             # print('No good values to interpolate')
             pass
 
-    return offset, max_corr
+    return offset, max_corr, f
 
 
 def synchronize_cams_all(config_dict):
@@ -1356,11 +1371,14 @@ def synchronize_cams_all(config_dict):
     # Get parameters from Config.toml
     project_dir = config_dict.get('project').get('project_dir')
     pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
+    sync_dir = os.path.abspath(os.path.join(pose_dir, '..', 'pose-sync'))
+    os.makedirs(sync_dir, exist_ok=True)
     pose_model = config_dict.get('pose').get('pose_model')
     # multi_person = config_dict.get('project').get('multi_person')
     fps =  config_dict.get('project').get('frame_rate')
     frame_range = config_dict.get('project').get('frame_range')
-    display_sync_plots = config_dict.get('synchronization').get('display_sync_plots')
+    display_sync_plots = config_dict.get('synchronization').get('display_sync_plots', True)
+    save_plots = config_dict.get('synchronization').get('save_sync_plots', True)
     keypoints_to_consider = config_dict.get('synchronization').get('keypoints_to_consider')
     approx_time_maxspeed = config_dict.get('synchronization').get('approx_time_maxspeed') 
     time_range_around_maxspeed = config_dict.get('synchronization').get('time_range_around_maxspeed')
@@ -1375,9 +1393,12 @@ def synchronize_cams_all(config_dict):
     vid_img_extension = config_dict['pose']['vid_img_extension']
     vid_or_img_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
     if not vid_or_img_files: # video_files is then img_dirs
-        image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
-        for image_folder in image_folders:
-            vid_or_img_files.append(glob.glob(os.path.join(video_dir, image_folder, '*'+vid_img_extension)))
+        try:
+            image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
+            for image_folder in image_folders:
+                vid_or_img_files.append(glob.glob(os.path.join(video_dir, image_folder, '*'+vid_img_extension)))
+        except:
+            logging.warning(f'No video files nor image directories found in {video_dir}.')
 
     if fps == 'auto': 
         try:
@@ -1386,8 +1407,9 @@ def synchronize_cams_all(config_dict):
             if cap.read()[0] == False:
                 raise
             fps = round(cap.get(cv2.CAP_PROP_FPS))
-        except:
-            fps = 60  
+        except: 
+            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            fps = 30
     lag_range = time_range_around_maxspeed*fps # frames
 
     # Retrieve keypoints from model
@@ -1428,13 +1450,11 @@ def synchronize_cams_all(config_dict):
     cam_names = [os.path.basename(j_dir).split('_')[0] for j_dir in json_dirs]
     
     # frame range selection
-    f_range = [[0, min([len(j) for j in json_files_names])] if frame_range==[] else frame_range][0]
+    f_range = [[0, min([len(j) for j in json_files_names])] if frame_range in ('all', 'auto', []) else frame_range][0]
     # json_files_names = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*f_range)] for json_files_cam in json_files_names]
 
     # Determine frames to consider for synchronization
     if isinstance(approx_time_maxspeed, list): # search around max speed
-        logging.info(f'Synchronization is calculated around the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
-
         if len(approx_time_maxspeed) == 1 and cam_nb > 1:
             approx_time_maxspeed *= cam_nb
 
@@ -1455,26 +1475,17 @@ def synchronize_cams_all(config_dict):
 
     elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
         search_around_frames = [[f_range[0], f_range[0]+nb_frames_per_cam[i]] for i in range(cam_nb)]
-        logging.info('Synchronization is calculated on the whole sequence. This may take a while.')
-    else:
-        raise ValueError('approx_time_maxspeed should be a list of floats or "auto"')
-    
+
     if keypoints_to_consider == 'right':
         keypoints_to_consider = [keypoints_names[i] for i in range(len(keypoints_ids)) if keypoints_names[i].startswith('R') or keypoints_names[i].startswith('right')]
-        logging.info(f'Keypoints used to compute the best synchronization offset: right side.')
     elif keypoints_to_consider == 'left':
         keypoints_to_consider = [keypoints_names[i] for i in range(len(keypoints_ids)) if keypoints_names[i].startswith('L') or keypoints_names[i].startswith('left')]
-        logging.info(f'Keypoints used to compute the best synchronization offset: left side.')
-    elif isinstance(keypoints_to_consider, list):
-        logging.info(f'Keypoints used to compute the best synchronization offset: {keypoints_to_consider}.')
     elif keypoints_to_consider == 'all':
         keypoints_to_consider = [keypoints_names[i] for i in range(len(keypoints_ids))]
-        logging.info(f'All keypoints are used to compute the best synchronization offset.')
-    else:
+    elif not isinstance(keypoints_to_consider, list) and not synchronization_gui:
         raise ValueError('keypoints_to_consider should be "all", "right", "left", or a list of keypoint names.\n\
                         If you specified keypoints, make sure that they exist in your pose_model.')
-    logging.info(f'These keypoints are filtered with a Butterworth filter (cut-off frequency: {filter_cutoff} Hz, order: {filter_order}).')
-    logging.info(f'They are removed when their likelihood is below {likelihood_threshold}.\n')
+
 
     # Extract, interpolate, and filter keypoint coordinates
     logging.info('Synchronizing...')
@@ -1491,28 +1502,41 @@ def synchronize_cams_all(config_dict):
     
     # Handle manual selection if synchronization_gui is True
     if synchronization_gui:
-        selected_id_list, keypoints_to_consider, approx_time_maxspeed, time_RAM_list = select_person(
-            vid_or_img_files, cam_names, json_files_names_range, search_around_frames, 
-            pose_dir, json_dirs_names, keypoints_names, keypoints_to_consider, time_range_around_maxspeed, fps)
-        
-        # Calculate lag_ranges using time_RAM_list
-        lag_ranges = [int(dt * fps) for dt in time_RAM_list]
-        
-        # Update search_around_frames if approx_time_maxspeed is a list
-        if isinstance(approx_time_maxspeed, list):
-            approx_frame_maxspeed = [int(fps * t) for t in approx_time_maxspeed]
-            search_around_frames = [[int(a-lag_ranges[i]) if a-lag_ranges[i]>0 else 0, 
-                                    int(a+lag_ranges[i]) if a+lag_ranges[i]<nb_frames_per_cam[i] else nb_frames_per_cam[i]+f_range[0]] 
-                                    for i,a in enumerate(approx_frame_maxspeed)]
+        if vid_or_img_files:
+            selected_id_list, keypoints_to_consider, approx_time_maxspeed, time_RAM_list = select_person(
+                vid_or_img_files, cam_names, json_files_names_range, search_around_frames, 
+                pose_dir, json_dirs_names, keypoints_names, keypoints_to_consider, time_range_around_maxspeed, fps)
             
-            # Recalculate json_files_names_range and json_files_range with updated search_around_frames
-            json_files_names_range = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*frames_cam)] 
-                                     for (json_files_cam, frames_cam) in zip(json_files_names,search_around_frames)]
-            json_files_range = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names_range[j]] 
+            # Calculate lag_ranges using time_RAM_list
+            lag_ranges = [int(dt * fps) for dt in time_RAM_list]
+            
+            # Update search_around_frames if approx_time_maxspeed is a list
+            if isinstance(approx_time_maxspeed, list):
+                approx_frame_maxspeed = [int(fps * t) for t in approx_time_maxspeed]
+                search_around_frames = [[int(a-lag_ranges[i]) if a-lag_ranges[i]>0 else 0, 
+                                        int(a+lag_ranges[i]) if a+lag_ranges[i]<nb_frames_per_cam[i] else nb_frames_per_cam[i]+f_range[0]] 
+                                        for i,a in enumerate(approx_frame_maxspeed)]
+                
+                # Recalculate json_files_names_range and json_files_range with updated search_around_frames
+                json_files_names_range = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*frames_cam)] 
+                                        for (json_files_cam, frames_cam) in zip(json_files_names,search_around_frames)]
+                json_files_range = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names_range[j]] 
                                for j, j_dir in enumerate(json_dirs_names)]
-                               
+
+        else:
+            logging.warning('No video files found. Synchronization GUI will not be available.')                               
     else:
         selected_id_list = [None] * cam_nb
+        if isinstance(approx_time_maxspeed, list): # search around max speed
+            logging.info(f'Synchronization is calculated around the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
+        elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
+            logging.info('Synchronization is calculated on the whole sequence. This may take a while.')
+        else:
+            raise ValueError('approx_time_maxspeed should be a list of floats or "auto"')
+
+    logging.info(f'\nKeypoints used to compute the best synchronization offset: {keypoints_to_consider}.')
+    logging.info(f'These keypoints are filtered with a Butterworth filter (cut-off frequency: {filter_cutoff} Hz, order: {filter_order}).')
+    logging.info(f'They are removed when their likelihood is below {likelihood_threshold}.\n')
 
     padlen = 3 * (max(len(a), len(b)) - 1)
     
@@ -1520,7 +1544,7 @@ def synchronize_cams_all(config_dict):
         df_coords.append(convert_json2pandas(json_files_range[i], likelihood_threshold=likelihood_threshold, keypoints_ids=keypoints_ids, synchronization_gui=synchronization_gui, selected_id=selected_id_list[i]))
         df_coords[i] = drop_col(df_coords[i],3) # drop likelihood
         df_coords[i] = df_coords[i][kpt_id_in_df]
-        df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args = ['linear'])
+        df_coords[i] = df_coords[i].apply(interpolate_zeros_nans, axis=0, args=['linear'])
         df_coords[i] = df_coords[i].bfill().ffill()
         if df_coords[i].shape[0] > padlen:
             df_coords[i] = pd.DataFrame(signal.filtfilt(b, a, df_coords[i], axis=0))
@@ -1561,7 +1585,10 @@ def synchronize_cams_all(config_dict):
     offset = []
     logging.info('')
     for cam_id, cam_name in zip(cam_list, cam_names):
-        offset_cam_section, max_corr_cam = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=display_sync_plots, ref_cam_name=ref_cam_name, cam_name=cam_name)
+        offset_cam_section, max_corr_cam, fig = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=display_sync_plots, ref_cam_name=ref_cam_name, cam_name=cam_name)
+        if save_plots and fig is not None:
+            fig.savefig(os.path.join(sync_dir, f'sync_{ref_cam_name}_vs_{cam_name}.png'))
+            plt.close(fig)
         offset_cam = offset_cam_section - (search_around_frames[ref_cam_id][0] - search_around_frames[cam_id][0])
         if isinstance(approx_time_maxspeed, list):
             logging.info(f'--> Camera {ref_cam_name} and {cam_name}: {offset_cam} frames offset ({offset_cam_section} on the selected section), correlation {round(max_corr_cam, 2)}.')
@@ -1569,10 +1596,10 @@ def synchronize_cams_all(config_dict):
             logging.info(f'--> Camera {ref_cam_name} and {cam_name}: {offset_cam} frames offset, correlation {round(max_corr_cam, 2)}.')
         offset.append(offset_cam)
     offset.insert(ref_cam_id, 0)
+    if save_plots:
+        logging.info(f'Synchronization plots saved in {sync_dir}.')
 
     # rename json files according to the offset and copy them to pose-sync
-    sync_dir = os.path.abspath(os.path.join(pose_dir, '..', 'pose-sync'))
-    os.makedirs(sync_dir, exist_ok=True)
     for d, j_dir in enumerate(json_dirs):
         os.makedirs(os.path.join(sync_dir, os.path.basename(j_dir)), exist_ok=True)
         for j_file in json_files_names[d]:

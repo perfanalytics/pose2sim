@@ -52,17 +52,17 @@
     
     Usage: 
     List of available arguments:
-        python -m trc_gaitevents -h
+        trc_gaitevents -h
 
         import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>')
         OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_coordinates', gait_direction='-X', motion_type='gait', plot=True, save_output=True, output_file='gaitevents.txt')
         OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='height_coordinates', up_direction='Y', height_threshold=6, motion_type='gait', right_toe_marker='RBigToe', left_toe_marker='LBigToe')
         OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_velocity', gait_direction='-Z', forward_velocity_threshold=1, motion_type='gait', right_toe_marker='RBigToe', left_toe_marker='LBigToe')
         
-        python -m trc_gaitevents -i input_trc_file
-        OR python -m trc_gaitevents -i input_trc_file --method forward_coordinates --gait_direction=-X --motion_type gait --plot True --save_output True --output_file gaitevents.txt
-        OR python -m trc_gaitevents -i input_trc_file --method height_coordinates --up_direction=Y --height_threshold 6 --motion_type gait --right_toe_marker RBigToe --left_toe_marker LBigToe
-        OR python -m trc_gaitevents -i input_trc_file --method forward_velocity --gait_direction=-Z --forward_velocity_threshold 1 --motion_type gait --right_toe_marker RBigToe --left_toe_marker LBigToe
+        trc_gaitevents -i input_trc_file
+        OR trc_gaitevents -i input_trc_file --method forward_coordinates --gait_direction=-X --motion_type gait --plot True --save_output True --output_file gaitevents.txt
+        OR trc_gaitevents -i input_trc_file --method height_coordinates --up_direction=Y --height_threshold 6 --motion_type gait --right_toe_marker RBigToe --left_toe_marker LBigToe
+        OR trc_gaitevents -i input_trc_file --method forward_velocity --gait_direction=-Z --forward_velocity_threshold 1 --motion_type gait --right_toe_marker RBigToe --left_toe_marker LBigToe
 '''
 
 
@@ -81,13 +81,38 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser(description='Determine gait on and off with "forward_coordinates", "height_coordinates", or "forward_velocity" method. More details in the file description.')
+    parser.add_argument('-i', '--trc_path', required = True, help='Trc input file')
+    parser.add_argument('-g', '--gait_direction', default = 'X', required = False, help='Direction of the gait. "X", "Y", "Z", "-X", "-Y", or "-Z". Default: "X". Requires an equal sign if negative, eg -g=-X')
+    parser.add_argument('-u', '--up_direction', default = 'Y', required = False, help='Up direction. "X", "Y", or "Z", "-X", "-Y", or "-Z". Default: "Y"')
+    parser.add_argument('-m', '--method', default = 'height_coordinates', required = False, help='Method to determine gait events. "forward_coordinates", "height_coordinates", or "forward_velocity". Default:"height_coordinates"')
+    parser.add_argument('-V', '--forward_velocity_threshold', default = 1, type=float, required = False, help='Forward velocity below which the foot is considered to have touched the ground (m/s). Used if method is forward_velocity. Default: 1.5')
+    parser.add_argument('-H', '--height_threshold', default = 6, type=float, required = False, help='Height below which the foot is considered to have touched the ground (cm). Used if method is height_coordinates. Default: 6')
+    parser.add_argument('-t', '--motion_type', default = 'gait', required = False, help='Motion type. "gait" for walking, "sprint" for sprinting, "" if there is no specific alternation. Default: "gait"')
+    parser.add_argument('--sacrum_marker', default = 'Hip', required = False, help='Hip marker name. Default: "Hip"')
+    parser.add_argument('--right_heel_marker', default = 'RHeel', required = False, help='Right heel marker name. Default: "RHeel"')
+    parser.add_argument('--right_toe_marker', default = 'RBigToe', required = False, help='Right toe marker name. Default: "RBigToe"')
+    parser.add_argument('--left_heel_marker', default = 'LHeel', required = False, help='Left heel marker name. Default: "LHeel"')
+    parser.add_argument('--left_toe_marker', default = 'LBigToe', required = False, help='Left toe marker name. Default: "LBigToe"')
+    parser.add_argument('-f', '--cut_off_frequency', default = 10, type=float, required = False, help='Butterworth filter cutoff frequency (Hz). Default: 10')
+    parser.add_argument('-p', '--plot', default = True, required = False, help='Plot results. Default: True')
+    parser.add_argument('-s', '--save_output', default = True, required = False, help='Save output in csv file. Default: True')
+    parser.add_argument('-o', '--output_file', default = 'gaitevents.txt', required = False, help='Output file name. Default: "gaitevents.txt"')
+
+    args = vars(parser.parse_args())
+    
+    trc_gaitevents_func(**args)
+
+
 def start_end_true_seq(series):
     '''
     Find starts and ends of sequences of True values in a pandas Series
@@ -110,29 +135,32 @@ def start_end_true_seq(series):
 
 def read_trc(trc_path):
     '''
-    Read trc file
+    Read a TRC file and extract its contents.
 
     INPUTS:
-    - trc_path: path to the trc file
+    - trc_path (str): The path to the TRC file.
 
     OUTPUTS:
-    - Q_coords: dataframe of coordinates
-    - frames_col: series of frames
-    - time_col: series of time
-    - markers: list of marker names
-    - header: list of header lines
+    - tuple: A tuple containing the Q coordinates, frames column, time column, marker names, and header.
     '''
-    
-    with open(trc_path, 'r') as trc_file:
-        header = [next(trc_file) for line in range(5)]
-    markers = header[3].split('\t')[2::3]
-    
-    trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4)
-    frames_col, time_col = pd.Series(trc_df.iloc[:,0], name='frames'), pd.Series(trc_df.iloc[:,1], name='time')
-    Q_coords = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
 
-    return Q_coords, frames_col, time_col, markers, header
+    try:
+        with open(trc_path, 'r') as trc_file:
+            header = [next(trc_file) for _ in range(5)]
+        markers = header[3].split('\t')[2::3]
+        markers = [m.strip() for m in markers if m.strip()] # remove last \n character
+       
+        trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4, encoding='utf-8')
+        frames_col, time_col = trc_df.iloc[:, 0], trc_df.iloc[:, 1]
+        Q_coords = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
+        Q_coords = Q_coords.loc[:, ~Q_coords.columns.str.startswith('Unnamed')] # remove unnamed columns
+        Q_coords.columns = np.array([[m,m,m] for m in markers]).ravel().tolist()
 
+        return Q_coords, frames_col, time_col, markers, header
+    
+    except Exception as e:
+        raise ValueError(f"Error reading TRC file at {trc_path}: {e}")
+    
 
 def first_step_side(Ron, Lon):
     '''
@@ -595,17 +623,17 @@ def trc_gaitevents_func(**args):
     
     Usage: 
     List of available arguments:
-        python -m trc_gaitevents -h
+        trc_gaitevents -h
 
         import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>')
         OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_coordinates', gait_direction='-X', motion_type='gait', plot=True, save_output=True, output_file='gaitevents.txt')
         OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='height_coordinates', up_direction='Y', height_threshold=6, motion_type='gait', right_toe_marker='RBigToe', left_toe_marker='LBigToe')
         OR import trc_gaitevents; trc_gaitevents.trc_gaitevents_func(trc_path=r'<input_trc_file>', method='forward_velocity', gait_direction='-Z', forward_velocity_threshold=1, motion_type='gait', right_toe_marker='RBigToe', left_toe_marker='LBigToe')
         
-        python -m trc_gaitevents -i input_trc_file
-        OR python -m trc_gaitevents -i input_trc_file --method forward_coordinates --gait_direction=-X --motion_type gait --plot True --save_output True --output_file gaitevents.txt
-        OR python -m trc_gaitevents -i input_trc_file --method height_coordinates --up_direction=Y --height_threshold 6 --motion_type gait --right_toe_marker RBigToe --left_toe_marker LBigToe
-        OR python -m trc_gaitevents -i input_trc_file --method forward_velocity --gait_direction=-Z --forward_velocity_threshold 1 --motion_type gait --right_toe_marker RBigToe --left_toe_marker LBigToe
+        trc_gaitevents -i input_trc_file
+        OR trc_gaitevents -i input_trc_file --method forward_coordinates --gait_direction=-X --motion_type gait --plot True --save_output True --output_file gaitevents.txt
+        OR trc_gaitevents -i input_trc_file --method height_coordinates --up_direction=Y --height_threshold 6 --motion_type gait --right_toe_marker RBigToe --left_toe_marker LBigToe
+        OR trc_gaitevents -i input_trc_file --method forward_velocity --gait_direction=-Z --forward_velocity_threshold 1 --motion_type gait --right_toe_marker RBigToe --left_toe_marker LBigToe
     '''
 
     # Retrieve arguments
@@ -651,7 +679,7 @@ def trc_gaitevents_func(**args):
     if len(up_direction)==1:
         up_direction = +1, up_direction
     elif len(up_direction)==2:
-        up_direction = int(up_direction[0]+'1'), up_direction
+        up_direction = int(up_direction[0]+'1'), up_direction[1]
 
     if method not in ['forward_coordinates', 'height_coordinates', 'forward_velocity']:
         raise ValueError('Method must be "forward_coordinates", "height_coordinates", or "forward_velocity"')
@@ -702,24 +730,4 @@ def trc_gaitevents_func(**args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Determine gait on and off with "forward_coordinates", "height_coordinates", or "forward_velocity" method. More details in the file description.')
-    parser.add_argument('-i', '--trc_path', required = True, help='Trc input file')
-    parser.add_argument('-g', '--gait_direction', default = 'X', required = False, help='Direction of the gait. "X", "Y", "Z", "-X", "-Y", or "-Z". Default: "X". Requires an equal sign if negative, eg -g=-X')
-    parser.add_argument('-u', '--up_direction', default = 'Y', required = False, help='Up direction. "X", "Y", or "Z", "-X", "-Y", or "-Z". Default: "Y"')
-    parser.add_argument('-m', '--method', default = 'height_coordinates', required = False, help='Method to determine gait events. "forward_coordinates", "height_coordinates", or "forward_velocity". Default:"height_coordinates"')
-    parser.add_argument('-V', '--forward_velocity_threshold', default = 1, type=float, required = False, help='Forward velocity below which the foot is considered to have touched the ground (m/s). Used if method is forward_velocity. Default: 1.5')
-    parser.add_argument('-H', '--height_threshold', default = 6, type=float, required = False, help='Height below which the foot is considered to have touched the ground (cm). Used if method is height_coordinates. Default: 6')
-    parser.add_argument('-t', '--motion_type', default = 'gait', required = False, help='Motion type. "gait" for walking, "sprint" for sprinting, "" if there is no specific alternation. Default: "gait"')
-    parser.add_argument('--sacrum_marker', default = 'Hip', required = False, help='Hip marker name. Default: "Hip"')
-    parser.add_argument('--right_heel_marker', default = 'RHeel', required = False, help='Right heel marker name. Default: "RHeel"')
-    parser.add_argument('--right_toe_marker', default = 'RBigToe', required = False, help='Right toe marker name. Default: "RBigToe"')
-    parser.add_argument('--left_heel_marker', default = 'LHeel', required = False, help='Left heel marker name. Default: "LHeel"')
-    parser.add_argument('--left_toe_marker', default = 'LBigToe', required = False, help='Left toe marker name. Default: "LBigToe"')
-    parser.add_argument('-f', '--cut_off_frequency', default = 10, type=float, required = False, help='Butterworth filter cutoff frequency (Hz). Default: 10')
-    parser.add_argument('-p', '--plot', default = True, required = False, help='Plot results. Default: True')
-    parser.add_argument('-s', '--save_output', default = True, required = False, help='Save output in csv file. Default: True')
-    parser.add_argument('-o', '--output_file', default = 'gaitevents.txt', required = False, help='Output file name. Default: "gaitevents.txt"')
-
-    args = vars(parser.parse_args())
-    
-    trc_gaitevents_func(**args)
+    main()

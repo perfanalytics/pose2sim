@@ -82,7 +82,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
    4. [Camera calibration](#camera-calibration)
       1. [Convert from Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
-   5. [Synchronizing, Associatiating, Triangulating, Filtering](#synchronizing-associating-triangulating-filtering)
+   5. [Synchronizing, Associating, Triangulating, Filtering](#synchronizing-associating-triangulating-filtering)
       1. [Synchronization](#synchronization)
       2. [Associate persons across cameras](#associate-persons-across-cameras)
       3. [Triangulating keypoints](#triangulating-keypoints)

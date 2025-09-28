@@ -58,7 +58,8 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
@@ -165,7 +166,7 @@ class Pose2SimPipeline:
             [os.path.join(self.session_dir, c) for c in os.listdir(self.session_dir) if 'calib' in c.lower() and not c.lower().endswith('.py')][0]
         except:
             self.session_dir = os.path.realpath(os.getcwd())
-        use_custom_logging = self.config_dicts[0].get('logging').get('use_custom_logging')
+        use_custom_logging = self.config_dicts[0].get('logging', {}).get('use_custom_logging', False)
         if not use_custom_logging:
             setup_logging(self.session_dir)
 
@@ -173,7 +174,7 @@ class Pose2SimPipeline:
         project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
         seq_name = os.path.basename(project_dir)
         frame_range = config_dict.get('project').get('frame_range')
-        frames = "all frames" if not frame_range or frame_range == [] else f"frames {frame_range[0]} to {frame_range[1]}"
+        frames = "all frames" if not frame_range or frame_range in ('all','auto') else f"frames {frame_range[0]} to {frame_range[1]}"
         logging.info("\n---------------------------------------------------------------------")
         logging.info(f"{step_name} for {seq_name}, for {frames}.")
         logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")

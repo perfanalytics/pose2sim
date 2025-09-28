@@ -15,8 +15,8 @@
     parameters may be wrong. Set show_corner_detection to 1 to verify.
 
     Usage: 
-    python -m calib_from_checkerboard -d "calib_path" -v False -e jpg -n 6 9 -S 1000
-    OR python -m calib_from_checkerboard -d "calib_path" -v True -e mp4 -n 6 9 -S 1000 1000 -s 1 -O 0 -f 50 -o Test.toml
+    calib_from_checkerboard -d "calib_path" -v False -e jpg -n 6 9 -S 1000
+    OR calib_from_checkerboard -d "calib_path" -v True -e mp4 -n 6 9 -S 1000 1000 -s 1 -O 0 -f 50 -o Test.toml
     OR from Pose2Sim.Utilities import calib_from_checkerboard; calib_from_checkerboard.calibrate_cams_func(calib_dir=r"calib_path", 
                 video=False, extension="jpg", corners_nb=(6,9), square_size=[1000])
     
@@ -37,13 +37,31 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--calib_dir', required = True, help='Directory of checkerboard images or videos (one folder per camera)')
+    parser.add_argument('-v', '--video', required = True, help='True if calibrate from videos, False if calibrate from images')
+    parser.add_argument('-e', '--extension', required=True, help='Video or image files extension (jpg, png, mp4, etc)')
+    parser.add_argument('-n', '--corners_nb', nargs=2, type=int, required=True, help='Number of (internal) square corners in the checkerboard: h,w')
+    parser.add_argument('-S', '--square_size', nargs='*', type=int, required=True, help='Square or rectangle size in mm (int or int int)')
+    parser.add_argument('-O', '--frame_for_origin', required=False, type=int, default=0, help='Checkerboard placed at world origin at frame N (-1 if last frame)')
+    parser.add_argument('-f', '--vid_snapshot_every_N_frames', type=int, required=False, help='Calibrate on each N frame of the video (if applicable)')
+    parser.add_argument('-s', '--show_corner_detection', type=int, required=False, default=0, help='Display corners detection overlayed on image')
+    parser.add_argument('-o', '--output_file', required=False, default="Calib.toml", help='Output calibration file name')
+    args = vars(parser.parse_args())
+
+    
+    calibrate_cams_func(**args)
+
+
 def euclidean_distance(q1, q2):
     '''
     Euclidean distance between 2 points (N-dim).
@@ -302,17 +320,4 @@ def calibrate_cams_func(**args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--calib_dir', required = True, help='Directory of checkerboard images or videos (one folder per camera)')
-    parser.add_argument('-v', '--video', required = True, help='True if calibrate from videos, False if calibrate from images')
-    parser.add_argument('-e', '--extension', required=True, help='Video or image files extension (jpg, png, mp4, etc)')
-    parser.add_argument('-n', '--corners_nb', nargs=2, type=int, required=True, help='Number of (internal) square corners in the checkerboard: h,w')
-    parser.add_argument('-S', '--square_size', nargs='*', type=int, required=True, help='Square or rectangle size in mm (int or int int)')
-    parser.add_argument('-O', '--frame_for_origin', required=False, type=int, default=0, help='Checkerboard placed at world origin at frame N (-1 if last frame)')
-    parser.add_argument('-f', '--vid_snapshot_every_N_frames', type=int, required=False, help='Calibrate on each N frame of the video (if applicable)')
-    parser.add_argument('-s', '--show_corner_detection', type=int, required=False, default=0, help='Display corners detection overlayed on image')
-    parser.add_argument('-o', '--output_file', required=False, default="Calib.toml", help='Output calibration file name')
-    args = vars(parser.parse_args())
-
-    
-    calibrate_cams_func(**args)
+    main()

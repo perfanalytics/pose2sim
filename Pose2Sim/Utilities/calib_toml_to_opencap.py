@@ -13,8 +13,8 @@
 
     Usage: 
         from Pose2Sim.Utilities import calib_toml_to_opencap; calib_toml_to_opencap.calib_toml_to_opencap_func(r'<input_toml_file>')
-        OR python -m calib_toml_to_opencap -t input_toml_file
-        OR python -m calib_toml_to_opencap -t input_toml_file -o output_calibration_folder>
+        OR calib_toml_to_opencap -t input_toml_file
+        OR calib_toml_to_opencap -t input_toml_file -o output_calibration_folder>
 '''
 
 ## INIT
@@ -31,13 +31,24 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', '--toml_file', required = True, help='Input OpenCV .toml calibration file')
+    parser.add_argument('-o', '--output_calibration_folder', required = False, help='OpenCap calibration folder')
+    args = vars(parser.parse_args())
+    
+    calib_toml_to_opencap_func(args)
+
+    
 def world_to_camera_persp(r, t):
     '''
     Converts rotation R and translation T 
@@ -152,8 +163,8 @@ def calib_toml_to_opencap_func(*args):
 
     Usage: 
         from Pose2Sim.Utilities import calib_toml_to_opencap; calib_toml_to_opencap.calib_toml_to_opencap_func(r'<input_toml_file>')
-        OR python -m calib_toml_to_opencap -t input_toml_file
-        OR python -m calib_toml_to_opencap -t input_toml_file -o output_calibration_folder
+        OR calib_toml_to_opencap -t input_toml_file
+        OR calib_toml_to_opencap -t input_toml_file -o output_calibration_folder
     '''
     
     try:
@@ -172,11 +183,5 @@ def calib_toml_to_opencap_func(*args):
     print(f'OpenCap calibration files generated at {output_calibration_folder}.\n')
 
 
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--toml_file', required = True, help='Input OpenCV .toml calibration file')
-    parser.add_argument('-o', '--output_calibration_folder', required = False, help='OpenCap calibration folder')
-    args = vars(parser.parse_args())
-    
-    calib_toml_to_opencap_func(args)
+    main()

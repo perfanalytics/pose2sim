@@ -14,8 +14,8 @@
     
     Usage:
     from Pose2Sim.Utilities import trc_combine; trc_combine.trc_combine_func(r'<first_path>', r'<second_path>', r'<output_path>')
-    OR python -m trc_combine -i first_path -j second_path -o output_path
-    OR python -m trc_combine -i first_path -j second_path
+    OR trc_combine -i first_path -j second_path -o output_path
+    OR trc_combine -i first_path -j second_path
 '''
 
 
@@ -31,13 +31,24 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2022, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--first_path', required = True, help='first trc file path')
+    parser.add_argument('-j', '--second_path', required = True, help='second trc file path')
+    parser.add_argument('-o', '--output_path', required = False, help='path of combined trc files')
+    args = vars(parser.parse_args())
+    
+    trc_combine_func(args)
+
+
 def df_from_trc(trc_path):
     '''
     Retrieve header and data from trc path.
@@ -133,8 +144,8 @@ def trc_combine_func(*args):
 
     Usage:
     from Pose2Sim.Utilities import trc_combine; trc_combine.trc_combine_func(r'<first_path>', r'<second_path>', r'<output_path>')
-    OR python -m trc_combine -i first_path -j second_path -o output_path
-    OR python -m trc_combine -i first_path -j second_path
+    OR trc_combine -i first_path -j second_path -o output_path
+    OR trc_combine -i first_path -j second_path
     '''
 
     try:
@@ -156,13 +167,8 @@ def trc_combine_func(*args):
     Header, Data = combine_trc_headerdata (first_path, second_path)
     trc_from_header_data(Header, Data, output_path)
 
+    print(f"trc files combined: {output_path}")
+
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--first_path', required = True, help='first trc file path')
-    parser.add_argument('-j', '--second_path', required = True, help='second trc file path')
-    parser.add_argument('-o', '--output_path', required = False, help='path of combined trc files')
-    args = vars(parser.parse_args())
-    
-    trc_combine_func(args)
-    
+    main()    

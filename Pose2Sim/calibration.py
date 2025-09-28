@@ -29,13 +29,14 @@ OUTPUTS:
 
 
 ## INIT
-from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort_key, zup2yup
+from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort_key, zup2yup, set_always_on_top
 
 import os
 import logging
 import pickle
 import numpy as np
 import pandas as pd
+np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 os.environ["OPENCV_LOG_LEVEL"]="FATAL"
 import cv2
 import glob
@@ -43,6 +44,8 @@ import toml
 import re
 from lxml import etree
 import warnings
+import tkinter as tk
+from tkinter import messagebox
 import matplotlib.pyplot as plt
 from mpl_interactions import zoom_factory, panhandler
 from PIL import Image
@@ -55,7 +58,8 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
@@ -95,7 +99,7 @@ def calib_qca_fun(file_to_convert_path, binning_factor=1):
 
     R = [np.array(cv2.Rodrigues(r)[0]).flatten() for r in R]
     T = np.array(T)
-      
+
     return ret, C, S, D, K, R, T
 
     
@@ -127,7 +131,7 @@ def read_qca(qca_path, binning_factor):
     for i, tag in enumerate(root.findall('cameras/camera')):
         ret += [float(tag.attrib.get('avg-residual'))]
         C += [tag.attrib.get('serial')]
-        res += [int(tag.attrib.get('video_resolution')[:-1]) if tag.attrib.get('video_resolution') is not None else 1080]
+        res += [int(tag.attrib.get('video_resolution')[:-1]) if tag.attrib.get('video_resolution') not in (None, "N/A") else 1080]
         if tag.attrib.get('model') in ('Miqus Video', 'Miqus Video UnderWater', 'none'):
             vid_id += [i]
     
@@ -301,7 +305,7 @@ def read_vicon(vicon_path):
         T += [[float(t)/1000 for t in trans]]
 
     # Camera names by natural order
-    C_vid_id = [v for v in vid_id if ('VIDEO' or 'Video') in root.findall('Camera')[v].attrib.get('TYPE')]
+    C_vid_id = [v for v in vid_id if 'video' in root.findall('Camera')[v].attrib.get('TYPE', '').lower()]
     C_vid = [root.findall('Camera')[v].attrib.get('DEVICEID') for v in C_vid_id]
     C = sorted(C_vid, key=natural_sort_key)
     C_id_sorted = [i for v_sorted in C for i,v in enumerate(root.findall('Camera')) if v.attrib.get('DEVICEID')==v_sorted]
@@ -492,13 +496,13 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
 
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
     try:
-        calib_file = glob.glob(os.path.join(calib_dir, f'Calib*.toml'))[0]
+        calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
+        calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
     except:
         pass
     if not overwrite_intrinsics and 'calib_file' in locals():
         logging.info(f'\nPreexisting calibration file found: \'{calib_file}\'.')
         logging.info(f'\nRetrieving intrinsic parameters from file. Set "overwrite_intrinsics" to true in Config.toml to recalculate them.')
-        calib_file = glob.glob(os.path.join(calib_dir, f'Calib*.toml'))[0]
         calib_data = toml.load(calib_file)
 
         ret, C, S, D, K, R, T = [], [], [], [], [], [], []
@@ -552,7 +556,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
     '''
 
     try:
-        intrinsics_cam_listdirs_names = next(os.walk(os.path.join(calib_dir, 'intrinsics')))[1]
+        intrinsics_cam_listdirs_names = sorted(next(os.walk(os.path.join(calib_dir, 'intrinsics')))[1])
     except StopIteration:
         logging.exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
         raise Exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
@@ -641,7 +645,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
     '''
 
     try:
-        extrinsics_cam_listdirs_names = next(os.walk(os.path.join(calib_dir, 'extrinsics')))[1]
+        extrinsics_cam_listdirs_names = sorted(next(os.walk(os.path.join(calib_dir, 'extrinsics')))[1])
     except StopIteration:
         logging.exception(f'Error: No {os.path.join(calib_dir, "extrinsics")} folder found.')
         raise Exception(f'Error: No {os.path.join(calib_dir, "extrinsics")} folder found.')
@@ -650,14 +654,25 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
     ret, R, T = [], [], []
     
     if extrinsics_method in {'board', 'scene'}:
-                
         # Define 3D object points
         if extrinsics_method == 'board':
+            board_position = extrinsics_config_dict.get('board').get('board_position')
+            if not board_position:
+                logging.warning('board_position not defined in Config.toml. Defaulting to "vertical".')
+                board_position = 'vertical'
             extrinsics_corners_nb = extrinsics_config_dict.get('board').get('extrinsics_corners_nb')
             extrinsics_square_size = extrinsics_config_dict.get('board').get('extrinsics_square_size') / 1000 # convert to meters
             object_coords_3d = np.zeros((extrinsics_corners_nb[0] * extrinsics_corners_nb[1], 3), np.float32)
-            object_coords_3d[:, :2] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]].T.reshape(-1, 2)
-            object_coords_3d[:, :2] = object_coords_3d[:, 0:2] * extrinsics_square_size
+            if board_position == 'horizontal':
+                object_coords_3d[:, :2] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]].T.reshape(-1, 2)
+                object_coords_3d[:, :2] = object_coords_3d[:, 0:2] * extrinsics_square_size
+            elif board_position == 'vertical':
+                object_coords_3d[:, [0,2]] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]][::-1].T.reshape(-1, 2)
+                object_coords_3d[:, [0,2]] = object_coords_3d[:, [0,2]] * extrinsics_square_size
+            else:
+                logging.exception('board_position should be "horizontal" or "vertical".')
+                raise ValueError('board_position should be "horizontal" or "vertical".')
+            
         elif extrinsics_method == 'scene':
             object_coords_3d = np.array(extrinsics_config_dict.get('scene').get('object_coords_3d'), np.float32)
                 
@@ -697,6 +712,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
 
             elif extrinsics_method == 'scene':
                 imgp, objp = imgp_objp_visualizer_clicker(img, imgp=[], objp=object_coords_3d, img_path=img_vid_files[0])
+
                 if len(imgp) == 0:
                     logging.exception('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
                     raise ValueError('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
@@ -720,6 +736,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             # P_cam = Kh_cam @ H_cam
             # proj_obj = [ ( P_cam[0] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)),  P_cam[1] @ np.append(o, 1) /  (P_cam[2] @ np.append(o, 1)) ) for o in objp]
             proj_obj = np.squeeze(cv2.projectPoints(objp,r,t,mtx,dist)[0])
+            proj_obj_all = np.squeeze(cv2.projectPoints(object_coords_3d,r,t,mtx,dist)[0])
 
             # Check calibration results
             if show_reprojection_error:
@@ -732,7 +749,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
                         raise
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-                for o in proj_obj:
+                for o in proj_obj_all:
                     cv2.circle(img, (int(o[0]), int(o[1])), 8, (0,0,255), -1) 
                 for i in imgp:
                     cv2.drawMarker(img, (int(i[0][0]), int(i[0][1])), (0,255,0), cv2.MARKER_CROSS, 15, 2)
@@ -746,6 +763,9 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
                 cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
                 im_pil = Image.fromarray(img)
                 im_pil.show(title = os.path.basename(img_vid_files[0]))
+                # save image
+                reproj_img_path = os.path.join(calib_dir, f'calib_{os.path.splitext(os.path.basename(img_vid_files[0]))[0]}.png')
+                im_pil.save(reproj_img_path)
 
             # Calculate reprojection error
             imgp_to_objreproj_dist = [euclidean_distance(proj_obj[n], imgp[n]) for n in range(len(proj_obj))]
@@ -932,36 +952,62 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                 ax_3d.set_ylabel('Y')
                 ax_3d.set_zlabel('Z')
                 if np.all(objp[:,2] == 0):
-                    ax_3d.view_init(elev=-90, azim=0)
+                    ax_3d.view_init(elev=90, azim=-90)
+                else:
+                    ax_3d.view_init(vertical_axis='z')
+                # Maintain 3D window on top
+                set_always_on_top(fig_3d)
                 fig_3d.show()
 
         if event.key == 'h':
             # If 'h', indicates that one of the objp is not visible on image
             # Displays it in red on 3D plot
-            if len(objp) != 0  and 'ax_3d' in globals():
+            if len(objp) != 0 and 'ax_3d' in globals():
                 count = [0 if 'count' not in globals() else count+1][0]
+                objp_confirmed_notok = objp[count]
                 if 'events' not in globals():
                     # retrieve first objp_confirmed_notok and plot 3D
                     events = [event]
-                    objp_confirmed_notok = objp[count]
+                    # Plot 3D
                     ax_3d.scatter(*objp_confirmed_notok, marker='o', color='r')
                     fig_3d.canvas.draw()
+
                 elif count == len(objp)-1:
-                    # if all objp have been clicked or indicated as not visible, close all
-                    objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])[:-1]
-                    imgp_confirmed = np.array(np.expand_dims(scat.get_offsets(), axis=1), np.float32) 
-                    plt.close('all')
-                    for var_to_delete in ['events', 'count', 'scat', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
-                        if var_to_delete in globals():
-                            del globals()[var_to_delete]
+                    # Plot 3D
+                    ax_3d.scatter(*objp_confirmed_notok, marker='o', color='r')
+                    fig_3d.canvas.draw()
+
+                    # Ask for confirmation
+                    root = tk.Tk()
+                    root.withdraw()
+                    response = messagebox.askyesno("Confirmation", "Confirm and go to next image")
+                    # Disable event picking
+                    fig.canvas.callbacks.blocked = True
+                    # Confirmed
+                    if response == True:
+                        plt.close('all')
+                        # if all objp have been clicked or indicated as not visible, close all
+                        objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])[:-1]
+                        imgp_confirmed = np.array(np.expand_dims(scat.get_offsets(), axis=1), np.float32) 
+                        for var_to_delete in ['events', 'count', 'scat', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
+                            if var_to_delete in globals():
+                                del globals()[var_to_delete]
+                    # Not confirmed
+                    else:
+                        root.destroy()
+                        # remove from plot 
+                        ax_3d.collections[-1].remove()
+                        fig_3d.canvas.draw()
+                        count -= 1
+                    # Enable event picking
+                    fig.canvas.callbacks.blocked = False
+
                 else:
                     # retrieve other objp_confirmed_notok and plot 3D
                     events.append(event)
                     objp_confirmed_notok = objp[count]
                     ax_3d.scatter(*objp_confirmed_notok, marker='o', color='r')
                     fig_3d.canvas.draw()
-            else:
-                pass
 
 
     def on_click(event):
@@ -970,11 +1016,11 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
         If right click, last point is removed
         '''
         
-        global imgp_confirmed, objp_confirmed, objp_confirmed_notok, scat, ax_3d, fig_3d, events, count, xydata
+        global imgp_confirmed, objp_confirmed, objp_confirmed_notok, events, count, xydata
         
-        # Left click: Add clicked point to imgp_confirmed
+        # Left click in the image: Add clicked point to imgp_confirmed
         # Display it on image and on 3D plot
-        if event.button == 1: 
+        if event.button == 1 and event.inaxes == ax: 
             # To remember the event to cancel after right click
             if 'events' in globals():
                 events.append(event)
@@ -992,20 +1038,47 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
             if len(objp) != 0:
                 count = [0 if 'count' not in globals() else count+1][0]
                 if count==0:
-                    # retrieve objp_confirmed and plot 3D
+                    # retrieve objp_confirmed
                     objp_confirmed = [objp[count]]
+                    # plot 3D
                     ax_3d.scatter(*objp[count], marker='o', color='g')
                     fig_3d.canvas.draw()
                 elif count == len(objp)-1:
-                    # close all
-                    plt.close('all')
-                    # retrieve objp_confirmed
-                    objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])
-                    imgp_confirmed = np.array(imgp_confirmed, np.float32)
-                    # delete all
-                    for var_to_delete in ['events', 'count', 'scat', 'scat_3d', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
-                        if var_to_delete in globals():
-                            del globals()[var_to_delete]
+                    # plot 3D
+                    ax_3d.scatter(*objp[count], marker='o', color='g')
+                    fig_3d.canvas.draw()
+                    # Ask for confirmation
+                    root = tk.Tk()
+                    root.withdraw()
+                    response = messagebox.askyesno("Confirmation", "Confirm and go to next image")
+                    # Disable event picking
+                    fig.canvas.callbacks.blocked = True
+                    # Confirmed
+                    if response == True:
+                        plt.close('all')
+                        # retrieve objp_confirmed
+                        objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])
+                        imgp_confirmed = np.array(imgp_confirmed, np.float32)
+                        # delete all
+                        for var_to_delete in ['events', 'count', 'scat', 'scat_3d', 'fig_3d', 'ax_3d', 'objp_confirmed_notok']:
+                            if var_to_delete in globals():
+                                del globals()[var_to_delete]
+                    # Not confirmed
+                    else:
+                        root.destroy()
+                        # Remove lastpoint from image
+                        new_xydata = scat.get_offsets()[:-1]
+                        scat.set_offsets(new_xydata)
+                        plt.draw()
+                        # Remove last point from imgp_confirmed
+                        imgp_confirmed = imgp_confirmed[:-1]
+                        # remove from plot 
+                        ax_3d.collections[-1].remove()
+                        fig_3d.canvas.draw()
+                        count -= 1
+                    # Enable event picking
+                    fig.canvas.callbacks.blocked = True                                    
+
                 else:
                     # retrieve objp_confirmed and plot 3D
                     objp_confirmed = [[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0]
@@ -1032,7 +1105,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                                 count -= 1
                             # Remove last point from objp_confirmed
                             objp_confirmed = objp_confirmed[:-1]
-                            # remove from plot 
+                            # remove from plot
                             if len(ax_3d.collections) > len(objp):
                                 ax_3d.collections[-1].remove()
                                 fig_3d.canvas.draw()
@@ -1040,13 +1113,17 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                 # If last event was 'h' key
                 elif events[-1].key == 'h':
                     if len(objp) != 0:
-                        if count >= 1: count -= 1
+                        if count >= 0: 
+                            count -= 1
                         # Remove last point from objp_confirmed_notok
                         objp_confirmed_notok = objp_confirmed_notok[:-1]
                         # remove from plot  
                         if len(ax_3d.collections) > len(objp):
                             ax_3d.collections[-1].remove()
-                            fig_3d.canvas.draw()                
+                            fig_3d.canvas.draw()
+                
+                events = events[:-1]
+
     
 
     def set_axes_equal(ax):

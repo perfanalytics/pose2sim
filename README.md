@@ -15,15 +15,23 @@
 
 # Pose2Sim
 
+https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 
-##### N.B:. Please set undistort_points and handle_LR_swap to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
+`Pose2Sim` provides a workflow for 3D markerless kinematics (human or animal), as an alternative to traditional marker-based MoCap methods. 
 
-> **_News_: Version 0.10.0:**\
-> **OpenSim scaling and inverse kinematics are now integrated in Pose2Sim!** No static trial needed.\
-> **Other recently added features**: Pose estimation, Automatic camera synchronization, Multi-person analysis, Blender visualization and rig, Marker augmentation, Batch processing.
-<!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
-and lens distortions are better taken into account.\ -->
-> To upgrade, type `pip install pose2sim --upgrade`
+**Pose2Sim** is free and open-source, requiring low-cost hardware but with research-grade accuracy and production-grade robustness. It gives maximum control over clearly explained parameters. Any combination of phones, webcams, or GoPros can be used with fully clothed subjects, so it is particularly adapted to the sports field, the doctor's office, or for outdoor 3D animation capture.
+
+***Note:*** For real-time analysis with a single camera, please consider **[Sports2D](https://github.com/davidpagnon/Sports2D)** (note that the motion must lie in the sagittal or frontal plane). 
+
+*Fun fact:*\
+Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inputs (2D keypoints coordinates) and led to an OpenSim result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose), and custom models (from [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut), for example) can also be used. 
+
+
+<br>
+
+<img src="Content/Pose2Sim_workflow.jpg" width="760">
+
+
 
 <!-- GitHub Star Button -->
 <!-- 
@@ -31,23 +39,7 @@ and lens distortions are better taken into account.\ -->
 <script async defer src="https://buttons.github.io/buttons.js"></script>
 -->
 
-<br>
 
-`Pose2Sim` provides a workflow for 3D markerless kinematics (human or animal), as an alternative to traditional marker-based MoCap methods. 
-
-**Pose2Sim** is free and open-source, low-cost but with research-grade accuracy and production-grade robustness. It gives a maximum of control on clearly explained parameters. Any combination of phones, webcams, or GoPros can be used with fully clothed subjects, so it is particularly adapted to the sports field, the doctor's office, or for outdoor 3D animation capture.
-
-***Note:*** For real-time analysis with a single camera, please consider **[Sports2D](https://github.com/davidpagnon/Sports2D)** (note that the motion must lie in the sagittal or frontal plane). 
-
-<br>
-
-*Fun fact:*\
-Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inputs (2D keypoints coordinates) and lead to an OpenSim result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose), and custom models (from [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut) for example) can also be used. 
-
-
-<img src="Content/Pose2Sim_workflow.jpg" width="760">
-
-<img src='Content/Activities_verylow.gif' title='Other more or less challenging tasks and conditions.' width="760">
 
 </br>
 
@@ -67,7 +59,9 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 - [ ] v0.13: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
 - [ ] v1.0: First full release
 
-***N.B.:*** As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).
+***N.B.:*** As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).\
+***N.B:*** Please set `undistort_points` and `handle_LR_swap` to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
+
 
 </br>
 
@@ -78,6 +72,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
    3. [Demonstration Part-2: Visualize your results with OpenSim or Blender](#demonstration-part-2-visualize-your-results-with-opensim-or-blender)
    4. [Demonstration Part-3: Try multi-person analysis](#demonstration-part-3-try-multi-person-analysis)
    5. [Demonstration Part-4: Try batch processing](#demonstration-part-4-try-batch-processing)
+   6. [Too slow for you?](#too-slow-for-you)
 2. [Use on your own data](#use-on-your-own-data)
    1. [Setting up your project](#setting-up-your-project)
    2. [2D pose estimation](#2d-pose-estimation)
@@ -90,7 +85,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
    4. [Camera calibration](#camera-calibration)
       1. [Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-caliscope-anipose-freemocap-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
-   5. [Synchronizing, Associatiating, Triangulating, Filtering](#synchronizing-associating-triangulating-filtering)
+   5. [Synchronizing, Associating, Triangulating, Filtering](#synchronizing-associating-triangulating-filtering)
       1. [Synchronization](#synchronization)
       2. [Associate persons across cameras](#associate-persons-across-cameras)
       3. [Triangulating keypoints](#triangulating-keypoints)
@@ -111,12 +106,11 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 
 ## Installation
 
-1. ***Optional:***\
-*Install Anaconda or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) for simplicity and avoiding the risk of incompatibilities between libraries.*
-
-   Once installed, open an Anaconda prompt and create a virtual environment:
+1. **Create a conda environment:**\
+  Download and install [Miniconda](https://docs.conda.io/en/latest/miniconda.html).\
+   Open an Anaconda prompt and create a virtual environment:
    ```
-   conda create -n Pose2Sim python=3.10 -y 
+   conda create -n Pose2Sim python=3.12 -y 
    conda activate Pose2Sim
    ```
 
@@ -127,7 +121,6 @@ Install the OpenSim Python API (if you do not want to install via conda, refer [
    ```
    
 3. **Install Pose2Sim**:\
-If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.10 is installed. 
    - OPTION 1: **Quick install:** Open a terminal. 
        ``` cmd
        pip install pose2sim
@@ -168,8 +161,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.1
   <!-- print(f'torch version: {torch.__version__}, cuda version: {torch.version.cuda}, cudnn version: {torch.backends.cudnn.version()}, onnxruntime version: {ort.__version__}') -->
 
 > **Note on storage use:**\
-     A full installation takes up to 11 GB of storage spate. However, GPU support is not mandatory and takes about 6 GB. Moreover, [marker augmentation](#marker-augmentation) requires Tensorflow and does not necessarily yield better results. You can save an additional 1.3 GB by uninstalling it: `pip uninstall tensorflow`.\
-     A minimal installation with carefully chosen pose models and without GPU support, Tensorflow, PyQt5 **would take less than 3 GB**.\
+     A full installation takes up to 10 GB of storage spate. However, GPU support is not mandatory and takes about 6 GB. A minimal installation with carefully chosen pose models and without GPU support **would take less than 3 GB**.\
     <img src="Content/Storage.png" width="760">
 
 
@@ -192,6 +184,9 @@ Pose2Sim.filtering()
 Pose2Sim.markerAugmentation()
 Pose2Sim.kinematics()
 ```
+
+When the Synchronization GUI is provided, Select the RWrist
+
 **3D marker locations** are stored as .trc files in each trial folder in the `pose-3d` directory.\
 **3D joint angles** are stored as .mot files in the `kinematics` directory. Scaled models are also stored in the same directory.
 
@@ -319,6 +314,38 @@ Run Pose2Sim from the `BatchSession` folder if you want to batch process the who
 For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or uncomment `[pose]` and set `mode = 'lightweight'` in the `Config.toml` file of `Trial_2`.
 
 
+<br/>
+
+## Too slow for you?
+
+- `Pose2Sim.calibration()`:\
+  Run it only when your cameras are moved or changed. If they are not, just copy a previous calibration.toml file into your new calibration folder.
+- `Pose2Sim.poseEstimation()`:
+  - **Use your GPU**: This makes pose estimation significantly faster, without any impact on accuracy. See [Installation](#installation) section for more information.
+  - Set `det_frequency = 100` in Config.toml. Run the bounding box detector and the pose estimator on the first frame; for all subsequent frames, only run pose estimation: 
+  *150 s -> 30 s on my laptop with the Demo videos*
+  - Use `mode = 'lightweight'`: Will use a lighter version of RTMPose, which is faster but less accurate\
+  *30 s -> 20 s*
+  - Set `display_detection = false`. Do not display results in real time\
+  *20 s -> 15 s*
+  - Set `save_video = 'none'`. Do not save images and videos\
+  *15 s -> 9 s*
+  - Set `tracking_mode = 'sports2d'` or `tracking_mode = 'none'`. If several persons are in the scene, use the sports2d tracker or no tracker at all, but not 'deepsort' (sports2d tracking is almost instantaneous though).
+- `Pose2Sim.synchronization()`:\
+  Do not run if your cameras are natively synchronized.
+- `Pose2Sim.personAssociation()`:\
+  Do not run if there is only one person in the scene.
+- `Pose2Sim.triangulation()`:\
+  Not much to do here.
+- `Pose2Sim.filtering()`:\
+  You can skip this step, but it is quite fast already.
+- `Pose2Sim.markerAugmentation()`:\
+  Very fast, too. Note that marker augmentation won't necessarily improve results so you can consider skipping it.
+- `Pose2Sim.kinematics()`:\
+  Set `use_simple_model = true`. Use a simpler OpenSim model, without muscles and constraints. Note that the spine will be stiff and shoulders will be a simple ball joint, but this is accurate enough for most gait-related tasks\
+  *9 s -> 0.7 s*
+
+
 </br></br>
 
 # Use on your own data
@@ -355,15 +382,6 @@ Pose2Sim.poseEstimation()
 
 ***N.B.:* To analyse wrist motion:**\
 'Whole_body_wrist' or 'Whole_body' `pose_model` is required in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml). Note that these are slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints. 
-
-<br>
-
-***N.B.:* To speed up the process:**
-- Disable `display_detection` and `save_video` 
-- Increase the value of `det_frequency`. In this case, the detection is only done every `det_frequency` frames, and bounding boxes are tracked inbetween (keypoint detection is still performed on all frames)
-- Use your GPU (See [Installation](#installation)). Slightly more involved, but often worth it. Note that the optimal device _(CPU or GPU)_ and backend for your configuration will be automatically selected, but you can also manually select them in Config.toml.
-- Run pose estimation in `lightweight` mode instead of `balanced` or `performance`. However, this will reduce the quality of results. 
-- Use `tracking_mode = 'sports2d'`: Will use the default Sports2D tracker. Unlike DeepSort, it is faster, does not require any parametrization, and is as good in non-crowded scenes. 
 
 <br>
 
@@ -410,7 +428,7 @@ Pose2Sim.poseEstimation()
 1. Train your DeepLabCut model and run it on your images or videos (more instruction on their repository)
 2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)). Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json': 
    ``` cmd
-   python -m DLC_to_OpenPose -i input_h5_file
+   DLC_to_OpenPose -i input_h5_file
    ```
 3. Edit `pose.CUSTOM` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), and edit the node IDs so that they correspond to the column numbers of the 2D pose file, starting from zero. Make sure you also changed the `pose_model` and the `tracked_keypoint`.\
    You can visualize your skeleton's hierarchy by changing pose_model to CUSTOM and writing these lines: 
@@ -449,9 +467,9 @@ Make sure you modify the [Config.toml](https://github.com/perfanalytics/pose2sim
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 * Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
   ``` cmd
-  python -m Blazepose_runsave -i input_file -dJs
+  Blazepose_runsave -i input_file -dJs
   ```
-  Type in `python -m Blazepose_runsave -h` for explanation on parameters.
+  Type in `Blazepose_runsave -h` for explanation on parameters.
 * Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
 ### With AlphaPose *(legacy)*:
@@ -462,7 +480,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 * Install and run AlphaPose on your videos (more instruction on their repository)
 * Translate the AlphaPose single json file to OpenPose frame-by-frame files (with `AlphaPose_to_OpenPose.py` script, see [Utilities](#utilities)): 
    ``` cmd
-   python -m AlphaPose_to_OpenPose -i input_alphapose_json_file
+   AlphaPose_to_OpenPose -i input_alphapose_json_file
    ```
 * Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
@@ -498,7 +516,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
   - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
   - Calibration can be skipped since these formats are natively supported by Pose2Sim.
 - **From [Qualisys](https://www.qualisys.com):**
-  - Export calibration to `.qca.txt` within QTM.
+  - Export calibration to `.qca.txt` within QTM (see [there](https://github.com/perfanalytics/pose2sim/issues/56#issuecomment-1855933754)).
   - Copy it in the `Calibration` Pose2Sim folder.
   - set `convert_from` to 'qualisys' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
   - If you set your cameras vertically and the videos are rendered sideways, you need to rotate them and the calibration file before running pose estimation. [Use this script](https://github.com/perfanalytics/pose2sim/issues/136#issuecomment-2398110061).
@@ -707,7 +725,8 @@ Pose2Sim.markerAugmentation()
 </br>
 
 ## OpenSim kinematics
-> _**Obtain a scaled model and 3D joint angles.**_
+> _**Obtain a scaled model and 3D joint angles.**_\
+> _**N.B.:**_ If you are not interested in muscles or having a flexible spine, set `use_simple_model` to true. This will make inverse kinematics at least 10 times faster.
 
 This can be either done fully automatically within Pose2Sim, or manually within OpenSim GUI.
 
@@ -803,6 +822,15 @@ Alternatively, you can use command-line tools:
 A list of standalone tools (see [Utilities](https://github.com/perfanalytics/pose2sim/tree/main/Pose2Sim/Utilities)), which can be either run as scripts, or imported as functions. Check usage in the docstring of each Python file. The figure below shows how some of these tools can be used to further extend Pose2Sim usage.
 
 
+<details>
+   <summary><b>Video editing</b> (CLICK TO SHOW)</summary>
+     <pre>
+     
+ [face_blurring.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/face_blurring.py)
+ Blurs or masks faces on a video.
+    </pre>
+ </details>
+ 
 <details>
   <summary><b>Converting pose files</b> (CLICK TO SHOW)</summary>
     <pre>
@@ -979,7 +1007,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Calibration:** Easier and clearer calibration procedure: separate intrinsic and extrinsic parameter calculation, edit corner detection if some are wrongly detected (or not visible). 
 &#10004; **Calibration:** Possibility to evaluate extrinsic parameters from cues on scene.
 &#9634; **Calibration:** Automatic calibration based on [keypoints](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/cvi2.12130). Set world reference frame in the end.
-&#9634; **Calibration:** Calibration of moving cameras. Detect or click points, and then track them for live calibration of moving cameras. Propose to click again when they are lost.
+&#9634; **Calibration:** Calibration of moving cameras. Detect or click points, and then track them for live calibration of moving cameras. Propose to click again when they are lost. Alternatively, use [DVPO](https://github.com/princeton-vl/DPVO) (see its implementation in [GVHMR](https://github.com/zju3dv/GVHMR/blob/main/hmr4d/utils/preproc/slam.py))
 &#9634; **Calibration:** Support vertical checkerboard.
 &#9634; **Calibration:** Calibrate cameras by pairs and compute average extrinsic calibration with [aniposelib](https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/utils.py#L167). 
 &#9634; **Calibration:** Fine-tune calibration with bundle adjustment.
@@ -1057,10 +1085,6 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 
 **Acknowledgements:**
 - Supervised my PhD: [@lreveret](https://github.com/lreveret) (INRIA, Université Grenoble Alpes), and [@mdomalai](https://github.com/mdomalai) (Université de Poitiers).
-- Provided the Demo data: [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
-- Tested the code and provided feedback: [@simonozan](https://github.com/simonozan), [@daeyongyang](https://github.com/daeyongyang), [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals)
-- Submitted various accepted pull requests: [@ANaaim](https://github.com/ANaaim), [@rlagnsals](https://github.com/rlagnsals), [@peterlololsss](https://github.com/peterlololsss)
-- Provided a code snippet for Optitrack calibration: [@claraaudap](https://github.com/claraaudap) (Université Bretagne Sud).
-- Issued MPP2SOS, a (non-free) Blender extension based on Pose2Sim: [@carlosedubarreto](https://github.com/carlosedubarreto)
-
-
+- Post-doc at the [University of Bath (UK)](https://www.bath.ac.uk/) and engineer at [ForceTeck](https://forceteck.com/).
+- Demo data from [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
+- Thanks to [all the contributors](https://github.com/perfanalytics/pose2sim/graphs/contributors), past and to come! Thanks to everyone who gave feedback and contributed to making this software program better.

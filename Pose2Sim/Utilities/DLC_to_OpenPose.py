@@ -11,8 +11,8 @@
     You may need to install tables: 'pip install tables' or 'conda install pytables'
         
     Usage: 
-    python -m DLC_to_OpenPose -i input_h5_file -o output_json_folder
-    OR python -m DLC_to_OpenPose -i input_h5_file
+    DLC_to_OpenPose -i input_h5_file -o output_json_folder
+    OR DLC_to_OpenPose -i input_h5_file
     OR from Pose2Sim.Utilities import DLC_to_OpenPose; DLC_to_OpenPose.DLC_to_OpenPose_func(r'input_h5_file', r'output_json_folder')
 '''
 
@@ -31,13 +31,23 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input', required = True, help='input 2D pose coordinates DeepLabCut h5 file')
+    parser.add_argument('-o', '--output', required = False, help='output folder for 2D pose coordinates OpenPose json files')
+    args = vars(parser.parse_args())
+    
+    DLC_to_OpenPose_func(args)
+
+
 def DLC_to_OpenPose_func(*args):
     '''
     Translates DeepLabCut (h5) 2D pose estimation files into OpenPose (json) files.
@@ -88,11 +98,8 @@ def DLC_to_OpenPose_func(*args):
         with open(json_file, 'w') as js_f:
             js_f.write(json.dumps(json_dict))
 
+    print(f"DeepLabCut h5 files converted to OpenPose json files in {json_folder_path}")
+
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', required = True, help='input 2D pose coordinates DeepLabCut h5 file')
-    parser.add_argument('-o', '--output', required = False, help='output folder for 2D pose coordinates OpenPose json files')
-    args = vars(parser.parse_args())
-    
-    DLC_to_OpenPose_func(args)
+    main()

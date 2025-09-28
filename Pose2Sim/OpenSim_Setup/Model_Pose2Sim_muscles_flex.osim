@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <OpenSimDocument Version="40000">
-	<Model name="Pose2Sim_WithContactsAndMuscles">
+	<Model name="Pose2Sim_WithMusclesAndConstraints">
 		<!--The model's ground reference frame.-->
 		<Ground name="ground">
 			<!--The geometry used to display the axes of this Frame.-->
@@ -2714,7 +2714,7 @@
 								<color>1 1 1</color>
 							</Appearance>
 							<!--Name of geometry file.-->
-							<mesh_file>hat_jaw.vtp</mesh_file>
+							<mesh_file>jaw.vtp</mesh_file>
 						</Mesh>
 						<Mesh name="torso_geom_22">
 							<!--Path to a Component that satisfies the Socket 'frame' of type Frame.-->
@@ -2729,7 +2729,7 @@
 								<color>1 1 1</color>
 							</Appearance>
 							<!--Name of geometry file.-->
-							<mesh_file>hat_skull.vtp</mesh_file>
+							<mesh_file>skull.vtp</mesh_file>
 						</Mesh>
 					</attached_geometry>
 					<!--Set of wrap objects fixed to this body that GeometryPaths can wrap over.This property used to be a member of Body but was moved up with the introduction of Frames.-->
@@ -6739,7 +6739,7 @@
 							<!--Path to a Component that satisfies the Socket 'parent' of type C (description: The parent frame to this frame.).-->
 							<socket_parent>/bodyset/head</socket_parent>
 							<!--Translational offset (in meters) of this frame's origin from the parent frame's origin, expressed in the parent frame.-->
-							<translation>0 0.54145799999999999 0</translation>
+							<translation>0 0.03 0</translation>
 							<!--Orientation offset (in radians) of this frame in its parent frame, expressed as a frame-fixed x-y-z rotation sequence.-->
 							<orientation>0 0 0</orientation>
 						</PhysicalOffsetFrame>
@@ -7050,7 +7050,7 @@
 							<!--The speed value of this coordinate before any value has been set. Rotational coordinate value is in rad/s and Translational in m/s.-->
 							<default_speed_value>0</default_speed_value>
 							<!--The minimum and maximum values that the coordinate can range between. Rotational coordinate range in radians and Translational in meters.-->
-							<range>0.0 1.5707963300000001</range>
+							<range>0.0 2.09</range>
 							<!--Flag indicating whether or not the values of the coordinates should be limited to the range, above.-->
 							<clamped>true</clamped>
 							<!--Flag indicating whether or not the values of the coordinates should be constrained to the current (e.g. default) value, above.-->
@@ -7395,7 +7395,7 @@
 							<!--The speed value of this coordinate before any value has been set. Rotational coordinate value is in rad/s and Translational in m/s.-->
 							<default_speed_value>0</default_speed_value>
 							<!--The minimum and maximum values that the coordinate can range between. Rotational coordinate range in radians and Translational in meters.-->
-							<range>0.0 1.5707963300000001</range>
+							<range>0.0 2.09</range>
 							<!--Flag indicating whether or not the values of the coordinates should be limited to the range, above.-->
 							<clamped>true</clamped>
 							<!--Flag indicating whether or not the values of the coordinates should be constrained to the current (e.g. default) value, above.-->

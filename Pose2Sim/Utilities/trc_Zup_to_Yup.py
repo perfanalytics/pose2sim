@@ -11,8 +11,8 @@
     
     Usage: 
     from Pose2Sim.Utilities import trc_Zup_to_Yup; trc_Zup_to_Yup.trc_Zup_to_Yup_func(r'<input_trc_file>', r'<output_trc_file>')
-    python -m trc_Zup_to_Yup -i input_trc_file
-    python -m trc_Zup_to_Yup -i input_trc_file -o output_trc_file
+    trc_Zup_to_Yup -i input_trc_file
+    trc_Zup_to_Yup -i input_trc_file -o output_trc_file
 '''
 
 
@@ -27,13 +27,23 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-__version__ = "0.9.4"
+from importlib.metadata import version
+__version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
 ## FUNCTIONS
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input', required = True, help='trc Zup input file')
+    parser.add_argument('-o', '--output', required=False, help='trc Yup output file')
+    args = vars(parser.parse_args())
+    
+    trc_Zup_to_Yup_func(args)
+
+
 def trc_Zup_to_Yup_func(*args):
     '''
     Turns trc files with Z-up system coordinates into Y-up files.
@@ -65,8 +75,8 @@ def trc_Zup_to_Yup_func(*args):
 
     # Y->Z, Z->Y
     cols = list(Q_coord.columns)
-    # cols = np.array([[cols[i*3+1],cols[i*3+2],cols[i*3]] for i in range(int(len(cols)/3))]).flatten() # X->Y, Y->Z, Z->X
-    cols = np.array([[cols[i*3],cols[i*3+2],cols[i*3+1]] for i in range(int(len(cols)/3))]).flatten() # Y->Z, Z->-Y
+    cols = np.array([[cols[i*3+1],cols[i*3+2],cols[i*3]] for i in range(int(len(cols)/3))]).flatten() # X->Y, Y->Z, Z->X
+    # cols = np.array([[cols[i*3],cols[i*3+2],cols[i*3+1]] for i in range(int(len(cols)/3))]).flatten() # Y->Z, Z->-Y
     Q_Yup = Q_coord[cols]
     # Q_Yup.iloc[:,2::3] = - Q_Yup.iloc[:,2::3]
 
@@ -76,11 +86,8 @@ def trc_Zup_to_Yup_func(*args):
         Q_Yup.insert(0, 'Frame#', frames_col)
         Q_Yup.insert(1, 'Time', time_col)
         Q_Yup.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+
+    print(f"trc file converted from Z-up to Y-up: {trc_yup_path}")
     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', required = True, help='trc Zup input file')
-    parser.add_argument('-o', '--output', required=False, help='trc Yup output file')
-    args = vars(parser.parse_args())
-    
-    trc_Zup_to_Yup_func(args)
+    main()
