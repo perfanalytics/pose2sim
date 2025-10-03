@@ -560,6 +560,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
       - is filmed from different angles, covers a large part of the video frame, and is in focus.
       - is flat, without reflections, surrounded by a wide white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even). Go to [calib.io](https://calib.io/pages/camera-calibration-pattern-generator) to generate a suitable checkerboard.
     - A common error is to specify the external, instead of the internal number of corners (one less than the count from calib.io). This may be one less than you would intuitively think. 
+    - Another common error is to take photos from the scene instead of extracting frames from a video. The photo image format is often different from the video one, which skew intrinsic calibration.
     
     <img src="Content/Calib_int.png" width="600">
 
