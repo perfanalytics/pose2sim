@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint on several OS with a several versions of Python
 # See: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Build on Win-MacOS-Ubuntu with Python 3.10-3.11
+name: Build on Win-MacOS-Ubuntu with Python 3.10-3.12
 
 on:
   push:
@@ -23,17 +23,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest, macos-13] # Mac ARM M1 vs Intel processors
-        python-version: ["3.10", "3.11"]
+        os: [ubuntu-latest, windows-latest, macos-latest] #, macos-13] # opensim not supported on macos Intel AMD x64 beyond python 3.11
+        python-version: ["3.10", "3.11", "3.12"]
         include:
           - os: ubuntu-latest
             cache-path: ~/.cache/pip
           - os: windows-latest
             cache-path: C:\Users\runneradmin\AppData\Local\pip\Cache
-          - os: macos-latest
+          - os: macos-latest #arm64
             cache-path: /Library/Caches/pip
-          - os: macos-13
-            cache-path: ~/Library/Caches/pip
+          # - os: macos-13 
+          #   cache-path: ~/Library/Caches/pip
 
     steps:
       - name: Checkout code

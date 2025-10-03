@@ -75,8 +75,8 @@ def trc_Zup_to_Yup_func(*args):
 
     # Y->Z, Z->Y
     cols = list(Q_coord.columns)
-    # cols = np.array([[cols[i*3+1],cols[i*3+2],cols[i*3]] for i in range(int(len(cols)/3))]).flatten() # X->Y, Y->Z, Z->X
-    cols = np.array([[cols[i*3],cols[i*3+2],cols[i*3+1]] for i in range(int(len(cols)/3))]).flatten() # Y->Z, Z->-Y
+    cols = np.array([[cols[i*3+1],cols[i*3+2],cols[i*3]] for i in range(int(len(cols)/3))]).flatten() # X->Y, Y->Z, Z->X
+    # cols = np.array([[cols[i*3],cols[i*3+2],cols[i*3+1]] for i in range(int(len(cols)/3))]).flatten() # Y->Z, Z->-Y
     Q_Yup = Q_coord[cols]
     # Q_Yup.iloc[:,2::3] = - Q_Yup.iloc[:,2::3]
 

@@ -31,6 +31,7 @@ import os
 import numpy as np
 import opensim as osim
 import argparse
+from scipy import signal
 
 #direction = 'zup' # 'zup' or 'yup'
 
@@ -48,10 +49,13 @@ __status__ = "Development"
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--input_mot_file', required = True, help='input .mot file')
-    parser.add_argument('-o', '--input_osim_file', required = True, help='input .osim file')
-    parser.add_argument('-c', '--csv_output_file', required = False, help='output csv file')
+    parser.add_argument('-m', '--input_mot_file', required=True, help='input .mot file')
+    parser.add_argument('-o', '--input_osim_file', required=True, help='input .osim file')
+    parser.add_argument('-c', '--csv_output_file', required=False, help='output csv file')
     parser.add_argument('-d', '--direction', required=False, help='vertical axis direction')
+    parser.add_argument('-v', '--calculate_com_vel', required=False, help='calculate center of mass velocity and return it')
+    parser.add_argument('-s', '--save_com_file', required=False, help='save a file that contains both CoM position and velocity')
+    parser.add_argument('-p', '--com_output_file', required=False, help='output CoM file path')
     args = vars(parser.parse_args())
     
     bodykin_from_mot_osim_func(args)
@@ -73,6 +77,8 @@ def bodykin_from_mot_osim_func(*args):
     try:
         motion_path = args[0]['input_mot_file'] # invoked with argparse
         osim_path = args[0]['input_osim_file']
+        calculate_com_vel = args[0]['calculate_com_vel']
+        save_com_file = args[0]['save_com_file']
         if args[0]['csv_output_file'] == None:
             output_csv_file = motion_path.replace('.mot', '.csv')
         else:
@@ -92,8 +98,26 @@ def bodykin_from_mot_osim_func(*args):
             direction = args[3]
         except:
             direction = 'zup'
-    
-    
+        try:
+            calculate_com_vel = args[4]
+        except:
+            calculate_com_vel = False
+        try:
+            save_com_file = args[5]
+        except:
+            save_com_file = False
+        try:
+            com_output_file = args[6]
+        except:
+            com_output_file = motion_path.replace('.mot', '_com.csv')
+
+    # if a user has requested to save the CoM data, without specifying to calculate it we can change that variable
+    if save_com_file == True and calculate_com_vel == False: calculate_com_vel = True
+
+    # pre-define the order and cut-off values for CoM filtering (we could give this as another argument if we think it's useful?)
+    CoM_order = 4
+    CoM_cutoff = 6.0
+
     # Read model and motion files
     model = osim.Model(osim_path)
     motion_data = osim.TimeSeriesTable(motion_path)
@@ -122,6 +146,10 @@ def bodykin_from_mot_osim_func(*args):
     # Motion: read coordinates and convert to radians
     times = motion_data.getIndependentColumn()
     motion_data_np = motion_data.getMatrix().to_numpy()
+
+    # pre allocate an array to store the CoM position at each frame
+    if calculate_com_vel: CoM_pos_array = np.zeros((motion_data_np.shape[0], 3))
+
     for i, c in enumerate(coordinateNames):
         if model_coordSet.get(c).getMotionType() == 1: # 1: rotation, 2: translation, 3: coupled
             if  motion_data.getTableMetaDataAsString('inDegrees') == 'yes':
@@ -145,7 +173,10 @@ def bodykin_from_mot_osim_func(*args):
                 pass
         # model.assemble(state)
         model.realizePosition(state) # much faster (IK already done, no need to compute it again)
-           
+
+        if calculate_com_vel:
+            CoM_pos_array[n, :] = model.calcMassCenterPosition(state).to_numpy()  # add the CoM position for this frame
+
         # Use state of model to get body coordinates in ground
         loc_rot_frame = []
         for b in bodies:
@@ -187,10 +218,29 @@ def bodykin_from_mot_osim_func(*args):
         if '_rot' in col:
             loc_rot_frame_all_np[:,n] = np.unwrap(loc_rot_frame_all_np[:,n],period=2*np.pi)
 
+    # calculate CoM velocity using the position and time data
+    if calculate_com_vel:
+
+        # filter the CoM position data before calculating the velocity as small noise can cause large spikes in the velocity
+        framerate = round(1 / np.diff(np.array(times)).mean(), 0)
+        b, a = signal.butter(CoM_order/2, CoM_cutoff/(0.5*framerate), 'low', analog=False)
+        CoM_pos_array = signal.filtfilt(b, a, CoM_pos_array, axis=0)
+
+        # calculate the velocity of the CoM using the numpy gradient function
+        CoM_vel_array = np.gradient(CoM_pos_array, np.array(times), axis=0)
+
+        if save_com_file:
+            # save the CoM position, velocity, and time to a file
+            com_data = np.hstack((np.array(times).reshape(-1, 1), CoM_pos_array, CoM_vel_array))
+            np.savetxt(com_output_file, com_data, delimiter=',', header='time,CoMx,CoMy,CoMz,CoMxVel,CoMyVel,CoMzVel')
+            print(f'CoM file saved to {com_output_file}.\n')
+
     # Export to csv
     np.savetxt(os.path.splitext(output_csv_file)[0]+'.csv', loc_rot_frame_all_np, delimiter=',', header=bodyHeader)
-    
     print(f'CSV file generated at {os.path.splitext(output_csv_file)[0]+".csv"}.\n')
+
+    if calculate_com_vel:
+        return CoM_pos_array, CoM_vel_array
     
 if __name__ == '__main__':
     main()

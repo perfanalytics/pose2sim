@@ -29,13 +29,14 @@ OUTPUTS:
 
 
 ## INIT
-from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort_key, zup2yup
+from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort_key, zup2yup, set_always_on_top
 
 import os
 import logging
 import pickle
 import numpy as np
 import pandas as pd
+np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 os.environ["OPENCV_LOG_LEVEL"]="FATAL"
 import cv2
 import glob
@@ -98,7 +99,7 @@ def calib_qca_fun(file_to_convert_path, binning_factor=1):
 
     R = [np.array(cv2.Rodrigues(r)[0]).flatten() for r in R]
     T = np.array(T)
-      
+
     return ret, C, S, D, K, R, T
 
     
@@ -304,7 +305,7 @@ def read_vicon(vicon_path):
         T += [[float(t)/1000 for t in trans]]
 
     # Camera names by natural order
-    C_vid_id = [v for v in vid_id if ('VIDEO' or 'Video') in root.findall('Camera')[v].attrib.get('TYPE')]
+    C_vid_id = [v for v in vid_id if 'video' in root.findall('Camera')[v].attrib.get('TYPE', '').lower()]
     C_vid = [root.findall('Camera')[v].attrib.get('DEVICEID') for v in C_vid_id]
     C = sorted(C_vid, key=natural_sort_key)
     C_id_sorted = [i for v_sorted in C for i,v in enumerate(root.findall('Camera')) if v.attrib.get('DEVICEID')==v_sorted]
@@ -666,12 +667,12 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
                 object_coords_3d[:, :2] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]].T.reshape(-1, 2)
                 object_coords_3d[:, :2] = object_coords_3d[:, 0:2] * extrinsics_square_size
             elif board_position == 'vertical':
-                object_coords_3d[:, 1:] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]][::-1].T.reshape(-1, 2)
-                object_coords_3d[:, 1:] = object_coords_3d[:, 1:] * extrinsics_square_size
+                object_coords_3d[:, [0,2]] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]][::-1].T.reshape(-1, 2)
+                object_coords_3d[:, [0,2]] = object_coords_3d[:, [0,2]] * extrinsics_square_size
             else:
                 logging.exception('board_position should be "horizontal" or "vertical".')
                 raise ValueError('board_position should be "horizontal" or "vertical".')
-
+            
         elif extrinsics_method == 'scene':
             object_coords_3d = np.array(extrinsics_config_dict.get('scene').get('object_coords_3d'), np.float32)
                 
@@ -711,7 +712,6 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
 
             elif extrinsics_method == 'scene':
                 imgp, objp = imgp_objp_visualizer_clicker(img, imgp=[], objp=object_coords_3d, img_path=img_vid_files[0])
-                # print(imgp, objp)
 
                 if len(imgp) == 0:
                     logging.exception('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
@@ -773,7 +773,6 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             ret.append(rms_px)
             R.append(r)
             T.append(t)
-            # print(r,t)
         
     elif extrinsics_method == 'keypoints':
         raise NotImplementedError('This has not been integrated yet.')
@@ -956,6 +955,8 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     ax_3d.view_init(elev=90, azim=-90)
                 else:
                     ax_3d.view_init(vertical_axis='z')
+                # Maintain 3D window on top
+                set_always_on_top(fig_3d)
                 fig_3d.show()
 
         if event.key == 'h':
@@ -1076,7 +1077,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                         fig_3d.canvas.draw()
                         count -= 1
                     # Enable event picking
-                    fig.canvas.callbacks.blocked = True
+                    fig.canvas.callbacks.blocked = True                                    
 
                 else:
                     # retrieve objp_confirmed and plot 3D
@@ -1115,13 +1116,15 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                         if count >= 0: 
                             count -= 1
                         # Remove last point from objp_confirmed_notok
-                        objp_confirmed_notok = []
+                        objp_confirmed_notok = objp_confirmed_notok[:-1]
                         # remove from plot  
                         if len(ax_3d.collections) > len(objp):
                             ax_3d.collections[-1].remove()
-                            fig_3d.canvas.draw()                
+                            fig_3d.canvas.draw()
+                
                 events = events[:-1]
 
+    
 
     def set_axes_equal(ax):
         '''

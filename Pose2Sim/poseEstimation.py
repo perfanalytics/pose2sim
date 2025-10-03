@@ -41,13 +41,21 @@ import ast
 from functools import partial
 from tqdm import tqdm
 from anytree.importer import DictImporter
+import numpy as np
+np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import cv2
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
+from rtmlib.tools.object_detection.post_processings import nms
 from deep_sort_realtime.deepsort_tracker import DeepSort
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort,\
-                        colors, thickness, draw_bounding_box, draw_keypts, draw_skel
+                        colors, thickness, draw_bounding_box, draw_keypts, draw_skel, bbox_xyxy_compute, \
+                        get_screen_size, calculate_display_size
 from Pose2Sim.skeletons import *
+
+# Not safe, but to be used until OpenMMLab/RTMlib's SSL certificates are updated
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 ## AUTHORSHIP INFORMATION
@@ -233,7 +241,10 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
         
     if display_detection:
-        cv2.namedWindow(f"Pose Estimation {os.path.basename(video_path)}", cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
+        screen_width, screen_height = get_screen_size()
+        display_width, display_height = calculate_display_size(W, H, screen_width, screen_height, margin=50)
+        cv2.namedWindow(f"Pose Estimation {os.path.basename(video_path)}", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(f"Pose Estimation {os.path.basename(video_path)}", display_width, display_height)
 
     frame_idx = 0
     cap = cv2.VideoCapture(video_path)
@@ -252,13 +263,21 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                 # Detect poses
                 keypoints, scores = pose_tracker(frame)
 
+                # Non maximum suppression (at pose level, not detection)
+                frame_shape = frame.shape
+                bboxes = bbox_xyxy_compute(frame_shape, keypoints, padding=0)
+                score_bboxes = np.array([np.mean(s) for s in scores])
+                keep = nms(bboxes, score_bboxes, nms_thr=0.45)
+                keypoints, scores = keypoints[keep], scores[keep]
+
                 # Track poses across frames
-                if multi_person:
-                    if tracking_mode == 'deepsort':
-                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
-                    if tracking_mode == 'sports2d': 
-                        if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                        prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+                if tracking_mode == 'deepsort':
+                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
+                if tracking_mode == 'sports2d': 
+                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+                else:
+                    pass
                     
                 # Save to json
                 if 'openpose' in output_format:
@@ -352,7 +371,10 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
 
     if display_detection:
+        screen_width, screen_height = get_screen_size()
+        display_width, display_height = calculate_display_size(W, H, screen_width, screen_height, margin=50)
         cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", display_width, display_height)
     
     f_range = [[0,len(image_files)] if frame_range in ('all', 'auto', []) else frame_range][0]
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
@@ -476,6 +498,7 @@ def estimate_pose_all(config_dict):
         deepsort_tracker = DeepSort(**deepsort_params)
     else:
         deepsort_tracker = None
+
     backend = config_dict['pose']['backend']
     device = config_dict['pose']['device']
 
@@ -562,7 +585,11 @@ def estimate_pose_all(config_dict):
                         det_class=det_class, det=det, det_input_size=det_input_size,
                         pose_class=pose_class, pose=pose, pose_input_size=pose_input_size,
                         backend=backend, device=device)
-            
+
+            if pose_class == 'RTMO' and model_name != 'COCO_17':
+                logging.warning("RTMO currently only supports 'Body' pose_model. Switching to 'Body'.")
+                pose_model = eval('COCO_17')
+
         except (json.JSONDecodeError, TypeError):
             logging.warning("\nInvalid mode. Must be 'lightweight', 'balanced', 'performance', or '''{dictionary}''' of parameters within triple quotes. Make sure input_sizes are within square brackets.")
             logging.warning('Using the default "balanced" mode.')
@@ -605,10 +632,16 @@ def estimate_pose_all(config_dict):
 
         else:
             # Process image folders
-            logging.info(f'Found image folders with {vid_img_extension} extension.')
-            image_folders = sorted([f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
-            for image_folder in image_folders:
-                pose_tracker.reset()
-                image_folder_path = os.path.join(video_dir, image_folder)
-                if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()                
-                process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
+            image_folders = sorted([os.path.join(video_dir,f) for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
+            empty_folders = [folder for folder in image_folders if len(glob.glob(os.path.join(folder, '*'+vid_img_extension)))==0]
+            if len(empty_folders) != 0:
+                raise NameError(f'No image files with {vid_img_extension} extension found in {empty_folders}.')
+            elif len(image_folders) == 0:
+                raise NameError(f'No image folders found in {video_dir}.')
+            else:
+                logging.info(f'Found image folders with {vid_img_extension} extension.')
+                for image_folder in image_folders:
+                    pose_tracker.reset()
+                    image_folder_path = os.path.join(video_dir, image_folder)
+                    if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()                
+                    process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
