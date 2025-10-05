@@ -1,0 +1,274 @@
+###############################################################################
+## SPORTS2D PROJECT PARAMETERS                                               ##
+###############################################################################
+
+# Configure your project parameters here
+
+# Then open an Anaconda prompt and enter:
+# conda activate Sports2D
+# ipython
+# from Sports2D import Sports2D
+# Sports2D.process('Config_demo.toml')
+
+
+[base]
+video_input = 'demo.mp4'   # 'webcam' or '<video_path.ext>', or ['video1_path.mp4', 'video2_path.avi>', ...]
+                           # On Windows, replace '\' with '/'
+                           # Beware that images won't be saved if paths contain non ASCII characters.
+
+nb_persons_to_detect = 'all'   # int or 'all' # Limiting or not the number of persons to be analyzed
+person_ordering_method = 'on_click' # 'on_click', 'highest_likelihood', 'largest_size', 'smallest_size',  'greatest_displacement', 'least_displacement', 'first_detected', or 'last_detected'
+first_person_height = 1.65  # Height of the reference person in meters (for pixels -> meters conversion: not used if a calibration file is provided)
+visible_side = ['auto', 'front', 'none']  # Choose visible side among ['right', 'left', 'front', 'back', 'auto', 'none']. String or list of strings.
+                  # if 'auto', will be either 'left', 'right', or 'front' depending on the direction of the motion
+                  # if 'none', coordinates will be left in 2D rather than 3D
+
+load_trc_px = ''  # If you do not want to recalculate pose, load it from a trc file (in px, not in m)
+compare = false   # Not implemented yet
+
+# Video parameters
+time_range = []   # [] for the whole video, or [start_time, end_time] (in seconds), or [[start_time1, end_time1], [start_time2, end_time2], ...]
+                  # Time ranges can be different for each video. 
+video_dir = ''    # If empty, video dir is current dir
+
+# Webcam parameters
+webcam_id = 0 # your webcam id (0 is default)
+input_size = [1280, 720] # [W, H]. Lower resolution will be faster but less precise.
+
+show_realtime_results = true
+save_vid = true
+save_img = true
+save_pose = true
+calculate_angles = true
+save_angles = true
+result_dir = '' # If empty, project dir is current dir
+
+
+##########################
+# ADVANCED CONFIGURATION #
+##########################
+[pose]
+# Slow motion factor
+slowmo_factor = 1       # 1 for normal speed. For a video recorded at 240 fps and exported to 30 fps, it would be 240/30 = 8
+
+# Pose detection parameters
+pose_model = 'Body_with_feet'  #With RTMLib: 
+                         # - Body_with_feet (default HALPE_26 model), 
+                         # - Whole_body_wrist (COCO_133_WRIST: body + feet + 2 hand_points), 
+                         # - Whole_body (COCO_133: body + feet + hands), 
+                         # - Body (COCO_17). Marker augmentation won't work, Kinematic analysis will work,
+                         # - Hand (HAND_21, only lightweight mode. Potentially better results with Whole_body), 
+                         # - Face (FACE_106), 
+                         # - Animal (ANIMAL2D_17)
+                         # ⚠ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the output files if needed
+                         # ⚠ For Face and Animal, use mode="""{dictionary}""", and find the corresponding .onnx model there https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose
+mode = 'balanced' # 'lightweight', 'balanced', 'performance', or """{dictionary}""" (see below)
+
+# A dictionary (WITHIN THREE DOUBLE QUOTES) allows you to manually select the person detection (if top_down approach) and/or pose estimation models (see https://github.com/Tau-J/rtmlib). 
+# Models can be local paths or URLs.
+# Make sure the input_sizes are within square brackets, and that they are in the opposite order from the one in the model path (for example, it would be [192,256] for rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip). 
+# If your pose_model is not provided in skeletons.py, you may have to create your own one (see example at the end of the file).
+# Example, equivalent to mode='balanced':
+# mode = """{'det_class':'YOLOX',
+#          'det_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/yolox_m_8xb8-300e_humanart-c2c7a14a.zip',
+#          'det_input_size':[640, 640],
+#          'pose_class':'RTMPose',
+#          'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip',
+#          'pose_input_size':[192,256]}"""
+# Example with one-stage RTMO model (Requires pose_model = 'Body'):
+# mode = """{'pose_class':'RTMO', 
+#          'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.zip', 
+#          'pose_input_size':[640, 640]}"""
+# Example with animal pose estimation:
+# mode = """{'pose_class':'RTMPose',
+#          'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.zip',
+#          'pose_input_size':[256,256]}"""
+
+det_frequency = 4       # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
+                        # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
+device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
+backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
+tracking_mode = 'sports2d' # 'sports2d' or 'deepsort'. 'deepsort' is slower, harder to parametrize but can be more robust if correctly tuned
+# deepsort_params = """{'max_age':30, 'n_init':3, 'max_cosine_distance':0.3, 'max_iou_distance':0.8, 'embedder_gpu': True, embedder':'torchreid'}""" # """{dictionary between 3 double quotes}"""
+                  # More robust in crowded scenes but tricky to parametrize. More information there: https://github.com/levan92/deep_sort_realtime/blob/master/deep_sort_realtime/deepsort_tracker.py#L51
+                  # Requires `pip install torch torchvision torchreid gdown tensorboard`
+
+# Processing parameters
+keypoint_likelihood_threshold = 0.3 # Keypoints whose likelihood is lower will not be taken into account
+average_likelihood_threshold = 0.5  # Person will be ignored if average likelihood of good keypoints is lower than this value
+keypoint_number_threshold = 0.3     # Person will be ignored if the number of good keypoints (above keypoint_likelihood_threshold) is less than this fraction
+
+
+[px_to_meters_conversion]
+# Pixel to meters conversion
+to_meters = true
+make_c3d = true
+save_calib = false
+
+# If conversion from first_person_height
+floor_angle = 'auto'    # 'auto' or a value in degrees, eg 2.3. If 'auto', estimated from the line formed by the toes when they are on the ground (where speed = 0)
+xy_origin = ['auto']    # ['auto'] or [px_x,px_y]. N.B.: px_y points downwards. If ['auto'], direction estimated from the start to the end of the line formed by the toes when they are on the ground
+
+# If conversion from a calibration file
+calib_file = ''         # Calibration in the Pose2Sim format. 'calib_demo.toml', or '' if not available
+
+
+[angles]
+display_angle_values_on = ['body', 'list'] # 'body', 'list', ['body', 'list'], 'none'. Display angle values on the body, as a list in the upper left of the image, both, or do not display them.
+fontSize = 0.3
+
+# Select joint angles among
+# ['Right ankle', 'Left ankle', 'Right knee', 'Left knee', 'Right hip', 'Left hip', 'Right shoulder', 'Left shoulder', 'Right elbow', 'Left elbow', 'Right wrist', 'Left wrist']
+joint_angles = ['Right ankle', 'Left ankle', 'Right knee', 'Left knee', 'Right hip', 'Left hip', 'Right shoulder', 'Left shoulder', 'Right elbow', 'Left elbow', 'Right wrist', 'Left wrist']
+# Select segment angles among
+# ['Right foot', 'Left foot', 'Right shank', 'Left shank', 'Right thigh', 'Left thigh', 'Pelvis', 'Trunk', 'Shoulders', 'Head', 'Right arm', 'Left arm', 'Right forearm', 'Left forearm']
+segment_angles = ['Right foot', 'Left foot', 'Right shank', 'Left shank', 'Right thigh', 'Left thigh', 'Pelvis', 'Trunk', 'Shoulders', 'Head', 'Right arm', 'Left arm', 'Right forearm', 'Left forearm']
+
+# Processing parameters
+flip_left_right = true  # Same angles whether the participant faces left/right. Set it to false if you want timeseries to be continuous even when the participant switches their stance.
+correct_segment_angles_with_floor_angle = true # If the camera is tilted, corrects segment angles as regards to the floor angle. Set to false if it is the floor which is actually tilted
+
+
+[post-processing]
+interpolate = true
+interp_gap_smaller_than = 10        # do not interpolate bigger gaps
+fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
+sections_to_keep = 'all' # 'all', 'largest', 'first', 'last'
+                        # keep 'all' valid sections even when they are interspersed with undetected chunks, or the 'largest' valid section, or the 'first' one, or the 'last' one
+reject_outliers = true      # Hampel filter for outlier rejection before other filtering methods. Rejects outliers that are outside of a 95% confidence interal from the median in a sliding window of size 7.
+
+filter = true
+show_graphs = true         # Show plots of raw and processed results
+save_graphs = true         # Save position and angle plots of raw and processed results
+filter_type = 'butterworth'     # butterworth, kalman, gcv_spline, gaussian, loess, median, butterworth_on_speed
+   
+   # Most intuitive and standard filter in biomechanics
+   [post-processing.butterworth]
+   cut_off_frequency = 6 # Hz # Will be divided by slowmo_factor to be equivalent to non slowed-down video
+   order = 4 
+
+   # Used in countless applications, this one is a simplified Kalman filter 
+   [post-processing.kalman]
+   # How much more do you trust triangulation results (measurements), than the assumption of constant acceleration(process)?
+   trust_ratio = 500 # = measurement_trust/process_trust ~= process_noise/measurement_noise
+   smooth = true # should be true, unless you need real-time filtering
+
+   # Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips).
+   [post-processing.gcv_spline]
+   gcv_cut_off_frequency = 'auto' # 'auto' or int # If int, behaves like a Butterworth filter. 'auto' is usually better, unless the signal is too short (noise can then be considered as signal -> trajectories not filtered)
+   gcv_smoothing_factor = 0.1 # >=0, ignored if cut_off_frequency != 'auto'. Biases results towards more smoothing (>1) or more fidelity to data (<1) 
+
+   [post-processing.loess]
+   nb_values_used = 5 # = fraction of data used * nb frames
+   [post-processing.gaussian]
+   sigma_kernel = 1 #px
+   [post-processing.median]
+   kernel_size = 3
+   [post-processing.butterworth_on_speed]
+   order = 4 
+   cut_off_frequency = 10 # Hz
+
+
+[kinematics]
+do_ik = false # Do scaling and inverse kinematics?
+use_augmentation = false  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
+feet_on_floor = false # true or false (lowercase) # Set to false if you want to use the model with feet not on the floor (e.g. running, jumping, etc.)
+use_simple_model = false # true or false # IK 10+ times faster, but no muscles or flexible spine, no patella
+participant_mass = [55.0, 67.0] # kg # defaults to 70 if not provided. No influence on kinematics (motion), only on kinetics (forces)
+right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)
+
+# Choosing best frames to scale the model
+default_height = 1.7 # meters # If automatic height calculation did not work, this value is used to scale the model
+fastest_frames_to_remove_percent = 0.1 # Frames with high speed are considered as outliers
+close_to_zero_speed_px = 50 # Sum for all keypoints: about 50 px/frame
+close_to_zero_speed_m = 0.2 # Sum for all keypoints: 0.2 m/frame
+large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
+trimmed_extrema_percent = 0.5 # Proportion of the most extreme segment values to remove before calculating their mean)
+remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
+remove_individual_ik_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
+
+
+[logging]
+use_custom_logging = false # if integrated in an API that already has logging
+
+
+
+# CUSTOM skeleton
+# If you use a model with different keypoints and/or different ordering
+# Useful if you trained your own model, from DeepLabCut or MMPose for example. 
+# Make sure the ids are set in the right order and start from zero.
+# 
+# If you want to perform inverse kinematics, you will also need to create an OpenSim model
+# and add to its markerset the location where you expect the triangulated keypoints to be detected.
+# 
+# In this example, CUSTOM reproduces the HALPE_26 skeleton (default skeletons are stored in skeletons.py).
+# You can create as many custom skeletons as you want, just add them further down and rename them.
+# 
+# Check your model hierarchy with:  for pre, _, node in RenderTree(model): 
+#                                      print(f'{pre}{node.name} id={node.id}')
+[pose.CUSTOM]
+name = "Hip"
+id = 19
+  [[pose.CUSTOM.children]]
+  name = "RHip"
+  id = 12
+     [[pose.CUSTOM.children.children]]
+     name = "RKnee"
+     id = 14
+        [[pose.CUSTOM.children.children.children]]
+        name = "RAnkle"
+        id = 16
+           [[pose.CUSTOM.children.children.children.children]]
+           name = "RBigToe"
+           id = 21
+              [[pose.CUSTOM.children.children.children.children.children]]
+              name = "RSmallToe"
+              id = 23
+           [[pose.CUSTOM.children.children.children.children]]
+           name = "RHeel"
+           id = 25
+  [[pose.CUSTOM.children]]
+  name = "LHip"
+  id = 11
+     [[pose.CUSTOM.children.children]]
+     name = "LKnee"
+     id = 13
+        [[pose.CUSTOM.children.children.children]]
+        name = "LAnkle"
+        id = 15
+           [[pose.CUSTOM.children.children.children.children]]
+           name = "LBigToe"
+           id = 20
+              [[pose.CUSTOM.children.children.children.children.children]]
+              name = "LSmallToe"
+              id = 22
+           [[pose.CUSTOM.children.children.children.children]]
+           name = "LHeel"
+           id = 24
+  [[pose.CUSTOM.children]]
+  name = "Neck"
+  id = 18
+     [[pose.CUSTOM.children.children]]
+     name = "Head"
+     id = 17
+        [[pose.CUSTOM.children.children.children]]
+        name = "Nose"
+        id = 0
+     [[pose.CUSTOM.children.children]]
+     name = "RShoulder"
+     id = 6
+        [[pose.CUSTOM.children.children.children]]
+        name = "RElbow"
+        id = 8
+           [[pose.CUSTOM.children.children.children.children]]
+           name = "RWrist"
+           id = 10
+     [[pose.CUSTOM.children.children]]
+     name = "LShoulder"
+     id = 5
+        [[pose.CUSTOM.children.children.children]]
+        name = "LElbow"
+        id = 7
+           [[pose.CUSTOM.children.children.children.children]]
+           name = "LWrist"
+           id = 9

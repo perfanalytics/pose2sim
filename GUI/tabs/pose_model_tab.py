@@ -49,7 +49,7 @@ class PoseModelTab:
             'pose': {
                 'pose_model': self.pose_model_var.get(),
                 'mode': self.mode_var.get(),
-                'tracking_mode': self.tracking_mode_var.get(),  # Added tracking mode setting
+                'tracking_mode': self.tracking_mode_var.get(),
                 'vid_img_extension': self.video_extension_var.get()
             },
             'project': {
@@ -57,26 +57,36 @@ class PoseModelTab:
             }
         }
         
-        # Add participant details
-        if self.multiple_persons_var.get() == 'single':
-            settings['project']['participant_height'] = float(self.participant_height_var.get())
-            settings['project']['participant_mass'] = float(self.participant_mass_var.get())
-        else:
-            settings['project']['participant_height'] = self.participant_heights
-            settings['project']['participant_mass'] = self.participant_masses
+        # Add participant details for 3D mode
+        if not self.simplified:
+            if self.multiple_persons_var.get() == 'single':
+                settings['project']['participant_height'] = float(self.participant_height_var.get())
+                settings['project']['participant_mass'] = float(self.participant_mass_var.get())
+            else:
+                settings['project']['participant_height'] = self.participant_heights
+                settings['project']['participant_mass'] = self.participant_masses
         
         # Add 2D-specific settings
         if self.simplified:
+            # CRITICAL FIX: Use 'base' section for 2D settings, not 'project'
+            if 'base' not in settings:
+                settings['base'] = {}
+            
             # Handle different video input types for 2D mode
             if self.video_input_type_var.get() == 'webcam':
-                settings['project']['video_input'] = 'webcam'
+                settings['base']['video_input'] = 'webcam'
             elif self.video_input_type_var.get() == 'multiple' and self.multiple_videos_list:
-                settings['project']['video_input'] = self.multiple_videos_list
+                settings['base']['video_input'] = self.multiple_videos_list
             else:
-                settings['project']['video_input'] = self.video_input_var.get()
-                
-            settings['project']['visible_side'] = self.visible_side_var.get()
+                settings['base']['video_input'] = self.video_input_var.get()
+            
+            settings['base']['visible_side'] = self.visible_side_var.get()
+            settings['base']['first_person_height'] = float(self.participant_height_var.get())
+            
+            # DEBUG: Print what we're returning
+            print(f"DEBUG pose_model get_settings: video_input = {settings['base']['video_input']}")
         
+        # CRITICAL FIX: Actually return the settings!
         return settings
     
     def build_ui(self):
@@ -876,7 +886,7 @@ class PoseModelTab:
                     "Trial Selection",
                     f"Enter trial number (1-{self.app.num_trials}):",
                     minvalue=1,
-                maxvalue=self.app.num_trials
+                    maxvalue=self.app.num_trials
                 )
                 
                 if not trial_num:

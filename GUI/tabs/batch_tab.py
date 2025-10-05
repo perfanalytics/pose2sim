@@ -1,9 +1,7 @@
-import os
-import tkinter as tk
+from pathlib import Path
 import customtkinter as ctk
 from tkinter import messagebox
-import tomlkit
-from tomlkit import parse, dumps
+import toml
 
 class BatchTab:
     def __init__(self, parent, app):
@@ -81,9 +79,9 @@ class BatchTab:
             ).pack(anchor='w', padx=15, pady=(15, 5))
             
             # Status indicator - check if config file exists
-            config_path = os.path.join(self.app.participant_name, f'Trial_{i}', 'Config.toml')
-            status = "○ Not configured" if not os.path.exists(config_path) else "● Configured"
-            status_color = "gray" if not os.path.exists(config_path) else "green"
+            config_path = Path(self.app.participant_name) / f'Trial_{i}' / 'Config.toml'
+            status = "○ Not configured" if not config_path.exist() else "● Configured"
+            status_color = "gray" if not config_path.exists() else "green"
             
             status_frame = ctk.CTkFrame(frame, fg_color="transparent")
             status_frame.pack(fill='x', padx=15, pady=5)
@@ -123,17 +121,15 @@ class BatchTab:
         scroll_frame.pack(fill='both', expand=True)
         
         # Load trial configuration
-        config_path = os.path.join(self.app.participant_name, f'Trial_{trial_number}', 'Config.toml')
+        config_path = Path(self.app.participant_name) / f'Trial_{trial_number}' / 'Config.toml'
         try:
-            if os.path.exists(config_path):
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = parse(f.read())
+            if config_path.exists():
+                config = toml.load(config_path)
             else:
                 # Use parent config as base
-                parent_config_path = os.path.join(self.app.participant_name, 'Config.toml')
-                if os.path.exists(parent_config_path):
-                    with open(parent_config_path, 'r', encoding='utf-8') as f:
-                        config = parse(f.read())
+                parent_config_path = Path(self.app.participant_name) / 'Config.toml'
+                if parent_config_path.exists():
+                    config = toml.load(parent_config_path)
                 else:
                     # Create a new config
                     config = {}
@@ -262,7 +258,8 @@ class BatchTab:
         """Save trial-specific configuration"""
         try:
             # Ensure the directories exist
-            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            config_path = Path(config_path)
+            config_path.parent.mkdir(parents=True, exist_ok=True)
             
             # Update config with new values
             for setting_name, (var, input_type) in settings_vars.items():
@@ -294,7 +291,7 @@ class BatchTab:
             
             # Write the updated config
             with open(config_path, 'w', encoding='utf-8') as f:
-                f.write(dumps(config))
+                toml.dump(config, f)
             
             messagebox.showinfo("Success", f"Configuration for Trial_{trial_number} has been saved successfully!")
             

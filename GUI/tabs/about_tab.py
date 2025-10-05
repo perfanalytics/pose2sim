@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 import requests
 import threading
 import tkinter as tk
@@ -10,7 +10,7 @@ import re
 import time
 import json
 import traceback
-from PIL import Image, ImageTk
+from PIL import Image
 
 class AboutTab:
     def __init__(self, parent, app):
@@ -175,10 +175,9 @@ class AboutTab:
         left_frame.pack(side='left', fill='y')
         
         # Try to load logo image
-        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "pose2sim_logo.png")
-        
+        logo_path = Path(__file__).parent.parent / "assets" / "pose2sim_logo.png"
         try:
-            if os.path.exists(logo_path):
+            if logo_path.exists():
                 logo_img = Image.open(logo_path)
                 logo_img = logo_img.resize((100, 100), Image.LANCZOS)
                 logo = ctk.CTkImage(light_image=logo_img, dark_image=logo_img, size=(100, 100))
@@ -764,15 +763,15 @@ class AboutTab:
         """Fetch citation data for the papers using DOIs"""
         try:
             # Cache file path for citation data
-            cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cache")
-            os.makedirs(cache_dir, exist_ok=True)
-            cache_file = os.path.join(cache_dir, "citation_data.json")
+            cache_dir = Path(__file__).parent.parent / "cache"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            cache_file = cache_dir / "citation_data.json"
             
             # Check if cache exists and not older than 1 day
             cache_valid = False
-            if os.path.exists(cache_file):
+            if cache_file.exists():
                 try:
-                    file_mod_time = os.path.getmtime(cache_file)
+                    file_mod_time = cache_file.stat().st_mtime
                     if (time.time() - file_mod_time) < 86400:  # 24 hours
                         with open(cache_file, 'r') as f:
                             self.citation_data = json.load(f)
@@ -965,13 +964,10 @@ class AboutTab:
     def refresh_citation_data(self):
         """Force refresh of citation data"""
         # Delete cache if it exists
-        cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cache")
-        cache_file = os.path.join(cache_dir, "citation_data.json")
-        if os.path.exists(cache_file):
-            try:
-                os.remove(cache_file)
-            except:
-                pass
+        cache_dir = Path(__file__).parent.parent / "cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / "citation_data.json"
+        if cache_file.exists(): cache_file.unlink()
         
         # Reset citation data
         self.citation_data = {}
