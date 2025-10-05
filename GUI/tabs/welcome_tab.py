@@ -1,4 +1,6 @@
+import tkinter as tk
 import customtkinter as ctk
+from tkinter import simpledialog
 
 class WelcomeTab:
     def __init__(self, parent, app):

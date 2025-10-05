@@ -1,11 +1,13 @@
-from pathlib import Path
+import os
 import cv2
+import tkinter as tk
 import customtkinter as ctk
-from tkinter import messagebox
+from tkinter import filedialog, messagebox
 import threading
 import subprocess
 from PIL import Image
 from customtkinter import CTkImage
+import shutil
 
 class PrepareVideoTab:
     def __init__(self, parent, app):
@@ -383,10 +385,10 @@ class PrepareVideoTab:
         """Launch the external blur.py editor"""
         try:
             # Path to the blur.py script (in the same directory as the app)
-            script_path = Path(__file__).parent.parent / "blur.py"
+            script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "blur.py")
             
             # Check if the file exists
-            if not script_path.exists():
+            if not os.path.exists(script_path):
                 self.update_status("Error: blur.py not found in the application directory", "red")
                 return
             
@@ -443,9 +445,12 @@ class PrepareVideoTab:
     def extract_frames(self, time_interval):
         """Extract frames from videos at given time intervals"""
         # Determine the base path based on app mode
-        base_path = Path(self.app.participant_name) / 'calibration' / 'intrinsics'
+        if self.app.process_mode == 'batch':
+            base_path = os.path.join(self.app.participant_name, 'calibration', 'intrinsics')
+        else:
+            base_path = os.path.join(self.app.participant_name, 'calibration', 'intrinsics')
         
-        if not base_path.exists():
+        if not os.path.exists(base_path):
             self.update_status(f"Error: Directory '{base_path}' does not exist.", "red")
             self.proceed_button.configure(state='normal')
             return
@@ -454,7 +459,11 @@ class PrepareVideoTab:
         extracted_images = []
         
         # Collect all video files
-        video_files = [file for file in base_path.rglob('*') if file.suffix.lower() in video_extensions]
+        video_files = []
+        for root, _, files in os.walk(base_path):
+            for file in files:
+                if file.lower().endswith(video_extensions):
+                    video_files.append(os.path.join(root, file))
         
         total_videos = len(video_files)
         
@@ -477,7 +486,7 @@ class PrepareVideoTab:
             self.update_status(f"Processing {total_videos} videos...", "blue")
             
             for idx, video_path in enumerate(video_files):
-                video_dir = video_path.parent
+                video_dir = os.path.dirname(video_path)
                 cap = cv2.VideoCapture(video_path)
                 
                 if not cap.isOpened():
@@ -497,8 +506,8 @@ class PrepareVideoTab:
                         break
                     
                     if frame_count % interval_frames == 0:
-                        image_name = f"{Path(video_path).stem}_frame{frame_count}.png"
-                        save_path = video_dir  / image_name
+                        image_name = f"{os.path.splitext(os.path.basename(video_path))[0]}_frame{frame_count}.png"
+                        save_path = os.path.join(video_dir, image_name)
                         cv2.imwrite(save_path, frame)
                         extracted_images.append(save_path)
                     
@@ -542,7 +551,7 @@ class PrepareVideoTab:
         images_by_camera = {}
         
         for img_path in image_paths:
-            camera_dir = Path(img_path).parent.name
+            camera_dir = os.path.basename(os.path.dirname(img_path))
             if camera_dir not in images_by_camera:
                 images_by_camera[camera_dir] = []
             images_by_camera[camera_dir].append(img_path)
@@ -621,7 +630,7 @@ class PrepareVideoTab:
                 # Add filename below image
                 ctk.CTkLabel(
                     img_frame,
-                    text=img_path.name,
+                    text=os.path.basename(img_path),
                     font=("Helvetica", 10),
                     wraplength=200
                 ).pack(pady=(0, 5))
@@ -654,7 +663,7 @@ class PrepareVideoTab:
             
             for img_path in to_delete:
                 try:
-                    img_path.unlink()  # Delete the image file
+                    os.remove(img_path)
                     print(f"Deleted {img_path}")
                 except Exception as e:
                     print(f"Failed to delete {img_path}: {e}")

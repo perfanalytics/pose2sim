@@ -83,7 +83,7 @@ class LanguageManager:
                 'activation_tab': "Activation",
                 'launch_options': "Choose how you want to launch Pose2Sim:",
                 'launch_cmd': "Launch with CMD",
-                'launch_conda': "Run analysis", #"Launch with Anaconda Prompt",
+                'launch_conda': "Launch with Anaconda Prompt",
                 'launch_powershell': "Launch with PowerShell",
                 
                 # Batch tab
@@ -173,7 +173,7 @@ class LanguageManager:
                 'activation_tab': "Activation",
                 'launch_options': "Choisissez comment lancer Pose2Sim :",
                 'launch_cmd': "Lancer avec CMD",
-                'launch_conda': "Lancer l'analyse", #"Lancer avec Anaconda Prompt",
+                'launch_conda': "Lancer avec Anaconda Prompt",
                 'launch_powershell': "Lancer avec PowerShell",
                 
                 # Batch tab

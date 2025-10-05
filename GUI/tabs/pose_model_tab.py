@@ -1,4 +1,6 @@
-from pathlib import Path
+import os
+import shutil
+import tkinter as tk
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, simpledialog
 
@@ -285,7 +287,7 @@ class PoseModelTab:
             video_frame.pack(fill='x', pady=2)
             
             # Show just the filename to save space
-            filename = Path(video_path).name
+            filename = os.path.basename(video_path)
             ctk.CTkLabel(
                 video_frame,
                 text=f"{i+1}. {filename}",
@@ -816,18 +818,17 @@ class PoseModelTab:
                         return
                     
                     # Copy video to participant directory if not already there
-                    dest_dir = Path(self.app.participant_name)
-                    dest_dir.mkdir(parents=True, exist_ok=True)
+                    dest_dir = os.path.join(self.app.participant_name)
+                    os.makedirs(dest_dir, exist_ok=True)
                     
                     # Check if file needs to be copied
-                    if not Path(self.video_input_var.get()).parent == dest_dir:
+                    if not os.path.dirname(self.video_input_var.get()) == dest_dir:
                         # Get just the filename (preserve the same name for config)
-                        filename = Path(self.video_input_var.get()).name
-                        dest_path = dest_dir / filename
+                        filename = os.path.basename(self.video_input_var.get())
+                        dest_path = os.path.join(dest_dir, filename)
                         
                         # Copy the file
-                        if dest_path.exists(): dest_path.unlink()
-                        dest_path.symlink_to(self.video_input_var.get())
+                        shutil.copy(self.video_input_var.get(), dest_path)
                         
                         # Update the path to only the filename for config_demo.toml
                         self.video_input_var.set(filename)
@@ -881,16 +882,19 @@ class PoseModelTab:
                 if not trial_num:
                     return False
                 
-                target_path = Path(self.app.participant_name) / f'Trial_{trial_num}' / 'videos'
+                target_path = os.path.join(self.app.participant_name, f'Trial_{trial_num}', 'videos')
             else:
                 # For single mode
-                target_path = Path(self.app.participant_name) / 'videos'
+                target_path = os.path.join(self.app.participant_name, 'videos')
             
             # Create the directory if it doesn't exist
-            target_path.mkdir(parents=True, exist_ok=True)
+            os.makedirs(target_path, exist_ok=True)
             
             # Check for existing videos
-            existing_videos = [file.name for file in target_path.glob(self.video_extension_var.get())]
+            existing_videos = [
+                f for f in os.listdir(target_path) 
+                if f.endswith(self.video_extension_var.get())
+            ]
             
             if existing_videos:
                 response = messagebox.askyesno(
@@ -902,7 +906,7 @@ class PoseModelTab:
                     # Delete existing videos
                     for video in existing_videos:
                         try:
-                            (target_path / video).unlink()
+                            os.remove(os.path.join(target_path, video))
                         except Exception as e:
                             messagebox.showerror(
                                 "Error",
@@ -929,11 +933,10 @@ class PoseModelTab:
                 
                 # Copy and rename the file
                 dest_filename = f"cam{cam}.{self.video_extension_var.get()}"
-                dest_path = target_path / dest_filename
+                dest_path = os.path.join(target_path, dest_filename)
                 
                 # Copy the file
-                if dest_path.exists(): dest_path.unlink()
-                dest_path.symlink_to(file_path)
+                shutil.copy(file_path, dest_path)
             
             # Show completion message
             messagebox.showinfo(

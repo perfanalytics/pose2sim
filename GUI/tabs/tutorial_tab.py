@@ -1,11 +1,13 @@
-from pathlib import Path
+import os
 import sys
+import tkinter as tk
 import customtkinter as ctk
 from tkinter import messagebox
 import subprocess
 import threading
 import webbrowser
-from PIL import Image
+import cv2
+from PIL import Image, ImageTk
 
 class TutorialTab:
     def __init__(self, parent, app):
@@ -16,7 +18,7 @@ class TutorialTab:
         self.frame = ctk.CTkFrame(parent)
         
         # Initialize variables
-        self.marker_file = Path(__file__).parent.parent / "tutorial_completed"
+        self.marker_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tutorial_completed")
         
         # Video links
         self.video_links = {
@@ -113,8 +115,9 @@ class TutorialTab:
         self.tutorial_img_frame.pack(fill='x', pady=10)
         
         # Load a placeholder image or tutorial screenshot if available
-        tutorial_img_path = Path(__file__).parent.parent / "assets" / "tutorial_preview.png"
-        if tutorial_img_path.exists():
+        tutorial_img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "tutorial_preview.png")
+        
+        if os.path.exists(tutorial_img_path):
             try:
                 # Load and display image
                 img = Image.open(tutorial_img_path)
@@ -260,7 +263,7 @@ class TutorialTab:
     
     def check_tutorial_status(self):
         """Check if the tutorial has been completed before"""
-        if Path(self.marker_file).exists():
+        if os.path.exists(self.marker_file):
             # Tutorial has been completed before, only show skip button
             self.complete_button.pack_forget()
         else:
@@ -535,7 +538,7 @@ class TutorialTab:
                 
             except Exception as e:
                 # Show error
-                self.frame.after(0, lambda e=e: status_label.configure(
+                self.frame.after(0, lambda: status_label.configure(
                     text=f"Error: {str(e)}",
                     text_color="#F44336"
                 ))
