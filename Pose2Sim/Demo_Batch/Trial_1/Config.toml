@@ -81,7 +81,7 @@
 # device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 # backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
 
-# tracking_mode = 'sports2d' # 'sports2d' or 'deepsort'. 'deepsort' is slower but more robust in difficult configurations
+# tracking_mode = 'sports2d' # 'none', 'sports2d' or 'deepsort'. 'deepsort' is slower but more robust in difficult configurations
 # deepsort_params = """{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8}""" # """{dictionary between 3 double quotes}"""
 #                   # More robust in crowded scenes but Can be tricky to parametrize. More information there: https://github.com/levan92/deep_sort_realtime/blob/master/deep_sort_realtime/deepsort_tracker.py#L51
 #                   # Note: For faster and more robust tracking, use {'embedder_gpu': True, embedder':'torchreid'}, which uses the GPU and runs osnet_ain_x1_0 by default. requires `pip install torch torchvision torchreid gdown tensorboard`
@@ -95,6 +95,8 @@
 # [synchronization]
 # synchronization_gui = false # true or false. If true, a player will popup and let the user determine synchronization parameters. If false, it will be done automatically based on the parameters below
 # display_sync_plots = true # true or false (lowercase)
+# save_sync_plots = true # true or false (lowercase) # save synchronization plots
+
 # keypoints_to_consider = 'all' # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least
                            # # ['RWrist', 'RElbow'] list of keypoint names if you want to specify keypoints with a sharp vertical motion.
 # approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
@@ -144,7 +146,7 @@
 
          # [calibration.calculate.extrinsics.board]
          # show_reprojection_error = true # true or false (lowercase)
-		   # board_position = 'vertical' # 'vertical' or 'horizontal'
+         # board_position = 'vertical' # 'vertical' or 'horizontal'
          # extrinsics_extension = 'png' # any video or image extension
          # extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
          # extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
@@ -185,50 +187,66 @@
 # reproj_error_threshold_triangulation = 15 # px
 # likelihood_threshold_triangulation= 0.3
 # min_cameras_for_triangulation = 2
+# interp_if_gap_smaller_than = 20 # do not interpolate larger gaps
+
 # interpolation = 'linear' #linear, slinear, quadratic, cubic, or none
-                        # # 'none' if you don't want to interpolate missing points
-# interp_if_gap_smaller_than = 10 # do not interpolate bigger gaps
+#                         # 'none' if you don't want to interpolate missing points
+# remove_incomplete_frames = false # true or false (lowercase) # If true, if any keypoint cannot be triangulated, the full time frame is removed
+# sections_to_keep = 'all' # 'all', 'largest', 'first', 'last'
+#                         # keep 'all' valid sections even when they are interspersed with untriangulated chunks, or the 'largest' valid section, or the 'first' one, or the 'last' one
 # fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
+
 # show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
-# handle_LR_swap = false # Better if few cameras (eg less than 4) with risk of limb swapping (eg camera facing sagittal plane), otherwise slightly less accurate and slower
-# undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
 # make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
 # [filtering]
-# type = 'butterworth' # butterworth, kalman, gaussian, LOESS, median, butterworth_on_speed
-# display_figures = false # true or false (lowercase) 
+# reject_outliers = true      # Hampel filter for outlier rejection before other filtering methods. Can be slow. Rejects outliers that are outside of a 95% confidence interal from the median in a sliding window of size 7.
+# filter = true               # Proceed to further filtering after outlier rejection.
+# type = 'butterworth' # butterworth, gvc_spline, kalman, gaussian, LOESS, median, butterworth_on_speed
+
+# display_figures = true # true or false (lowercase) 
+# save_filt_plots = true # true or false (lowercase) # save filtering plots
 # make_c3d = true # also save triangulated data in c3d format
 
-   # [filtering.butterworth]
-   # order = 4 
-   # cut_off_frequency = 6 # Hz
-   # [filtering.kalman]
-   # # How much more do you trust triangulation results (measurements), than previous data (process assuming constant acceleration)?
-   # trust_ratio = 100 # = measurement_trust/process_trust ~= process_noise/measurement_noise
-   # smooth = true # should be true, unless you need real-time filtering
-   # [filtering.butterworth_on_speed]
-   # order = 4 
-   # cut_off_frequency = 10 # Hz
-   # [filtering.gaussian]
-   # sigma_kernel = 2 #px
-   # [filtering.LOESS]
-   # nb_values_used = 30 # = fraction of data used * nb frames
-   # [filtering.median]
-   # kernel_size = 9
+#    # Most intuitive and standard filter in biomechanics
+#    [filtering.butterworth]
+#    cut_off_frequency = 6 # Hz # Will be divided by slowmo_factor to be equivalent to non slowed-down video
+#    order = 4 
+
+#    # Used in countless applications, this one is a simplified Kalman filter 
+#    [filtering.kalman]
+#    # How much more do you trust triangulation results (measurements), than the assumption of constant acceleration(process)?
+#    trust_ratio = 500 # = measurement_trust/process_trust ~= process_noise/measurement_noise
+#    smooth = true # should be true, unless you need real-time filtering
+
+#    # Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips).
+#    [filtering.gcv_spline]
+#    cut_off_frequency = 'auto' # 'auto' or int # If int, behaves like a Butterworth filter. 'auto' is usually better, unless the signal is too short (noise can then be considered as signal -> trajectories not filtered)
+#    smoothing_factor = 1.0 # >=0, ignored if cut_off_frequency != 'auto'. Biases results towards more smoothing (>1) or more fidelity to data (<1) 
+
+#    [filtering.loess]
+#    nb_values_used = 5 # = fraction of data used * nb frames
+#    [filtering.gaussian]
+#    sigma_kernel = 1 #px
+#    [filtering.median]
+#    kernel_size = 3
+#    [filtering.butterworth_on_speed]
+#    order = 4 
+#    cut_off_frequency = 10 # Hz
 
 
 # [markerAugmentation] 
 # ## Requires the following markers: ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
 # ##        "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
 # ##        "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
-# feet_on_floor = false # true or false (lowercase) # If true, markers will be translated so that the feet are at floor level (assuming that the floor is flat). Useful if you want to estimate ground reaction forces or joint loads.
+# feet_on_floor = false # true or false (lowercase) # If true, markers will be translated so that the feet are on the floor (assuming that the floor is flat). Useful if you want to estimate ground reaction forces or joint loads.
 # make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
 # [kinematics]
 # use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
-# use_contacts_muscles = true # true or false (lowercase) # If true, contact spheres and muscles are added to the model
+# use_simple_model = false # true or false # >10 times faster IK if true. No muscles, no constraints (eg stiff spine and shoulders, no patella)
 # right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)
 
 # default_height = 1.7 # meters # If automatic height calculation did not work, this value is used to scale the model

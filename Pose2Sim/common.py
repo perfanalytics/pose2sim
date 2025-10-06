@@ -14,6 +14,7 @@ Functions shared between modules, and other utilities
 import toml
 import json
 import numpy as np
+np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import pandas as pd
 from scipy import interpolate
 import re
@@ -24,6 +25,7 @@ import itertools as it
 import logging
 from anytree import PreOrderIter
 
+import tkinter as tk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -502,10 +504,18 @@ def world_to_camera_persp(r, t):
     '''
     Converts rotation R and translation T 
     from Qualisys world centered perspective
-    to OpenCV camera centered perspective
+    to OpenCV camera centered perspective,
     and inversely.
 
     Qc = RQ+T --> Q = R-1.Qc - R-1.T
+
+    INPUTS:
+    - r: rotation matrix (3x3)
+    - t: translation vector (3x1)
+
+    OUTPUTS:
+    - r: rotation matrix (3x3)
+    - t: translation vector (3x1)
     '''
 
     r = r.T
@@ -733,7 +743,7 @@ def interpolate_zeros_nans(col, *args):
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind="linear", bounds_error=False)
     else:
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, fill_value='extrapolate', bounds_error=False)
-    col_interp = np.where(mask, col, f_interp(col.index)) #replace at false index with interpolated values
+    col_interp = col.where(mask, f_interp(col.index)) #replace at false index with interpolated values
     
     # Reintroduce nans if length of sequence > N
     idx_notgood = mask.index[~mask].tolist()
@@ -742,7 +752,7 @@ def interpolate_zeros_nans(col, *args):
     if sequences[0].size>0:
         for seq in sequences:
             if len(seq) > N: # values to exclude from interpolation are set to false when they are too long 
-                col_interp[seq] = np.nan
+                col_interp.loc[seq] = np.nan
     
     return col_interp
 
@@ -1074,7 +1084,7 @@ def sort_people_sports2d(keyptpre, keypt, scores=None):
     Persons' indices are sometimes swapped when changing frame
     A person is associated to another in the next frame when they are at a small distance
     
-    N.B.: Requires min_with_single_indices and euclidian_distance function (see common.py)
+    N.B.: Requires min_with_single_indices, euclidian_distance, and pad_shape functions (see Pose2Sim/common.py)
 
     INPUTS:
     - keyptpre: (K, L, M) array of 2D coordinates for K persons in the previous frame, L keypoints, M 2D coordinates
@@ -1224,10 +1234,10 @@ def bbox_ltwh_compute(keypoints, padding=0):
 
     x_min, x_max = np.min(x_coords, axis=1), np.max(x_coords, axis=1)
     y_min, y_max = np.min(y_coords, axis=1), np.max(y_coords, axis=1)
-    width = x_max - x_min
-    height = y_max - y_min
 
     if padding > 0:
+        width = x_max - x_min
+        height = y_max - y_min
         x_min = x_min - width*padding/100
         y_min = y_min - height/2*padding/100
         width = width + 2*width*padding/100
@@ -1236,6 +1246,47 @@ def bbox_ltwh_compute(keypoints, padding=0):
     bbox_ltwh = np.stack((x_min, y_min, width, height), axis=1)
 
     return bbox_ltwh
+
+
+def bbox_xyxy_compute(frame_shape, keypoints, padding=0):
+    '''
+    Compute bounding boxes in (x_min, y_min, x_max, y_max) format
+    Optionally add padding to the bounding boxes 
+    as a percentage of the bounding box size (+padding% horizontally, +padding/2% vertically)
+
+    INPUTS:
+    - frame_shape: tuple. The shape of the image (height, width, channels)
+    - keypoints: array of shape K, L, M with K the number of detected persons,
+                    L the number of detected keypoints, M their 2D coordinates
+    - padding: int. The padding to add to the bounding boxes, in perceptage
+    '''
+
+    x_coords = keypoints[:, :, 0]
+    y_coords = keypoints[:, :, 1]
+
+    if not np.isnan(x_coords).all():
+        x_min, x_max = np.nanmin(x_coords, axis=1), np.nanmax(x_coords, axis=1)
+        y_min, y_max = np.nanmin(y_coords, axis=1), np.nanmax(y_coords, axis=1)
+
+        width = x_max - x_min
+        height = y_max - y_min
+        x_min = np.clip(x_min, 0, frame_shape[1])
+        x_max = np.clip(x_max, 0, frame_shape[1])
+        y_min = np.clip(y_min, 0, frame_shape[0])
+        y_max = np.clip(y_max, 0, frame_shape[0])
+    
+        if padding > 0:
+            x_min = x_min - width*padding/100
+            y_min = y_min - height/2*padding/100
+            x_max = x_max + width*padding/100
+            y_max = y_max + height/2*padding/100
+
+        bbox_xyxy = np.stack((x_min, y_min, x_max, y_max), axis=1)
+
+    else:
+        bbox_xyxy = np.array([[np.nan, np.nan, np.nan, np.nan]]*keypoints.shape[0])
+
+    return bbox_xyxy
 
 
 def draw_bounding_box(img, X, Y, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)], fontSize=0.3, thickness=1):
@@ -1345,3 +1396,84 @@ def draw_keypts(img, X, Y, scores, cmap_str='RdYlGn'):
             if not (np.isnan(x[i]) or np.isnan(y[i]))]
 
     return img
+
+
+def get_screen_size():
+    '''
+    Get the screen dimensions
+
+    INPUTS:
+    - None
+
+    OUTPUTS:
+    - tuple of int: (screen_width, screen_height)
+    '''
+
+    root = tk.Tk()
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    root.destroy()
+    
+    return screen_width, screen_height
+
+
+def calculate_display_size(W, H, screen_width, screen_height, margin=100):
+    '''
+    Calculate the optimal display size for the image
+    
+    INPUTS:
+        W, H: Original image dimensions
+        screen_width, screen_height: Screen dimensions
+        margin: Margin to leave around the window (pixels)
+    
+    OUTPUTS:
+        tuple: (display_width, display_height)
+    '''
+    
+    # If image fits within screen, use original size
+    if W <= screen_width - margin and H <= screen_height - margin:
+        return W, H
+    
+    # Calculate scaling factor to fit within screen while maintaining aspect ratio
+    width_ratio = (screen_width - margin) / W
+    height_ratio = (screen_height - margin) / H
+    scale_factor = min(width_ratio, height_ratio)
+    
+    # Calculate new dimensions
+    new_width = int(W * scale_factor)
+    new_height = int(H * scale_factor)
+    
+    return new_width, new_height
+
+
+def set_always_on_top(fig):
+    '''
+    Set a matplotlib figure window to be always on top.
+    Works with Tkinter, PyQt5, and PySide2 backends.
+    
+    INPUTS:
+    - fig: matplotlib figure object
+    '''
+
+    try:
+        # Try Tk method first
+        fig.canvas.manager.window.wm_attributes("-topmost", True)
+        print("Set always on top using Tk method")
+    except AttributeError:
+        try:
+            # Try Qt method
+            from PyQt5.QtCore import Qt
+            window = fig.canvas.manager.window
+            window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
+            window.show()
+            print("Set always on top using Qt method")
+        except (ImportError, AttributeError):
+            try:
+                # Try PySide2
+                from PySide2.QtCore import Qt
+                window = fig.canvas.manager.window
+                window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
+                window.show()
+                print("Set always on top using PySide2 method")
+            except (ImportError, AttributeError):
+                print("Could not set always on top - backend not supported")

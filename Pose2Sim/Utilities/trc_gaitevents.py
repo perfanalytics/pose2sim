@@ -135,29 +135,32 @@ def start_end_true_seq(series):
 
 def read_trc(trc_path):
     '''
-    Read trc file
+    Read a TRC file and extract its contents.
 
     INPUTS:
-    - trc_path: path to the trc file
+    - trc_path (str): The path to the TRC file.
 
     OUTPUTS:
-    - Q_coords: dataframe of coordinates
-    - frames_col: series of frames
-    - time_col: series of time
-    - markers: list of marker names
-    - header: list of header lines
+    - tuple: A tuple containing the Q coordinates, frames column, time column, marker names, and header.
     '''
-    
-    with open(trc_path, 'r') as trc_file:
-        header = [next(trc_file) for line in range(5)]
-    markers = header[3].split('\t')[2::3]
-    
-    trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4)
-    frames_col, time_col = pd.Series(trc_df.iloc[:,0], name='frames'), pd.Series(trc_df.iloc[:,1], name='time')
-    Q_coords = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
 
-    return Q_coords, frames_col, time_col, markers, header
+    try:
+        with open(trc_path, 'r') as trc_file:
+            header = [next(trc_file) for _ in range(5)]
+        markers = header[3].split('\t')[2::3]
+        markers = [m.strip() for m in markers if m.strip()] # remove last \n character
+       
+        trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4, encoding='utf-8')
+        frames_col, time_col = trc_df.iloc[:, 0], trc_df.iloc[:, 1]
+        Q_coords = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
+        Q_coords = Q_coords.loc[:, ~Q_coords.columns.str.startswith('Unnamed')] # remove unnamed columns
+        Q_coords.columns = np.array([[m,m,m] for m in markers]).ravel().tolist()
 
+        return Q_coords, frames_col, time_col, markers, header
+    
+    except Exception as e:
+        raise ValueError(f"Error reading TRC file at {trc_path}: {e}")
+    
 
 def first_step_side(Ron, Lon):
     '''
@@ -676,7 +679,7 @@ def trc_gaitevents_func(**args):
     if len(up_direction)==1:
         up_direction = +1, up_direction
     elif len(up_direction)==2:
-        up_direction = int(up_direction[0]+'1'), up_direction
+        up_direction = int(up_direction[0]+'1'), up_direction[1]
 
     if method not in ['forward_coordinates', 'height_coordinates', 'forward_velocity']:
         raise ValueError('Method must be "forward_coordinates", "height_coordinates", or "forward_velocity"')

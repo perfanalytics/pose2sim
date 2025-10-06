@@ -26,15 +26,6 @@ except ImportError:
     RTMPOSE_AVAILABLE = False
     print("Warning: RTMLib not available. Install with: pip install rtmlib")
 
-# NOTE for Question: Do we really need DeepSort for face blurring?
-# try:
-#     from deep_sort_realtime.deepsort_tracker import DeepSort
-#     DEEPSORT_AVAILABLE = True
-# except ImportError:
-#     DEEPSORT_AVAILABLE = False
-#     print("Warning: DeepSort not available. Install with: pip install deep-sort-realtime")
-
-# TODO: This class seems too many responsabilities. It would be great to be split into smaller classes.
 class VideoBlurApp:
     # ===== APPLICATION CONSTANTS =====
 

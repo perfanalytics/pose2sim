@@ -24,6 +24,7 @@ OUTPUT:
 import os
 import copy
 import numpy as np
+np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import pandas as pd
 import onnxruntime as ort
 import glob
@@ -165,7 +166,7 @@ def augment_markers_all(config_dict):
                     large_hip_knee_angles=large_hip_knee_angles,
                     trimmed_extrema_percent=trimmed_extrema_percent
                 )
-                if not np.isnan(height):
+                if np.isfinite(height):
                     logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m\n")
                 else:
                     logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
@@ -179,7 +180,7 @@ def augment_markers_all(config_dict):
     elif not type(subject_height) == list: # int or float
         subject_height = [subject_height]
     if len(subject_height) < len(trc_files):
-        logging.warning("Number of subject heights does not match number of TRC files. Missing heights are set to {default_height}m.")
+        logging.warning(f"Number of subject heights does not match number of TRC files. Missing heights are set to {default_height}m.")
         subject_height += [default_height] * (len(trc_files) - len(subject_height))
 
     # Get subject masses

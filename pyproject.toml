@@ -34,8 +34,9 @@ classifiers = [
 urls = {Homepage = "https://github.com/perfanalytics/pose2sim", "Bug Tracker" = "https://github.com/perfanalytics/pose2sim/issues"}
 dependencies = [
     "toml",
-    "numpy>=1.19",
-    "lxml==4.9.4",
+    "numpy<2.0; python_version<'3.12'",
+    "numpy>=2.0,<2.3; python_version>='3.12'",
+    "lxml",
     "matplotlib",
     "mpl_interactions",
     "PyQt5",
@@ -50,7 +51,7 @@ dependencies = [
     "rtmlib",
     "openvino",
     "onnxruntime",
-    "opencv-python",
+    "opencv-python != 4.11.*", # avoid 4.11 due to displaymatrix ignored (rotation metadata)
     "deep-sort-realtime",
     "customtkinter",
     "requests"
