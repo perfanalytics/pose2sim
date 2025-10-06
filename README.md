@@ -515,6 +515,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 - **From [Caliscope](https://mprib.github.io/caliscope/), [AniPose](https://github.com/lambdaloop/anipose) or [FreeMocap](https://github.com/freemocap/freemocap):**  
   - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
   - Calibration can be skipped since these formats are natively supported by Pose2Sim.
+  - **Note:** It seems like the FreeMoCap calibration is in millimeters rather than in meters. Just open your calibration.toml file and multiply all the translation values by 1000.
 - **From [Qualisys](https://www.qualisys.com):**
   - Export calibration to `.qca.txt` within QTM (see [there](https://github.com/perfanalytics/pose2sim/issues/56#issuecomment-1855933754)).
   - Copy it in the `Calibration` Pose2Sim folder.
