@@ -17,6 +17,7 @@ import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import pandas as pd
 from scipy import interpolate
+from scipy.optimize import linear_sum_assignment
 import re
 import cv2
 import c3d
@@ -372,52 +373,6 @@ def reprojection(P_all, Q):
         y_calc.append(P_cam[1] @ Q / (P_cam[2] @ Q))
         
     return x_calc, y_calc
-
-
-def min_with_single_indices(L, T):
-    '''
-    Let L be a list (size s) with T associated tuple indices (size s).
-    Select the smallest values of L, considering that 
-    the next smallest value cannot have the same numbers 
-    in the associated tuple as any of the previous ones.
-
-    Example:
-    L = [  20,   27,  51,    33,   43,   23,   37,   24,   4,   68,   84,    3  ]
-    T = list(it.product(range(2),range(3)))
-      = [(0,0),(0,1),(0,2),(0,3),(1,0),(1,1),(1,2),(1,3),(2,0),(2,1),(2,2),(2,3)]
-
-    - 1st smallest value: 3 with tuple (2,3), index 11
-    - 2nd smallest value when excluding indices (2,.) and (.,3), i.e. [(0,0),(0,1),(0,2),X,(1,0),(1,1),(1,2),X,X,X,X,X]:
-    20 with tuple (0,0), index 0
-    - 3rd smallest value when excluding [X,X,X,X,X,(1,1),(1,2),X,X,X,X,X]:
-    23 with tuple (1,1), index 5
-    
-    INPUTS:
-    - L: list (size s)
-    - T: T associated tuple indices (size s)
-
-    OUTPUTS: 
-    - minL: list of smallest values of L, considering constraints on tuple indices
-    - argminL: list of indices of smallest values of L
-    - T_minL: list of tuples associated with smallest values of L
-    '''
-
-    minL = [np.nanmin(L)]
-    argminL = [np.nanargmin(L)]
-    T_minL = [T[argminL[0]]]
-    
-    mask_tokeep = np.array([True for t in T])
-    i=0
-    while mask_tokeep.any()==True:
-        mask_tokeep = mask_tokeep & np.array([t[0]!=T_minL[i][0] and t[1]!=T_minL[i][1] for t in T])
-        if mask_tokeep.any()==True:
-            indicesL_tokeep = np.where(mask_tokeep)[0]
-            minL += [np.nanmin(np.array(L)[indicesL_tokeep]) if not np.isnan(np.array(L)[indicesL_tokeep]).all() else np.nan]
-            argminL += [indicesL_tokeep[np.nanargmin(np.array(L)[indicesL_tokeep])] if not np.isnan(minL[-1]) else indicesL_tokeep[0]]
-            T_minL += (T[argminL[i+1]],)
-            i+=1
-    
-    return np.array(minL), np.array(argminL), np.array(T_minL)
 
 
 def euclidean_distance(q1, q2):
@@ -1077,65 +1032,111 @@ def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, close_to_
 
     return leg_length
 
+    
 
-def sort_people_sports2d(keyptpre, keypt, scores=None):
+
+    # BEFORE ALL THAT: IN SORT, CONFIDENCE DECAY: REMOVE WHEN NOT SEEN FOR > 5*interp_gap_smaller_than?
+    # TEST POSTERS + OTHER CHALLENGING VIDS
+    # TEST POSE2SIM TRIG
+    # CHECK WHY RUGBY CUT OFF
+
+
+def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
     '''
     Associate persons across frames (Sports2D method)
     Persons' indices are sometimes swapped when changing frame
     A person is associated to another in the next frame when they are at a small distance
     
-    N.B.: Requires min_with_single_indices, euclidian_distance, and pad_shape functions (see Pose2Sim/common.py)
+    N.B.: Uses Hungarian algorithm (scipy.optimize.linear_sum_assignment): does not require min_with_single_indices anymore
+          Broadcasts distances: does not require euclidean_distance anymore
+          Still requires pad_shape
 
     INPUTS:
-    - keyptpre: (K, L, M) array of 2D coordinates for K persons in the previous frame, L keypoints, M 2D coordinates
+    - keyptpre: (K, L, M) array of 2D or 3D coordinates for K persons in the previous frame, L keypoints, M 2D/3D coordinates
     - keypt: idem keyptpre, for current frame
     - score: (K, L) array of confidence scores for K persons, L keypoints (optional) 
+    - max_dist: maximum distance threshold for association. If None, no threshold applied.
+                If distance > max_dist, person is treated as new (no association)
     
     OUTPUTS:
     - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
-    - sorted_keypoints: array with reordered persons --> if scores is not None
-    - sorted_scores: array with reordered scores     --> if scores is not None
-    - associated_tuples: list of tuples with correspondences between persons across frames --> if scores is None (for Pose2Sim.triangulation())
+    - sorted_keypoints: array with reordered persons
+    - sorted_scores: array with reordered scores
+    - sorted_ids: array with indices of associated persons in current frame
     '''
-    
-    # Generate possible person correspondences across frames
-    max_len = max(len(keyptpre), len(keypt))
-    keyptpre = pad_shape(keyptpre, max_len, fill_value=np.nan)
-    keypt = pad_shape(keypt, max_len, fill_value=np.nan)
-    if scores is not None:
-        scores = pad_shape(scores, max_len, fill_value=np.nan)
-    
-    # Compute distance between persons from one frame to another
-    personsIDs_comb = sorted(list(it.product(range(len(keyptpre)), range(len(keypt)))))
-    frame_by_frame_dist = [euclidean_distance(keyptpre[comb[0]],keypt[comb[1]]) for comb in personsIDs_comb]
-    frame_by_frame_dist = np.mean(frame_by_frame_dist, axis=1)
-    
-    # Sort correspondences by distance
-    _, _, associated_tuples = min_with_single_indices(frame_by_frame_dist, personsIDs_comb)
-    
-    # Associate points to same index across frames, nan if no correspondence
-    sorted_keypoints = []
-    for i in range(len(keyptpre)):
-        id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
-        if len(id_in_old) > 0:      sorted_keypoints += [keypt[id_in_old[0]]]
-        else:                       sorted_keypoints += [keypt[i]]
-    sorted_keypoints = np.array(sorted_keypoints)
 
+    # Handle empty frames
+    n_prev = len(keyptpre)
+    n_curr = len(keypt)
+    
+    if n_prev == 0 and n_curr == 0:
+        if scores is not None:
+            return np.array([]), np.array([]), np.array([])
+        else:
+            return np.array([]), np.array([])
+    
+    # Broadcasts the computation of distance matrix for all possible associations instead of using euclidean_distance in a loop
+    keyptpre_expanded = keyptpre[:, np.newaxis, :, :]
+    keypt_expanded = keypt[np.newaxis, :, :, :]
+    diff = keypt_expanded - keyptpre_expanded
+    distances_per_keypoint = np.sqrt(np.nansum(diff**2, axis=3))
+    dist_matrix = np.nanmean(distances_per_keypoint, axis=2)
+    dist_matrix = np.nan_to_num(dist_matrix, nan=1e10, posinf=1e10) # Replace inf/nan with large number
+    
+    # Hungarian algorithm instead of min_with_single_indices in previous versions (faster when many people)
+    # Finds the associations with smallest distances between previous and current frame, each person associated only once
+    pre_ids, curr_ids = linear_sum_assignment(dist_matrix)
+    
+    # Filter associations based on max_dist threshold
+    valid_associations = []
+    if max_dist is not None:
+        for pre_id, curr_id in zip(pre_ids, curr_ids):
+            if dist_matrix[pre_id, curr_id] <= max_dist:
+                valid_associations.append((pre_id, curr_id))
+    else:
+        valid_associations = list(zip(pre_ids, curr_ids))
+    
+    # Track non associated people in current frame (new people)
+    associated_curr_ids = set([curr_id for _, curr_id in valid_associations])
+    unassociated_curr_ids = [i for i in range(n_curr) if i not in associated_curr_ids]
+    
+    # Create sorted_keypoints filled with nans
+    n_total = n_prev + len(unassociated_curr_ids)
+    sorted_keypoints = np.full((n_total,) + keypt.shape[1:], np.nan)
     if scores is not None:
-        sorted_scores = []
-        for i in range(len(keyptpre)):
-            id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
-            if len(id_in_old) > 0:  sorted_scores += [scores[id_in_old[0]]]
-            else:                   sorted_scores += [scores[i]]
-        sorted_scores = np.array(sorted_scores)
+        sorted_scores = np.full((n_total,) + scores.shape[1:], np.nan)
+    else:
+        sorted_ids = np.full(n_total, -1)
 
-    # Keep track of previous values even when missing for more than one frame
-    sorted_prev_keypoints = np.where(np.isnan(sorted_keypoints) & ~np.isnan(keyptpre), keyptpre, sorted_keypoints)
+    # Map valid associations to their previous indices
+    for prev_idx, curr_idx in valid_associations:
+        sorted_keypoints[prev_idx] = keypt[curr_idx]
+        if scores is not None:
+            sorted_scores[prev_idx] = scores[curr_idx]
+        else:
+            sorted_ids[prev_idx] = curr_idx
+    
+    # Add unassociated current detections as new people
+    for new_idx, curr_idx in enumerate(unassociated_curr_ids):
+        sorted_keypoints[n_prev + new_idx] = keypt[curr_idx]
+        if scores is not None:
+            sorted_scores[n_prev + new_idx] = scores[curr_idx]
+        else:
+            sorted_ids[n_prev + new_idx] = curr_idx
+
+    # Pad keyptpre to match new size
+    keyptpre_padded = pad_shape(keyptpre, n_total, fill_value=np.nan)
+    
+    # Keep track of previous values when missing
+    sorted_prev_keypoints = np.where(
+        np.isnan(sorted_keypoints) & ~np.isnan(keyptpre_padded), 
+        keyptpre_padded, 
+        sorted_keypoints)
     
     if scores is not None:
         return sorted_prev_keypoints, sorted_keypoints, sorted_scores
-    else: # For Pose2Sim.triangulation()
-        return sorted_keypoints, associated_tuples
+    else:
+        return sorted_prev_keypoints, sorted_keypoints, sorted_ids
 
 
 def sort_people_rtmlib(pose_tracker, keypoints, scores):

@@ -451,7 +451,7 @@ def matchSVT(affinity, cum_persons_per_view, circ_constraint, max_iter = 20, w_r
         new_aff0 = new_aff.copy()
         
         Q = new_aff + Y*1.0/mu
-        Q = SVT(Q,w_rank/mu)
+        Q = SVT(Q, w_rank/mu)
         new_aff = Q - (W + Y)/mu
 
         # Project X onto dimGroups
@@ -761,9 +761,13 @@ def associate_all(config_dict):
             # obtain proposals after computing affinity between all the people in the different views
             persons_per_view = [0] + [len(j) for j in all_json_data_f]
             cum_persons_per_view = np.cumsum(persons_per_view)
+            
+            # compute affinity and only keep possible matches
             affinity = compute_affinity(all_json_data_f, calib_params, cum_persons_per_view, reconstruction_error_threshold=reconstruction_error_threshold)
             circ_constraint = circular_constraint(cum_persons_per_view)
             affinity = affinity * circ_constraint
+
+            # For each person, propose their index for each camera
             #TODO: affinity without hand, face, feet (cf ray.py L31)
             affinity = matchSVT(affinity, cum_persons_per_view, circ_constraint, max_iter = 20, w_rank = 50, tol = 1e-4, w_sparse=0.1)
             affinity[affinity<min_affinity] = 0

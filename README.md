@@ -318,6 +318,8 @@ For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or un
 
 ## Too slow for you?
 
+First of all, set `multi_person = True` in your `Config.toml`file, and remove all the detections other than the ones of interest. It works as well as the single person mode, and is much faster. In the future, I plan to add a person selection feature (like on Sports2D) and to remove the old single person mode.
+
 - `Pose2Sim.calibration()`:\
   Run it only when your cameras are moved or changed. If they are not, just copy a previous calibration.toml file into your new calibration folder.
 - `Pose2Sim.poseEstimation()`:
