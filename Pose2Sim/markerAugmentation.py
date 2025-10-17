@@ -114,7 +114,7 @@ def augment_markers_all(config_dict):
     pose_3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     feet_on_floor = config_dict.get('markerAugmentation').get('feet_on_floor')
     make_c3d = config_dict.get('markerAugmentation').get('make_c3d')
-    shoulder_constraint_weight = config_dict.get('markerAugmentation').get('shoulder_constraint_weight', 0.3)
+    shoulder_constraint_weight = config_dict.get('markerAugmentation').get('shoulder_constraint_weight', 1.0)
     frame_range = config_dict.get('project').get('frame_range')
     subject_height = config_dict.get('project').get('participant_height')
     subject_mass = config_dict.get('project').get('participant_mass')
