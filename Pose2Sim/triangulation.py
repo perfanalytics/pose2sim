@@ -15,7 +15,12 @@ The triangulation is weighted by the likelihood of each detected 2D keypoint
 threshold, right and left sides are swapped; if it is still above, a camera 
 is removed for this point and this frame, until the threshold is met. If more 
 cameras are removed than a predefined minimum, triangulation is skipped for 
-the point and this frame. In the end, missing values are interpolated.
+the point and this frame. 
+
+In the end, missing values are interpolated if the gaps are smaller than a 
+threshold. The trial if the person is out of the camera view for a long time. 
+The last missing frames are filled with the last valid value, resulting in a
+freeze, that might be better than doubtful long interpolations.
 
 In case of multiple subjects detection, make sure you first run the 
 personAssociation module. It will then associate people across frames by 
@@ -851,16 +856,10 @@ def triangulate_all(config_dict):
                         error_sorted.append(error[detection_idx])
                         nb_cams_excluded_sorted.append(nb_cams_excluded[detection_idx])
                         id_excluded_cams_sorted.append(id_excluded_cams[detection_idx])
-                    else:  # Person is not detected in current frame: Use previous frame value (-1)
-                        # Use previous frame values if available
-                        if n < len(error):
-                            error_sorted.append(error[n])
-                            nb_cams_excluded_sorted.append(nb_cams_excluded[n])
-                            id_excluded_cams_sorted.append(id_excluded_cams[n])
-                        else: # Person has never been detected before
-                            error_sorted.append(np.nan)
-                            nb_cams_excluded_sorted.append(0)
-                            id_excluded_cams_sorted.append([])
+                    else:  # Person is not detected in current frame
+                        error_sorted.append([np.nan] * keypoints_nb)
+                        nb_cams_excluded_sorted.append([n_cams] * keypoints_nb)
+                        id_excluded_cams_sorted.append([list(range(n_cams))] * keypoints_nb)
                 error, nb_cams_excluded, id_excluded_cams = error_sorted, nb_cams_excluded_sorted, id_excluded_cams_sorted
         
         # TODO: if distance > threshold, new person
@@ -930,11 +929,16 @@ def triangulate_all(config_dict):
             c3d_paths.append(convert_to_c3d(t) for t in trc_paths)
 
         # IDs of excluded cameras
-        # id_excluded_cams_tot = [np.concatenate([id_excluded_cams_tot[f][k] for f in range(frames_nb)]) for k in range(keypoints_nb)]
-        id_excluded_cams = np.hstack(np.hstack(np.array(id_excluded_cams_tot[n])))
-        cam_count = dict(Counter(id_excluded_cams))
-        cam_count.update((x, y/frame_nb/keypoints_nb) for x, y in cam_count.items())
-        cam_excluded_count.append(cam_count)
+        frame_count = len(Q_tot[n])
+        cam_exclusion_counts = {cam_id: 0 for cam_id in range(n_cams)} # initialize at zero
+        for excluded_at_frame in id_excluded_cams_tot[n].values:
+            for keypoint_cams in excluded_at_frame:
+                if isinstance(keypoint_cams, (list, np.ndarray)):
+                    for cam_id in keypoint_cams:
+                        if isinstance(cam_id, (int, np.integer)):
+                            cam_exclusion_counts[cam_id] += 1
+        total_opportunities = frame_count * keypoints_nb
+        cam_excluded_count.append({k: v/total_opportunities for k, v in cam_exclusion_counts.items()})
 
         # Optionally, for each person, for each keypoint, show indices of frames that should be interpolated
         if show_interp_indices:

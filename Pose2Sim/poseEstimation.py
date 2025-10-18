@@ -234,10 +234,11 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     output_video_path = os.path.join(pose_dir, f'{video_name_wo_ext}_pose.mp4')
     img_output_dir = os.path.join(pose_dir, f'{video_name_wo_ext}_img')
     
+    W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) # Get the width and height from the raw video
+
     if save_video: # Set up video writer
         fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
         fps = round(cap.get(cv2.CAP_PROP_FPS)) # Get the frame rate from the raw video
-        W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) # Get the width and height from the raw video
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
         
     if display_detection:

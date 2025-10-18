@@ -170,26 +170,29 @@ keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, f
 
 
 # [personAssociation]
-   # likelihood_threshold_association = 0.3
+#    likelihood_threshold_association = 0.3 # should be in single_person section
 
-   # [personAssociation.single_person]
-   # reproj_error_threshold_association = 20 # px
-   # tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
-               # # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' or 'RShoulder')
+#    [personAssociation.single_person]
+#    reproj_error_threshold_association = 20 # px
+#    tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
+#                # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' or 'RShoulder')
    
-   # [personAssociation.multi_person]
-   # reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
-   # min_affinity = 0.2 # affinity below which a correspondence is ignored
-
+#    [personAssociation.multi_person]
+#    reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
+#    min_affinity = 0.2 # affinity below which a correspondence is ignored. 
+#                       # affinity is high when reconstruction_error << reconstruction_error_threshold
+#    # if reconstruction_error_threshold too low or min_affinity too high: no correspondences will be found
+#    # if reconstruction_error_threshold too high or min_affinity too low: wrong correspondences will be found. If one person is associated to several ones on a different view, only the first is kept
+                      
 
 # [triangulation]
-# reproj_error_threshold_triangulation = 15 # px
-# likelihood_threshold_triangulation= 0.3
-# min_cameras_for_triangulation = 2
+# reproj_error_threshold_triangulation = 15 # px # keypoint not triangulated if reprojection error is above 
+# likelihood_threshold_triangulation= 0.3 # keypoint ignored if 2D likelihood is below
+# min_cameras_for_triangulation = 2 # Won't triangulate a point if less than N cameras see it correctly
 # interp_if_gap_smaller_than = 20 # do not interpolate larger gaps
 # max_distance_m = 1.0 # m # if a person is detected further than max_distance from its position on the previous frame, it will be considered as a new one
 
-# interpolation = 'linear' #linear, slinear, quadratic, cubic, or none
+# interpolation = 'linear' # linear, slinear, quadratic, cubic, or none
 #                         # 'none' if you don't want to interpolate missing points
 # remove_incomplete_frames = false # true or false (lowercase) # If true, if any keypoint cannot be triangulated, the full time frame is removed
 # sections_to_keep = 'all' # 'all', 'largest', 'first', 'last'

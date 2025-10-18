@@ -508,7 +508,7 @@ def person_index_per_cam(affinity, cum_persons_per_view, min_cameras_for_triangu
     proposals, nb_detections = np.unique(proposals, axis=0, return_counts=True)
     proposals = proposals[np.argsort(nb_detections)[::-1]]
 
-    # remove row if any value is the same in previous rows at same index (nan!=nan so nan ignored)
+    # remove row if any value is the same in previous rows at same index (nan!=nan so nan ignored) --> double detections
     proposals[proposals==-1] = np.nan
     mask = np.ones(proposals.shape[0], dtype=bool)
     for i in range(1, len(proposals)):
