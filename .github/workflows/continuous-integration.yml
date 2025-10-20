@@ -100,7 +100,7 @@ jobs:
             calib_toml_to_qca
             DLC_to_OpenPose
             face_blurring
-            json_display_with_img
+            # json_display_with_img # requires cmapy
             json_display_without_img
             MMPose_to_OpenPose
             reproj_from_trc_calib
