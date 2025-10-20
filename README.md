@@ -120,7 +120,7 @@ Install the OpenSim Python API (if you do not want to install via conda, refer [
    conda install -c opensim-org opensim -y
    ```
    
-3. **Install Pose2Sim**:\
+3. **Install Pose2Sim**:
    - OPTION 1: **Quick install:** Open a terminal. 
        ``` cmd
        pip install pose2sim
@@ -317,6 +317,8 @@ For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or un
 <br/>
 
 ## Too slow for you?
+
+First of all, set `multi_person = True` in your `Config.toml`file, and remove all the detections other than the ones of interest. It works as well as the single person mode, and is much faster. In the future, I plan to add a person selection feature (like on Sports2D) and to remove the old single person mode.
 
 - `Pose2Sim.calibration()`:\
   Run it only when your cameras are moved or changed. If they are not, just copy a previous calibration.toml file into your new calibration folder.
@@ -515,6 +517,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 - **From [Caliscope](https://mprib.github.io/caliscope/), [AniPose](https://github.com/lambdaloop/anipose) or [FreeMocap](https://github.com/freemocap/freemocap):**  
   - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
   - Calibration can be skipped since these formats are natively supported by Pose2Sim.
+  - **Note:** It seems like the FreeMoCap calibration is in millimeters rather than in meters. Just open your calibration.toml file and multiply all the translation values by 1000.
 - **From [Qualisys](https://www.qualisys.com):**
   - Export calibration to `.qca.txt` within QTM (see [there](https://github.com/perfanalytics/pose2sim/issues/56#issuecomment-1855933754)).
   - Copy it in the `Calibration` Pose2Sim folder.

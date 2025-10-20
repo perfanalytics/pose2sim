@@ -15,7 +15,12 @@ The triangulation is weighted by the likelihood of each detected 2D keypoint
 threshold, right and left sides are swapped; if it is still above, a camera 
 is removed for this point and this frame, until the threshold is met. If more 
 cameras are removed than a predefined minimum, triangulation is skipped for 
-the point and this frame. In the end, missing values are interpolated.
+the point and this frame. 
+
+In the end, missing values are interpolated if the gaps are smaller than a 
+threshold. The trial if the person is out of the camera view for a long time. 
+The last missing frames are filled with the last valid value, resulting in a
+freeze, that might be better than doubtful long interpolations.
 
 In case of multiple subjects detection, make sure you first run the 
 personAssociation module. It will then associate people across frames by 
@@ -99,6 +104,7 @@ def indices_of_first_last_non_nan_chunks(series, min_chunk_size=10, chunk_choice
     - tuple: (start_index, end_index) of the first and last valid chunks
     '''
     
+    min_chunk_size = 10 if min_chunk_size == None else min_chunk_size
     non_nan_mask = ~np.isnan(series.values)
     
     # Find runs of consecutive non-NaN values (eg [(8, 15), (16, 17), (19, 26)])
@@ -157,7 +163,7 @@ def make_trc(config_dict, Q, keypoints_names, id_person=-1):
     project_dir = config_dict.get('project').get('project_dir')
     multi_person = config_dict.get('project').get('multi_person')
     if multi_person:
-        seq_name = f'{os.path.basename(os.path.realpath(project_dir))}_P{id_person+1}'
+        seq_name = f'{os.path.basename(os.path.realpath(project_dir))}_P{id_person}'
     else:
         seq_name = f'{os.path.basename(os.path.realpath(project_dir))}'
     pose3d_dir = os.path.join(project_dir, 'pose-3d')
@@ -244,7 +250,7 @@ def retrieve_right_trc_order(trc_paths):
     return trc_id
 
 
-def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, f_range_trimmed, f_range, trc_path):
+def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, f_range_trimmed, f_range, trc_paths):
     '''
     Print a message giving statistics on reprojection errors (in pixel and in m)
     as well as the number of cameras that had to be excluded to reach threshold 
@@ -277,6 +283,7 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     cam_names = cam_names[list(cam_excluded_count[0].keys())]
     error_threshold_triangulation = config_dict.get('triangulation').get('reproj_error_threshold_triangulation')
     likelihood_threshold = config_dict.get('triangulation').get('likelihood_threshold_triangulation')
+    min_chunk_size = config_dict.get('triangulation').get('min_chunk_size', 10)
     show_interp_indices = config_dict.get('triangulation').get('show_interp_indices')
     interpolation_kind = config_dict.get('triangulation').get('interpolation')
     interp_gap_smaller_than = config_dict.get('triangulation').get('interp_if_gap_smaller_than')
@@ -293,8 +300,12 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     logging.info('')
     nb_persons_to_detect = len(error)
     for n in range(nb_persons_to_detect):
+        first_run_start_min, last_run_end_max = f_range_trimmed[n]
+        if last_run_end_max - first_run_start_min <= min_chunk_size:
+            continue
+
         if nb_persons_to_detect > 1:
-            logging.info(f'\n\nPARTICIPANT {n+1}\n')
+            logging.info(f'\n\nPARTICIPANT {n}\n')
         
         for idx, name in enumerate(keypoints_names):
             mean_error_keypoint_px = np.around(error[n].iloc[:,idx].mean(), decimals=1) # RMS à la place?
@@ -324,7 +335,7 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
             logging.info(f'Gaps were interpolated with {interpolation_kind} method if smaller than {interp_gap_smaller_than} frames. Larger gaps were filled with {["the last valid value" if fill_large_gaps_with == "last_value" else "zeros" if fill_large_gaps_with == "zeros" else "NaNs"][0]}.') 
         logging.info(f'In average, {mean_cam_excluded} cameras had to be excluded to reach these thresholds.')
         if len(range(*f_range_trimmed[n])) < len(range(*f_range)):
-            logging.warning(f'\nSome frames could not be correctly triangulated: trimmed around frames {f_range_trimmed[n]}.\n' +
+            logging.warning(f'\nSome frames could not be correctly triangulated: trial trimmed between frames {f_range_trimmed[n]}.\n' +
                          'You might need to tweak the triangulation parameters in Config.toml (for example, try increasing "reproj_error_threshold_triangulation").')
         
         cam_excluded_count[n] = {i: v for i, v in zip(cam_names, cam_excluded_count[n].values())}
@@ -338,7 +349,7 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
             else:
                 str_cam_excluded_count += f'Camera {k}: {int(np.round(v*100))}%, '
         logging.info(str_cam_excluded_count)
-        logging.info(f'3D coordinates are stored at {trc_path[n]}.')
+        logging.info(f'3D coordinates are stored at {trc_paths[n]}.')
         
     logging.info('\n\n')
     if make_c3d:
@@ -673,8 +684,10 @@ def triangulate_all(config_dict):
     likelihood_threshold = config_dict.get('triangulation').get('likelihood_threshold_triangulation')
     interpolation_kind = config_dict.get('triangulation').get('interpolation')
     interp_gap_smaller_than = config_dict.get('triangulation').get('interp_if_gap_smaller_than')
+    max_distance_m = config_dict.get('triangulation').get('max_distance_m', None)
     remove_incomplete_frames = config_dict.get('triangulation').get('remove_incomplete_frames', False)
     sections_to_keep = config_dict.get('triangulation').get('sections_to_keep')
+    min_chunk_size = config_dict.get('triangulation').get('min_chunk_size', 10)
     fill_large_gaps_with = config_dict.get('triangulation').get('fill_large_gaps_with')
     show_interp_indices = config_dict.get('triangulation').get('show_interp_indices')
     undistort_points = config_dict.get('triangulation').get('undistort_points')
@@ -775,7 +788,9 @@ def triangulate_all(config_dict):
     error = [[] for n in range(nb_persons_to_detect)]
     nb_cams_excluded = [[] for n in range(nb_persons_to_detect)]
     id_excluded_cams = [[] for n in range(nb_persons_to_detect)]
-    Q_tot, error_tot, nb_cams_excluded_tot, id_excluded_cams_tot, f_range_trimmed = [], [], [], [], []
+    Q_tot, error_tot, nb_cams_excluded_tot, cam_excluded_count, id_excluded_cams_tot = [], [], [], [], []
+    interp_frames, non_interp_frames, f_range_trimmed = [], [], []
+    trc_paths, c3d_paths = [], []
     for f in tqdm(range(*f_range)):
         # print(f'\nFrame {f}:')        
         # Get x,y,likelihood values from files
@@ -831,23 +846,20 @@ def triangulate_all(config_dict):
             # reID persons across frames by checking the distance from one frame to another
             # print('Q before ordering ', np.array(Q)[:,:2])
             if f !=0:
-                Q, associated_tuples = sort_people_sports2d(Q_old, Q)
-                # Q, personsIDs_sorted, associated_tuples = sort_people(Q_old, Q)
-                # print('Q after ordering ', personsIDs_sorted, associated_tuples, np.array(Q)[:,:2])
+                Q = np.array(Q)
+                Q_old, Q, sorted_ids = sort_people_sports2d(Q_old, np.array(Q), max_dist=max_distance_m)
                 
                 error_sorted, nb_cams_excluded_sorted, id_excluded_cams_sorted = [], [], []
-                for i in range(len(Q)):
-                    id_in_old =  associated_tuples[:,1][associated_tuples[:,0] == i].tolist()
-                    if len(id_in_old) > 0:
-                        # personsIDs_sorted += id_in_old
-                        error_sorted += [error[id_in_old[0]]]
-                        nb_cams_excluded_sorted += [nb_cams_excluded[id_in_old[0]]]
-                        id_excluded_cams_sorted += [id_excluded_cams[id_in_old[0]]]
-                    else:
-                        # personsIDs_sorted += [-1]
-                        error_sorted += [error[i]]
-                        nb_cams_excluded_sorted += [nb_cams_excluded[i]]
-                        id_excluded_cams_sorted += [id_excluded_cams[i]]
+                for n in range(nb_persons_to_detect):
+                    detection_idx = sorted_ids[n]
+                    if detection_idx >= 0:  # Person is detected in current frame
+                        error_sorted.append(error[detection_idx])
+                        nb_cams_excluded_sorted.append(nb_cams_excluded[detection_idx])
+                        id_excluded_cams_sorted.append(id_excluded_cams[detection_idx])
+                    else:  # Person is not detected in current frame
+                        error_sorted.append([np.nan] * keypoints_nb)
+                        nb_cams_excluded_sorted.append([n_cams] * keypoints_nb)
+                        id_excluded_cams_sorted.append([list(range(n_cams))] * keypoints_nb)
                 error, nb_cams_excluded, id_excluded_cams = error_sorted, nb_cams_excluded_sorted, id_excluded_cams_sorted
         
         # TODO: if distance > threshold, new person
@@ -871,93 +883,75 @@ def triangulate_all(config_dict):
     nb_cams_excluded_tot = [pd.DataFrame([nb_cams_excluded_tot_f[n] for nb_cams_excluded_tot_f in nb_cams_excluded_tot], index=range(*f_range)) for n in range(nb_persons_to_detect)]
     id_excluded_cams_tot = [pd.DataFrame([id_excluded_cams_tot_f[n] for id_excluded_cams_tot_f in id_excluded_cams_tot], index=range(*f_range)) for n in range(nb_persons_to_detect)]
 
-    # import pickle
-    # with open(os.path.join(session_dir, 'all.pkl'), 'wb') as f:
-    #     pickle.dump([Q_tot, error_tot, nb_cams_excluded_tot, id_excluded_cams_tot, zero_nan_frames_per_kpt], f)
-    ## with open(os.path.join(session_dir, 'all.pkl'), 'rb') as f:
-    ##     Q_tot, error_tot, nb_cams_excluded_tot, id_excluded_cams_tot, zero_nan_frames_per_kpt = pickle.load(f)
-    # Q_tot[0].to_csv(os.path.join(session_dir, 'Q_tot.csv'), index=False, sep='\t')
-    # error_tot[0].to_csv(os.path.join(session_dir, 'error_tot.csv'), index=False, sep='\t')
-
     # Interpolate small missing sections
-    if interpolation_kind != 'none':
-        for n in range(nb_persons_to_detect):
+    for n in range(nb_persons_to_detect):
+        if interpolation_kind != 'none':
             try:
                 Q_tot[n] = Q_tot[n].apply(interpolate_zeros_nans, axis=0, args=[interp_gap_smaller_than, interpolation_kind])
             except:
-                logging.info(f'Interpolation was not possible for person {n}. This means that not enough points are available, which is often due to a bad calibration.')
+                logging.warning(f'Interpolation was not possible for person {n}. This means that not enough points are available, which is often due to a bad calibration.')
 
-    # Determine frames where the person is out of the frame
-    for n in range(nb_persons_to_detect):
+        # Determine frames where the person is out of the frame
         error_tot[n]['mean'] = error_tot[n].mean(axis = 1, skipna = not remove_incomplete_frames)
         nb_cams_excluded_tot[n]['mean'] = nb_cams_excluded_tot[n].mean(axis=1)
-    f_range_trimmed = [indices_of_first_last_non_nan_chunks(err['mean'], min_chunk_size=10, chunk_choice_method=sections_to_keep) for err in error_tot]
-    # f_range_trimmed = [f_range]*nb_persons_to_detect
+        first_run_start_min, last_run_end_max = indices_of_first_last_non_nan_chunks(error_tot[n]['mean'], min_chunk_size=min_chunk_size, chunk_choice_method=sections_to_keep)
+        f_range_trimmed.append([first_run_start_min, last_run_end_max])
 
-    # Remove persons with fewer than 4 frames detected
-    deleted_person_id = [n for n, f_range in enumerate(f_range_trimmed) if len(range(*f_range))<4]
-    Q_tot = [Q_tot[n] for n in range(len(Q_tot)) if n not in deleted_person_id]
-    error_tot = [error_tot[n] for n in range(len(error_tot)) if n not in deleted_person_id]
-    nb_cams_excluded_tot = [nb_cams_excluded_tot[n] for n in range(len(nb_cams_excluded_tot)) if n not in deleted_person_id]
-    id_excluded_cams_tot = [id_excluded_cams_tot[n] for n in range(len(id_excluded_cams_tot)) if n not in deleted_person_id]
-    nb_persons_to_detect = len(Q_tot)
-    if nb_persons_to_detect == 0:
-        raise Exception('No persons have been triangulated. Please check your calibration and your synchronization, or the triangulation parameters in Config.toml.')
-        
-    # Trim around good frames
-    Q_tot = [Q_tot[n].iloc[f_range_trimmed[n][0]:f_range_trimmed[n][1]] for n in range(nb_persons_to_detect)]
-    error_tot = [error_tot[n].iloc[f_range_trimmed[n][0]:f_range_trimmed[n][1]] for n in range(nb_persons_to_detect)]
-    nb_cams_excluded_tot = [nb_cams_excluded_tot[n].iloc[f_range_trimmed[n][0]:f_range_trimmed[n][1]] for n in range(nb_persons_to_detect)]
-    id_excluded_cams_tot = [id_excluded_cams_tot[n].iloc[f_range_trimmed[n][0]:f_range_trimmed[n][1]] for n in range(nb_persons_to_detect)]
-    zero_nan_frames = [np.where( Q_tot[n].iloc[:,::3].T.eq(0) | ~np.isfinite(Q_tot[n].iloc[:,::3].T) ) for n in range(nb_persons_to_detect)]
-    zero_nan_frames_per_kpt = [[zero_nan_frames[n][1][np.where(zero_nan_frames[n][0]==k)[0]] for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
-    zero_nan_frames_per_kpt = [[z[(f_range_trimmed[n][0] < z) & (f_range_trimmed[n][1] > z)] for z in zero_nan_frames_per_kpt[n]] for n in range(nb_persons_to_detect)]
+        # Skip person if not correctly triangulated
+        if last_run_end_max - first_run_start_min <= min_chunk_size:
+            nb_cams_excluded_tot[n] = pd.DataFrame(columns=nb_cams_excluded_tot[n].columns)
+            cam_excluded_count.append({})
+            interp_frames.append([])
+            non_interp_frames.append([])
+            trc_paths.append ('')
+            logging.info(f'\nPerson {n}: Less than {min_chunk_size} valid frames in a row. Deleting person.')
+            continue
 
+        # Trim around good frames
+        Q_tot[n] = Q_tot[n].iloc[first_run_start_min:last_run_end_max]
+        error_tot[n] = error_tot[n].iloc[first_run_start_min:last_run_end_max]
+        nb_cams_excluded_tot[n] = nb_cams_excluded_tot[n].iloc[first_run_start_min:last_run_end_max]
+        id_excluded_cams_tot[n] = id_excluded_cams_tot[n].iloc[first_run_start_min:last_run_end_max]
+        zero_nan_frames = np.where( Q_tot[n].iloc[:,::3].T.eq(0) | ~np.isfinite(Q_tot[n].iloc[:,::3].T) )
+        zero_nan_frames_per_kpt = [zero_nan_frames[1][np.where(zero_nan_frames[0]==k)[0]] for k in range(keypoints_nb)]
+        zero_nan_frames_per_kpt = [z[(first_run_start_min < z) & (last_run_end_max > z)] for z in zero_nan_frames_per_kpt]
 
-    # Fill non-interpolated values with last valid one
-    if fill_large_gaps_with == 'last_value':
-        for n in range(nb_persons_to_detect): 
+        # Fill non-interpolated values with last valid one
+        if fill_large_gaps_with == 'last_value':
             Q_tot[n] = Q_tot[n].ffill(axis=0).bfill(axis=0)
             Q_tot[n].replace([np.nan, np.inf], 0, inplace=True)
-    elif fill_large_gaps_with == 'zeros':
-        for n in range(nb_persons_to_detect): 
+        elif fill_large_gaps_with == 'zeros':
             Q_tot[n].replace([np.nan, np.inf], 0, inplace=True)
 
-    # Create TRC file
-    trc_paths = [make_trc(config_dict, Q_tot[n], keypoints_names, id_person=n) for n in range(len(Q_tot))]
-    if make_c3d:
-        c3d_paths = [convert_to_c3d(t) for t in trc_paths]
-        
-    # # Reorder TRC files
-    # if multi_person and reorder_trc and len(trc_paths)>1:
-    #     trc_id = retrieve_right_trc_order(trc_paths)
-    #     [os.rename(t, t+'.old') for t in trc_paths]
-    #     [os.rename(t+'.old', trc_paths[i]) for i, t in zip(trc_id,trc_paths)]
-    #     if make_c3d:
-    #         [os.rename(c, c+'.old') for c in c3d_paths]
-    #         [os.rename(c+'.old', c3d_paths[i]) for i, c in zip(trc_id,c3d_paths)]
-    #     error_tot = [error_tot[i] for i in trc_id]
-    #     nb_cams_excluded_tot = [nb_cams_excluded_tot[i] for i in trc_id]
-    #     cam_excluded_count = [cam_excluded_count[i] for i in trc_id]
-    #     interp_frames = [interp_frames[i] for i in trc_id]
-    #     non_interp_frames = [non_interp_frames[i] for i in trc_id]
-    #     logging.info('\nThe trc and c3d files have been renamed to match the order of the static sequences.')
+        # Create TRC file
+        trc_paths.append(make_trc(config_dict, Q_tot[n], keypoints_names, id_person=n))
+        if make_c3d:
+            c3d_paths.append(convert_to_c3d(t) for t in trc_paths)
 
-    # IDs of excluded cameras
-    # id_excluded_cams_tot = [np.concatenate([id_excluded_cams_tot[f][k] for f in range(frames_nb)]) for k in range(keypoints_nb)]
-    id_excluded_cams_tot = [np.hstack(np.hstack(np.array(id_excluded_cams_tot[n]))) for n in range(nb_persons_to_detect)]
-    cam_excluded_count = [dict(Counter(k)) for k in id_excluded_cams_tot]
-    [cam_excluded_count[n].update((x, y/frame_nb/keypoints_nb) for x, y in cam_excluded_count[n].items()) for n in range(nb_persons_to_detect)]
+        # IDs of excluded cameras
+        frame_count = len(Q_tot[n])
+        cam_exclusion_counts = {cam_id: 0 for cam_id in range(n_cams)} # initialize at zero
+        for excluded_at_frame in id_excluded_cams_tot[n].values:
+            for keypoint_cams in excluded_at_frame:
+                if isinstance(keypoint_cams, (list, np.ndarray)):
+                    for cam_id in keypoint_cams:
+                        if isinstance(cam_id, (int, np.integer)):
+                            cam_exclusion_counts[cam_id] += 1
+        total_opportunities = frame_count * keypoints_nb
+        cam_excluded_count.append({k: v/total_opportunities for k, v in cam_exclusion_counts.items()})
 
-    # Optionally, for each person, for each keypoint, show indices of frames that should be interpolated
-    if show_interp_indices:
-        gaps = [[np.where(np.diff(zero_nan_frames_per_kpt[n][k]) > 1)[0] + 1 for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
-        sequences = [[np.split(zero_nan_frames_per_kpt[n][k], gaps[n][k]) for k in range(keypoints_nb)] for n in range(nb_persons_to_detect)]
-        interp_frames = [[[f'{seq[0]}:{seq[-1]}' for seq in seq_kpt if len(seq)<=interp_gap_smaller_than and len(seq)>0] for seq_kpt in sequences[n]] for n in range(nb_persons_to_detect)]
-        non_interp_frames = [[[f'{seq[0]}:{seq[-1]}' for seq in seq_kpt if len(seq)>interp_gap_smaller_than] for seq_kpt in sequences[n]] for n in range(nb_persons_to_detect)]
-    else:
-        interp_frames = None
-        non_interp_frames = []
+        # Optionally, for each person, for each keypoint, show indices of frames that should be interpolated
+        if show_interp_indices:
+            gaps = [np.where(np.diff(zero_nan_frames_per_kpt[k]) > 1)[0] + 1 for k in range(keypoints_nb)]
+            sequences = [np.split(zero_nan_frames_per_kpt[k], gaps[k]) for k in range(keypoints_nb)]
+            interp_frames.append([[f'{seq[0]}:{seq[-1]}' for seq in seq_kpt if len(seq)<=interp_gap_smaller_than and len(seq)>0] for seq_kpt in sequences])
+            non_interp_frames.append([[f'{seq[0]}:{seq[-1]}' for seq in seq_kpt if len(seq)>interp_gap_smaller_than] for seq_kpt in sequences])
+        else:
+            interp_frames.append(None)
+            non_interp_frames.append([])
+
+    if np.all(np.diff(np.array(f_range_trimmed))==0):
+        raise Exception('No persons have been triangulated. Please check your calibration and your synchronization, or the triangulation parameters in Config.toml.')
 
     # Recap message
     recap_triangulate(config_dict, error_tot, nb_cams_excluded_tot, keypoints_names, cam_excluded_count, interp_frames, non_interp_frames, f_range_trimmed, f_range, trc_paths)

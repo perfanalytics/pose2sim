@@ -47,7 +47,6 @@ import cv2
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
 from rtmlib.tools.object_detection.post_processings import nms
-from deep_sort_realtime.deepsort_tracker import DeepSort
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort,\
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel, bbox_xyxy_compute, \
                         get_screen_size, calculate_display_size
@@ -196,7 +195,7 @@ def save_to_openpose(json_file_path, keypoints, scores):
         json.dump(json_output, json_file)
 
 
-def process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker):
+def process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker):
     '''
     Estimate pose from a video file
     
@@ -234,10 +233,11 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     output_video_path = os.path.join(pose_dir, f'{video_name_wo_ext}_pose.mp4')
     img_output_dir = os.path.join(pose_dir, f'{video_name_wo_ext}_img')
     
+    W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) # Get the width and height from the raw video
+
     if save_video: # Set up video writer
         fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
         fps = round(cap.get(cv2.CAP_PROP_FPS)) # Get the frame rate from the raw video
-        W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) # Get the width and height from the raw video
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
         
     if display_detection:
@@ -263,19 +263,31 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                 # Detect poses
                 keypoints, scores = pose_tracker(frame)
 
-                # Non maximum suppression (at pose level, not detection)
+                # Non maximum suppression (at pose level, not detection, and only using likely keypoints)
                 frame_shape = frame.shape
-                bboxes = bbox_xyxy_compute(frame_shape, keypoints, padding=0)
-                score_bboxes = np.array([np.mean(s) for s in scores])
-                keep = nms(bboxes, score_bboxes, nms_thr=0.45)
-                keypoints, scores = keypoints[keep], scores[keep]
+                mask_scores = np.mean(scores, axis=1) > 0.2
+
+                likely_keypoints = np.where(mask_scores[:, np.newaxis, np.newaxis], keypoints, np.nan)
+                likely_scores = np.where(mask_scores[:, np.newaxis], scores, np.nan)
+                likely_bboxes = bbox_xyxy_compute(frame_shape, likely_keypoints, padding=0)
+                score_likely_bboxes = np.nanmean(likely_scores, axis=1)
+
+                valid_indices = np.where(~np.isnan(score_likely_bboxes))[0]
+                if len(valid_indices) > 0:
+                    valid_bboxes = likely_bboxes[valid_indices]
+                    valid_scores = score_likely_bboxes[valid_indices]
+                    keep_valid = nms(valid_bboxes, valid_scores, nms_thr=0.45)
+                    keep = valid_indices[keep_valid]
+                else:
+                    keep = []
+                keypoints, scores = likely_keypoints[keep], likely_scores[keep]
 
                 # Track poses across frames
                 if tracking_mode == 'deepsort':
                     keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
                 if tracking_mode == 'sports2d': 
                     if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores, max_dist=max_distance_px)
                 else:
                     pass
                     
@@ -331,7 +343,7 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
         cv2.destroyAllWindows()
 
 
-def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker):
+def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker):
     '''
     Estimate pose estimation from a folder of images
     
@@ -345,7 +357,6 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
     - save_images: bool. Whether to save the output images
     - display_detection: bool. Whether to show real-time visualization
     - frame_range: list. Range of frames to process
-    - multi_person: bool. Whether to detect multiple people in the video
     - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
     - deepsort_tracker: DeepSort tracker object or None
 
@@ -389,12 +400,11 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
             keypoints, scores = pose_tracker(frame)
 
             # Track poses across frames
-            if multi_person:
-                if tracking_mode == 'deepsort':
-                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
-                if tracking_mode == 'sports2d': 
-                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores)
+            if tracking_mode == 'deepsort':
+                keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
+            if tracking_mode == 'sports2d': 
+                if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores, max_dist=max_distance_px)
                     
             # Extract frame number from the filename
             if 'openpose' in output_format:
@@ -487,6 +497,7 @@ def estimate_pose_all(config_dict):
     overwrite_pose = config_dict['pose']['overwrite_pose']
     det_frequency = config_dict['pose']['det_frequency']
     tracking_mode = config_dict.get('pose').get('tracking_mode')
+    max_distance_px = config_dict.get('pose').get('max_distance_px', None)
     if tracking_mode == 'deepsort' and multi_person:
         deepsort_params = config_dict.get('pose').get('deepsort_params')
         try:
@@ -495,6 +506,7 @@ def estimate_pose_all(config_dict):
             deepsort_params = deepsort_params.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/',':/').replace('":"\\',':\\')
             deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params) # changes "[640", "640]" to [640,640]
             deepsort_params = json.loads(deepsort_params)
+        from deep_sort_realtime.deepsort_tracker import DeepSort
         deepsort_tracker = DeepSort(**deepsort_params)
     else:
         deepsort_tracker = None
@@ -627,8 +639,9 @@ def estimate_pose_all(config_dict):
             logging.info(f'Found video files with {vid_img_extension} extension.')
             for video_path in video_files:
                 pose_tracker.reset()
-                if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()
-                process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
+                if tracking_mode == 'deepsort': 
+                    deepsort_tracker.tracker.delete_all_tracks()
+                process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker)
 
         else:
             # Process image folders
@@ -643,5 +656,6 @@ def estimate_pose_all(config_dict):
                 for image_folder in image_folders:
                     pose_tracker.reset()
                     image_folder_path = os.path.join(video_dir, image_folder)
-                    if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()                
-                    process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, multi_person, tracking_mode, deepsort_tracker)
+                    if tracking_mode == 'deepsort': 
+                        deepsort_tracker.tracker.delete_all_tracks()                
+                    process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker)

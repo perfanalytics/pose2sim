@@ -20,7 +20,10 @@ import pandas as pd
 import sys
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-mpl.use('qt5agg')
+import platform
+os_name = platform.system()
+if os_name == 'Windows':
+    mpl.use('qt5agg') # windows
 mpl.rc('figure', max_open_warning=0)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar

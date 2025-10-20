@@ -83,6 +83,7 @@ device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
 
 tracking_mode = 'sports2d' # 'none', 'sports2d' or 'deepsort'. 'deepsort' is slower but more robust in difficult configurations
+max_distance_px = 100  # px # If a person is detected further than max_distance from its position on the previous frame, it will be considered as a new one
 deepsort_params = """{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8}""" # """{dictionary between 3 double quotes}"""
                   # More robust in crowded scenes but Can be tricky to parametrize. More information there: https://github.com/levan92/deep_sort_realtime/blob/master/deep_sort_realtime/deepsort_tracker.py#L51
                   # Note: For faster and more robust tracking, use {'embedder_gpu': True, embedder':'torchreid'}, which uses the GPU and runs osnet_ain_x1_0 by default. requires `pip install torch torchvision torchreid gdown tensorboard`
@@ -171,7 +172,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 
 
 [personAssociation]
-   likelihood_threshold_association = 0.3
+   likelihood_threshold_association = 0.3 # should be in single_person section
 
    [personAssociation.single_person]
    reproj_error_threshold_association = 20 # px
@@ -180,20 +181,25 @@ calibration_type = 'convert' # 'convert' or 'calculate'
    
    [personAssociation.multi_person]
    reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
-   min_affinity = 0.2 # affinity below which a correspondence is ignored
-
+   min_affinity = 0.2 # affinity below which a correspondence is ignored. 
+                      # affinity is high when reconstruction_error << reconstruction_error_threshold
+   # if reconstruction_error_threshold too low or min_affinity too high: no correspondences will be found
+   # if reconstruction_error_threshold too high or min_affinity too low: wrong correspondences will be found. If one person is associated to several ones on a different view, only the first is kept
+                      
 
 [triangulation]
-reproj_error_threshold_triangulation = 15 # px
-likelihood_threshold_triangulation= 0.3
-min_cameras_for_triangulation = 2
+reproj_error_threshold_triangulation = 15 # px # keypoint not triangulated if reprojection error is above 
+likelihood_threshold_triangulation= 0.3 # keypoint ignored if 2D likelihood is below
+min_cameras_for_triangulation = 2 # Won't triangulate a point if less than N cameras see it correctly
 interp_if_gap_smaller_than = 20 # do not interpolate larger gaps
+max_distance_m = 1.0 # m # if a person is detected further than max_distance from its position on the previous frame, it will be considered as a new one
 
-interpolation = 'linear' #linear, slinear, quadratic, cubic, or none
+interpolation = 'linear' # linear, slinear, quadratic, cubic, or none
                         # 'none' if you don't want to interpolate missing points
 remove_incomplete_frames = false # true or false (lowercase) # If true, if any keypoint cannot be triangulated, the full time frame is removed
 sections_to_keep = 'all' # 'all', 'largest', 'first', 'last'
                         # keep 'all' valid sections even when they are interspersed with untriangulated chunks, or the 'largest' valid section, or the 'first' one, or the 'last' one
+min_chunk_size = 10 # Minimum number of valid frames in a row to keep a chunk of data for a person
 fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
 
 show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
