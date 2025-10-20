@@ -120,7 +120,7 @@ Install the OpenSim Python API (if you do not want to install via conda, refer [
    conda install -c opensim-org opensim -y
    ```
    
-3. **Install Pose2Sim**:\
+3. **Install Pose2Sim**:
    - OPTION 1: **Quick install:** Open a terminal. 
        ``` cmd
        pip install pose2sim

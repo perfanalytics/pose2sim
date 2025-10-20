@@ -83,6 +83,45 @@ jobs:
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
+      - name: Smoke test CLI entry points
+        shell: bash -l {0}
+        run: |
+          conda activate pose2sim
+          entry_points=(
+            AlphaPose_to_OpenPose
+            Blazepose_runsave
+            bodykin_from_mot_osim
+            c3d_to_trc
+            calib_easymocap_to_toml
+            calib_from_checkerboard
+            calib_qca_to_toml
+            calib_toml_to_easymocap
+            calib_toml_to_opencap
+            calib_toml_to_qca
+            DLC_to_OpenPose
+            face_blurring
+            json_display_with_img
+            json_display_without_img
+            MMPose_to_OpenPose
+            reproj_from_trc_calib
+            trc_combine
+            trc_desample
+            trc_filter
+            trc_from_easymocap
+            trc_from_mot_osim
+            trc_gaitevents
+            trc_plot
+            trc_to_c3d
+            trc_Zup_to_Yup
+          )
+          for cmd in "${entry_points[@]}"; do
+            echo "Testing: $cmd --help"
+            if ! "$cmd" --help >/dev/null 2>&1; then
+              echo "❌ Failed to run: $cmd"
+              exit 1
+            fi
+          done
+
       - name: Test with pytest
         shell: bash -l {0}
         env: 
