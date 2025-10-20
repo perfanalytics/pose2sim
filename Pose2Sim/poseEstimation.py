@@ -47,7 +47,6 @@ import cv2
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
 from rtmlib.tools.object_detection.post_processings import nms
-from deep_sort_realtime.deepsort_tracker import DeepSort
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort,\
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel, bbox_xyxy_compute, \
                         get_screen_size, calculate_display_size
@@ -639,7 +638,9 @@ def estimate_pose_all(config_dict):
             logging.info(f'Found video files with {vid_img_extension} extension.')
             for video_path in video_files:
                 pose_tracker.reset()
-                if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()
+                if tracking_mode == 'deepsort': 
+                    from deep_sort_realtime.deepsort_tracker import DeepSort
+                    deepsort_tracker.tracker.delete_all_tracks()
                 process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker)
 
         else:
@@ -655,5 +656,7 @@ def estimate_pose_all(config_dict):
                 for image_folder in image_folders:
                     pose_tracker.reset()
                     image_folder_path = os.path.join(video_dir, image_folder)
-                    if tracking_mode == 'deepsort': deepsort_tracker.tracker.delete_all_tracks()                
+                    if tracking_mode == 'deepsort': 
+                        from deep_sort_realtime.deepsort_tracker import DeepSort
+                        deepsort_tracker.tracker.delete_all_tracks()                
                     process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker)
