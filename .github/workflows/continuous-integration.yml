@@ -89,7 +89,7 @@ jobs:
           conda activate pose2sim
           entry_points=(
             AlphaPose_to_OpenPose
-            Blazepose_runsave
+            # Blazepose_runsave # requires pip install mediapipe
             bodykin_from_mot_osim
             c3d_to_trc
             calib_easymocap_to_toml
