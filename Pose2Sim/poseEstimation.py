@@ -506,6 +506,7 @@ def estimate_pose_all(config_dict):
             deepsort_params = deepsort_params.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/',':/').replace('":"\\',':\\')
             deepsort_params = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', deepsort_params) # changes "[640", "640]" to [640,640]
             deepsort_params = json.loads(deepsort_params)
+        from deep_sort_realtime.deepsort_tracker import DeepSort
         deepsort_tracker = DeepSort(**deepsort_params)
     else:
         deepsort_tracker = None
@@ -639,7 +640,6 @@ def estimate_pose_all(config_dict):
             for video_path in video_files:
                 pose_tracker.reset()
                 if tracking_mode == 'deepsort': 
-                    from deep_sort_realtime.deepsort_tracker import DeepSort
                     deepsort_tracker.tracker.delete_all_tracks()
                 process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker)
 
@@ -657,6 +657,5 @@ def estimate_pose_all(config_dict):
                     pose_tracker.reset()
                     image_folder_path = os.path.join(video_dir, image_folder)
                     if tracking_mode == 'deepsort': 
-                        from deep_sort_realtime.deepsort_tracker import DeepSort
                         deepsort_tracker.tracker.delete_all_tracks()                
                     process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker)
