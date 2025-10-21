@@ -52,7 +52,7 @@ dependencies = [
     "openvino",
     "onnxruntime",
     "opencv-python != 4.11.*", # avoid 4.11 due to displaymatrix ignored (rotation metadata)
-    "deep-sort-realtime",
+    # "deep-sort-realtime", # likely not required anymore
 ]
 
 [tool.setuptools_scm]
