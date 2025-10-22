@@ -184,8 +184,8 @@ class TestWorkflow(unittest.TestCase):
 
         # Run all
         # No filtering, no marker augmentation
-        config_dict.get("pose").update({"tracking_mode":'deepsort'})
-        config_dict.get("pose").update({"deepsort_params":"""{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8, 'embedder':None}"""})
+        # config_dict.get("pose").update({"tracking_mode":'deepsort'})
+        # config_dict.get("pose").update({"deepsort_params":"""{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8, 'embedder':None}"""})
         config_dict.get('kinematics').update({'use_simple_model':True})
         Pose2Sim.runAll(config_dict, do_synchronization=False, do_markerAugmentation=False, do_filtering=False)
 
