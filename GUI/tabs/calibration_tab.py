@@ -41,11 +41,7 @@ class CalibrationTab:
         
         # Build the UI
         self.build_ui()
-    
-    def get_title(self):
-        """Return the tab title"""
-        return self.app.lang_manager.get_text('calibration_tab')
-    
+
     def get_settings(self):
         """Get the calibration settings"""
         settings = {
@@ -90,7 +86,14 @@ class CalibrationTab:
     def build_ui(self):
         # Create a two-panel layout
         self.main_panel = ctk.CTkFrame(self.frame)
-        self.main_panel.pack(fill='both', expand=True, padx=10, pady=10)
+        self.main_panel.pack(fill='both', expand=True, padx=0, pady=0)
+
+        self.title_label = ctk.CTkLabel(
+            self.main_panel,
+            text=self.app.lang_manager.get_text('calibration_tab'),
+            font=("Helvetica", 24, "bold")
+        )
+        self.title_label.pack(pady=(0, 20))
         
         # Left panel (for inputs)
         self.left_panel = ctk.CTkFrame(self.main_panel, width=600)
@@ -112,13 +115,6 @@ class CalibrationTab:
         ).pack(expand=True)
     
     def build_left_panel(self):
-        # Title
-        ctk.CTkLabel(
-            self.left_panel, 
-            text=self.get_title(),
-            font=('Helvetica', 24, 'bold')
-        ).pack(anchor='w', pady=(0, 20))
-        
         # Calibration Type
         type_frame = ctk.CTkFrame(self.left_panel)
         type_frame.pack(fill='x', pady=5)
@@ -285,9 +281,11 @@ class CalibrationTab:
             text="Confirm Configuration",
             command=self.confirm_calibration_type,
             height=40,
-            width=200
+            width=200,
+            font=("Helvetica", 14),
+            fg_color=("#4CAF50", "#2E7D32")
         )
-        self.confirm_button.pack(pady=10)
+        self.confirm_button.pack(side='bottom', pady=10)
         
         # Proceed button (initially hidden)
         self.proceed_button = ctk.CTkButton(

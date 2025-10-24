@@ -28,7 +28,7 @@ class ActivationTab:
     def build_ui(self):
         # Create main container
         self.content_frame = ctk.CTkFrame(self.frame)
-        self.content_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        self.content_frame.pack(fill='both', expand=True, padx=0, pady=0)
         
         # Tab title
         ctk.CTkLabel(
@@ -46,7 +46,7 @@ class ActivationTab:
         ).pack(pady=10)
         
         # Card frame for activation options
-        card_frame = ctk.CTkFrame(self.content_frame)
+        card_frame = ctk.CTkFrame(self.content_frame, fg_color='transparent')
         card_frame.pack(pady=40)
         
         # Only show Anaconda Prompt Button

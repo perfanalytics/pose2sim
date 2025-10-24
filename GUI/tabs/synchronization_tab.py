@@ -102,14 +102,14 @@ class SynchronizationTab:
         """Build the tab user interface"""
         # Create scrollable frame for content
         content_frame = ctk.CTkScrollableFrame(self.frame)
-        content_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        content_frame.pack(fill='both', expand=True, padx=0, pady=0)
         
         # Title header
         ctk.CTkLabel(
             content_frame,
             text="Synchronization",
             font=("Helvetica", 24, "bold")
-        ).pack(anchor='w', pady=(0, 20))
+        ).pack(pady=(0, 20))
         
         # Information text
         ctk.CTkLabel(
@@ -341,9 +341,13 @@ class SynchronizationTab:
         # Hide manual sync frame initially
         self.manual_sync_frame.pack_forget()
         
+        # Add empty frame to push the buttons to the bottom
+        spacer_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        spacer_frame.pack(fill='both', expand=True)
+
         # Buttons for saving settings
         self.skip_button_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        self.skip_button_frame.pack(pady=20)
+        self.skip_button_frame.pack(side='bottom', pady=20)
         
         self.confirm_skip_button = ctk.CTkButton(
             self.skip_button_frame,
@@ -351,8 +355,11 @@ class SynchronizationTab:
             command=self.confirm_skip_synchronization,
             font=("Helvetica", 14),
             height=40,
-            width=250
+            width=250,
+            fg_color="#4CAF50",
+            hover_color="#388E3C"
         )
+        self.confirm_skip_button.pack(side='bottom')
         
         self.confirm_gui_button = ctk.CTkButton(
             self.skip_button_frame,
@@ -364,6 +371,7 @@ class SynchronizationTab:
             fg_color="#4CAF50",
             hover_color="#388E3C"
         )
+        self.confirm_gui_button.pack(side='bottom')
         
         self.save_manual_button = ctk.CTkButton(
             self.skip_button_frame,
@@ -371,8 +379,11 @@ class SynchronizationTab:
             command=self.save_manual_settings,
             font=("Helvetica", 14),
             height=40,
-            width=250
+            width=250,
+            fg_color="#4CAF50",
+            hover_color="#388E3C"
         )
+        self.save_manual_button.pack(side='bottom')
         
         # Status label for feedback
         self.status_label = ctk.CTkLabel(

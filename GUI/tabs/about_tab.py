@@ -148,7 +148,7 @@ class AboutTab:
         """Build the about tab UI"""
         # Create a scrollable content frame with more padding
         self.content_frame = ctk.CTkScrollableFrame(self.frame)
-        self.content_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        self.content_frame.pack(fill='both', expand=True, padx=0, pady=0)
         
         # Create header with logo and title
         self.create_header()
@@ -175,7 +175,7 @@ class AboutTab:
         left_frame.pack(side='left', fill='y')
         
         # Try to load logo image
-        logo_path = Path(__file__).parent.parent / "assets" / "pose2sim_logo.png"
+        logo_path = Path(__file__).parent.parent / "assets" / "Pose2Sim_logo.png"
         try:
             if logo_path.exists():
                 logo_img = Image.open(logo_path)

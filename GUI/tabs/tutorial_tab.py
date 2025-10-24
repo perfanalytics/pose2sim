@@ -5,7 +5,6 @@ from tkinter import messagebox
 import subprocess
 import threading
 import webbrowser
-from PIL import Image
 
 class TutorialTab:
     def __init__(self, parent, app):
@@ -55,7 +54,7 @@ class TutorialTab:
         """Build the tutorial UI"""
         # Create a scrollable content frame
         self.content_frame = ctk.CTkScrollableFrame(self.frame)
-        self.content_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        self.content_frame.pack(fill='both', expand=True, padx=0, pady=0)
         
         # Title
         self.title_label = ctk.CTkLabel(
@@ -67,22 +66,21 @@ class TutorialTab:
         
         # Video information section
         video_info_frame = ctk.CTkFrame(self.content_frame, fg_color=("gray95", "gray20"))
-        video_info_frame.pack(fill='x', pady=10, padx=20)
+        video_info_frame.pack(fill='x', pady=10, padx=0)
         
-        ctk.CTkLabel(
-            video_info_frame,
-            text="Due to size, tutorial videos are hosted on Google Drive",
-            font=("Helvetica", 16, "bold"),
-            wraplength=600
-        ).pack(pady=(10, 5))
+        # ctk.CTkLabel(
+        #     video_info_frame,
+        #     text="Due to size, tutorial videos are hosted on Google Drive",
+        #     font=("Helvetica", 16, "bold"),
+        #     wraplength=600
+        # ).pack(pady=(10, 5))
         
         # Get the analysis mode
         analysis_mode = getattr(self.app, 'analysis_mode', '3d')
         
-        # Video buttons frame
         video_buttons_frame = ctk.CTkFrame(video_info_frame, fg_color="transparent")
         video_buttons_frame.pack(pady=10)
-        
+
         # Button for current mode video
         current_mode_text = "Watch 2D Tutorial Video" if analysis_mode == '2d' else "Watch 3D Tutorial Video"
         ctk.CTkButton(
@@ -91,10 +89,8 @@ class TutorialTab:
             command=lambda: self.open_video_link(analysis_mode),
             font=("Helvetica", 14, "bold"),
             width=250,
-            height=40,
-            fg_color="#4CAF50",
-            hover_color="#388E3C"
-        ).pack(side='left', padx=10)
+            height=40
+        ).pack(padx=10, pady=5)
         
         # Button for other mode video
         other_mode = '3d' if analysis_mode == '2d' else '2d'
@@ -103,74 +99,75 @@ class TutorialTab:
             video_buttons_frame,
             text=other_mode_text,
             command=lambda: self.open_video_link(other_mode),
-            font=("Helvetica", 14),
-            width=250,
-            height=40
-        ).pack(side='left', padx=10)
+            font=("Helvetica", 12),
+            width=150,
+            height=30, 
+            text_color="grey20"
+        ).pack(padx=10, pady=5)
         
-        # Tutorial image placeholder
-        self.tutorial_img_frame = ctk.CTkFrame(self.content_frame, height=300)
-        self.tutorial_img_frame.pack(fill='x', pady=10)
+        # # Tutorial image placeholder
+        # self.tutorial_img_frame = ctk.CTkFrame(self.content_frame, height=300)
+        # self.tutorial_img_frame.pack(fill='x', pady=10)
         
-        # Load a placeholder image or tutorial screenshot if available
-        tutorial_img_path = Path(__file__).parent.parent / "assets" / "tutorial_preview.png"
-        if tutorial_img_path.exists():
-            try:
-                # Load and display image
-                img = Image.open(tutorial_img_path)
-                img = img.resize((800, 300), Image.LANCZOS)
-                self.tutorial_img = ctk.CTkImage(light_image=img, dark_image=img, size=(800, 300))
+        # # Load a placeholder image or tutorial screenshot if available
+        # tutorial_img_path = Path(__file__).parent.parent / "assets" / "tutorial_preview.png"
+        # if tutorial_img_path.exists():
+        #     try:
+        #         # Load and display image
+        #         img = Image.open(tutorial_img_path)
+        #         img = img.resize((800, 300), Image.LANCZOS)
+        #         self.tutorial_img = ctk.CTkImage(light_image=img, dark_image=img, size=(800, 300))
                 
-                img_label = ctk.CTkLabel(self.tutorial_img_frame, image=self.tutorial_img, text="")
-                img_label.pack(pady=10)
-            except Exception as e:
-                ctk.CTkLabel(
-                    self.tutorial_img_frame,
-                    text="Tutorial Preview Image Not Available",
-                    font=("Helvetica", 16)
-                ).pack(expand=True)
-        else:
-            ctk.CTkLabel(
-                self.tutorial_img_frame,
-                text="Tutorial Preview Image Not Available",
-                font=("Helvetica", 16)
-            ).pack(expand=True)
+        #         img_label = ctk.CTkLabel(self.tutorial_img_frame, image=self.tutorial_img, text="")
+        #         img_label.pack(pady=10)
+        #     except Exception as e:
+        #         ctk.CTkLabel(
+        #             self.tutorial_img_frame,
+        #             text="Tutorial Preview Image Not Available",
+        #             font=("Helvetica", 16)
+        #         ).pack(expand=True)
+        # else:
+        #     ctk.CTkLabel(
+        #         self.tutorial_img_frame,
+        #         text="Tutorial Preview Image Not Available",
+        #         font=("Helvetica", 16)
+        #     ).pack(expand=True)
         
         # Add beta version message box
         self.beta_message_frame = ctk.CTkFrame(self.content_frame, fg_color="white")
-        self.beta_message_frame.pack(fill='x', pady=10, padx=40)
+        self.beta_message_frame.pack(fill='x', pady=10, padx=0)
 
         self.beta_message = ctk.CTkLabel(
             self.beta_message_frame,
-            text="This GUI is a beta version. If you have recommendations, errors, or suggestions please send them to yacine.pose2sim@gmail.com",
+            text="This GUI is a beta version. If you have recommendations, errors, or suggestions please send them to yacine.pose2sim@gmail.com or contact@david-pagnon.com",
             font=("Helvetica", 12),
             text_color="black",
             wraplength=600
         )
         self.beta_message.pack(pady=10, padx=10)
         
-        # Description text
-        self.description_frame = ctk.CTkFrame(self.content_frame)
-        self.description_frame.pack(fill='x', pady=10)
+        # # Description text
+        # self.description_frame = ctk.CTkFrame(self.content_frame)
+        # self.description_frame.pack(fill='x', pady=10)
         
-        self.description_text = ctk.CTkTextbox(
-            self.description_frame,
-            height=100,
-            font=("Helvetica", 12)
-        )
-        self.description_text.pack(fill='x', padx=10, pady=10)
+        # self.description_text = ctk.CTkTextbox(
+        #     self.description_frame,
+        #     height=100,
+        #     font=("Helvetica", 12)
+        # )
+        # self.description_text.pack(fill='x', padx=10, pady=10)
         
-        description = (
-            "Welcome to the Pose2Sim tutorial. This guide will help you set up and use Pose2Sim effectively.\n\n"
-            "The tutorial videos cover:\n"
-            "• Configuration workflow\n"
-            "• Data processing\n"
-            "• Advanced features\n\n"
-            "Click on the video link above to watch the complete tutorial on Google Drive."
-        )
+        # description = (
+        #     "Welcome to the Pose2Sim tutorial. This guide will help you set up and use Pose2Sim effectively.\n\n"
+        #     "The tutorial videos cover:\n"
+        #     "• Configuration workflow\n"
+        #     "• Data processing\n"
+        #     "• Advanced features\n\n"
+        #     "Click on the video link above to watch the complete tutorial on Google Drive."
+        # )
         
-        self.description_text.insert("1.0", description)
-        self.description_text.configure(state="disabled")
+        # self.description_text.insert("1.0", description)
+        # self.description_text.configure(state="disabled")
         
         # Dependency check frame
         self.dependency_frame = ctk.CTkFrame(self.content_frame)
@@ -187,10 +184,9 @@ class TutorialTab:
         self.dependency_items_frame.pack(fill='x', padx=10, pady=10)
         
         # Create indicators for each dependency
-        row = 0
         for dep_id, dep_info in self.dependencies.items():
             dep_frame = ctk.CTkFrame(self.dependency_items_frame, fg_color="transparent")
-            dep_frame.grid(row=row, column=0, sticky="w", pady=2)
+            dep_frame.pack(fill='x', pady=5, padx=10)
             
             # Status indicator
             status_label = ctk.CTkLabel(
@@ -225,34 +221,39 @@ class TutorialTab:
             dep_info["status_label"] = status_label
             dep_info["install_button"] = install_button
             
-            row += 1
-        
+        # # Add spacer frame to push buttons to bottom
+        # spacer = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        # spacer.pack(fill='x', pady=100)
+
         # Bottom buttons frame
         self.bottom_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
-        self.bottom_frame.pack(fill='x', pady=20)
-        
-        # Skip tutorial button
-        self.skip_button = ctk.CTkButton(
-            self.bottom_frame,
-            text="Skip Tutorial",
-            command=self.skip_tutorial,
-            width=150,
-            fg_color="#FF9500",
-            hover_color="#FF7000"
-        )
-        self.skip_button.pack(side='right', padx=10)
+        self.bottom_frame.pack(side='bottom', expand=True, fill='x', pady=(10, 10))
         
         # Complete tutorial button
         self.complete_button = ctk.CTkButton(
             self.bottom_frame,
             text="Complete Tutorial",
             command=self.complete_tutorial,
-            width=150,
-            fg_color="#4CAF50",
-            hover_color="#388E3C"
+            height=40,
+            width=200,
+            font=("Helvetica", 14),
+            fg_color=("#4CAF50", "#2E7D32")
         )
         self.complete_button.pack(side='right', padx=10)
     
+        # Skip tutorial button
+        self.skip_button = ctk.CTkButton(
+            self.bottom_frame,
+            text="Skip Tutorial",
+            command=self.skip_tutorial,
+            height=40,
+            width=200,
+            font=("Helvetica", 14),
+            fg_color="#FF9500",
+            hover_color="#FF7000"
+        )
+        self.skip_button.pack(side='right', padx=10)
+        
     def open_video_link(self, mode):
         """Open the video link in a web browser"""
         if mode in self.video_links:

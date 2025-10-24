@@ -29,10 +29,6 @@ class PrepareVideoTab:
         # Build the tab UI
         self.build_ui()
     
-    def get_title(self):
-        """Return the tab title"""
-        return "Prepare Video"
-    
     def get_settings(self):
         """Get the prepare video settings"""
         settings = {}
@@ -44,15 +40,16 @@ class PrepareVideoTab:
         """Build the tab user interface"""
         # Create a scrollable frame for content
         content_frame = ctk.CTkScrollableFrame(self.frame)
-        content_frame.pack(fill='both', expand=True, padx=20, pady=20)
-        
+        content_frame.pack(fill='both', expand=True, padx=0, pady=0)
+
         # Tab title
-        ctk.CTkLabel(
+        self.title_label = ctk.CTkLabel(
             content_frame,
             text="Prepare Video",
             font=("Helvetica", 24, "bold")
-        ).pack(anchor="w", pady=(0, 20))
-        
+        )
+        self.title_label.pack(pady=(0, 20))
+
         # Editing mode selection - using a card-style UI
         mode_frame = ctk.CTkFrame(content_frame)
         mode_frame.pack(fill='x', pady=15)
@@ -99,8 +96,7 @@ class PrepareVideoTab:
             command=lambda: self.set_editing_mode('advanced'),
             width=150,
             height=40,
-            font=("Helvetica", 14),
-            fg_color="transparent"  # Unselected color
+            font=("Helvetica", 14)
         )
         self.advanced_mode_btn.pack(pady=10, padx=10, fill='x')
         
@@ -198,9 +194,10 @@ class PrepareVideoTab:
             command=self.confirm_checkerboard_only,
             width=200,
             height=40,
-            font=("Helvetica", 14)
+            font=("Helvetica", 14),
+            fg_color=("#4CAF50", "#2E7D32")
         )
-        self.confirm_button.pack(pady=20)
+        self.confirm_button.pack(pady=20, side='bottom')
         
         # Proceed button for "No" option (initially hidden)
         self.proceed_button = ctk.CTkButton(
@@ -209,7 +206,8 @@ class PrepareVideoTab:
             command=self.proceed_prepare_video,
             width=200,
             height=40,
-            font=("Helvetica", 14)
+            font=("Helvetica", 14),
+            fg_color=("#4CAF50", "#2E7D32")
         )
         
         # Advanced mode frame (initially hidden)
@@ -265,7 +263,7 @@ class PrepareVideoTab:
             height=45,
             font=("Helvetica", 14),
             state="disabled",  # Initially disabled
-            fg_color=("#FF9800", "#F57C00")  # Orange color
+            fg_color=("#FF9500", "#FF7000")  # Orange color
         )
         self.done_editing_btn.pack(side='left', padx=10)
         
@@ -290,14 +288,14 @@ class PrepareVideoTab:
         
         # Update button colors
         if mode == 'simple':
-            self.simple_mode_btn.configure(fg_color=("#3a7ebf", "#1f538d"))
-            self.advanced_mode_btn.configure(fg_color="transparent")
+            self.simple_mode_btn.configure(text_color='white', fg_color=("#3a7ebf", "#1f538d"))
+            self.advanced_mode_btn.configure(text_color="grey20")
             self.simple_mode_frame.pack(fill='x', pady=10)
             self.advanced_mode_frame.pack_forget()
             self.update_status("Simple mode: Configure video extraction settings", "blue")
         else:  # advanced
-            self.simple_mode_btn.configure(fg_color="transparent")
-            self.advanced_mode_btn.configure(fg_color=("#3a7ebf", "#1f538d"))
+            self.simple_mode_btn.configure(text_color="grey20")
+            self.advanced_mode_btn.configure(text_color='white', fg_color=("#3a7ebf", "#1f538d"))
             self.simple_mode_frame.pack_forget()
             self.advanced_mode_frame.pack(fill='x', pady=10)
             self.update_status("Advanced mode: Use external editor for video processing", "blue")

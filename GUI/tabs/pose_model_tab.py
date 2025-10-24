@@ -92,7 +92,7 @@ class PoseModelTab:
     def build_ui(self):
         # Create scrollable container
         self.content_frame = ctk.CTkScrollableFrame(self.frame)
-        self.content_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        self.content_frame.pack(fill='both', expand=True, padx=0, pady=0)
         
         # Tab title
         ctk.CTkLabel(
@@ -194,8 +194,10 @@ class PoseModelTab:
             text=self.app.lang_manager.get_text('proceed_pose_estimation'),
             command=self.proceed_pose_estimation,
             height=40,
-            width=200
-        ).pack(pady=20)
+            width=200,
+            font=("Helvetica", 14),
+            fg_color=("#4CAF50", "#2E7D32")
+        ).pack(side='bottom', pady=20)
     
     def build_single_video_input(self):
         """Build the UI for single video file input"""
@@ -396,7 +398,9 @@ class PoseModelTab:
             text=self.app.lang_manager.get_text('proceed_pose_estimation'),
             command=self.proceed_pose_estimation,
             height=40,
-            width=200
+            width=200,
+            font=("Helvetica", 14),
+            fg_color=("#4CAF50", "#2E7D32")
         ).pack(pady=20)
     
     def build_pose_model_section(self):

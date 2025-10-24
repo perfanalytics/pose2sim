@@ -1,5 +1,7 @@
 import tkinter as tk
 import customtkinter as ctk
+from PIL import Image, ImageTk
+from pathlib import Path
 
 class IntroWindow:
     """Displays an animated introduction window for the Pose2Sim GUI."""
@@ -24,9 +26,16 @@ class IntroWindow:
             self.shadow_color_value = 170  
             self.bg_color = '#1A1A1A'      # Very dark gray
 
+        favicon_path = Path(__file__).parent/"assets/Pose2Sim_logo.png"
 
         # Create the intro window
         self.root = ctk.CTk()
+        
+        # Favicon
+        favicon = Image.open(favicon_path)
+        icon = ImageTk.PhotoImage(favicon)
+        self.root.iconphoto(False, icon)
+
         self.root.title("Welcome to Pose2Sim")
         
         # Get screen dimensions
@@ -54,7 +63,18 @@ class IntroWindow:
         # Create canvas for animation
         self.canvas = tk.Canvas(self.root, bg=self.bg_color, highlightthickness=0)
         self.canvas.pack(expand=True, fill='both')
-        
+
+        # Add logo above the letters
+        self.top_image = Image.open(favicon_path)
+        self.top_photo = ImageTk.PhotoImage(self.top_image)
+
+        self.canvas.create_image(
+            window_width / 2,
+            window_height / 2 - 200,
+            image=self.top_photo,
+            anchor='center'
+        )
+
         # Create individual letters with initial opacity
         letters = ['P', 'o', 's', 'e', '2', 'S', 'i', 'm']
         self.text_ids = []

@@ -285,32 +285,30 @@ class AdvancedTab:
     def build_ui(self):
         """Build the user interface"""
         # Create header
-        header_frame = ctk.CTkFrame(self.frame)
-        header_frame.pack(fill='x', padx=20, pady=(20, 0))
+        header_frame = ctk.CTkScrollableFrame(self.frame)
+        header_frame.pack(fill='both', expand=True, padx=0, pady=(0, 0))
         
         ctk.CTkLabel(
             header_frame, 
             text=self.get_title(), 
             font=('Helvetica', 24, 'bold')
-        ).pack(anchor='w')
-        
-        # Create scrollable content frame
-        scroll_frame = ctk.CTkScrollableFrame(self.frame)
-        scroll_frame.pack(fill='both', expand=True, padx=20, pady=20)
-        
+        ).pack(fill='both', expand=True, padx=0, pady=0)
+
         if self.simplified:
             # Build simplified 2D interface
-            self.build_2d_interface(scroll_frame)
+            self.build_2d_interface(header_frame)
         else:
             # Build full 3D interface
-            self.build_3d_interface(scroll_frame)
+            self.build_3d_interface(header_frame)
         
         # Save Button
         save_button = ctk.CTkButton(
             self.frame,
             text=self.app.lang_manager.get_text('save_advanced_settings'),
             command=self.save_settings,
-            height=40
+            height=40,
+            font=("Helvetica", 14),
+            fg_color=("#4CAF50", "#2E7D32")
         )
         save_button.pack(side='bottom', pady=20)
     

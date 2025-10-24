@@ -27,7 +27,7 @@ class BatchTab:
     def build_ui(self):
         # Create scrollable container
         self.content_frame = ctk.CTkScrollableFrame(self.frame)
-        self.content_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        self.content_frame.pack(fill='both', expand=True, padx=0, pady=0)
         
         # Header
         header_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
