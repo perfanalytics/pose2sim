@@ -29,8 +29,8 @@ class TutorialTab:
             "path": {"installed": False, "name": "Anaconda Path"},
             "pose2sim": {"installed": False, "name": "Pose2Sim"},
             "opensim": {"installed": False, "name": "OpenSim"},
-            "pytorch": {"installed": False, "name": "PyTorch"},
-            "onnxruntime-gpu": {"installed": False, "name": "ONNX Runtime GPU"}
+            "pytorch": {"installed": False, "name": "PyTorch (optional)"},
+            "onnxruntime-gpu": {"installed": False, "name": "ONNX Runtime GPU (optional)"},
         }
         
         # Build the UI
@@ -59,7 +59,7 @@ class TutorialTab:
         # Title
         self.title_label = ctk.CTkLabel(
             self.content_frame,
-            text="Welcome to Pose2Sim Tutorial",
+            text="Welcome to Pose2Sim",
             font=("Helvetica", 24, "bold")
         )
         self.title_label.pack(pady=(0, 20))

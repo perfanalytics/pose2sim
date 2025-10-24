@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import customtkinter as ctk
 
 # Import language manager
@@ -239,9 +240,16 @@ class Pose2SimApp:
         # Configure language selector in top-right corner
         self.setup_language_selector(self.top_sidebar)
 
+        # Add logo above the title
+        favicon_path = Path(__file__).parent/"assets/Pose2Sim_logo.png"
+        self.top_image = Image.open(favicon_path)
+        self.top_photo = ctk.CTkImage(light_image=self.top_image, dark_image=self.top_image, size=(120,120))
+        image_label = ctk.CTkLabel(self.sidebar, image=self.top_photo, text="")
+        image_label.pack(pady=(0, 0))
+
         # App title in sidebar
         app_title_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        app_title_frame.pack(fill='x', pady=(20, 30))
+        app_title_frame.pack(fill='x', pady=(10, 30))
         
         ctk.CTkLabel(
             app_title_frame,
