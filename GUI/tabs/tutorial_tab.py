@@ -30,14 +30,14 @@ class TutorialTab:
             "pose2sim": {"installed": False, "name": "Pose2Sim"},
             "opensim": {"installed": False, "name": "OpenSim"},
             "pytorch": {"installed": False, "name": "PyTorch (optional)"},
-            "onnxruntime-gpu": {"installed": False, "name": "ONNX Runtime GPU (optional)"},
+            "onnxruntime-gpu": {"installed": False, "name": "ONNX GPU (optional)"},
         }
         
         # Build the UI
         self.build_ui()
         
-        # Check for tutorial marker file
-        self.check_tutorial_status()
+        # # Check for tutorial marker file
+        # self.check_tutorial_status()
         
         # Start dependency check in background thread
         threading.Thread(target=self.check_dependencies, daemon=True).start()
@@ -225,91 +225,91 @@ class TutorialTab:
         # spacer = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         # spacer.pack(fill='x', pady=100)
 
-        # Bottom buttons frame
-        self.bottom_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
-        self.bottom_frame.pack(side='bottom', expand=True, fill='x', pady=(10, 10))
+        # # Bottom buttons frame
+        # self.bottom_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        # self.bottom_frame.pack(side='bottom', expand=True, fill='x', pady=(10, 10))
         
-        # Complete tutorial button
-        self.complete_button = ctk.CTkButton(
-            self.bottom_frame,
-            text="Complete Tutorial",
-            command=self.complete_tutorial,
-            height=40,
-            width=200,
-            font=("Helvetica", 14),
-            fg_color=("#4CAF50", "#2E7D32")
-        )
-        self.complete_button.pack(side='right', padx=10)
+        # # Complete tutorial button
+        # self.complete_button = ctk.CTkButton(
+        #     self.bottom_frame,
+        #     text="Complete Tutorial",
+        #     command=self.complete_tutorial,
+        #     height=40,
+        #     width=200,
+        #     font=("Helvetica", 14),
+        #     fg_color=("#4CAF50", "#2E7D32")
+        # )
+        # self.complete_button.pack(side='right', padx=10)
     
-        # Skip tutorial button
-        self.skip_button = ctk.CTkButton(
-            self.bottom_frame,
-            text="Skip Tutorial",
-            command=self.skip_tutorial,
-            height=40,
-            width=200,
-            font=("Helvetica", 14),
-            fg_color="#FF9500",
-            hover_color="#FF7000"
-        )
-        self.skip_button.pack(side='right', padx=10)
+        # # Skip tutorial button
+        # self.skip_button = ctk.CTkButton(
+        #     self.bottom_frame,
+        #     text="Skip Tutorial",
+        #     command=self.skip_tutorial,
+        #     height=40,
+        #     width=200,
+        #     font=("Helvetica", 14),
+        #     fg_color="#FF9500",
+        #     hover_color="#FF7000"
+        # )
+        # self.skip_button.pack(side='right', padx=10)
         
     def open_video_link(self, mode):
         """Open the video link in a web browser"""
         if mode in self.video_links:
             webbrowser.open(self.video_links[mode])
     
-    def check_tutorial_status(self):
-        """Check if the tutorial has been completed before"""
-        if Path(self.marker_file).exists():
-            # Tutorial has been completed before, only show skip button
-            self.complete_button.pack_forget()
-        else:
-            # First time user, show both buttons
-            pass
+    # def check_tutorial_status(self):
+    #     """Check if the tutorial has been completed before"""
+    #     if Path(self.marker_file).exists():
+    #         # Tutorial has been completed before, only show skip button
+    #         self.complete_button.pack_forget()
+    #     else:
+    #         # First time user, show both buttons
+    #         pass
     
-    def skip_tutorial(self):
-        """Skip the tutorial and move to the main app"""
-        # Confirm the user wants to skip
-        response = messagebox.askyesno(
-            "Skip Tutorial",
-            "Are you sure you want to skip the tutorial? You can access it again from the Tutorial tab later."
-        )
+    # def skip_tutorial(self):
+    #     """Skip the tutorial and move to the main app"""
+    #     # Confirm the user wants to skip
+    #     response = messagebox.askyesno(
+    #         "Skip Tutorial",
+    #         "Are you sure you want to skip the tutorial? You can access it again from the Tutorial tab later."
+    #     )
         
-        if response:
-            # Move to the next tab
-            if hasattr(self.app, 'show_tab'):
-                tab_order = list(self.app.tabs.keys())
-                current_idx = tab_order.index('tutorial')
-                if current_idx + 1 < len(tab_order):
-                    next_tab = tab_order[current_idx + 1]
-                    self.app.show_tab(next_tab)
+    #     if response:
+    #         # Move to the next tab
+    #         if hasattr(self.app, 'show_tab'):
+    #             tab_order = list(self.app.tabs.keys())
+    #             current_idx = tab_order.index('tutorial')
+    #             if current_idx + 1 < len(tab_order):
+    #                 next_tab = tab_order[current_idx + 1]
+    #                 self.app.show_tab(next_tab)
     
-    def complete_tutorial(self):
-        """Mark the tutorial as completed and continue to the app"""
-        # Create marker file to indicate tutorial completion
-        try:
-            with open(self.marker_file, 'w') as f:
-                f.write("Tutorial completed")
+    # def complete_tutorial(self):
+    #     """Mark the tutorial as completed and continue to the app"""
+    #     # Create marker file to indicate tutorial completion
+    #     try:
+    #         with open(self.marker_file, 'w') as f:
+    #             f.write("Tutorial completed")
                 
-            messagebox.showinfo(
-                "Tutorial Complete",
-                "You have completed the Pose2Sim tutorial. You can access it again at any time from the Tutorial tab."
-            )
+    #         messagebox.showinfo(
+    #             "Tutorial Complete",
+    #             "You have completed the Pose2Sim tutorial. You can access it again at any time from the Tutorial tab."
+    #         )
             
-            # Move to the next tab
-            if hasattr(self.app, 'show_tab'):
-                tab_order = list(self.app.tabs.keys())
-                current_idx = tab_order.index('tutorial')
-                if current_idx + 1 < len(tab_order):
-                    next_tab = tab_order[current_idx + 1]
-                    self.app.show_tab(next_tab)
+    #         # Move to the next tab
+    #         if hasattr(self.app, 'show_tab'):
+    #             tab_order = list(self.app.tabs.keys())
+    #             current_idx = tab_order.index('tutorial')
+    #             if current_idx + 1 < len(tab_order):
+    #                 next_tab = tab_order[current_idx + 1]
+    #                 self.app.show_tab(next_tab)
                     
-        except Exception as e:
-            messagebox.showerror(
-                "Error",
-                f"Failed to mark tutorial as completed: {str(e)}"
-            )
+    #     except Exception as e:
+    #         messagebox.showerror(
+    #             "Error",
+    #             f"Failed to mark tutorial as completed: {str(e)}"
+    #         )
     
     def check_dependencies(self):
         """Check if required dependencies are installed"""

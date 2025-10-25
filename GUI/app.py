@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import customtkinter as ctk
+from PIL import Image
 
 # Import language manager
 from GUI.language_manager import LanguageManager
@@ -245,7 +246,7 @@ class Pose2SimApp:
         self.top_image = Image.open(favicon_path)
         self.top_photo = ctk.CTkImage(light_image=self.top_image, dark_image=self.top_image, size=(120,120))
         image_label = ctk.CTkLabel(self.sidebar, image=self.top_photo, text="")
-        image_label.pack(pady=(0, 0))
+        image_label.pack(pady=(10, 0))
 
         # App title in sidebar
         app_title_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -333,15 +334,16 @@ class Pose2SimApp:
             button.pack(pady=5, padx=10)
             self.tab_buttons[tab_id] = button
         
-        # Determine first tab to show
-        if not self.tutorial_completed and 'tutorial' in self.tab_info:
-            first_tab_id = 'tutorial'
-        else:
-            first_tab_id = list(self.tab_info.keys())[0]
-            if first_tab_id == 'tutorial':  # Skip tutorial if completed
-                first_tab_id = list(self.tab_info.keys())[1] if len(self.tab_info) > 1 else first_tab_id
+        # # Determine first tab to show
+        # if not self.tutorial_completed and 'tutorial' in self.tab_info:
+        #     first_tab_id = 'tutorial'
+        # else:
+        #     first_tab_id = list(self.tab_info.keys())[0]
+        #     if first_tab_id == 'tutorial':  # Skip tutorial if completed
+        #         first_tab_id = list(self.tab_info.keys())[1] if len(self.tab_info) > 1 else first_tab_id
         
         # Show first tab (this will trigger lazy instantiation)
+        first_tab_id = 'tutorial'
         self.show_tab(first_tab_id)
     
     def show_tab(self, tab_id):
