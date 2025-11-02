@@ -51,8 +51,10 @@ dependencies = [
     "rtmlib",
     "openvino",
     "onnxruntime",
-    "opencv-python != 4.11.*", # avoid 4.11 due to displaymatrix ignored (rotation metadata)
-    # "deep-sort-realtime", # likely not required anymore
+    "opencv-python != 4.11.*",  # avoid 4.11 due to displaymatrix ignored (rotation metadata)
+    # "deep-sort-realtime",     # likely not required anymore
+    "customtkinter",
+    "requests"
 ]
 
 [tool.setuptools_scm]
@@ -93,3 +95,4 @@ trc_rotate = "Pose2Sim.Utilities.trc_rotate:main"
 trc_scale = "Pose2Sim.Utilities.trc_scale:main"
 
 tests_pose2sim = "Pose2Sim.Utilities.tests:main"
+Pose2Sim = "GUI.main:main"
