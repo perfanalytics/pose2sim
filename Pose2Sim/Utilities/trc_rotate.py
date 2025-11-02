@@ -12,12 +12,12 @@
     or use one of the predefined conversions from and axis-up to another one.
 
     90° rotation around:
-    - "X"  corresponds to:  Y-up -> Z-up     or Z-up -> Y-down
-    - "-X" corresponds to:  Y-up -> Z-down   or Z-up -> Y-up
-    - "Y"  corresponds to:  Z-up -> X-up     or X-up -> Z-down
-    - "-Y" corresponds to:  Z-up -> X-down   or X-up -> Z-up
-    - "Z"  corresponds to:  Y-up -> X-down
-    - "-Z" corresponds to:  Y-up -> X-up
+    - "X"  corresponds to:  yup_to_zup     or zup_to_ydown
+    - "-X" corresponds to:  yup_to_zdown   or zup_to_yup
+    - "Y"  corresponds to:  zup_to_xup     or xup_to_zdown
+    - "-Y" corresponds to:  zup_to_xdown   or xup_to_zup
+    - "Z"  corresponds to:  yup_to_xdown
+    - "-Z" corresponds to:  yup_to_xup
 
     The output file argument is optional. If not specified, 
     '_X', '_-X', '_Y', '_-Y', '_Z' or '_-Z' is appended to the input filename.
@@ -59,12 +59,12 @@ def trc_rotate_func(**args):
     or use one of the predefined conversions from and axis-up to another one.
 
     90° rotation around:
-    - "X"  corresponds to:  Y-up -> Z-up     or Z-up -> Y-down
-    - "-X" corresponds to:  Y-up -> Z-down   or Z-up -> Y-up
-    - "Y"  corresponds to:  Z-up -> X-up     or X-up -> Z-down
-    - "-Y" corresponds to:  Z-up -> X-down   or X-up -> Z-up
-    - "Z"  corresponds to:  Y-up -> X-down
-    - "-Z" corresponds to:  Y-up -> X-up
+    - "X"  corresponds to:  yup_to_zup     or zup_to_ydown
+    - "-X" corresponds to:  yup_to_zdown   or zup_to_yup
+    - "Y"  corresponds to:  zup_to_xup     or xup_to_zdown
+    - "-Y" corresponds to:  zup_to_xdown   or xup_to_zup
+    - "Z"  corresponds to:  yup_to_xdown
+    - "-Z" corresponds to:  yup_to_xup
 
     The output file argument is optional. If not specified, 
     '_X', '_-X', '_Y', '_-Y', '_Z' or '_-Z' is appended to the input filename.
