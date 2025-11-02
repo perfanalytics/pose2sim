@@ -23,9 +23,9 @@
     '_X', '_-X', '_Y', '_-Y', '_Z' or '_-Z' is appended to the input filename.
 
     Usage: 
-    from Pose2Sim.Utilities import trc_rotate; trc_rotate.trc_rotate_func(r'<input_trc_file>', r'<output_trc_file>')
+    from Pose2Sim.Utilities import trc_rotate; trc_rotate.trc_rotate_func(input=r'<input_trc_file>', output=r'<output_trc_file>', rotate90='-X')
     
-    trc_rotate -i input_trc_file                    # Will rotate around X by default (Y-up -> Z-up)
+    trc_rotate -i input_trc_file                    # Will rotate around -X by default (Y-up -> Z-up)
     trc_rotate -i input_trc_file -o output_trc_file
 
     trc_rotate -i input_trc_file --zup_to_yup
@@ -70,9 +70,9 @@ def trc_rotate_func(**args):
     '_X', '_-X', '_Y', '_-Y', '_Z' or '_-Z' is appended to the input filename.
 
     Usage: 
-    from Pose2Sim.Utilities import trc_rotate; trc_rotate.trc_rotate_func(r'<input_trc_file>', r'<output_trc_file>')
+    from Pose2Sim.Utilities import trc_rotate; trc_rotate.trc_rotate_func(input=r'<input_trc_file>', output=r'<output_trc_file>', rotate90='-X')
     
-    trc_rotate -i input_trc_file                    # Will rotate around X by default (Y-up -> Z-up)
+    trc_rotate -i input_trc_file                    # Will rotate around -X by default (Y-up -> Z-up)
     trc_rotate -i input_trc_file -o output_trc_file
 
     trc_rotate -i input_trc_file --zup_to_yup
@@ -82,6 +82,8 @@ def trc_rotate_func(**args):
     trc_path = args.get('input')
     output_trc_path = args.get('output')
     rotate90 = args.get('rotate90')
+    if rotate90 is None:
+        rotate90 = "-X"
     if output_trc_path is None:
         output_trc_path = trc_path.replace('.trc', f'_{rotate90}.trc')
 
@@ -98,7 +100,6 @@ def trc_rotate_func(**args):
     cols = Q_coord.values.reshape(-1,3)
     if rotate90 == "X": # X->X, Y->-Z, Z->Y
         cols = np.stack([cols[:,0],-cols[:,2],cols[:,1]], axis=-1)
-        # cols = np.array([[cols[i*3],-cols[i*3+2],cols[i*3+1]] for i in range(int(len(cols)//3))]).flatten()
     elif rotate90 == "-X": # X->X, Y->Z, Z->-Y
         cols = np.stack([cols[:,0],cols[:,2],-cols[:,1]], axis=-1)
     elif rotate90 == "Y": # X->Z, Y->Y, Z->-X
@@ -130,7 +131,7 @@ def main():
 
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument("--rotate90",
-                    choices=["X","-X","Y","-Y","Z","-Z"], default="X",
+                    choices=["X","-X","Y","-Y","Z","-Z"], default="-X",
                     help="Axis and direction for a 90-degree rotation")
     group.add_argument("--yup_to_zup",   action="store_const", const="X",  dest="rotate90",
                     help="Corresponds to a 90-degree rotation around +X")
