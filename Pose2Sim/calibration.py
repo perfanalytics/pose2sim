@@ -132,7 +132,7 @@ def read_qca(qca_path, binning_factor):
         ret += [float(tag.attrib.get('avg-residual'))]
         C += [tag.attrib.get('serial')]
         res += [int(tag.attrib.get('video_resolution')[:-1]) if tag.attrib.get('video_resolution') not in (None, "N/A") else 1080]
-       if any(model in tag.attrib.get('model', '').lower() for model in ["video", "none"]):
+        if any(model in tag.attrib.get('model', '').lower() for model in ["video", "none"]):
             vid_id += [i]
     
     # Image size
