@@ -909,6 +909,12 @@ Converts 3D point data from a .trc file to a .c3d file compatible with Visual3D.
 [trc_desample.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_desample.py)
 Undersamples a trc file.
 
+[trc_scale.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_scale.py)
+Scale trc coordinates by a desired factor.
+
+[trc_rotate.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_rotate.py)
+Rotate trc coordinates by 90° around an axis. You can either choose an axis to rotate around, or use one of the predefined conversions from and axis-up to another one.
+
 [trc_Zup_to_Yup.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_Zup_to_Yup.py)
 Changes Z-up system coordinates to Y-up system coordinates.
 

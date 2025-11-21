@@ -568,7 +568,7 @@ def estimate_pose_all(config_dict):
         pose_model = eval(model_name)
     except:
         try: # from Config.toml
-            pose_model = DictImporter().import_(config_dict.get('pose').get(pose_model))
+            pose_model = DictImporter().import_(config_dict.get('pose').get(pose_model)[0])
             if pose_model.id == 'None':
                 pose_model.id = None
         except:

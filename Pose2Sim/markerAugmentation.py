@@ -307,7 +307,6 @@ def augment_markers_all(config_dict):
         # to align feet and floor when visualizing.
         response_markers_conc = [m for resp in response_markers_all for m in resp]
         min_y_pos = trc_data[response_markers_conc].iloc[:,1::3].min().min()
-        print(response_markers_conc)
         with open(os.path.join(pose_3d_dir, 'trc_data.npy'), 'wb') as f:
             np.save(f, trc_data[response_markers_conc])
             
