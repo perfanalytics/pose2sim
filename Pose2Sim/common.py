@@ -972,14 +972,9 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
                          RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder.\
                          Make sure that the person is entirely visible, or use a calibration file instead, or set "to_meters=false".')
 
-    try:
-        head_pair = [['MidShoulder', 'Head']]
-        head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]
-    except:
-        head_pair = [['MidShoulder', 'Nose']]
-        head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]\
-                *1.33
-        logging.warning('The Head marker is missing from your model. Considering Neck to Head size as 1.33 times Neck to MidShoulder size.')
+    head_pair = [['MidShoulder', 'Nose']]
+    head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]\
+            *1.5
     
     heights = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2 + (rback + lback)/2 + head
     
