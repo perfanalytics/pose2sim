@@ -41,6 +41,7 @@ import ast
 from functools import partial
 from tqdm import tqdm
 from anytree.importer import DictImporter
+from anytree import RenderTree
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import cv2
@@ -100,6 +101,83 @@ def setup_pose_tracker(ModelClass, det_frequency, mode, tracking, backend, devic
         to_openpose=False)
         
     return pose_tracker
+
+
+def setup_model_class_mode(pose_model, mode, config_dict={}):
+    '''
+    Set up the pose model class and mode for the pose tracker.
+    '''
+
+    if pose_model.upper() in ('HALPE_26', 'BODY_WITH_FEET'):
+        model_name = 'HALPE_26'
+        ModelClass = BodyWithFeet # 26 keypoints(halpe26)
+        logging.info(f"Using HALPE_26 model (body and feet) for pose estimation in {mode} mode.")
+    elif pose_model.upper() in ('COCO_133', 'WHOLE_BODY', 'WHOLE_BODY_WRIST'):
+        model_name = 'COCO_133'
+        ModelClass = Wholebody
+        logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation in {mode} mode.")
+    elif pose_model.upper() in ('COCO_17', 'BODY'):
+        model_name = 'COCO_17'
+        ModelClass = Body
+        logging.info(f"Using COCO_17 model (body) for pose estimation in {mode} mode.")
+    elif pose_model.upper() =='HAND':
+        model_name = 'HAND_21'
+        ModelClass = Hand
+        logging.info(f"Using HAND_21 model for pose estimation in {mode} mode.")
+    elif pose_model.upper() =='FACE':
+        model_name = 'FACE_106'
+        logging.info(f"Using FACE_106 model for pose estimation in {mode} mode.")
+    elif pose_model.upper() =='ANIMAL':
+        model_name = 'ANIMAL2D_17'
+        logging.info(f"Using ANIMAL2D_17 model for pose estimation in {mode} mode.")
+    else:
+        model_name = pose_model.upper()
+        logging.info(f"Using model {model_name} for pose estimation in {mode} mode.")
+    try:
+        pose_model = eval(model_name)
+    except:
+        try: # from Config.toml
+            from anytree.importer import DictImporter
+            model_name = pose_model.upper()
+            pose_model = DictImporter().import_(config_dict.get('pose').get(pose_model)[0])
+            if pose_model.id == 'None':
+                pose_model.id = None
+            logging.info(f"Using model {model_name} for pose estimation.")
+        except:
+            raise NameError(f'{pose_model} not found in skeletons.py nor in Config.toml')
+
+    # Manually select the models if mode is a dictionary rather than 'lightweight', 'balanced', or 'performance'
+    if not mode in ['lightweight', 'balanced', 'performance'] or 'ModelClass' not in locals():
+        try:
+            from functools import partial
+            try:
+                mode = ast.literal_eval(mode)
+            except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
+                mode = mode.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/',':/').replace('":"\\',':\\')
+                mode = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', mode) # changes "[640", "640]" to [640,640]
+                mode = json.loads(mode)
+            det_class = mode.get('det_class')
+            det = mode.get('det_model')
+            det_input_size = mode.get('det_input_size')
+            pose_class = mode.get('pose_class')
+            pose = mode.get('pose_model')
+            pose_input_size = mode.get('pose_input_size')
+
+            ModelClass = partial(Custom,
+                        det_class=det_class, det=det, det_input_size=det_input_size,
+                        pose_class=pose_class, pose=pose, pose_input_size=pose_input_size)
+            logging.info(f"Using model {model_name} with the following custom parameters: {mode}.")
+
+            if pose_class == 'RTMO' and model_name != 'COCO_17':
+                logging.warning("RTMO currently only supports 'Body' pose_model. Switching to 'Body'.")
+                pose_model = eval('COCO_17')
+            
+        except (json.JSONDecodeError, TypeError):
+            logging.warning("Invalid mode. Must be 'lightweight', 'balanced', 'performance', or '''{dictionary}''' of parameters within triple quotes. Make sure input_sizes are within square brackets.")
+            logging.warning('Using the default "balanced" mode.')
+            mode = 'balanced'
+
+    return pose_model, ModelClass, mode
 
 
 def setup_backend_device(backend='auto', device='auto'):
@@ -252,6 +330,11 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     f_range = [[0,total_frames] if frame_range in ('all', 'auto', []) else frame_range][0]
     cap.set(cv2.CAP_PROP_POS_FRAMES, f_range[0])
     frame_idx = f_range[0]
+
+    # Retrieve keypoint names from model
+    keypoints_ids = [node.id for _, _, node in RenderTree(pose_model) if node.id!=None]
+    kpt_id_max = max(keypoints_ids)+1
+
     with tqdm(iterable=range(*f_range), desc=f'Processing {os.path.basename(video_path)}') as pbar:
         while cap.isOpened():
             if frame_idx in range(*f_range):
@@ -260,36 +343,41 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                 if not success:
                     break
             
-                # Detect poses
-                keypoints, scores = pose_tracker(frame)
+                try: # Frames with no detection cause errors on MacOS CoreMLExecutionProvider
+                    # Detect poses
+                    keypoints, scores = pose_tracker(frame)
 
-                # Non maximum suppression (at pose level, not detection, and only using likely keypoints)
-                frame_shape = frame.shape
-                mask_scores = np.mean(scores, axis=1) > 0.2
+                    # Non maximum suppression (at pose level, not detection, and only using likely keypoints)
+                    frame_shape = frame.shape
+                    mask_scores = np.mean(scores, axis=1) > 0.2
 
-                likely_keypoints = np.where(mask_scores[:, np.newaxis, np.newaxis], keypoints, np.nan)
-                likely_scores = np.where(mask_scores[:, np.newaxis], scores, np.nan)
-                likely_bboxes = bbox_xyxy_compute(frame_shape, likely_keypoints, padding=0)
-                score_likely_bboxes = np.nanmean(likely_scores, axis=1)
+                    likely_keypoints = np.where(mask_scores[:, np.newaxis, np.newaxis], keypoints, np.nan)
+                    likely_scores = np.where(mask_scores[:, np.newaxis], scores, np.nan)
+                    likely_bboxes = bbox_xyxy_compute(frame_shape, likely_keypoints, padding=0)
+                    score_likely_bboxes = np.nanmean(likely_scores, axis=1)
 
-                valid_indices = np.where(~np.isnan(score_likely_bboxes))[0]
-                if len(valid_indices) > 0:
-                    valid_bboxes = likely_bboxes[valid_indices]
-                    valid_scores = score_likely_bboxes[valid_indices]
-                    keep_valid = nms(valid_bboxes, valid_scores, nms_thr=0.45)
-                    keep = valid_indices[keep_valid]
-                else:
-                    keep = []
-                keypoints, scores = likely_keypoints[keep], likely_scores[keep]
+                    valid_indices = np.where(~np.isnan(score_likely_bboxes))[0]
+                    if len(valid_indices) > 0:
+                        valid_bboxes = likely_bboxes[valid_indices]
+                        valid_scores = score_likely_bboxes[valid_indices]
+                        keep_valid = nms(valid_bboxes, valid_scores, nms_thr=0.45)
+                        keep = valid_indices[keep_valid]
+                    else:
+                        keep = []
+                    keypoints, scores = likely_keypoints[keep], likely_scores[keep]
 
-                # Track poses across frames
-                if tracking_mode == 'deepsort':
-                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
-                if tracking_mode == 'sports2d': 
-                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores, max_dist=max_distance_px)
-                else:
-                    pass
+                    # Track poses across frames
+                    if tracking_mode == 'deepsort':
+                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
+                    if tracking_mode == 'sports2d': 
+                        if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                        prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores, max_dist=max_distance_px)
+                    else:
+                        pass
+
+                except:
+                    keypoints = np.full((1,kpt_id_max,2), fill_value=np.nan)
+                    scores = np.full((1,kpt_id_max), fill_value=np.nan)
                     
                 # Save to json
                 if 'openpose' in output_format:
@@ -387,6 +475,10 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
         cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
         cv2.resizeWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", display_width, display_height)
     
+    # Retrieve keypoint names from model
+    keypoints_ids = [node.id for _, _, node in RenderTree(pose_model) if node.id!=None]
+    kpt_id_max = max(keypoints_ids)+1
+    
     f_range = [[0,len(image_files)] if frame_range in ('all', 'auto', []) else frame_range][0]
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
         if frame_idx in range(*f_range):
@@ -396,16 +488,20 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
             except:
                 raise NameError(f"{image_file} is not an image. Videos must be put in the video directory, not in subdirectories.")
             
-            # Detect poses
-            keypoints, scores = pose_tracker(frame)
+            try:
+                # Detect poses
+                keypoints, scores = pose_tracker(frame)
 
-            # Track poses across frames
-            if tracking_mode == 'deepsort':
-                keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
-            if tracking_mode == 'sports2d': 
-                if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores, max_dist=max_distance_px)
-                    
+                # Track poses across frames
+                if tracking_mode == 'deepsort':
+                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
+                if tracking_mode == 'sports2d': 
+                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores, max_dist=max_distance_px)
+            except:
+                keypoints = np.full((1,kpt_id_max,2), fill_value=np.nan)
+                scores = np.full((1,kpt_id_max), fill_value=np.nan)
+
             # Extract frame number from the filename
             if 'openpose' in output_format:
                 json_file_path = os.path.join(json_output_dir, f"{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.json")
@@ -538,75 +634,11 @@ def estimate_pose_all(config_dict):
 
     # Select the appropriate model based on the model_type
     logging.info('\nEstimating pose...')
-    if pose_model.upper() in ('HALPE_26', 'BODY_WITH_FEET'):
-        model_name = 'HALPE_26'
-        ModelClass = BodyWithFeet # 26 keypoints(halpe26)
-        logging.info(f"Using HALPE_26 model (body and feet) for pose estimation.")
-    elif pose_model.upper() in ('COCO_133', 'WHOLE_BODY', 'WHOLE_BODY_WRIST'):
-        model_name = 'COCO_133'
-        ModelClass = Wholebody
-        logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation.")
-    elif pose_model.upper() in ('COCO_17', 'BODY'):
-        model_name = 'COCO_17'
-        ModelClass = Body
-        logging.info(f"Using COCO_17 model (body) for pose estimation.")
-    elif pose_model.upper() =='HAND':
-        model_name = 'HAND_21'
-        ModelClass = Hand
-        logging.info(f"Using HAND_21 model for pose estimation.")
-    elif pose_model.upper() =='FACE':
-        model_name = 'FACE_106'
-        logging.info(f"Using FACE_106 model for pose estimation.")
-    elif pose_model.upper() =='ANIMAL':
-        model_name = 'ANIMAL2D_17'
-        logging.info(f"Using ANIMAL2D_17 model for pose estimation.")
-    else:
-        model_name = pose_model.upper()
-        logging.info(f"Using model {model_name} for pose estimation.")
     pose_model_name = pose_model
-    try:
-        pose_model = eval(model_name)
-    except:
-        try: # from Config.toml
-            pose_model = DictImporter().import_(config_dict.get('pose').get(pose_model)[0])
-            if pose_model.id == 'None':
-                pose_model.id = None
-        except:
-            raise NameError(f'{pose_model} not found in skeletons.py nor in Config.toml')
+    pose_model, ModelClass, mode = setup_model_class_mode(pose_model, mode, config_dict)
 
     # Select device and backend
     backend, device = setup_backend_device(backend=backend, device=device)
-
-    # Manually select the models if mode is a dictionary rather than 'lightweight', 'balanced', or 'performance'
-    if not mode in ['lightweight', 'balanced', 'performance'] or 'ModelClass' not in locals():
-        try:
-            try:
-                mode = ast.literal_eval(mode)
-            except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
-                mode = mode.strip("'").replace('\n', '').replace(" ", "").replace(",", '", "').replace(":", '":"').replace("{", '{"').replace("}", '"}').replace('":"/',':/').replace('":"\\',':\\')
-                mode = re.sub(r'"\[([^"]+)",\s?"([^"]+)\]"', r'[\1,\2]', mode) # changes "[640", "640]" to [640,640]
-                mode = json.loads(mode)
-            det_class = mode.get('det_class')
-            det = mode.get('det_model')
-            det_input_size = mode.get('det_input_size')
-            pose_class = mode.get('pose_class')
-            pose = mode.get('pose_model')
-            pose_input_size = mode.get('pose_input_size')
-
-            ModelClass = partial(Custom,
-                        det_class=det_class, det=det, det_input_size=det_input_size,
-                        pose_class=pose_class, pose=pose, pose_input_size=pose_input_size,
-                        backend=backend, device=device)
-
-            if pose_class == 'RTMO' and model_name != 'COCO_17':
-                logging.warning("RTMO currently only supports 'Body' pose_model. Switching to 'Body'.")
-                pose_model = eval('COCO_17')
-
-        except (json.JSONDecodeError, TypeError):
-            logging.warning("\nInvalid mode. Must be 'lightweight', 'balanced', 'performance', or '''{dictionary}''' of parameters within triple quotes. Make sure input_sizes are within square brackets.")
-            logging.warning('Using the default "balanced" mode.')
-            mode = 'balanced'
-
 
     # Estimate pose
     try:
