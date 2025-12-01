@@ -296,12 +296,9 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
     '''
 
-    try:
-        cap = cv2.VideoCapture(video_path)
-        cap.read()
-        if cap.read()[0] == False:
-            raise
-    except:
+    cap = cv2.VideoCapture(video_path)
+    cap.read()
+    if cap.read()[0] == False:
         raise NameError(f"{video_path} is not a video. Images must be put in one subdirectory per camera.")
     
     pose_dir = os.path.abspath(os.path.join(video_path, '..', '..', 'pose'))

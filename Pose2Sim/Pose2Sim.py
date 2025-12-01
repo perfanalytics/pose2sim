@@ -121,8 +121,11 @@ def read_config_files(config):
         level = 2 # log_dir = os.getcwd()
         config_dicts = [config]
         if config_dicts[0].get('project').get('project_dir') == None:
-            raise ValueError('Please specify the project directory in config_dict:\n \
-                             config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
+            config_dicts[0].get('project').get('project_dir') == '.'
+            logging.warning('Project directory not specified in config dictionary: using current directory.')
+
+            # raise ValueError('Please specify the project directory in config_dict:\n \
+            #                  config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
     else:
         # if launched without an argument, config == None, else it is the path to the config directory
         config_dir = ['.' if config == None else config][0]

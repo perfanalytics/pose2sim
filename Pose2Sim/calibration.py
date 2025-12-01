@@ -41,6 +41,7 @@ os.environ["OPENCV_LOG_LEVEL"]="FATAL"
 import cv2
 import glob
 import toml
+import json
 import re
 from lxml import etree
 import warnings
@@ -528,7 +529,7 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict):
         logging.info(f'\nCalculating extrinsic parameters...')
         
         # check that the number of cameras is consistent
-        nb_cams_extrinsics = len(next(os.walk(os.path.join(calib_dir, 'extrinsics')))[1])
+        nb_cams_extrinsics = [max(len(fold),len(files)) for path, fold, files in os.walk(os.path.join(calib_dir, 'extrinsics'))][0]
         if nb_cams_intrinsics != nb_cams_extrinsics:
             raise Exception(f'Error: The number of cameras is not consistent:\
                     Found {nb_cams_intrinsics} cameras based on the number of intrinsic folders or on calibration file data,\
@@ -599,14 +600,12 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict):
         for img_path in img_vid_files:
             if show_detection_intrinsics == True:
                 imgp_confirmed, objp_confirmed = findCorners(img_path, intrinsics_corners_nb, objp=objp, show=show_detection_intrinsics)
-                if isinstance(imgp_confirmed, np.ndarray):
-                    imgpoints.append(imgp_confirmed)
-                    objpoints.append(objp_confirmed)
             else:
                 imgp_confirmed = findCorners(img_path, intrinsics_corners_nb, objp=objp, show=show_detection_intrinsics)
-                if isinstance(imgp_confirmed, np.ndarray):
-                    imgpoints.append(imgp_confirmed)
-                    objpoints.append(objp)
+            if isinstance(imgp_confirmed, np.ndarray):
+                imgpoints.append(imgp_confirmed)
+                objpoints.append(objp_confirmed)
+
         if len(imgpoints) < 10:
             logging.info(f'Corners were detected only on {len(imgpoints)} images for camera {cam}. Calibration of intrinsic parameters may not be accurate with fewer than 10 good images of the board.')
 
@@ -644,24 +643,35 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
     - T: extrinsic translation: list of arrays of floats
     '''
 
-    try:
-        extrinsics_cam_listdirs_names = sorted(next(os.walk(os.path.join(calib_dir, 'extrinsics')))[1])
-    except StopIteration:
-        logging.exception(f'Error: No {os.path.join(calib_dir, "extrinsics")} folder found.')
-        raise Exception(f'Error: No {os.path.join(calib_dir, "extrinsics")} folder found.')
-    
     extrinsics_method = extrinsics_config_dict.get('extrinsics_method')
+    extrinsics_extension = extrinsics_config_dict.get('extrinsics_extension')
+    if not extrinsics_extension:
+        extrinsics_extension = [extrinsics_config_dict.get('extrinsics_extension') if extrinsics_method == 'board'
+                            else extrinsics_config_dict.get('scene').get('extrinsics_extension')][0]
+    show_reprojection_error = extrinsics_config_dict.get('show_reprojection_error', True)
+    board_position = extrinsics_config_dict.get('board').get('board_position')
+    extrinsics_corners_nb = extrinsics_config_dict.get('board').get('extrinsics_corners_nb')
+    extrinsics_square_size = extrinsics_config_dict.get('board').get('extrinsics_square_size') / 1000 # convert to meters
+    object_coords_3d = np.array(extrinsics_config_dict.get('scene').get('object_coords_3d'), np.float32)
+
+    try:
+        img_vid_files = sorted(glob.glob(os.path.join(calib_dir, 'extrinsics', '*', f'*.{extrinsics_extension}')))
+        if len(img_vid_files) == 0:
+            img_vid_files = sorted(glob.glob(os.path.join(calib_dir, 'extrinsics', f'*.{extrinsics_extension}')))
+        if len(img_vid_files) == 0:
+            raise
+        img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
+    except StopIteration:
+        logging.exception(f'Error: The {os.path.join(calib_dir, "extrinsics")} folder does not exist or does not contain any files with extension .{extrinsics_extension}.')
+        raise Exception(f'Error: The {os.path.join(calib_dir, "extrinsics")} folder does not exist or does not contain any files with extension .{extrinsics_extension}.')
+
     ret, R, T = [], [], []
-    
     if extrinsics_method in {'board', 'scene'}:
         # Define 3D object points
         if extrinsics_method == 'board':
-            board_position = extrinsics_config_dict.get('board').get('board_position')
             if not board_position:
                 logging.warning('board_position not defined in Config.toml. Defaulting to "vertical".')
                 board_position = 'vertical'
-            extrinsics_corners_nb = extrinsics_config_dict.get('board').get('extrinsics_corners_nb')
-            extrinsics_square_size = extrinsics_config_dict.get('board').get('extrinsics_square_size') / 1000 # convert to meters
             object_coords_3d = np.zeros((extrinsics_corners_nb[0] * extrinsics_corners_nb[1], 3), np.float32)
             if board_position == 'horizontal':
                 object_coords_3d[:, :2] = np.mgrid[0:extrinsics_corners_nb[0], 0:extrinsics_corners_nb[1]].T.reshape(-1, 2)
@@ -672,32 +682,27 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             else:
                 logging.exception('board_position should be "horizontal" or "vertical".')
                 raise ValueError('board_position should be "horizontal" or "vertical".')
-            
-        elif extrinsics_method == 'scene':
-            object_coords_3d = np.array(extrinsics_config_dict.get('scene').get('object_coords_3d'), np.float32)
                 
         # Save reference 3D coordinates as trc
-        calib_output_path = os.path.join(calib_dir, f'Object_points.trc')
-        trc_write(object_coords_3d, calib_output_path)
-    
-        for i, cam in enumerate(extrinsics_cam_listdirs_names):
-            logging.info(f'\nCamera {cam}:')
-            
-            # Read images or video
-            extrinsics_extension = [extrinsics_config_dict.get('board').get('extrinsics_extension') if extrinsics_method == 'board'
-                                    else extrinsics_config_dict.get('scene').get('extrinsics_extension')][0]
-            show_reprojection_error = [extrinsics_config_dict.get('board').get('show_reprojection_error') if extrinsics_method == 'board'
-                                    else extrinsics_config_dict.get('scene').get('show_reprojection_error')][0]
-            img_vid_files = glob.glob(os.path.join(calib_dir, 'extrinsics', cam, f'*.{extrinsics_extension}'))
-            if len(img_vid_files) == 0:
-                logging.exception(f'The folder {os.path.join(calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
-                raise ValueError(f'The folder {os.path.join(calib_dir, "extrinsics", cam)} does not exist or does not contain any files with extension .{extrinsics_extension}.')
-            img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
-            
+        obj_pts_path = os.path.join(calib_dir, f'Object_points.trc')
+        trc_write(object_coords_3d, obj_pts_path)
+
+        # Load clicked image points if exist
+        img_pts_path = os.path.join(calib_dir, f'Image_points.json')
+        if os.path.exists(img_pts_path):
+            with open(img_pts_path, 'r') as f:
+                imgp_data = json.load(f)
+            image_points = imgp_data['image_points']
+
+        # Create or update clicked image points file
+        for i, img_vid_file in enumerate(img_vid_files):
+            cam_name = os.path.basename(img_vid_file)
+            logging.info(f'\nCamera {cam_name}:')
+           
             # extract frames from image, or from video if imread is None
-            img = cv2.imread(img_vid_files[0])
+            img = cv2.imread(img_vid_file)
             if img is None:
-                cap = cv2.VideoCapture(img_vid_files[0])
+                cap = cv2.VideoCapture(img_vid_file)
                 res, img = cap.read()
                 if res == False:
                     raise
@@ -705,20 +710,20 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
 
             # Find corners or label by hand
             if extrinsics_method == 'board':
-                imgp, objp = findCorners(img_vid_files[0], extrinsics_corners_nb, objp=object_coords_3d, show=show_reprojection_error)
+                imgp, objp = findCorners(img_vid_file, extrinsics_corners_nb, objp=object_coords_3d, image_points=imgp, show=show_reprojection_error)
                 if len(imgp) == 0:
                     logging.exception('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
                     raise ValueError('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
 
             elif extrinsics_method == 'scene':
-                imgp, objp = imgp_objp_visualizer_clicker(img, imgp=[], objp=object_coords_3d, img_path=img_vid_files[0])
+                imgp, objp = imgp_objp_visualizer_clicker(img, imgp=[], objp=object_coords_3d, img_path=img_vid_files[i])
 
                 if len(imgp) == 0:
                     logging.exception('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
                     raise ValueError('No points clicked (or fewer than 6). Press \'C\' when the image is displayed, and then click on the image points corresponding to the \'object_coords_3d\' you measured and wrote down in the Config.toml file.')
                 if len(objp) < 10:
-                    logging.info(f'Only {len(objp)} reference points for camera {cam}. Calibration of extrinsic parameters may not be accurate with fewer than 10 reference points, as spread out in the captured volume as possible.')
-            
+                    logging.info(f'Only {len(objp)} reference points for camera {cam_name}. Calibration of extrinsic parameters may not be accurate with fewer than 10 reference points, as spread out in the captured volume as possible.')
+
             elif extrinsics_method == 'keypoints':
                 logging.info('Calibration based on keypoints is not available yet.')
             
@@ -741,9 +746,9 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
             # Check calibration results
             if show_reprojection_error:
                 # Reopen image, otherwise 2 sets of text are overlaid
-                img = cv2.imread(img_vid_files[0])
+                img = cv2.imread(img_vid_file)
                 if img is None:
-                    cap = cv2.VideoCapture(img_vid_files[0])
+                    cap = cv2.VideoCapture(img_vid_file)
                     res, img = cap.read()
                     if res == False:
                         raise
@@ -762,9 +767,9 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D):
                 cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 7, lineType = cv2.LINE_AA)
                 cv2.putText(img, '    Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
                 im_pil = Image.fromarray(img)
-                im_pil.show(title = os.path.basename(img_vid_files[0]))
+                im_pil.show(title = os.path.basename(img_vid_file))
                 # save image
-                reproj_img_path = os.path.join(calib_dir, f'calib_{os.path.splitext(os.path.basename(img_vid_files[0]))[0]}.png')
+                reproj_img_path = os.path.join(calib_dir, f'calib_{os.path.splitext(os.path.basename(img_vid_file))[0]}.png')
                 im_pil.save(reproj_img_path)
 
             # Calculate reprojection error
@@ -1123,7 +1128,6 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                             fig_3d.canvas.draw()
                 
                 events = events[:-1]
-
     
 
     def set_axes_equal(ax):
