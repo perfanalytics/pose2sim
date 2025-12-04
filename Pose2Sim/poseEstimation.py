@@ -43,7 +43,6 @@ from tqdm import tqdm
 from anytree.importer import DictImporter
 from anytree import RenderTree
 import numpy as np
-np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import cv2
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
@@ -52,6 +51,11 @@ from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel, bbox_xyxy_compute, \
                         get_screen_size, calculate_display_size
 from Pose2Sim.skeletons import *
+
+np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
+import warnings # Silence numpy "RuntimeWarning: Mean of empty slice"
+warnings.filterwarnings("ignore", category=RuntimeWarning, message="Mean of empty slice")
+warnings.filterwarnings("ignore", category=RuntimeWarning, message="All-NaN slice encountered")
 
 # Not safe, but to be used until OpenMMLab/RTMlib's SSL certificates are updated
 import ssl
@@ -367,7 +371,8 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                     if tracking_mode == 'deepsort':
                         keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
                     if tracking_mode == 'sports2d': 
-                        if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                        if 'prev_keypoints' not in locals(): 
+                            prev_keypoints = keypoints
                         prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores, max_dist=max_distance_px)
                     else:
                         pass
@@ -493,7 +498,8 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
                 if tracking_mode == 'deepsort':
                     keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
                 if tracking_mode == 'sports2d': 
-                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
+                    if 'prev_keypoints' not in locals(): 
+                        prev_keypoints = keypoints
                     prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores=scores, max_dist=max_distance_px)
             except:
                 keypoints = np.full((1,kpt_id_max,2), fill_value=np.nan)
@@ -679,7 +685,7 @@ def estimate_pose_all(config_dict):
             if len(empty_folders) != 0:
                 raise NameError(f'No image files with {vid_img_extension} extension found in {empty_folders}.')
             elif len(image_folders) == 0:
-                raise NameError(f'No image folders found in {video_dir}.')
+                raise NameError(f'No image folders containing files with {vid_img_extension} extension found in {video_dir}.')
             else:
                 logging.info(f'Found image folders with {vid_img_extension} extension.')
                 for image_folder in image_folders:
