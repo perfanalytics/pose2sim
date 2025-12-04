@@ -1069,12 +1069,16 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
     # Handle empty frames
     n_prev = len(keyptpre)
     n_curr = len(keypt)
-    
     if n_prev == 0 and n_curr == 0:
+            if scores is not None:
+                return np.array([]), np.array([]), np.array([])
+            else:
+                return np.array([]), np.array([])
+    if n_prev == 0:
         if scores is not None:
-            return np.array([]), np.array([]), np.array([])
+            return np.array([]), keypt, scores
         else:
-            return np.array([]), np.array([])
+            return np.array([]), keypt
     
     # Broadcasts the computation of distance matrix for all possible associations instead of using euclidean_distance in a loop
     keyptpre_expanded = keyptpre[:, np.newaxis, :, :]
