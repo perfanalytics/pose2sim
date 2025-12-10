@@ -111,7 +111,7 @@ def trc_rotate_func(**args):
     elif rotate90 == "-Z": # X->Y, Y->-X, Z->Z
         cols = np.stack([cols[:,1],-cols[:,0],cols[:,2]], axis=-1)
     Q_coord = pd.DataFrame(cols.reshape(Q_coord.values.shape[0],-1), columns=Q_coord.columns, index=Q_coord.index)
-
+  
     # write file
     with open(output_trc_path, 'w') as trc_o:
         [trc_o.write(line) for line in header]
