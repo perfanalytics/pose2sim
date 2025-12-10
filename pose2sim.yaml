@@ -1,0 +1,13 @@
+# pose2sim.yaml
+
+# install: conda env create -f pose2sim.yaml
+name: Pose2Sim
+channels:
+  - conda-forge
+  - opensim-org
+dependencies:
+  - python>=3.10
+  - pip
+  - opensim
+  - pip:
+    - pose2sim

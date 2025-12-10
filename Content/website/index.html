@@ -1,0 +1,2449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pose2Sim Documentation</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Translate -->
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'en',
+                includedLanguages: 'en,fr,es,de,it,pt,zh-CN,zh-TW,ja,ko,ar,ru,hi,tr,nl,pl,sv,da,fi,no,cs,el,he,id,th,vi,uk,ro,hu,sk,bg,hr,sr,sl,lt,lv,et',
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+                autoDisplay: false
+            }, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</head>
+<body>
+    <!-- Google Translate Widget -->
+    <div class="translate-widget">
+        <div id="google_translate_element"></div>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+        <div class="logo">
+            <h2>Pose2Sim</h2>
+            <p>Documentation</p>
+        </div>
+        <nav class="nav-menu">
+            <a href="#step-0" onclick="goToStep(0)" class="nav-item active">
+                <span class="step-num">00</span>
+                <span>Introduction</span>
+            </a>
+            <a href="#step-1" onclick="goToStep(1)" class="nav-item">
+                <span class="step-num">01</span>
+                <span>Installation</span>
+            </a>
+            <a href="#step-2" onclick="goToStep(2)" class="nav-item">
+                <span class="step-num">02</span>
+                <span>Single Person Demo</span>
+            </a>
+            <a href="#step-3" onclick="goToStep(3)" class="nav-item">
+                <span class="step-num">03</span>
+                <span>Multi-Person Demo</span>
+            </a>
+            <a href="#step-4" onclick="goToStep(4)" class="nav-item">
+                <span class="step-num">04</span>
+                <span>Batch Processing</span>
+            </a>
+            <a href="#step-5" onclick="goToStep(5)" class="nav-item">
+                <span class="step-num">05</span>
+                <span>Project Setup</span>
+            </a>
+            <a href="#step-6" onclick="goToStep(6)" class="nav-item">
+                <span class="step-num">06</span>
+                <span>Pose Estimation</span>
+            </a>
+            <a href="#step-7" onclick="goToStep(7)" class="nav-item">
+                <span class="step-num">07</span>
+                <span>Camera Calibration</span>
+            </a>
+            <a href="#step-8" onclick="goToStep(8)" class="nav-item">
+                <span class="step-num">08</span>
+                <span>Synchronization</span>
+            </a>
+            <a href="#step-9" onclick="goToStep(9)" class="nav-item">
+                <span class="step-num">09</span>
+                <span>Person Association</span>
+            </a>
+            <a href="#step-10" onclick="goToStep(10)" class="nav-item">
+                <span class="step-num">10</span>
+                <span>Triangulation</span>
+            </a>
+            <a href="#step-11" onclick="goToStep(11)" class="nav-item">
+                <span class="step-num">11</span>
+                <span>Filtering</span>
+            </a>
+            <a href="#step-12" onclick="goToStep(12)" class="nav-item">
+                <span class="step-num">12</span>
+                <span>Marker Augmentation</span>
+            </a>
+            <a href="#step-13" onclick="goToStep(13)" class="nav-item">
+                <span class="step-num">13</span>
+                <span>OpenSim Kinematics</span>
+            </a>
+            <a href="#step-14" onclick="goToStep(14)" class="nav-item">
+                <span class="step-num">14</span>
+                <span>All Parameters</span>
+            </a>
+            <a href="#step-15" onclick="goToStep(15)" class="nav-item">
+                <span class="step-num">15</span>
+                <span>Optimization</span>
+            </a>
+        </nav>
+        <button class="view-all-btn" onclick="toggleViewAll()">
+            <span>View All Steps</span>
+        </button>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="content">
+        <div class="step-container">
+            
+            <!-- Step 0: Introduction -->
+            <section class="step active" id="step-0" data-step="0">
+                <div class="step-header">
+                    <span class="step-badge">Step 0</span>
+                    <h1>Welcome to Pose2Sim</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Pose2Sim provides a workflow for 3D markerless kinematics, as an alternative to traditional marker-based motion capture methods.</p>
+                    
+               
+                    <!-- Workflow Image -->
+                    <div class="info-box" style="text-align: center; margin: 30px 0;">
+                        <img src="https://raw.githubusercontent.com/perfanalytics/pose2sim/main/Content/Pose2Sim_workflow.jpg" alt="Pose2Sim Workflow" style="max-width: 100%; height: auto; border-radius: 8px;">
+                    </div>
+
+                    <!-- Activities GIF -->
+                    <div class="info-box" style="text-align: center; margin: 30px 0;">
+                        <img src="https://raw.githubusercontent.com/perfanalytics/pose2sim/main/Content/Activities_verylow.gif" alt="Various Activities" style="max-width: 100%; height: auto; border-radius: 8px;">
+                        <p style="margin-top: 10px; font-style: italic;">Other more or less challenging tasks and conditions</p>
+                    </div>
+                    
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <div class="feature-icon">📹</div>
+                            <h3>Multiple Cameras</h3>
+                            <p>Use phones, webcams, or GoPros - any combination works</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">🎯</div>
+                            <h3>Research-Grade Accuracy</h3>
+                            <p>Validated accuracy with low-cost hardware</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">👥</div>
+                            <h3>Multi-Person Support</h3>
+                            <p>Track multiple people simultaneously</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">🤸</div>
+                            <h3>Full 3D Kinematics</h3>
+                            <p>Complete OpenSim skeletal analysis with joint angles</p>
+                        </div>
+                    </div>
+
+                    <div class="warning-box">
+                        <h4>⚠️ Important Note</h4>
+                        <p>Please set <code>undistort_points</code> and <code>handle_LR_swap</code> to <strong>false</strong> for now since it currently leads to inaccuracies. This will be fixed soon.</p>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>🎬 Perfect For</h4>
+                        <ul>
+                            <li><strong>Sports Analysis:</strong> Field-based 3D motion capture</li>
+                            <li><strong>Clinical Assessment:</strong> Gait analysis in doctor's office</li>
+                            <li><strong>Animation:</strong> Outdoor 3D capture with fully clothed subjects</li>
+                            <li><strong>Research:</strong> Biomechanics studies with multiple participants</li>
+                        </ul>
+                    </div>
+
+                    <div class="warning-box">
+                        <h4>⚠️ Key Requirements</h4>
+                        <ul>
+                            <li><strong>Multiple cameras:</strong> Minimum 2 cameras (4+ recommended)</li>
+                            <li><strong>Camera calibration:</strong> Cameras must be calibrated</li>
+                            <li><strong>Synchronization:</strong> Cameras should be synchronized (or sync in post)</li>
+                            <li><strong>Single camera?</strong> Use <a href="https://github.com/davidpagnon/Sports2D" target="_blank">Sports2D</a> for 2D analysis</li>
+                        </ul>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>📦 Version History</h4>
+                        <ul>
+                            <li><strong>v0.10 (09/2024):</strong> OpenSim integration in pipeline</li>
+                            <li><strong>v0.9 (07/2024):</strong> Integrated pose estimation</li>
+                            <li><strong>v0.8 (04/2024):</strong> New synchronization tool</li>
+                            <li><strong>v0.7 (03/2024):</strong> Multi-person analysis</li>
+                            <li><strong>v0.6 (02/2024):</strong> Marker augmentation & Blender visualizer</li>
+                            <li><strong>v0.5 (12/2023):</strong> Automatic batch processing</li>
+                        </ul>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ What You'll Learn</h4>
+                        <p>This comprehensive guide will take you through:</p>
+                        <ul>
+                            <li>Complete installation and setup</li>
+                            <li>Running demos (single & multi-person)</li>
+                            <li>Setting up your own projects</li>
+                            <li>2D pose estimation from videos</li>
+                            <li>Camera calibration techniques</li>
+                            <li>Multi-camera synchronization</li>
+                            <li>3D triangulation and filtering</li>
+                            <li>OpenSim kinematic analysis</li>
+                            <li>Performance optimization</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 1: Installation -->
+            <section class="step" id="step-1" data-step="1">
+                <div class="step-header">
+                    <span class="step-badge">Step 1</span>
+                    <h1>Complete Installation</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Full installation with OpenSim support for complete 3D kinematic analysis.</p>
+                    
+                    <div class="instruction-step">
+                        <h3>1. Install Anaconda or Miniconda</h3>
+                        <p>Anaconda creates isolated environments for different projects, preventing package conflicts and ensuring reproducibility.</p>
+                        <p>Download <a href="https://docs.conda.io/en/latest/miniconda.html" target="_blank">Miniconda</a> (recommended - lightweight version)</p>
+                        <p>Once installed, open an Anaconda prompt and create a virtual environment:</p>
+                        <div class="code-block">
+                            <code>conda create -n Pose2Sim python=3.9 -y
+conda activate Pose2Sim</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>2. Install OpenSim</h3>
+                        <p>OpenSim provides biomechanical modeling toolkit for accurate skeletal analysis with physical constraints:</p>
+                        <div class="code-block">
+                            <code>conda install -c opensim-org opensim -y</code>
+                        </div>
+                        <p class="small-note">Alternative methods: <a href="https://opensimconfluence.atlassian.net/wiki/spaces/OpenSim/pages/53085346/Scripting+in+Python" target="_blank">OpenSim documentation</a></p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>3. Install Pose2Sim</h3>
+                        
+                        <h4>Option A: Quick Install (Recommended)</h4>
+                        <div class="code-block">
+                            <code>pip install pose2sim</code>
+                        </div>
+
+                        <h4>Option B: Install from Source</h4>
+                        <p>For developers who want the latest unreleased features:</p>
+                        <div class="code-block">
+                            <code>git clone --depth 1 https://github.com/perfanalytics/pose2sim.git
+cd pose2sim
+pip install .</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>4. Optional: GPU Acceleration</h3>
+                        <p>GPU support dramatically speeds up pose estimation (3-5x faster) but requires 6 GB additional disk space.</p>
+                        
+                        <div class="substep">
+                            <h4>Check GPU Compatibility:</h4>
+                            <div class="code-block">
+                                <code>nvidia-smi</code>
+                            </div>
+                            <p class="small-note">Note the CUDA version - this is the latest your driver supports</p>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Install PyTorch with CUDA:</h4>
+                            <p>Visit <a href="https://pytorch.org/get-started/previous-versions/" target="_blank">PyTorch website</a> and install compatible version. For example:</p>
+                            <div class="code-block">
+                                <code>pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124</code>
+                            </div>
+                            <p class="small-note">Adjust cu124 based on your CUDA version</p>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Install ONNX Runtime GPU:</h4>
+                            <div class="code-block">
+                                <code>pip install onnxruntime-gpu</code>
+                            </div>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Verify Installation:</h4>
+                            <div class="code-block">
+                                <code>python -c "import torch; import onnxruntime as ort; print(torch.cuda.is_available(), ort.get_available_providers())"</code>
+                            </div>
+                            <p class="small-note">Should print: True ['CUDAExecutionProvider', ...]</p>
+                        </div>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Installation Complete!</h4>
+                        <p>Pose2Sim is now ready. Remember to activate your environment before use:</p>
+                        <div class="code-block">
+                            <code>conda activate Pose2Sim</code>
+                        </div>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>💾 Storage Requirements</h4>
+                        <ul>
+                            <li><strong>Minimal install:</strong> ~3 GB (without GPU, minimal models)</li>
+                            <li><strong>Standard install:</strong> ~4.75 GB (without GPU)</li>
+                            <li><strong>Full install with GPU:</strong> ~10.75 GB</li>
+                        </ul>
+                        <p class="small-note">You can save 1.3 GB by uninstalling TensorFlow if you skip marker augmentation: <code>pip uninstall tensorflow</code></p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 2: Single Person Demo -->
+            <section class="step" id="step-2" data-step="2">
+                <div class="step-header">
+                    <span class="step-badge">Step 2</span>
+                    <h1>Single Person Demo</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Test your installation with a demo of a person balancing on a beam, filmed with 4 calibrated cameras.</p>
+                    
+                    <div class="instruction-step">
+                        <h3>1. Locate Demo Folder</h3>
+                        <p>Find where Pose2Sim is installed:</p>
+                        <div class="code-block">
+                            <code>pip show pose2sim</code>
+                        </div>
+                        <p>Copy the location path and navigate to demo:</p>
+                        <div class="code-block">
+                            <code>cd &lt;path&gt;\Pose2Sim\Demo_SinglePerson</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>2. Run Complete Workflow</h3>
+                        <p>Launch Python and execute the full pipeline:</p>
+                        <div class="code-block">
+                            <code>ipython</code>
+                        </div>
+                        <div class="code-block">
+                            <code>from Pose2Sim import Pose2Sim
+
+Pose2Sim.calibration()
+Pose2Sim.poseEstimation()
+Pose2Sim.synchronization()
+Pose2Sim.personAssociation()
+Pose2Sim.triangulation()
+Pose2Sim.filtering()
+Pose2Sim.markerAugmentation()
+Pose2Sim.kinematics()</code>
+                        </div>
+                        
+                        <div class="info-box">
+                            <h4>💡 Quick Tip</h4>
+                            <p>Run all steps at once with:</p>
+                            <div class="code-block">
+                                <code>Pose2Sim.runAll()</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>3. Understanding the Synchronization GUI</h3>
+                        <p>When the synchronization GUI appears, select a keypoint showing clear vertical motion for best results.</p>
+                        <p class="small-note">The GUI helps you choose which keypoint to use for camera synchronization based on vertical speed.</p>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>📁 Output Files Created</h4>
+                        <ul>
+                            <li><strong>pose-3d/*.trc:</strong> 3D marker coordinates for each trial</li>
+                            <li><strong>kinematics/*.mot:</strong> 3D joint angles over time</li>
+                            <li><strong>kinematics/*.osim:</strong> Scaled OpenSim models</li>
+                            <li><strong>logs.txt:</strong> Processing details and statistics</li>
+                        </ul>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>4. Visualize Results</h3>
+                        
+                        <h4>Option A: OpenSim GUI</h4>
+                        <ol>
+                            <li>Download <a href="https://simtk.org/projects/opensim" target="_blank">OpenSim GUI</a></li>
+                            <li><strong>File → Open Model:</strong> Load scaled model from <code>kinematics</code> folder</li>
+                            <li><strong>File → Load Motion:</strong> Load .mot file from <code>kinematics</code> folder</li>
+                            <li><strong>File → Preview Experimental Data:</strong> Load .trc file to see 3D markers</li>
+                        </ol>
+
+                        <!-- OpenSim Image -->
+                        <div style="text-align: center; margin: 20px 0;">
+                            <img src="https://raw.githubusercontent.com/perfanalytics/pose2sim/main/Content/OpenSim.JPG" alt="OpenSim Visualization" style="max-width: 100%; height: auto; border-radius: 8px;">
+                        </div>
+
+                        <h4>Option B: Blender (More Visual)</h4>
+                        <p>Install <a href="https://github.com/davidpagnon/Pose2Sim_Blender" target="_blank">Pose2Sim_Blender add-on</a> for beautiful 3D visualization with camera overlay and animation capabilities.</p>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>⚙️ Configuration</h4>
+                        <p>Default parameters are in <code>Config.toml</code> - all parameters are documented. Feel free to experiment!</p>
+                       
+                    </div>
+
+                    <div class="warning-box">
+                        <h4>📝 Important Notes</h4>
+                        <ul>
+                            <li><strong>Marker Augmentation:</strong> Doesn't always improve results.</li>
+                            <li><strong>Save space:</strong> If you skip marker augmentation, uninstall tensorflow to save 1.3 GB: <code>pip uninstall tensorflow</code></li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 3: Multi-Person Demo -->
+            <section class="step" id="step-3" data-step="3">
+                <div class="step-header">
+                    <span class="step-badge">Step 3</span>
+                    <h1>Multi-Person Demo</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Discover how Pose2Sim tracks multiple people simultaneously - a hidden person appears when multi-person analysis is activated!</p>
+                    
+                    <div class="instruction-step">
+                        <h3>1. Navigate to Multi-Person Demo</h3>
+                        <div class="code-block">
+                            <code>cd &lt;path&gt;\Pose2Sim\Demo_MultiPerson</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>2. Verify Configuration</h3>
+                        <p>Ensure <code>multi_person = true</code> is set in your <code>Config.toml</code> file.</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>3. Run Multi-Person Workflow</h3>
+                        <div class="code-block">
+                            <code>ipython</code>
+                        </div>
+                        <div class="code-block">
+                            <code>from Pose2Sim import Pose2Sim
+
+Pose2Sim.calibration()
+Pose2Sim.poseEstimation()
+Pose2Sim.synchronization()
+Pose2Sim.personAssociation()
+Pose2Sim.triangulation()
+Pose2Sim.filtering()
+Pose2Sim.markerAugmentation()
+Pose2Sim.kinematics()</code>
+                        </div>
+                        
+                        <p>Or simply:</p>
+                        <div class="code-block">
+                            <code>Pose2Sim.runAll()</code>
+                        </div>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>📊 Multi-Person Output</h4>
+                        <p>Pose2Sim generates separate files for each detected person:</p>
+                        <ul>
+                            <li><strong>pose-3d/:</strong> One .trc file per participant</li>
+                            <li><strong>kinematics/:</strong> One scaled .osim model per participant</li>
+                            <li><strong>kinematics/:</strong> One .mot angle file per participant</li>
+                        </ul>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>4. How Multi-Person Tracking Works</h3>
+                        <p>Pose2Sim uses sophisticated algorithms to:</p>
+                        <ul>
+                            <li><strong>Associate persons across views:</strong> Matches people across different camera angles using epipolar geometry</li>
+                            <li><strong>Track over time:</strong> Maintains consistent IDs by analyzing movement speed and displacement</li>
+                            <li><strong>Handle occlusions:</strong> Robust to temporary occlusions or people entering/leaving frame</li>
+                        </ul>
+                    </div>
+
+                    <div class="warning-box">
+                        <h4>⚠️ Important Configuration</h4>
+                        <p>When using marker augmentation and kinematics with multiple people, ensure the order matches:</p>
+                        <ul>
+                            <li><code>markerAugmentation > participant_height</code> values</li>
+                            <li><code>participant_mass</code> values</li>
+                        </ul>
+                        <p>Must correspond to person IDs in the same order!</p>
+                        <div class="code-block">
+                            <code># Example in Config.toml
+participant_height = [1.72, 1.65]  # Person 0, Person 1
+participant_mass = [70, 65]        # Person 0, Person 1</code>
+                        </div>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>💡 Visualization Tips</h4>
+                        <p>Use <strong>Blender</strong> visualization (as explained in Step 2) to see both people simultaneously in 3D space with their respective skeletons!</p>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Multi-Person Success!</h4>
+                        <p>You've now mastered both single and multi-person analysis. Ready to process your own data!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 4: Batch Processing -->
+            <section class="step" id="step-4" data-step="4">
+                <div class="step-header">
+                    <span class="step-badge">Step 4</span>
+                    <h1>Batch Processing Demo</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Process multiple trials with different parameters efficiently using batch processing structure.</p>
+                    
+                    <div class="instruction-step">
+                        <h3>1. Navigate to Batch Demo</h3>
+                        <div class="code-block">
+                            <code>cd &lt;path&gt;\Pose2Sim\Demo_Batch</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>2. Understanding Batch Structure</h3>
+                        <p>Batch processing uses a hierarchical configuration system:</p>
+                        <div class="code-block">
+                            <code>BatchSession/
+├── Config.toml              # Global parameters
+├── Calibration/
+├── Trial_1/
+│   ├── Config.toml          # Trial-specific overrides
+│   └── videos/
+├── Trial_2/
+│   ├── Config.toml          # Different parameters for this trial
+│   └── videos/
+└── Trial_3/
+    ├── Config.toml
+    └── videos/</code>
+                        </div>
+                        
+                        <div class="info-box">
+                            <h4>🔧 How It Works</h4>
+                            <ul>
+                                <li><strong>Global Config:</strong> BatchSession/Config.toml sets defaults for all trials</li>
+                                <li><strong>Trial Overrides:</strong> Each Trial/Config.toml can override specific parameters</li>
+                                <li><strong>Inheritance:</strong> Uncommented keys in trial configs override global settings</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>3. Run Batch Processing</h3>
+                        <div class="code-block">
+                            <code>ipython</code>
+                        </div>
+                        <div class="code-block">
+                            <code>from Pose2Sim import Pose2Sim
+
+# Run from BatchSession folder to process all trials
+Pose2Sim.runAll()
+
+# Or run from specific Trial folder to process only that trial</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>4. Experiment with Parameters</h3>
+                        <p>Try modifying <code>Trial_2/Config.toml</code>:</p>
+                        
+                        <div class="substep">
+                            <h4>Example: Different Time Range</h4>
+                            <p>Uncomment and set in Trial_2/Config.toml:</p>
+                            <div class="code-block">
+                                <code>[project]
+frame_range = [10, 99]  # Process only frames 10-99</code>
+                            </div>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Example: Lightweight Mode</h4>
+                            <p>Uncomment and set in Trial_2/Config.toml:</p>
+                            <div class="code-block">
+                                <code>[pose]
+mode = 'lightweight'  # Faster pose estimation</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>📊 Batch Processing Benefits</h4>
+                        <ul>
+                            <li><strong>Consistency:</strong> Same calibration and global settings across trials</li>
+                            <li><strong>Flexibility:</strong> Trial-specific customization when needed</li>
+                            <li><strong>Efficiency:</strong> Process entire sessions with one command</li>
+                            <li><strong>Experimentation:</strong> Compare different parameter sets easily</li>
+                        </ul>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Batch Processing Mastered!</h4>
+                        <p>You now understand how to efficiently process multiple trials with varying parameters. This structure scales from research studies to production pipelines!</p>
+                    </div>
+                </div>
+            </section>
+
+<!-- Step 5: Project Setup -->
+            <section class="step" id="step-5" data-step="5">
+                <div class="step-header">
+                    <span class="step-badge">Step 5</span>
+                    <h1>Setting Up Your Project</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Organize your own data for analysis using Pose2Sim's structured project format.</p>
+                    
+                    <div class="instruction-step">
+                        <h3>1. Find Your Pose2Sim Installation</h3>
+                        <div class="code-block">
+                            <code>pip show pose2sim</code>
+                        </div>
+                        <p>Note the location path and navigate to it:</p>
+                        <div class="code-block">
+                            <code>cd &lt;path&gt;\pose2sim</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>2. Copy Template Folder</h3>
+                        <p>Copy the appropriate demo folder as your project template:</p>
+                        <ul>
+                            <li><strong>Demo_SinglePerson:</strong> For single person analysis</li>
+                            <li><strong>Demo_MultiPerson:</strong> For multiple people</li>
+                            <li><strong>Demo_Batch:</strong> For batch processing multiple trials</li>
+                        </ul>
+                        <p>Copy it to your preferred location and rename as desired.</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>3. Project Structure</h3>
+                        <p>Your project should follow this structure:</p>
+                        <div class="code-block">
+                            <code>MyProject/
+├── Config.toml                    # Main configuration
+├── Calibration/
+│   ├── intrinsics/
+│   │   ├── cam01/                 # Videos/images for intrinsic calibration
+│   │   ├── cam02/
+│   │   └── ...
+│   └── extrinsics/
+│       ├── cam01/                 # Videos/images for extrinsic calibration
+│       ├── cam02/
+│       └── ...
+├── videos/
+│   ├── cam01.mp4                  # Your capture videos
+│   ├── cam02.mp4
+│   └── ...
+├── pose/                          # Created automatically - 2D poses
+├── pose-3d/                       # Created automatically - 3D coordinates
+└── kinematics/                    # Created automatically - OpenSim results</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>4. Edit Configuration</h3>
+                        <p>Open <code>Config.toml</code> and customize key parameters:</p>
+                        
+                        <div class="substep">
+                            <h4>Project Settings:</h4>
+                            <div class="code-block">
+                                <code>[project]
+project_dir = 'path/to/MyProject'  # Absolute path to your project
+frame_range = []                    # Empty for all frames, or [start, end]
+multi_person = false                # true for multiple people</code>
+                            </div>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Participant Info:</h4>
+                            <div class="code-block">
+                                <code>[markerAugmentation]
+participant_height = [1.72]         # Height in meters
+participant_mass = [70]             # Mass in kg</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>5. Add Your Videos</h3>
+                        <ul>
+                            <li>Place all camera videos in the <code>videos/</code> folder</li>
+                            <li>Name them clearly (e.g., cam01.mp4, cam02.mp4, etc.)</li>
+                            <li>Ensure all videos capture the same action</li>
+                            <li>Videos don't need to be perfectly synchronized (we'll sync in post)</li>
+                        </ul>
+                    </div>
+
+                    <div class="warning-box">
+                        <h4>⚠️ Important Tips</h4>
+                        <ul>
+                            <li><strong>Camera placement:</strong> Position cameras to minimize occlusions</li>
+                            <li><strong>Coverage:</strong> Ensure the capture volume is covered by at least 2 cameras at all times</li>
+                            <li><strong>Lighting:</strong> Consistent lighting helps pose estimation</li>
+                            <li><strong>Background:</strong> Uncluttered backgrounds improve accuracy</li>
+                        </ul>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Project Ready!</h4>
+                        <p>Your project is now set up. Continue to the next steps to calibrate cameras and process your data!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 6: Pose Estimation -->
+            <section class="step" id="step-6" data-step="6">
+                <div class="step-header">
+                    <span class="step-badge">Step 6</span>
+                    <h1>2D Pose Estimation</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Detect 2D keypoints from your videos using RTMPose or other pose estimation models.</p>
+                    
+                    <!-- Pose2D Image -->
+                    <div style="text-align: center; margin: 20px 0;">
+                        <img src="https://raw.githubusercontent.com/perfanalytics/pose2sim/main/Content/Pose2D.png" alt="2D Pose Estimation" style="max-width: 100%; height: auto; border-radius: 8px;">
+                    </div>
+                    
+                    <div class="instruction-step">
+                        <h3>Run Pose Estimation</h3>
+                        <p>Navigate to your project folder and run:</p>
+                        <div class="code-block">
+                            <code>ipython</code>
+                        </div>
+                        <div class="code-block">
+                            <code>from Pose2Sim import Pose2Sim
+Pose2Sim.poseEstimation()</code>
+                        </div>
+                        <p>This will process all videos in your <code>videos/</code> folder and save 2D keypoints to <code>pose/</code>.</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Pose Models Available</h3>
+                        <p>Configure in <code>Config.toml</code> under <code>[pose]</code>:</p>
+                        
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Model</th>
+                                    <th>Best For</th>
+                                    <th>Speed</th>
+                                </tr>
+                                <tr>
+                                    <td><code>body_with_feet</code></td>
+                                    <td>General body tracking (default)</td>
+                                    <td>Balanced</td>
+                                </tr>
+                                <tr>
+                                    <td><code>whole_body</code></td>
+                                    <td>Body + hands + face</td>
+                                    <td>Slower</td>
+                                </tr>
+                                <tr>
+                                    <td><code>whole_body_wrist</code></td>
+                                    <td>Detailed wrist motion</td>
+                                    <td>Slower</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Performance Modes</h3>
+                        <p>Choose speed vs accuracy trade-off:</p>
+                        <div class="code-block">
+                            <code>[pose]
+mode = 'balanced'  # Options: 'lightweight', 'balanced', 'performance'</code>
+                        </div>
+                        <ul>
+                            <li><strong>lightweight:</strong> Fastest, slightly less accurate</li>
+                            <li><strong>balanced:</strong> Good speed/accuracy balance (default)</li>
+                            <li><strong>performance:</strong> Most accurate, slower</li>
+                        </ul>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Advanced: Custom Models</h3>
+                        <p>Use any RTMLib-compatible model with custom dictionary syntax:</p>
+                        <div class="code-block">
+                            <code>mode = """{'det_class':'YOLOX', 
+    'det_model':'https://download.openmmlab.com/mmpose/.../yolox_m.zip', 
+    'det_input_size':[640, 640], 
+    'pose_class':'RTMPose', 
+    'pose_model':'https://download.openmmlab.com/mmpose/.../rtmpose-m.zip', 
+    'pose_input_size':[192,256]}"""</code>
+                        </div>
+                        
+                        <div class="info-box">
+                            <h4>💡 Other Pose Solutions</h4>
+                            <ul>
+                                <li><strong>DeepLabCut:</strong> For custom-trained models (animals, specific points)</li>
+                                <li><strong>OpenPose:</strong> Legacy support (BODY_25B recommended if using)</li>
+                                <li><strong>AlphaPose:</strong> Alternative to OpenPose</li>
+                                <li><strong>BlazePose:</strong> Fast inference, single person only</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Detection Frequency Optimization</h3>
+                        <p>Speed up pose estimation by detecting people less frequently:</p>
+                        <div class="code-block">
+                            <code>[pose]
+det_frequency = 4  # Detect people every 4 frames, track in between</code>
+                        </div>
+                        <p class="small-note">Person detection is slow; tracking between frames is fast. This can provide 5x speedup! However, it might impact accuracy.</p>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>📊 Output Format</h4>
+                        <p>2D poses saved as JSON files in <code>pose/</code> folder:</p>
+                        <ul>
+                            <li>One JSON file per frame per camera</li>
+                            <li>Contains keypoint coordinates and confidence scores</li>
+                            <li>OpenPose-compatible format</li>
+                        </ul>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Pose Estimation Complete!</h4>
+                        <p>Your 2D keypoints are ready. Next step: calibrate your cameras to enable 3D triangulation!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 7: Camera Calibration -->
+            <section class="step" id="step-7" data-step="7">
+                <div class="step-header">
+                    <span class="step-badge">Step 7</span>
+                    <h1>Camera Calibration</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Calibrate your cameras to determine their intrinsic properties (lens characteristics) and extrinsic parameters (position and orientation in space).</p>
+                    
+                    <!-- Calibration Images -->
+                    <div style="text-align: center; margin: 20px 0;">
+                        <img src="https://raw.githubusercontent.com/perfanalytics/pose2sim/main/Content/Calib_int.png" alt="Intrinsic Calibration" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 10px;">
+                        <p style="font-style: italic; margin-bottom: 20px;">Intrinsic calibration with checkerboard</p>
+                        <img src="https://raw.githubusercontent.com/perfanalytics/pose2sim/main/Content/Calib_ext.png" alt="Extrinsic Calibration" style="max-width: 100%; height: auto; border-radius: 8px;">
+                        <p style="font-style: italic;">Extrinsic calibration</p>
+                    </div>
+                    
+                    <div class="instruction-step">
+                        <h3>Run Calibration</h3>
+                        <div class="code-block">
+                            <code>from Pose2Sim import Pose2Sim
+Pose2Sim.calibration()</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Method 1: Convert Existing Calibration</h3>
+                        <p>If you already have a calibration file from another system:</p>
+                        
+                        <div class="substep">
+                            <h4>Set in Config.toml:</h4>
+                            <div class="code-block">
+                                <code>[calibration]
+calibration_type = 'convert'
+convert_from = 'qualisys'  # Options: qualisys, optitrack, vicon, opencap, 
+                            # easymocap, biocv, caliscope, anipose, freemocap</code>
+                            </div>
+                        </div>
+
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>System</th>
+                                    <th>File Format</th>
+                                    <th>Notes</th>
+                                </tr>
+                                <tr>
+                                    <td>Qualisys</td>
+                                    <td>.qca.txt</td>
+                                    <td>Export from QTM</td>
+                                </tr>
+                                <tr>
+                                    <td>Vicon</td>
+                                    <td>.xcp</td>
+                                    <td>Direct copy</td>
+                                </tr>
+                                <tr>
+                                    <td>OpenCap</td>
+                                    <td>.pickle</td>
+                                    <td>Multiple files</td>
+                                </tr>
+                                <tr>
+                                    <td>Caliscope</td>
+                                    <td>.toml</td>
+                                    <td>Native format</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Method 2: Calculate from Scratch</h3>
+                        <p>Calculate calibration using checkerboard or scene measurements.</p>
+                        
+                        <div class="substep">
+                            <h4>Set in Config.toml:</h4>
+                            <div class="code-block">
+                                <code>[calibration]
+calibration_type = 'calculate'</code>
+                            </div>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Step 1: Intrinsic Calibration</h4>
+                            <p>Intrinsic parameters are camera-specific properties (focal length, distortion) - usually only need to calculate once per camera.</p>
+                            
+                            <ol>
+                                <li>Create folder for each camera in <code>Calibration/intrinsics/</code></li>
+                                <li>Film a checkerboard with each camera (board OR camera can move)</li>
+                                <li>Configure checkerboard parameters in Config.toml:
+                                    <div class="code-block">
+                                        <code>[calibration.intrinsics]
+overwrite_intrinsics = true
+show_detection_intrinsics = true
+intrinsics_corners_nb = [9, 6]  # Internal corners (one less than visible)
+intrinsics_square_size = 60     # Square size in mm</code>
+                                    </div>
+                                </li>
+                            </ol>
+
+                            <div class="warning-box">
+                                <h4>📋 Checkerboard Requirements</h4>
+                                <ul>
+                                    <li><strong>Flat:</strong> Board must be completely flat</li>
+                                    <li><strong>Asymmetric:</strong> Rows ≠ Columns (or rows odd if columns even)</li>
+                                    <li><strong>Border:</strong> Wide white border around pattern</li>
+                                    <li><strong>Focus:</strong> Sharp, in-focus images</li>
+                                    <li><strong>Coverage:</strong> Film from multiple angles covering most of frame</li>
+                                    <li><strong>No glare:</strong> Avoid reflections</li>
+                                </ul>
+                                <p>Generate checkerboard at <a href="https://calib.io/pages/camera-calibration-pattern-generator" target="_blank">calib.io</a></p>
+                            </div>
+
+                            <div class="info-box">
+                                <h4>✅ Target Error</h4>
+                                <p>Intrinsic calibration error should be <strong>below 0.5 pixels</strong></p>
+                            </div>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Step 2: Extrinsic Calibration</h4>
+                            <p>Extrinsic parameters are camera positions and orientations in space - must recalculate whenever cameras move.</p>
+                            
+                            <ol>
+                                <li>Create folder for each camera in <code>Calibration/extrinsics/</code></li>
+                                <li>Film either:
+                                    <ul>
+                                        <li><strong>Checkerboard:</strong> Place on ground, visible to all cameras</li>
+                                        <li><strong>Scene measurements:</strong> Measure 10+ point coordinates in 3D space</li>
+                                    </ul>
+                                </li>
+                                <li>Configure in Config.toml:
+                                    <div class="code-block">
+                                        <code>[calibration.extrinsics]
+extrinsics_method = 'board'  # or 'scene'
+show_detection_extrinsics = true
+extrinsics_corners_nb = [10, 7]
+extrinsics_square_size = 60
+
+# If using 'scene' method:
+# object_coords_3d = [[0,0,0], [1,0,0], ...]  # Measured 3D coordinates</code>
+                                    </div>
+                                </li>
+                            </ol>
+
+                            <div class="info-box">
+                                <h4>💡 Scene Measurement Tips</h4>
+                                <ul>
+                                    <li>Use tiles, wall lines, boxes, or treadmill dimensions</li>
+                                    <li>Spread points throughout capture volume</li>
+                                    <li>More points = better accuracy</li>
+                                    <li>Can temporarily add then remove objects for calibration</li>
+                                </ul>
+                            </div>
+
+                            <div class="info-box">
+                                <h4>✅ Target Error</h4>
+                                <p>Extrinsic calibration error should be <strong>below 1 cm</strong> (acceptable up to 2.5 cm depending on application)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Output: Calibration File</h3>
+                        <p>Calibration creates <code>Calib.toml</code> in your Calibration folder containing:</p>
+                        <ul>
+                            <li>Camera matrix (intrinsics) for each camera</li>
+                            <li>Distortion coefficients</li>
+                            <li>Rotation and translation (extrinsics)</li>
+                            <li>Calibration errors</li>
+                        </ul>
+
+                        <!-- CalibFile Image -->
+                        <div style="text-align: center; margin: 20px 0;">
+                            <img src="https://raw.githubusercontent.com/perfanalytics/pose2sim/main/Content/CalibFile.png" alt="Calibration File" style="max-width: 100%; height: auto; border-radius: 8px;">
+                        </div>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Calibration Complete!</h4>
+                        <p>Your cameras are now calibrated and ready for 3D triangulation!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 8: Synchronization -->
+            <section class="step" id="step-8" data-step="8">
+                <div class="step-header">
+                    <span class="step-badge">Step 8</span>
+                    <h1>Camera Synchronization</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Synchronize your cameras by finding optimal time offset based on keypoint movement correlation.</p>
+                    
+                    <!-- Synchronization Image -->
+                    <div style="text-align: center; margin: 20px 0;">
+                        <img src="https://raw.githubusercontent.com/perfanalytics/pose2sim/main/Content/synchro.jpg" alt="Synchronization" style="max-width: 100%; height: auto; border-radius: 8px;">
+                    </div>
+                    
+                    <div class="warning-box">
+                        <h4>⚠️ Skip This Step If...</h4>
+                        <p>Your cameras are <strong>natively synchronized</strong> (hardware sync, genlock, or timecode).</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Run Synchronization</h3>
+                        <div class="code-block">
+                            <code>from Pose2Sim import Pose2Sim
+Pose2Sim.synchronization()</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>How It Works</h3>
+                        <p>The algorithm:</p>
+                        <ol>
+                            <li>Computes vertical speed of chosen keypoint(s) in each camera</li>
+                            <li>Finds time offset that maximizes correlation between cameras</li>
+                            <li>Applies offset to align all cameras to reference camera</li>
+                        </ol>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Synchronization GUI</h3>
+                        <p>Enable interactive GUI for better control:</p>
+                        <div class="code-block">
+                            <code>[synchronization]
+synchronization_gui = true</code>
+                        </div>
+                        
+                        <p>The GUI allows you to:</p>
+                        <ul>
+                            <li>Select which keypoint to use (e.g., RWrist, LAnkle)</li>
+                            <li>Choose reference person (in multi-person scenes)</li>
+                            <li>Adjust time window for analysis</li>
+                            <li>Visualize correlation plots</li>
+                        </ul>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Configuration Options</h3>
+                        <div class="code-block">
+                            <code>[synchronization]
+reset_sync = false              # Start from scratch or refine existing
+frames_range = []               # Limit analysis to specific frames
+display_corr = true             # Show correlation plots
+keypoints_to_consider = ['RWrist', 'LWrist']  # Keypoints for sync
+approx_time_maxspeed = 'auto'   # Or specify time of max speed</code>
+                        </div>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>📊 Best Results When...</h4>
+                        <ul>
+                            <li>Person performs <strong>clear vertical movement</strong> (jump, wave, etc.)</li>
+                            <li>Capture lasts <strong>5+ seconds</strong> (enough data)</li>
+                            
+                        </ul>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Alternative Sync Methods (Not included in Pose2Sim)</h3>
+                        <p>If keypoint-based sync doesn't work well:</p>
+                        
+                        <div class="substep">
+                            <h4>Manual Sync Markers:</h4>
+                            <ul>
+                                <li><strong>Flashlight:</strong> Flash visible to all cameras</li>
+                                <li><strong>Clap:</strong> Sync with audio (if available)</li>
+                                <li><strong>Clear event:</strong> Ball drop, jump, etc.</li>
+                            </ul>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Hardware Solutions:</h4>
+                            <ul>
+                                <li><strong>GoPro timecode:</strong> Built-in sync feature</li>
+                                <li><strong>GPS sync:</strong> For outdoor captures (GoPro)</li>
+                                <li><strong>GoPro app:</strong> Sync via app (slightly less reliable)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Cameras Synchronized!</h4>
+                        <p>Your videos are now time-aligned and ready for multi-view triangulation!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 9: Person Association -->
+            <section class="step" id="step-9" data-step="9">
+                <div class="step-header">
+                    <span class="step-badge">Step 9</span>
+                    <h1>Person Association</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Associate the same person across different camera views and track them over time.</p>
+                    
+                    <div class="warning-box">
+                        <h4>⚠️ Skip This Step If...</h4>
+                        <p>Only <strong>one person</strong> is visible in your capture.</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Run Person Association</h3>
+                        <div class="code-block">
+                            <code>from Pose2Sim import Pose2Sim
+Pose2Sim.personAssociation()</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>How It Works</h3>
+                        
+                        <div class="substep">
+                            <h4>Single Person Mode (multi_person = false):</h4>
+                            <p>Automatically selects the person with <strong>smallest reprojection error</strong> (best 3D reconstruction).</p>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Multi-Person Mode (multi_person = true):</h4>
+                            <ol>
+                                <li><strong>Cross-view association:</strong> Uses epipolar geometry to match people across camera views</li>
+                                <li><strong>Temporal tracking:</strong> Tracks people across frames using displacement speed</li>
+                                <li><strong>Consistent IDs:</strong> Maintains identity even with brief occlusions</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Association Method</h3>
+                        <p>The algorithm finds the best person associations by:</p>
+                        <ul>
+                            <li>Triangulating all possible person combinations</li>
+                            <li>Reprojecting 3D points back to image planes</li>
+                            <li>Computing epipolar line distances</li>
+                            <li>Choosing combination with minimum geometric error</li>
+                        </ul>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Configuration Parameters</h3>
+                        <div class="code-block">
+                            <code>[personAssociation]
+likelihood_threshold_association = 0.3
+reproj_error_threshold_association = 20    # pixels
+min_cameras_for_triangulation = 2</code>
+                        </div>
+                        
+                        <div class="info-box">
+                            <h4>💡 Parameter Tuning</h4>
+                            <ul>
+                                <li><strong>Increase thresholds</strong> if people are frequently lost</li>
+                                <li><strong>Decrease thresholds</strong> if wrong person associations occur</li>
+                                <li><strong>Monitor console output</strong> for association success rates</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Handling Occlusions</h3>
+                        <p>Pose2Sim is robust to:</p>
+                        <ul>
+                            <li>Temporary loss of person in some camera views</li>
+                            <li>People entering/leaving the capture volume</li>
+                            <li>Brief full occlusions (person behind object)</li>
+                        </ul>
+                        <p>If reprojection error is too high, cameras are progressively removed until threshold is met.</p>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>📊 Check Results</h4>
+                        <p>Review console output showing:</p>
+                        <ul>
+                            <li>Number of people detected per frame</li>
+                            <li>Association success rate</li>
+                            <li>Average reprojection errors</li>
+                            <li>Cameras excluded per frame</li>
+                        </ul>
+                        <p>If results aren't satisfying, adjust constraints in Config.toml.</p>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Person Association Complete!</h4>
+                        <p>People are now correctly identified across views and time. Ready for 3D triangulation!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 10: Triangulation -->
+            <section class="step" id="step-10" data-step="10">
+                <div class="step-header">
+                    <span class="step-badge">Step 10</span>
+                    <h1>3D Triangulation</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Convert 2D keypoints from multiple views into robust 3D coordinates using weighted triangulation.</p>
+                    
+                    <div class="instruction-step">
+                        <h3>Run Triangulation</h3>
+                        <div class="code-block">
+                            <code>from Pose2Sim import Pose2Sim
+Pose2Sim.triangulation()</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>How It Works</h3>
+                        <p>Robust triangulation process:</p>
+                        <ol>
+                            <li><strong>Weighted triangulation:</strong> Each 2D point weighted by detection confidence</li>
+                            <li><strong>Likelihood filtering:</strong> Only points above confidence threshold used</li>
+                            <li><strong>Reprojection check:</strong> Verify 3D point quality by reprojecting to cameras</li>
+                            <li><strong>Error-based refinement:</strong>
+                                <ul>
+                                    <li>If error high: swap left/right sides and retry</li>
+                                    <li>Still high: progressively remove cameras until error acceptable</li>
+                                    <li>Too few cameras: skip frame, interpolate later</li>
+                                </ul>
+                            </li>
+                            <li><strong>Interpolation:</strong> Fill missing values with cubic spline interpolation(default, can be changed)</li>
+                        </ol>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Configuration Parameters</h3>
+                        <div class="code-block">
+                            <code>[triangulation]
+reproj_error_threshold_triangulation = 15      # pixels
+likelihood_threshold_triangulation = 0.3
+min_cameras_for_triangulation = 2
+interpolation_kind = 'cubic'                   # cubic, linear, slinear, quadratic
+interp_if_gap_smaller_than = 10                # frames
+show_interp_indices = true                     # Show which frames were interpolated
+handle_LR_swap = false                         # KEEP FALSE - Correct left/right swaps (buggy)
+undistort_points = false                       # KEEP FALSE - Undistort before triangulation (buggy)
+make_c3d = false                               # Also save as .c3d format</code>
+                        </div>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>📊 Output Information</h4>
+                        <p>Triangulation provides detailed statistics:</p>
+                        <ul>
+                            <li><strong>Mean reprojection error</strong> per keypoint (mm and px)</li>
+                            <li><strong>Cameras excluded</strong> on average per keypoint</li>
+                            <li><strong>Frames interpolated</strong> for each keypoint</li>
+                            <li><strong>Least reliable cameras</strong> identification</li>
+                        </ul>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Visualize Results</h3>
+                        <p>Check your .trc file in OpenSim:</p>
+                        <div class="code-block">
+                            <code># In OpenSim GUI:
+File → Preview Experimental Data → Open .trc file</code>
+                        </div>
+                        <p>Look for smooth, realistic trajectories. Jumps or jitter indicate issues.</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Troubleshooting</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Issue</th>
+                                    <th>Solution</th>
+                                </tr>
+                                <tr>
+                                    <td>High reprojection errors</td>
+                                    <td>Increase <code>reproj_error_threshold_triangulation</code></td>
+                                </tr>
+                                <tr>
+                                    <td>Missing keypoints</td>
+                                    <td>Decrease <code>likelihood_threshold_triangulation</code></td>
+                                </tr>
+                                <tr>
+                                    <td>Jittery motion</td>
+                                    <td>Increase <code>min_cameras_for_triangulation</code></td>
+                                </tr>
+                                <tr>
+                                    <td>Left/right swaps</td>
+                                    <td>Keep <code>handle_LR_swap = false</code> (currently buggy)</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="warning-box">
+                        <h4>⚠️ Important Notes</h4>
+                        <ul>
+                            <li><strong>Undistortion:</strong> Currently causes inaccuracies, keep <code>undistort_points = false</code></li>
+                            <li><strong>LR Swap:</strong> Currently causes issues, keep <code>handle_LR_swap = false</code></li>
+                            <li><strong>Interpolation limit:</strong> Large gaps (&gt;10 frames) won't be interpolated by default</li>
+                            <li><strong>Quality check:</strong> Always visualize .trc in OpenSim before proceeding</li>
+                        </ul>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Triangulation Complete!</h4>
+                        <p>Your 3D coordinates are ready! Next step: filter the data for smoother motion.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 11: Filtering -->
+            <section class="step" id="step-11" data-step="11">
+                <div class="step-header">
+                    <span class="step-badge">Step 11</span>
+                    <h1>3D Filtering</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Smooth your 3D coordinates to remove noise while preserving natural motion characteristics.</p>
+                    
+                    <!-- FilterPlot Image -->
+                    <div style="text-align: center; margin: 20px 0;">
+                        <img src="https://raw.githubusercontent.com/perfanalytics/pose2sim/main/Content/FilterPlot.png" alt="Filter Plot" style="max-width: 100%; height: auto; border-radius: 8px;">
+                    </div>
+                    
+                    <div class="instruction-step">
+                        <h3>Run Filtering</h3>
+                        <div class="code-block">
+                            <code>from Pose2Sim import Pose2Sim
+Pose2Sim.filtering()</code>
+                        </div>
+                        <p>Filtered .trc files are saved with <code>_filt</code> suffix.</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Available Filter Types</h3>
+                        <div class="code-block">
+                            <code>[filtering]
+type = 'butterworth'  # Choose filter type</code>
+                        </div>
+                        
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Filter</th>
+                                    <th>Best For</th>
+                                    <th>Key Parameters</th>
+                                </tr>
+                                <tr>
+                                    <td><code>butterworth</code></td>
+                                    <td>General motion (default)</td>
+                                    <td>order, cut_off_frequency</td>
+                                </tr>
+                                <tr>
+                                    <td><code>kalman</code></td>
+                                    <td>Noisy data with gaps</td>
+                                    <td>trust_ratio, smooth</td>
+                                </tr>
+                                <tr>
+                                    <td><code>butterworth_on_speed</code></td>
+                                    <td>Preserve sharp movements</td>
+                                    <td>order, cut_off_frequency</td>
+                                </tr>
+                                <tr>
+                                    <td><code>gaussian</code></td>
+                                    <td>Simple smoothing</td>
+                                    <td>sigma_kernel</td>
+                                </tr>
+                                <tr>
+                                    <td><code>loess</code></td>
+                                    <td>Local polynomial smoothing</td>
+                                    <td>nb_values_used</td>
+                                </tr>
+                                <tr>
+                                    <td><code>median</code></td>
+                                    <td>Remove outliers</td>
+                                    <td>kernel_size</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Butterworth Filter (Recommended)</h3>
+                        <p>Most commonly used for motion capture data:</p>
+                        <div class="code-block">
+                            <code>[filtering]
+type = 'butterworth'
+butterworth_order = 4                # Filter order (2-4 typical)
+butterworth_cut_off_frequency = 6   # Hz - adjust based on motion speed</code>
+                        </div>
+                        
+                        <div class="info-box">
+                            <h4>💡 Cutoff Frequency Guide</h4>
+                            <ul>
+                                <li><strong>3-6 Hz:</strong> Walking, slow movements</li>
+                                <li><strong>6-10 Hz:</strong> Running, moderate speed</li>
+                                <li><strong>10-15 Hz:</strong> Fast movements, sports</li>
+                                <li><strong>15+ Hz:</strong> Very fast, impulsive motions</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Kalman Filter</h3>
+                        <p>Excellent for noisy data with missing values:</p>
+                        <div class="code-block">
+                            <code>[filtering]
+type = 'kalman'
+kalman_trust_ratio = 500    # Measurement trust vs process model
+kalman_smooth = true        # Apply smoothing pass</code>
+                        </div>
+                        <p class="small-note">Higher trust_ratio = trust measurements more; lower = trust motion model more</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Display Results</h3>
+                        <p>Enable visualization to compare before/after filtering:</p>
+                        <div class="code-block">
+                            <code>[filtering]
+display_figures = true    # Show plots comparing raw vs filtered</code>
+                        </div>
+                        <p>Plots show each keypoint's trajectory in X, Y, Z coordinates.</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Evaluate Filter Quality</h3>
+                        <ol>
+                            <li><strong>Visual inspection:</strong> Check plots for smooth but realistic motion</li>
+                            <li><strong>OpenSim preview:</strong> Load filtered .trc in OpenSim
+                                <div class="code-block">
+                                    <code>File → Preview Experimental Data</code>
+                                </div>
+                            </li>
+                            <li><strong>Motion validation:</strong> Ensure filter doesn't remove real motion features</li>
+                        </ol>
+                    </div>
+
+                    <div class="warning-box">
+                        <h4>⚠️ Filtering Cautions</h4>
+                        <ul>
+                            <li><strong>Over-filtering:</strong> Too aggressive = removes real motion details</li>
+                            <li><strong>Under-filtering:</strong> Insufficient smoothing = noise remains</li>
+                            <li><strong>Cutoff frequency:</strong> Adjust based on motion speed - no one-size-fits-all</li>
+                            <li><strong>Can skip:</strong> Filtering is optional if data quality is already good</li>
+                        </ul>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Filtering Complete!</h4>
+                        <p>Your 3D data is now smoothed and ready for marker augmentation or kinematics!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 12: Marker Augmentation -->
+            <section class="step" id="step-12" data-step="12">
+                <div class="step-header">
+                    <span class="step-badge">Step 12</span>
+                    <h1>Marker Augmentation (Optional)</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Use Stanford's LSTM model to estimate 47 virtual marker positions, potentially improving inverse kinematics results.</p>
+                    
+                    <div class="warning-box">
+                        <h4>⚠️ Important: Not Always Better</h4>
+                        <p>Marker augmentation <strong>doesn't necessarily improve results</strong>  It's most beneficial when using <strong>fewer than 4 cameras</strong>.</p>
+                        <p><strong>Recommendation:</strong> Run IK with and without augmentation, compare results.</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Run Marker Augmentation</h3>
+                        <div class="code-block">
+                            <code>from Pose2Sim import Pose2Sim
+Pose2Sim.markerAugmentation()</code>
+                        </div>
+                        <p>Creates augmented .trc files with <code>_LSTM</code> suffix.</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>How It Works</h3>
+                        <p>LSTM neural network trained on marker-based motion capture data:</p>
+                        <ol>
+                            <li>Takes your detected keypoints as input</li>
+                            <li>Predicts positions of 47 virtual markers</li>
+                            <li>Outputs more stable but potentially less accurate motion</li>
+                        </ol>
+                        <p class="small-note">Trade-off: More stability vs less precision</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Configuration Requirements</h3>
+                        <div class="code-block">
+                            <code>[markerAugmentation]
+participant_height = [1.72]    # Required - height in meters
+participant_mass = [70]        # Optional - mass in kg (for kinetics only)
+make_c3d = false               # Also save as .c3d format</code>
+                        </div>
+                        
+                        <div class="warning-box">
+                            <h4>⚠️ Multi-Person Projects</h4>
+                            <p>Order must match person IDs:</p>
+                            <div class="code-block">
+                                <code>participant_height = [1.72, 1.65, 1.80]  # Person 0, 1, 2
+participant_mass = [70, 65, 85]           # Same order!</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Required Keypoints</h3>
+                        <p>Marker augmentation requires these minimum keypoints (e.g., COCO won't work):</p>
+                        <div class="code-block">
+                            <code>["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
+ "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
+ "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Limitations</h3>
+                        <ul>
+                            <li><strong>No NaN values:</strong> Interpolation must fill all gaps before augmentation</li>
+                            <li><strong>Standing pose required:</strong> Model trained on standing/walking motions</li>
+                            <li><strong>Not suitable for:</strong> Sitting, crouching, lying down poses</li>
+                            <li><strong>Disk space:</strong> Requires TensorFlow (~1.3 GB)</li>
+                        </ul>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>💾 Save Disk Space</h4>
+                        <p>If you skip marker augmentation, uninstall TensorFlow:</p>
+                        <div class="code-block">
+                            <code>pip uninstall tensorflow</code>
+                        </div>
+                        <p>Saves ~1.3 GB of storage.</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>When to Use</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Use When</th>
+                                    <th>Skip When</th>
+                                </tr>
+                                <tr>
+                                    <td>Using 2-3 cameras</td>
+                                    <td>Using 4+ cameras</td>
+                                </tr>
+                                <tr>
+                                    <td>Noisy keypoint detection</td>
+                                    <td>Clean keypoint detection</td>
+                                </tr>
+                                <tr>
+                                    <td>Standing/walking motions</td>
+                                    <td>Sitting/crouching/lying</td>
+                                </tr>
+                                <tr>
+                                    <td>Need more stability</td>
+                                    <td>Need maximum precision</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Decision Point</h4>
+                        <p>You now have both regular and augmented .trc files. Compare both in the next step (Kinematics) to see which works better for your data!</p>
+                    </div>
+                </div>
+            </section>
+
+<!-- Step 13: OpenSim Kinematics -->
+            <section class="step" id="step-13" data-step="13">
+                <div class="step-header">
+                    <span class="step-badge">Step 13</span>
+                    <h1>OpenSim Kinematics</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Scale an OpenSim skeletal model to your participant and compute biomechanically accurate 3D joint angles using inverse kinematics.</p>
+                    
+                    <div class="instruction-step">
+                        <h3>Run Kinematics</h3>
+                        <div class="code-block">
+                            <code>from Pose2Sim import Pose2Sim
+Pose2Sim.kinematics()</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Automatic vs Manual</h3>
+                        
+                        <h4>Automatic (Recommended - Fully Integrated)</h4>
+                        <p>Pose2Sim performs scaling and IK automatically with no static trial needed:</p>
+                        <ol>
+                            <li><strong>Intelligent scaling:</strong> Uses frames where person is standing upright</li>
+                            <li><strong>Outlier removal:</strong> Removes fastest 10%, stationary frames, crouching frames</li>
+                            <li><strong>Robust averaging:</strong> Mean of best segment measurements</li>
+                            <li><strong>Automatic IK:</strong> Runs inverse kinematics on all frames</li>
+                        </ol>
+
+                        <h4>Manual (OpenSim GUI)</h4>
+                        <p>For specific trials or fine-tuned control, use OpenSim GUI:</p>
+                        <ol>
+                            <li>Open OpenSim GUI</li>
+                            <li>Load model from <code>Pose2Sim/OpenSim_Setup/</code></li>
+                            <li>Tools → Scale Model → Load scaling setup .xml</li>
+                            <li>Tools → Inverse Kinematics → Load IK setup .xml</li>
+                            <li>Run and save results</li>
+                        </ol>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Configuration Options</h3>
+                        <div class="code-block">
+                            <code>[opensim]
+use_augmentation = false           # Use LSTM-augmented markers or not
+use_contacts_muscles = false       # Include muscles and contact spheres
+right_left_symmetry = true         # Enforce bilateral symmetry
+remove_scaling_setup = false       # Keep scaling files for inspection
+remove_ik_setup = false            # Keep IK files for inspection
+
+# Model selection
+use_simple_model = false           # Simple model (10x faster, stiff spine)
+
+# Participant info
+participant_height = [1.72]        # meters - must match marker augmentation
+participant_mass = [70]            # kg - affects kinetics, not kinematics</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Simple vs Full Model</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Feature</th>
+                                    <th>Simple Model</th>
+                                    <th>Full Model</th>
+                                </tr>
+                                <tr>
+                                    <td><strong>Speed</strong></td>
+                                    <td>~0.7s per trial</td>
+                                    <td>~9s per trial</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Spine</strong></td>
+                                    <td>Stiff/rigid</td>
+                                    <td>Flexible</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Shoulders</strong></td>
+                                    <td>Ball joint</td>
+                                    <td>Anatomical constraints</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Muscles</strong></td>
+                                    <td>None</td>
+                                    <td>Full muscle set</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Best For</strong></td>
+                                    <td>Gait, running, basic motion</td>
+                                    <td>Complex motion, research</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Scaling Strategy</h3>
+                        <p>Pose2Sim intelligently selects frames for scaling by removing:</p>
+                        <ul>
+                            <li><strong>10% fastest frames:</strong> Potential detection outliers</li>
+                            <li><strong>Zero-speed frames:</strong> Person likely out of frame</li>
+                            <li><strong>Crouching frames:</strong> Hip/knee flexion > 45° (less accurate)</li>
+                            <li><strong>20% extreme values:</strong> After above filtering</li>
+                        </ul>
+                        <p>Remaining frames averaged for robust segment lengths.</p>
+                        
+                        <div class="code-block">
+                            <code># Adjust these in Config.toml if needed
+[opensim.scaling]
+fastest_frames_to_remove_percent = 10
+large_hip_knee_angles = 45
+trimmed_extrema_percent = 20</code>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Output Files</h3>
+                        <p>Created in <code>kinematics/</code> folder:</p>
+                        <ul>
+                            <li><strong>*_scaled.osim:</strong> Scaled OpenSim model for each person</li>
+                            <li><strong>*.mot:</strong> Joint angles over time (open with Excel or OpenSim)</li>
+                            <li><strong>*_scaling.xml:</strong> Scaling setup (if not removed)</li>
+                            <li><strong>*_ik.xml:</strong> IK setup (if not removed)</li>
+                        </ul>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Visualize Results</h3>
+                        <p>In OpenSim GUI:</p>
+                        <ol>
+                            <li><strong>File → Open Model:</strong> Load *_scaled.osim</li>
+                            <li><strong>File → Load Motion:</strong> Load *.mot file</li>
+                            <li>Play animation to verify realistic motion</li>
+                        </ol>
+                        
+                        <p>Or use Blender add-on for better visualization!</p>
+                    </div>
+
+                    <div class="warning-box">
+                        <h4>⚠️ When Automatic Scaling May Fail</h4>
+                        <p>Automatic scaling works best for standing/walking. Use manual scaling for:</p>
+                        <ul>
+                            <li>Mostly sitting or crouching trials</li>
+                            <li>Unusual body positions throughout</li>
+                            <li>Extreme motions (gymnastics, dancing)</li>
+                        </ul>
+                        <p>In these cases, capture a separate standing trial for scaling.</p>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>🚀 Further Analysis</h4>
+                        <p>With scaled model and joint angles, you can proceed to:</p>
+                        <ul>
+                            <li><strong>Inverse Dynamics:</strong> Compute joint torques</li>
+                            <li><strong>Muscle Analysis:</strong> Estimate muscle forces</li>
+                            <li><strong>Moco:</strong> Trajectory optimization and prediction</li>
+                            <li><strong>Ground Reaction Forces:</strong> With contact spheres</li>
+                        </ul>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Kinematics Complete!</h4>
+                        <p>You now have biomechanically accurate 3D joint angles! Your complete 3D motion capture workflow is finished!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 14: All Parameters -->
+            <section class="step" id="step-14" data-step="14">
+                <div class="step-header">
+                    <span class="step-badge">Step 14</span>
+                    <h1>All Parameters Reference</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Complete reference of all configuration parameters in Config.toml.</p>
+                    
+                    <div class="params-section">
+                        <h3>📁 Project Settings</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Description</th>
+                                    <th>Default</th>
+                                </tr>
+                                <tr>
+                                    <td><code>project_dir</code></td>
+                                    <td>Absolute path to project folder</td>
+                                    <td>current directory</td>
+                                </tr>
+                                <tr>
+                                    <td><code>frame_range</code></td>
+                                    <td>[start, end] or [] for all</td>
+                                    <td>[]</td>
+                                </tr>
+                                <tr>
+                                    <td><code>frame_rate</code></td>
+                                    <td>Video frame rate (auto-detected)</td>
+                                    <td>auto</td>
+                                </tr>
+                                <tr>
+                                    <td><code>multi_person</code></td>
+                                    <td>Track multiple people</td>
+                                    <td>false</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="params-section">
+                        <h3>🎯 Pose Estimation</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Description</th>
+                                    <th>Default</th>
+                                </tr>
+                                <tr>
+                                    <td><code>pose_model</code></td>
+                                    <td>body_with_feet, whole_body, whole_body_wrist, CUSTOM</td>
+                                    <td>body_with_feet</td>
+                                </tr>
+                                <tr>
+                                    <td><code>mode</code></td>
+                                    <td>lightweight, balanced, performance (or custom dict)</td>
+                                    <td>balanced</td>
+                                </tr>
+                                <tr>
+                                    <td><code>det_frequency</code></td>
+                                    <td>Run person detection every N frames</td>
+                                    <td>1</td>
+                                </tr>
+                                <tr><td><code>tracking_mode</code></td>
+                                    <td>sports2d, deepsort, none</td>
+                                    <td>sports2d</td>
+                                </tr>
+                                <tr>
+                                    <td><code>display_detection</code></td>
+                                    <td>Show real-time detection</td>
+                                    <td>true</td>
+                                </tr>
+                                <tr>
+                                    <td><code>save_video</code></td>
+                                    <td>'to_video', 'to_images', 'none'</td>
+                                    <td>to_video</td>
+                                </tr>
+                                <tr>
+                                    <td><code>output_format</code></td>
+                                    <td>openpose, mmpose, deeplabcut</td>
+                                    <td>openpose</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="params-section">
+                        <h3>📐 Calibration</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Description</th>
+                                    <th>Default</th>
+                                </tr>
+                                <tr>
+                                    <td><code>calibration_type</code></td>
+                                    <td>convert, calculate</td>
+                                    <td>convert</td>
+                                </tr>
+                                <tr>
+                                    <td><code>convert_from</code></td>
+                                    <td>qualisys, optitrack, vicon, opencap, etc.</td>
+                                    <td>qualisys</td>
+                                </tr>
+                                <tr>
+                                    <td><code>binning_factor</code></td>
+                                    <td>For Qualisys if filming in 540p</td>
+                                    <td>1</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <h4>Intrinsic Calibration</h4>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Description</th>
+                                    <th>Default</th>
+                                </tr>
+                                <tr>
+                                    <td><code>overwrite_intrinsics</code></td>
+                                    <td>Recalculate or use existing</td>
+                                    <td>false</td>
+                                </tr>
+                                <tr>
+                                    <td><code>intrinsics_corners_nb</code></td>
+                                    <td>[rows, cols] internal corners</td>
+                                    <td>[9, 6]</td>
+                                </tr>
+                                <tr>
+                                    <td><code>intrinsics_square_size</code></td>
+                                    <td>Square size in mm</td>
+                                    <td>60</td>
+                                </tr>
+                                <tr>
+                                    <td><code>show_detection_intrinsics</code></td>
+                                    <td>Display corner detection</td>
+                                    <td>true</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <h4>Extrinsic Calibration</h4>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Description</th>
+                                    <th>Default</th>
+                                </tr>
+                                <tr>
+                                    <td><code>extrinsics_method</code></td>
+                                    <td>board, scene, keypoints</td>
+                                    <td>board</td>
+                                </tr>
+                                <tr>
+                                    <td><code>extrinsics_corners_nb</code></td>
+                                    <td>[rows, cols] for board method</td>
+                                    <td>[10, 7]</td>
+                                </tr>
+                                <tr>
+                                    <td><code>extrinsics_square_size</code></td>
+                                    <td>Square size in mm</td>
+                                    <td>60</td>
+                                </tr>
+                                <tr>
+                                    <td><code>show_detection_extrinsics</code></td>
+                                    <td>Display detection/points</td>
+                                    <td>true</td>
+                                </tr>
+                                <tr>
+                                    <td><code>object_coords_3d</code></td>
+                                    <td>For scene method: measured points</td>
+                                    <td>[]</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="params-section">
+                        <h3>🔄 Synchronization</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Description</th>
+                                    <th>Default</th>
+                                </tr>
+                                <tr>
+                                    <td><code>synchronization_gui</code></td>
+                                    <td>Use interactive GUI</td>
+                                    <td>true</td>
+                                </tr>
+                                <tr>
+                                    <td><code>reset_sync</code></td>
+                                    <td>Start fresh or refine existing</td>
+                                    <td>false</td>
+                                </tr>
+                                <tr>
+                                    <td><code>frames_range</code></td>
+                                    <td>[start, end] for sync analysis</td>
+                                    <td>[]</td>
+                                </tr>
+                                <tr>
+                                    <td><code>display_corr</code></td>
+                                    <td>Show correlation plots</td>
+                                    <td>true</td>
+                                </tr>
+                                <tr>
+                                    <td><code>keypoints_to_consider</code></td>
+                                    <td>List of keypoints for sync</td>
+                                    <td>['RWrist']</td>
+                                </tr>
+                                <tr>
+                                    <td><code>approx_time_maxspeed</code></td>
+                                    <td>Time of max speed or 'auto'</td>
+                                    <td>auto</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="params-section">
+                        <h3>👥 Person Association</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Description</th>
+                                    <th>Default</th>
+                                </tr>
+                                <tr>
+                                    <td><code>likelihood_threshold_association</code></td>
+                                    <td>Min confidence for association</td>
+                                    <td>0.3</td>
+                                </tr>
+                                <tr>
+                                    <td><code>reproj_error_threshold_association</code></td>
+                                    <td>Max reprojection error (pixels)</td>
+                                    <td>20</td>
+                                </tr>
+                                <tr>
+                                    <td><code>min_cameras_for_triangulation</code></td>
+                                    <td>Minimum cameras needed</td>
+                                    <td>2</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="params-section">
+                        <h3>📐 Triangulation</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Description</th>
+                                    <th>Default</th>
+                                </tr>
+                                <tr>
+                                    <td><code>reproj_error_threshold_triangulation</code></td>
+                                    <td>Max reprojection error (pixels)</td>
+                                    <td>15</td>
+                                </tr>
+                                <tr>
+                                    <td><code>likelihood_threshold_triangulation</code></td>
+                                    <td>Min keypoint confidence</td>
+                                    <td>0.3</td>
+                                </tr>
+                                <tr>
+                                    <td><code>min_cameras_for_triangulation</code></td>
+                                    <td>Minimum cameras required</td>
+                                    <td>2</td>
+                                </tr>
+                                <tr>
+                                    <td><code>interpolation_kind</code></td>
+                                    <td>cubic, linear, slinear, quadratic</td>
+                                    <td>cubic</td>
+                                </tr>
+                                <tr>
+                                    <td><code>interp_if_gap_smaller_than</code></td>
+                                    <td>Max gap size for interpolation (frames)</td>
+                                    <td>10</td>
+                                </tr>
+                                <tr>
+                                    <td><code>show_interp_indices</code></td>
+                                    <td>Display interpolated frames</td>
+                                    <td>true</td>
+                                </tr>
+                                <tr>
+                                    <td><code>handle_LR_swap</code></td>
+                                    <td>Correct left/right swaps (KEEP FALSE)</td>
+                                    <td>false</td>
+                                </tr>
+                                <tr>
+                                    <td><code>undistort_points</code></td>
+                                    <td>Undistort before triangulation (KEEP FALSE)</td>
+                                    <td>false</td>
+                                </tr>
+                                <tr>
+                                    <td><code>make_c3d</code></td>
+                                    <td>Also save as .c3d format</td>
+                                    <td>false</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="params-section">
+                        <h3>🔄 Filtering</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Description</th>
+                                    <th>Default</th>
+                                </tr>
+                                <tr>
+                                    <td><code>type</code></td>
+                                    <td>butterworth, kalman, gaussian, loess, median</td>
+                                    <td>butterworth</td>
+                                </tr>
+                                <tr>
+                                    <td><code>display_figures</code></td>
+                                    <td>Show before/after plots</td>
+                                    <td>true</td>
+                                </tr>
+                                <tr>
+                                    <td><code>butterworth_order</code></td>
+                                    <td>Filter order</td>
+                                    <td>4</td>
+                                </tr>
+                                <tr>
+                                    <td><code>butterworth_cut_off_frequency</code></td>
+                                    <td>Cutoff frequency (Hz)</td>
+                                    <td>6</td>
+                                </tr>
+                                <tr>
+                                    <td><code>kalman_trust_ratio</code></td>
+                                    <td>Measurement vs process trust</td>
+                                    <td>500</td>
+                                </tr>
+                                <tr>
+                                    <td><code>kalman_smooth</code></td>
+                                    <td>Apply smoothing pass</td>
+                                    <td>true</td>
+                                </tr>
+                                <tr>
+                                    <td><code>gaussian_sigma_kernel</code></td>
+                                    <td>Gaussian kernel size</td>
+                                    <td>5</td>
+                                </tr>
+                                <tr>
+                                    <td><code>loess_nb_values_used</code></td>
+                                    <td>Number of values for LOESS</td>
+                                    <td>30</td>
+                                </tr>
+                                <tr>
+                                    <td><code>median_kernel_size</code></td>
+                                    <td>Median filter kernel</td>
+                                    <td>5</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="params-section">
+                        <h3>🎯 Marker Augmentation</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Description</th>
+                                    <th>Default</th>
+                                </tr>
+                                <tr>
+                                    <td><code>participant_height</code></td>
+                                    <td>Height in meters (list for multi-person)</td>
+                                    <td>[1.72]</td>
+                                </tr>
+                                <tr>
+                                    <td><code>participant_mass</code></td>
+                                    <td>Mass in kg (list for multi-person)</td>
+                                    <td>[70]</td>
+                                </tr>
+                                <tr>
+                                    <td><code>make_c3d</code></td>
+                                    <td>Save as .c3d format</td>
+                                    <td>false</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="params-section">
+                        <h3>🤸 OpenSim Kinematics</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Description</th>
+                                    <th>Default</th>
+                                </tr>
+                                <tr>
+                                    <td><code>use_augmentation</code></td>
+                                    <td>Use LSTM-augmented markers</td>
+                                    <td>false</td>
+                                </tr>
+                                <tr>
+                                    <td><code>use_simple_model</code></td>
+                                    <td>Simple model (10x faster)</td>
+                                    <td>false</td>
+                                </tr>
+                                <tr>
+                                    <td><code>use_contacts_muscles</code></td>
+                                    <td>Include muscles and contact spheres</td>
+                                    <td>false</td>
+                                </tr>
+                                <tr>
+                                    <td><code>right_left_symmetry</code></td>
+                                    <td>Enforce bilateral symmetry</td>
+                                    <td>true</td>
+                                </tr>
+                                <tr>
+                                    <td><code>remove_scaling_setup</code></td>
+                                    <td>Delete scaling .xml after</td>
+                                    <td>false</td>
+                                </tr>
+                                <tr>
+                                    <td><code>remove_ik_setup</code></td>
+                                    <td>Delete IK .xml after</td>
+                                    <td>false</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>📖 Full Documentation</h4>
+                        <p>For complete details and examples, see the <a href="https://github.com/perfanalytics/pose2sim" target="_blank">Pose2Sim GitHub repository</a>.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 15: Optimization -->
+            <section class="step" id="step-15" data-step="15">
+                <div class="step-header">
+                    <span class="step-badge">Step 15</span>
+                    <h1>Performance Optimization</h1>
+                </div>
+                <div class="step-content">
+                    <p class="lead">Speed up processing for large projects and batch operations.</p>
+                    
+                    <div class="instruction-step">
+                        <h3>1. Calibration - Run Once</h3>
+                        <p>If cameras don't move between sessions:</p>
+                        <ul>
+                            <li>Run <code>Pose2Sim.calibration()</code> only once</li>
+                            <li>Copy <code>Calib.toml</code> to new project folders</li>
+                            <li>Skip calibration step entirely</li>
+                        </ul>
+                        <div class="info-box">
+                            <h4>💡 Time Saved</h4>
+                            <p>Calibration can take 5-15 minutes. Reusing saves this every session!</p>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>2. Pose Estimation Optimization</h3>
+                        
+                        <div class="substep">
+                            <h4>Use GPU (Biggest Speedup)</h4>
+                            <p>GPU acceleration provides <strong>3-10x speedup</strong>. See Step 1 for installation.</p>
+                            <div class="success-box">
+                                <h4>⚡ Speed Comparison</h4>
+                                <p>Processing 4 camera videos (500 frames each):</p>
+                                <ul>
+                                    <li><strong>CPU:</strong> ~150 seconds</li>
+                                    <li><strong>GPU:</strong> ~30 seconds</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Reduce Detection Frequency</h4>
+                            <p>Huge speedup with minimal accuracy loss:</p>
+                            <div class="code-block">
+                                <code>[pose]
+det_frequency = 100  # Detect people every 100 frames instead of every frame</code>
+                            </div>
+                            <p><strong>Result:</strong> 150s → 30s (5x faster)</p>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Use Lightweight Mode</h4>
+                            <div class="code-block">
+                                <code>[pose]
+mode = 'lightweight'  # Faster model, slightly less accurate</code>
+                            </div>
+                            <p><strong>Result:</strong> 30s → 20s (1.5x faster)</p>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Disable Real-Time Display</h4>
+                            <div class="code-block">
+                                <code>[pose]
+display_detection = false  # Don't show video during processing</code>
+                            </div>
+                            <p><strong>Result:</strong> 20s → 15s (1.3x faster)</p>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Skip Video Saving</h4>
+                            <div class="code-block">
+                                <code>[pose]
+save_video = 'none'  # Don't save annotated videos</code>
+                            </div>
+                            <p><strong>Result:</strong> 15s → 9s (1.7x faster)</p>
+                        </div>
+
+                        <div class="substep">
+                            <h4>Use Sports2D Tracker</h4>
+                            <div class="code-block">
+                                <code>[pose]
+tracking_mode = 'sports2d'  # Faster than deepsort for simple scenes</code>
+                            </div>
+                        </div>
+
+                        <div class="success-box">
+                            <h4>✅ Cumulative Speedup</h4>
+                            <p>Combining all optimizations:</p>
+                            <p><strong>150s → 9s (17x faster!)</strong></p>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>3. Skip Unnecessary Steps</h3>
+                        <div class="params-table">
+                            <table>
+                                <tr>
+                                    <th>Step</th>
+                                    <th>Skip If...</th>
+                                </tr>
+                                <tr>
+                                    <td>Calibration</td>
+                                    <td>Cameras haven't moved</td>
+                                </tr>
+                                <tr>
+                                    <td>Synchronization</td>
+                                    <td>Cameras natively synchronized</td>
+                                </tr>
+                                <tr>
+                                    <td>Person Association</td>
+                                    <td>Only one person in scene</td>
+                                </tr>
+                                <tr>
+                                    <td>Filtering</td>
+                                    <td>Data already clean</td>
+                                </tr>
+                                <tr>
+                                    <td>Marker Augmentation</td>
+                                    <td>Using 4+ cameras, not helpful</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>4. OpenSim Optimization</h3>
+                        <div class="code-block">
+                            <code>[opensim]
+use_simple_model = true  # 10x faster than full model</code>
+                        </div>
+                        <p><strong>Result:</strong> 9s → 0.7s per trial</p>
+                        <p class="small-note">Simple model accurate enough for most gait analysis</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>5. Batch Processing Structure</h3>
+                        <p>Efficient organization for processing multiple trials:</p>
+                        <ul>
+                            <li>Single calibration for entire batch</li>
+                            <li>Global parameters in session-level Config.toml</li>
+                            <li>Trial-specific overrides only when needed</li>
+                            <li>Run from session level to process all trials</li>
+                        </ul>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>6. Frame Range Limitation</h3>
+                        <p>Process only relevant portions:</p>
+                        <div class="code-block">
+                            <code>[project]
+frame_range = [100, 500]  # Only process frames 100-500</code>
+                        </div>
+                        <p>Especially useful for long captures where action is brief.</p>
+                    </div>
+
+                    <div class="instruction-step">
+                        <h3>Maximum Speed Configuration</h3>
+                        <p>For fastest processing (batch operations, prototyping):</p>
+                        <div class="code-block">
+                            <code>[pose]
+mode = 'lightweight'
+det_frequency = 100
+display_detection = false
+save_video = 'none'
+tracking_mode = 'sports2d'
+
+[filtering]
+display_figures = false
+
+[opensim]
+use_simple_model = true
+use_augmentation = false</code>
+                        </div>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>💡 Performance Tips Summary</h4>
+                        <ul>
+                            <li><strong>GPU:</strong> Single biggest speedup (3-10x)</li>
+                            <li><strong>Detection frequency:</strong> Set to 50-100 for 5x speedup</li>
+                            <li><strong>Lightweight mode:</strong> Minimal accuracy loss for 1.5x speedup</li>
+                            <li><strong>Skip displays/videos:</strong> Another 2-3x cumulative</li>
+                            <li><strong>Simple OpenSim model:</strong> 10x faster for IK</li>
+                            <li><strong>Skip unnecessary steps:</strong> Don't run what you don't need</li>
+                        </ul>
+                    </div>
+
+                    <div class="warning-box">
+                        <h4>⚠️ Speed vs Accuracy Trade-offs</h4>
+                        <p>Some optimizations reduce accuracy:</p>
+                        <ul>
+                            <li><strong>Lightweight mode:</strong> Slightly less accurate pose detection</li>
+                            <li><strong>High det_frequency:</strong> May miss fast movements</li>
+                            <li><strong>Simple OpenSim model:</strong> Less anatomically detailed</li>
+                        </ul>
+                        <p><strong>Recommendation:</strong> Use full accuracy for final analysis, optimized settings for testing/development.</p>
+                    </div>
+
+                    <div class="success-box">
+                        <h4>✅ Optimization Complete!</h4>
+                        <p>You now know how to process data efficiently for any scale - from single trials to large research studies!</p>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="nav-buttons">
+            <button class="btn btn-secondary" onclick="previousStep()" id="prevBtn" style="display:none;">
+                <span>← Previous</span>
+            </button>
+            <button class="btn btn-primary" onclick="nextStep()" id="nextBtn">
+                <span>Next →</span>
+            </button>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <p>Pose2Sim Documentation  • <a href="https://github.com/perfanalytics/pose2sim" target="_blank">GitHub</a> • <a href="https://joss.theoj.org/papers/10.21105/joss.04362" target="_blank">Cite</a></p>
+                <p>Open-source markerless motion capture • BSD-3-Clause License</p>
+				   <p>Website Created by AYL with ❤️ for the Markerless Community</p>
+				
+            </div>
+        </footer>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
