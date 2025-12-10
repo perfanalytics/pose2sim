@@ -3,7 +3,7 @@ import toml
 
 
 class ConfigGenerator:
-    def __init__(self):
+    def __init__(self): 
         # Load templates from files to avoid comment issues
         self.config_3d_template_path = Path('templates') / '3d_config_template.toml'
         self.config_2d_template_path = Path('templates') /'2d_config_template.toml'
