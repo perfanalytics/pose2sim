@@ -27,7 +27,7 @@ class TutorialTab:
         self.dependencies = {
             "anaconda": {"installed": False, "name": "Anaconda"},
             "path": {"installed": False, "name": "Anaconda Path"},
-            "pose2sim": {"installed": False, "name": "Pose2Sim"},
+            "pose2sim": {"installed": False, "name": "Pose2Sim / Sports2D"},
             "opensim": {"installed": False, "name": "OpenSim"},
             "pytorch": {"installed": False, "name": "PyTorch (optional)"},
             "onnxruntime-gpu": {"installed": False, "name": "ONNX GPU (optional)"},
@@ -139,7 +139,7 @@ class TutorialTab:
 
         self.beta_message = ctk.CTkLabel(
             self.beta_message_frame,
-            text="This GUI is a beta version. If you have recommendations, errors, or suggestions please send them to yacine.pose2sim@gmail.com or contact@david-pagnon.com",
+            text="This GUI is a beta version. If you have suggestions or find errors, please send them to yacine.pose2sim@gmail.com and/or contact@david-pagnon.com",
             font=("Helvetica", 12),
             text_color="black",
             wraplength=600
@@ -172,21 +172,33 @@ class TutorialTab:
         # Dependency check frame
         self.dependency_frame = ctk.CTkFrame(self.content_frame)
         self.dependency_frame.pack(fill='x', pady=10)
-        
+
         ctk.CTkLabel(
             self.dependency_frame,
             text="System Requirements Check",
             font=("Helvetica", 16, "bold")
         ).pack(pady=(10, 5))
-        
-        # Create a frame for each dependency
+
+        # Create a frame for the grid layout
         self.dependency_items_frame = ctk.CTkFrame(self.dependency_frame)
         self.dependency_items_frame.pack(fill='x', padx=10, pady=10)
-        
-        # Create indicators for each dependency
-        for dep_id, dep_info in self.dependencies.items():
+
+        # Configure grid with 2 columns
+        self.dependency_items_frame.grid_columnconfigure(0, weight=1)
+        self.dependency_items_frame.grid_columnconfigure(1, weight=1)
+
+        # Create indicators for each dependency in a grid (column-first order)
+        dependencies_list = list(self.dependencies.items())
+        num_deps = len(dependencies_list)
+        cols_per_row = 2
+
+        for idx, (dep_id, dep_info) in enumerate(dependencies_list):
+            # Calculate row and column (fill columns first)
+            col = idx % cols_per_row
+            row = idx // cols_per_row
+            
             dep_frame = ctk.CTkFrame(self.dependency_items_frame, fg_color="transparent")
-            dep_frame.pack(fill='x', pady=5, padx=10)
+            dep_frame.grid(row=row, column=col, sticky='ew', pady=5, padx=10)
             
             # Status indicator
             status_label = ctk.CTkLabel(
@@ -319,12 +331,12 @@ class TutorialTab:
         # Check for anaconda in PATH
         self.check_anaconda_path()
         
-        # Check for pose2sim
-        self.check_package("pose2sim")
-        
         # Check for OpenSim
         self.check_package("opensim")
         
+        # Check for pose2sim
+        self.check_package("pose2sim")
+
         # Check for PyTorch
         self.check_pytorch()
         
@@ -354,7 +366,7 @@ class TutorialTab:
         """Check if Anaconda is in PATH"""
         try:
             # Try to run conda command
-            result = subprocess.run(["conda", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(["conda", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
             
             if result.returncode == 0:
                 self.dependencies["path"]["installed"] = True
@@ -373,7 +385,7 @@ class TutorialTab:
                 # Check with pip
                 cmd = ["pip", "show", package_name]
                 
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
             
             dep_key = package_name.lower().replace("-", "-")
             if result.returncode == 0 and result.stdout.strip():
@@ -393,7 +405,7 @@ class TutorialTab:
                 "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')"
             ]
             
-            result = subprocess.run(check_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(check_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
             
             if result.returncode == 0 and "CUDA: True" in result.stdout:
                 self.dependencies["pytorch"]["installed"] = True
@@ -426,13 +438,13 @@ class TutorialTab:
                 "message": "Anaconda is installed but not in PATH. Please add it to your system PATH.",
                 "command": None  # Manual configuration required
             },
-            "pose2sim": {
-                "message": "Installing Pose2Sim...",
-                "command": ["pip", "install", "pose2sim"]
-            },
             "opensim": {
                 "message": "Installing OpenSim...",
                 "command": ["conda", "install", "-c", "opensim-org", "opensim", "-y"]
+            },
+            "pose2sim": {
+                "message": "Installing Pose2Sim and Sports2D...",
+                "command": ["pip", "install", "sports2d"]
             },
             "pytorch": {
                 "message": "Installing PyTorch with CUDA...",
@@ -517,6 +529,7 @@ class TutorialTab:
                     
                     # Update dependency status
                     self.dependencies[dependency_id]["installed"] = True
+                    self.frame.after(0, progress.set(1.0))
                     self.frame.after(500, self.update_dependency_ui)
                 else:
                     self.frame.after(0, lambda: status_label.configure(
