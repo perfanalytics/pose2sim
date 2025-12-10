@@ -287,7 +287,7 @@ class Pose2SimApp:
                 ('pose_model', PoseModelTab, "Pose Estimation", "👤"),
                 ('synchronization', SynchronizationTab, "Synchronization", "⏱️"),
                 ('advanced', AdvancedTab, "Advanced Settings", "⚙️"),
-                ('activation', ActivationTab, "Run Analysis", "▶️")
+                ('activation', ActivationTab, "Run Analysis", "💡")#▶️")
             ]
             
             if self.process_mode == 'batch':
@@ -304,13 +304,17 @@ class Pose2SimApp:
                 ('tutorial', TutorialTab, "Tutorial", "📚"),
                 ('pose_model', PoseModelTab, "Pose Estimation", "👤"),
                 ('advanced', AdvancedTab, "Advanced Settings", "⚙️"),
-                ('activation', ActivationTab, "Run Analysis", "▶️"),
+                ('activation', ActivationTab, "Run Analysis", "💡"),
                 ('visualization', VisualizationTab, "Data Visualization", "📊"),
                 ('about', AboutTab, "About Us", "ℹ️")  # Add about tab at the end
             ]
         
         # Create tab instances and sidebar buttons
         for i, (tab_id, tab_class, tab_title, tab_icon) in enumerate(tab_classes):
+            # "activation" in bold and Align "about" tab right
+            font = ("Helvetica", 12, "bold") if tab_id == 'activation' else ("Helvetica", 12)
+            anchor = "e" if tab_id == 'about' else "w"
+            
             # Store tab class and metadata for lazy instantiation
             self.tab_info[tab_id] = {
                 'class': tab_class,
@@ -323,7 +327,8 @@ class Pose2SimApp:
             button = ctk.CTkButton(
                 self.sidebar,
                 text=f"{tab_icon} {tab_title}",
-                anchor="w",
+                anchor=anchor,
+                font=font,
                 fg_color="transparent",
                 text_color=("gray10", "gray90"),
                 hover_color=("gray70", "gray30"),
@@ -333,7 +338,7 @@ class Pose2SimApp:
             )
             button.pack(pady=5, padx=10)
             self.tab_buttons[tab_id] = button
-        
+
         # # Determine first tab to show
         # if not self.tutorial_completed and 'tutorial' in self.tab_info:
         #     first_tab_id = 'tutorial'
