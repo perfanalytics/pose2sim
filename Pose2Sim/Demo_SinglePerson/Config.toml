@@ -111,7 +111,7 @@ filter_order = 4
 
 # Take heart, calibration is not that complicated once you get the hang of it!
 [calibration]
-calibration_type = 'calculate' # 'convert' or 'calculate'
+calibration_type = 'convert' # 'convert' or 'calculate'
 
    [calibration.convert]
    convert_from = 'qualisys' # 'caliscope', 'qualisys', 'optitrack', vicon', 'opencap', 'easymocap', 'biocv', 'anipose', or 'freemocap'
