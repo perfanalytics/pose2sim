@@ -688,7 +688,8 @@ def filter_all(config_dict):
                 raise
             frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
-            frame_rate = 60
+            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            frame_rate = 30  
     
     # Trc paths
     trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in file]
@@ -699,7 +700,7 @@ def filter_all(config_dict):
         Q_coords, frames_col, time_col, markers, header = read_trc(t_path_in)
 
         # frame range selection
-        f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if frame_range in ('all', 'auto', []) else frame_range][0]
+        f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if (frame_range in ('all', 'auto', []) or frames_col.iloc[0]>frame_range[0] or frames_col.iloc[1]<frame_range[1]) else frame_range][0]
         frame_nb = f_range[1] - f_range[0]
         f_index = [frames_col[frames_col==f_range[0]].index[0], frames_col[frames_col==f_range[1]-1].index[0]+1]
         Q_coords = Q_coords.iloc[f_index[0]:f_index[1]].reset_index(drop=True)

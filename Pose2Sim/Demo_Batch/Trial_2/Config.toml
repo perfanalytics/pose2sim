@@ -125,34 +125,33 @@ keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, f
   
 
    # [calibration.calculate] 
+      # save_debug_images = true       # Save images with clicked points (and their reprojections for extrinsic calibration)
       # # Camera properties, theoretically need to be calculated only once in a camera lifetime
       # [calibration.calculate.intrinsics]
       # overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
-      # show_detection_intrinsics = true # true or false (lowercase)
       # intrinsics_extension = 'jpg' # any video or image extension
       # extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
       # intrinsics_corners_nb = [4,7] 
       # intrinsics_square_size = 60 # mm
+      # show_detection_intrinsics = true # true or false (lowercase)
 
       # # Camera placements, need to be done before every session
       # [calibration.calculate.extrinsics]
       # calculate_extrinsics = true # true or false (lowercase) 
       # extrinsics_method = 'scene' # 'board', 'scene', 'keypoints'
+      # extrinsics_extension = 'png' # any video or image extension
       # # 'board' should be large enough to be detected when laid on the floor. Not recommended.
       # # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out.
       # # 'keypoints' uses automatic pose estimation of a person freely walking and waving arms in the scene. Slighlty less accurate, requires synchronized cameras.
+      # show_reprojection_error = true # true or false (lowercase)
       # moving_cameras = false # Not implemented yet
 
          # [calibration.calculate.extrinsics.board]
-         # show_reprojection_error = true # true or false (lowercase)
          # board_position = 'vertical' # 'vertical' or 'horizontal'
-         # extrinsics_extension = 'png' # any video or image extension
          # extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
          # extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
 
          # [calibration.calculate.extrinsics.scene]
-         # show_reprojection_error = true # true or false (lowercase)
-         # extrinsics_extension = 'png' # any video or image extension
          # # list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
          # # in m -> unlike for intrinsics, NOT in mm!
          # # [X,Y,Z], which becomes [Z,X,Y] in the TRC reference frame, and [-Y,X,Z] in the Blender one
@@ -283,7 +282,7 @@ keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, f
 # # from anytree import Node, RenderTree
 # # for pre, _, node in RenderTree(model): 
 # #     print(f'{pre}{node.name} id={node.id}')
-# [pose.CUSTOM]
+# [[pose.CUSTOM]]
 # name = "Hip"
 # id = 19
 #   [[pose.CUSTOM.children]]

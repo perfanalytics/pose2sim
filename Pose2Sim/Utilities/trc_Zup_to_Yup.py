@@ -62,7 +62,10 @@ def trc_Zup_to_Yup_func(*args):
             trc_yup_path = args[0]['output']
     except:
         trc_path = args[0] # invoked as a function
-        trc_yup_path = trc_path.replace('.trc', '_Yup.trc')
+        try:
+            trc_yup_path = args[1]
+        except:
+            trc_yup_path = trc_path.replace('.trc', '_Yup.trc')
 
     # header
     with open(trc_path, 'r') as trc_file:

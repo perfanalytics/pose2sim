@@ -24,14 +24,13 @@ participant_mass = 70.0             # float (eg 70.0), or list of floats (eg [70
 
 frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
 frame_range = 'auto' # 'auto', 'all', or range like [10,300]. If 'auto', will trim around the frames with low reprojection error (useful if a person enters/exits the scene)
-
-## If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
-## N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
-## For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
-## frame_range = [0.1, 2.0]*frame_rate = [6, 120]
+                     # If cameras are not synchronized, designates the frame range of the camera with the shortest recording time
+                     # N.B.: If you want a time range instead, use frame_range = time_range * frame_rate
+                     # For example if you want to analyze from 0.1 to 2 seconds with a 60 fps frame rate, 
+                     # frame_range = [0.1, 2.0]*frame_rate = [6, 120]
 
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
-# e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
+                        # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
 
 [pose]
@@ -47,7 +46,6 @@ pose_model = 'Body_with_feet'  #With RTMLib:
                          # - Animal (ANIMAL2D_17)
                          # /!\ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the output files if needed
                          # /!\ For Face and Animal, use mode="""{dictionary}""", and find the corresponding .onnx model there https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose
-                         
                          #With MMPose: HALPE_26, COCO_133, COCO_17, CUSTOM. See CUSTOM example at the end of the file
                          #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
                          #With mediapipe: BLAZEPOSE
@@ -91,8 +89,8 @@ deepsort_params = """{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosi
 handle_LR_swap = false # Might be useful if cameras film from the sagittal plane and the right and left sides are hard to differenciate to your eye.
 undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
 
-display_detection = true
-overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
+display_detection = true # Real-time display of the videos with pose estimation
+overwrite_pose = false # Set to false if you don't want to recalculate pose estimation when it has already been done
 save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
@@ -130,34 +128,33 @@ calibration_type = 'convert' # 'convert' or 'calculate'
   
 
    [calibration.calculate] 
+      save_debug_images = true       # Save images with clicked points (and their reprojections for extrinsic calibration)
       # Camera properties, theoretically need to be calculated only once in a camera lifetime
       [calibration.calculate.intrinsics]
       overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
-      show_detection_intrinsics = true # true or false (lowercase)
       intrinsics_extension = 'jpg' # any video or image extension
       extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
       intrinsics_corners_nb = [4,7] 
       intrinsics_square_size = 60 # mm
+      show_detection_intrinsics = true # true or false (lowercase)
 
       # Camera placements, need to be done before every session
       [calibration.calculate.extrinsics]
       calculate_extrinsics = true # true or false (lowercase) 
       extrinsics_method = 'scene' # 'board', 'scene', 'keypoints'
+      extrinsics_extension = 'png' # any video or image extension
       # 'board' should be large enough to be detected when laid on the floor. Not recommended.
       # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out.
       # 'keypoints' uses automatic pose estimation of a person freely walking and waving arms in the scene. Slighlty less accurate, requires synchronized cameras.
+      show_reprojection_error = true # true or false (lowercase)
       moving_cameras = false # Not implemented yet
 
          [calibration.calculate.extrinsics.board]
-         show_reprojection_error = true # true or false (lowercase)
-         extrinsics_extension = 'png' # any video or image extension
          board_position = 'vertical' # 'vertical' or 'horizontal'
          extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
          extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
 
          [calibration.calculate.extrinsics.scene]
-         show_reprojection_error = true # true or false (lowercase)
-         extrinsics_extension = 'png' # any video or image extension
          # list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
          # in m -> unlike for intrinsics, NOT in mm!
          # [X,Y,Z], which becomes [Z,X,Y] in the TRC reference frame, and [-Y,X,Z] in the Blender one
@@ -178,6 +175,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
    likelihood_threshold_association = 0.3 # should be in single_person section
 
    [personAssociation.single_person]
+   likelihood_threshold_association = 0.3
    reproj_error_threshold_association = 20 # px
    tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
                # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' or 'RShoulder')
@@ -287,7 +285,7 @@ use_custom_logging = false # if integrated in an API that already has logging
 # from anytree import Node, RenderTree
 # for pre, _, node in RenderTree(model): 
 #     print(f'{pre}{node.name} id={node.id}')
-[pose.CUSTOM]
+[[pose.CUSTOM]]
 name = "Hip"
 id = 19
   [[pose.CUSTOM.children]]

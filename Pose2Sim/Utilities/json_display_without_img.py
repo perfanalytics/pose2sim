@@ -135,10 +135,16 @@ def json_display_without_img_func(**args):
             json_file = json.load(json_f)
             if id_persons == 'all':
                 for ppl in range(len(json_file['people'])):  
-                    keypt = np.asarray(json_file['people'][ppl]['pose_keypoints_2d']).reshape(-1,3)
-                    xfrm = np.concatenate((xfrm,keypt[:,0]))
-                    yfrm = np.concatenate((yfrm,keypt[:,1]))
-                    conffrm = np.concatenate((conffrm,keypt[:,2]))
+                    try:
+                        keypt = np.asarray(json_file['people'][ppl]['pose_keypoints_2d']).reshape(-1,3)
+                        xfrm = np.concatenate((xfrm,keypt[:,0]))
+                        yfrm = np.concatenate((yfrm,keypt[:,1]))
+                        conffrm = np.concatenate((conffrm,keypt[:,2]))
+                    except:
+                        xfrm = np.concatenate((xfrm,[]))
+                        yfrm = np.concatenate((yfrm,[]))
+                        conffrm = np.concatenate((conffrm,[]))
+
             elif isinstance(id_persons, list):
                 for ppl in id_persons:  
                     try:

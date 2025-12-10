@@ -974,11 +974,12 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
 
     try:
         head_pair = [['MidShoulder', 'Head']]
-        head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]
+        head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]\
+                *1.008
     except:
         head_pair = [['MidShoulder', 'Nose']]
         head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]\
-                *1.33
+                *1.5
         logging.warning('The Head marker is missing from your model. Considering Neck to Head size as 1.33 times Neck to MidShoulder size.')
     
     heights = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2 + (rback + lback)/2 + head
@@ -1068,12 +1069,16 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
     # Handle empty frames
     n_prev = len(keyptpre)
     n_curr = len(keypt)
-    
     if n_prev == 0 and n_curr == 0:
+            if scores is not None:
+                return np.array([]), np.array([]), np.array([])
+            else:
+                return np.array([]), np.array([])
+    if n_prev == 0:
         if scores is not None:
-            return np.array([]), np.array([]), np.array([])
+            return np.array([]), keypt, scores
         else:
-            return np.array([]), np.array([])
+            return np.array([]), keypt
     
     # Broadcasts the computation of distance matrix for all possible associations instead of using euclidean_distance in a loop
     keyptpre_expanded = keyptpre[:, np.newaxis, :, :]
