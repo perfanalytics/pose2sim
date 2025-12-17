@@ -47,7 +47,7 @@ from anytree.importer import DictImporter
 import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
-    reprojection, euclidean_distance, sort_stringlist_by_last_number
+    reprojection, euclidean_distance, sort_stringlist_by_last_number, adapt_P_and_calib_params
 from Pose2Sim.skeletons import *
 
 
@@ -736,11 +736,14 @@ def associate_all(config_dict):
     f_range = [[0,max([len(j) for j in json_files_names])] if frame_range in ('all', 'auto', []) else frame_range][0]
     n_cams = len(json_dirs_names)
 
-    # Check that camera number is consistent between calibration file and pose folders
-    if n_cams != len(P_all):
-        raise Exception(f'Error: The number of cameras is not consistent:\
-                    Found {len(P_all)} cameras in the calibration file,\
-                    and {n_cams} cameras based on the number of pose folders.')
+    # Check camera number consistency between calibration file and pose folders
+    if len(P_all) > n_cams:
+        logging.warning('The number of cameras in the calibration file is greater than the number of pose folders. Only cameras in pose folders will be considered.')
+        P_adapted, calib_params_adapted = adapt_P_and_calib_params(P_all, calib_params, json_dirs_names)
+    elif len(P_all) < n_cams:
+        raise Exception ('The number of cameras in the calibration file is less than the number of pose folders. Please match your calibration file and pose folders.')
+    else:
+        P_adapted, calib_params_adapted = P_all, calib_params
 
     if not multi_person:
         logging.info('\nSingle-person analysis selected.')
@@ -771,12 +774,12 @@ def associate_all(config_dict):
             personsIDs_comb = persons_combinations(json_files_f) 
             
             # choose persons of interest and exclude cameras with bad pose estimation
-            error_proposals, proposals, Q_kpt = best_persons_and_cameras_combination(config_dict, json_files_f, personsIDs_comb, P_all, tracked_keypoint_id, calib_params)
+            error_proposals, proposals, Q_kpt = best_persons_and_cameras_combination(config_dict, json_files_f, personsIDs_comb, P_adapted, tracked_keypoint_id, calib_params_adapted)
 
             if not np.isinf(error_proposals):
                 error_min_tot.append(np.nanmean(error_proposals))
             cameras_off_count = np.count_nonzero([np.isnan(comb) for comb in proposals]) / len(proposals)
-            cameras_off_tot.append(cameras_off_count)            
+            cameras_off_tot.append(cameras_off_count)
 
         else:
             # read data
@@ -790,7 +793,7 @@ def associate_all(config_dict):
             cum_persons_per_view = np.cumsum(persons_per_view)
             
             # compute affinity and only keep possible matches
-            affinity = compute_affinity(all_json_data_f, calib_params, cum_persons_per_view, reconstruction_error_threshold=reconstruction_error_threshold)
+            affinity = compute_affinity(all_json_data_f, calib_params_adapted, cum_persons_per_view, reconstruction_error_threshold=reconstruction_error_threshold)
             circ_constraint = circular_constraint(cum_persons_per_view)
             affinity = affinity * circ_constraint
 

@@ -323,6 +323,18 @@ def computeP(calib_file, undistort=False):
    
     return P
 
+def adapt_P_and_calib_params(P_all, calib_params_all, pose_listdirs_names):
+    P_adapted = []
+    calib_params_adapted = {k: [] for k in calib_params_all}
+    
+    for dir_name in pose_listdirs_names:
+        cam_idx = int(re.findall(r'\d+', dir_name)[-1]) - 1  # assuming camera numbering starts at 1
+        P_adapted.append(P_all[cam_idx])
+        for key in calib_params_all:
+            calib_params_adapted[key].append(calib_params_all[key][cam_idx])
+
+    return P_adapted, calib_params_adapted
+
 
 def weighted_triangulation(P_all,x_all,y_all,likelihood_all):
     '''
