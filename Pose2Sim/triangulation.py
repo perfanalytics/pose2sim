@@ -57,7 +57,7 @@ import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
     reprojection, euclidean_distance, sort_people_sports2d, interpolate_zeros_nans, \
-    sort_stringlist_by_last_number, zup2yup, convert_to_c3d, adapt_P_and_calib_params
+    sort_stringlist_by_last_number, zup2yup, convert_to_c3d
 from Pose2Sim.skeletons import *
 
 
@@ -707,10 +707,6 @@ def triangulate_all(config_dict):
     pose_dir = os.path.join(project_dir, 'pose')
     poseSync_dir = os.path.join(project_dir, 'pose-sync')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
-    
-    # Projection matrix from toml calibration file
-    P = computeP(calib_file, undistort=undistort_points)
-    calib_params = retrieve_calib_params(calib_file)
         
     # Retrieve keypoints from model
     try: # from skeletons.py
@@ -774,15 +770,10 @@ def triangulate_all(config_dict):
     # frame range selection
     f_range = [[0,min([len(j) for j in json_files_names])] if frame_range in ('all', 'auto', []) else frame_range][0]
     frame_nb = f_range[1] - f_range[0]
-    
-    # Check camera number consistency between calibration file and pose folders
-    if len(P) > n_cams:
-        logging.warning('The number of cameras in the calibration file is greater than the number of pose folders. Only cameras in pose folders will be considered.')
-        P_adapted, calib_params_adapted = adapt_P_and_calib_params(P, calib_params, pose_listdirs_names)
-    elif len(P) < n_cams:
-        raise Exception ('The number of cameras in the calibration file is less than the number of pose folders. Please match your calibration file and pose folders.')
-    else:
-        P_adapted, calib_params_adapted = P, calib_params
+
+    # Projection matrix from toml calibration file
+    P = computeP(calib_file, json_dirs_names, undistort=undistort_points)
+    calib_params = retrieve_calib_params(calib_file, json_dirs_names)
     
     # Triangulation
     if multi_person:
@@ -813,7 +804,7 @@ def triangulate_all(config_dict):
         if undistort_points:
             for n in range(nb_persons_to_detect):
                 points = [np.array(tuple(zip(x_files[n][i],y_files[n][i]))).reshape(-1, 1, 2).astype('float32') for i in range(n_cams)]
-                undistorted_points = [cv2.undistortPoints(points[i], calib_params_adapted['K'][i], calib_params_adapted['dist'][i], None, calib_params_adapted['optim_K'][i]) for i in range(n_cams)]
+                undistorted_points = [cv2.undistortPoints(points[i], calib_params['K'][i], calib_params['dist'][i], None, calib_params['optim_K'][i]) for i in range(n_cams)]
                 x_files[n] =  np.array([[u[i][0][0] for i in range(len(u))] for u in undistorted_points])
                 y_files[n] =  np.array([[u[i][0][1] for i in range(len(u))] for u in undistorted_points])
                 # This is good for slight distortion. For fisheye camera, the model does not work anymore. See there for an example https://github.com/lambdaloop/aniposelib/blob/d03b485c4e178d7cff076e9fe1ac36837db49158/aniposelib/cameras.py#L301
@@ -842,7 +833,7 @@ def triangulate_all(config_dict):
                 coords_2D_kpt = np.array( (x_files[n][:, keypoint_idx], y_files[n][:, keypoint_idx], likelihood_files[n][:, keypoint_idx]) )
                 coords_2D_kpt_swapped = np.array(( x_files[n][:, keypoints_idx_swapped[keypoint_idx]], y_files[n][:, keypoints_idx_swapped[keypoint_idx]], likelihood_files[n][:, keypoints_idx_swapped[keypoint_idx]] ))
 
-                Q_kpt, error_kpt, nb_cams_excluded_kpt, id_excluded_cams_kpt = triangulation_from_best_cameras(config_dict, coords_2D_kpt, coords_2D_kpt_swapped, P_adapted, calib_params_adapted) # P has been modified if undistort_points=True
+                Q_kpt, error_kpt, nb_cams_excluded_kpt, id_excluded_cams_kpt = triangulation_from_best_cameras(config_dict, coords_2D_kpt, coords_2D_kpt_swapped, P, calib_params) # P has been modified if undistort_points=True
 
                 Q[n].append(Q_kpt)
                 error[n].append(error_kpt)
