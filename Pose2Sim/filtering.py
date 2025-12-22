@@ -743,7 +743,7 @@ def filter_all(config_dict):
                 Q_filt.insert(0, 'Frame#', frames_col)
                 Q_filt.insert(1, 'Time', time_col)
                 # Q_filt = Q_filt.fillna(' ')
-                Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+                Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n', na_rep='NaN')
 
             # Save c3d
             if make_c3d:
