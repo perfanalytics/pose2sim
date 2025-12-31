@@ -53,9 +53,11 @@ from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_
 from Pose2Sim.skeletons import *
 
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
-import warnings # Silence numpy "RuntimeWarning: Mean of empty slice"
+import warnings # Silence numpy and CoreML warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning, message="Mean of empty slice")
 warnings.filterwarnings("ignore", category=RuntimeWarning, message="All-NaN slice encountered")
+warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in scalar divide")
+warnings.filterwarnings("ignore", message=".*Input.*has a dynamic shape.*but the runtime shape.*has zero elements.*")
 
 # Not safe, but to be used until OpenMMLab/RTMlib's SSL certificates are updated
 import ssl
