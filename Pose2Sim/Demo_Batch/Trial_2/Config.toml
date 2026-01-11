@@ -210,7 +210,7 @@ keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, f
 # [filtering]
 # reject_outliers = true      # Hampel filter for outlier rejection before other filtering methods. Can be slow. Rejects outliers that are outside of a 95% confidence interal from the median in a sliding window of size 7.
 # filter = true               # Proceed to further filtering after outlier rejection.
-# type = 'butterworth' # butterworth, gvc_spline, kalman, gaussian, LOESS, median, butterworth_on_speed
+# type = 'butterworth' # butterworth, kalman, one_euro, gvc_spline, gaussian, LOESS, median, butterworth_on_speed
 
 # display_figures = true # true or false (lowercase) 
 # save_filt_plots = true # true or false (lowercase) # save filtering plots
@@ -221,11 +221,17 @@ keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, f
 #    cut_off_frequency = 6 # Hz # Will be divided by slowmo_factor to be equivalent to non slowed-down video
 #    order = 4 
 
-#    # Used in countless applications, this one is a simplified Kalman filter 
+#    # Used in countless applications, especially real-time. This one is a simplified Kalman filter 
 #    [filtering.kalman]
 #    # How much more do you trust triangulation results (measurements), than the assumption of constant acceleration(process)?
 #    trust_ratio = 500 # = measurement_trust/process_trust ~= process_noise/measurement_noise
 #    smooth = true # should be true, unless you need real-time filtering
+
+#    # Simpler and even faster alternative to Kalman filter for real-time, similar to a 1st order Butterworth but with adaptive cut-off frequency. This one is zero-phase
+#    [filtering.one_euro]
+#    cut_off_frequency = 4.0 # Hz # cutoff frequency, similar to Butterworth but adapts to velocity (with beta)
+#    beta = 1.5 # cutoff adaptation to velocity: cut_off_frequency = cut_off_frequency + beta*velocity
+#    d_cut_off_frequency = 1.0 # Hz # cutoff frequency for derivative (1.0 is usually good)
 
 #    # Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips).
 #    [filtering.gcv_spline]
