@@ -40,7 +40,7 @@ pose_model = 'Body_with_feet'  #With RTMLib:
                          # - Body_with_feet (default HALPE_26 model), 
                          # - Whole_body_wrist (COCO_133_WRIST: body + feet + 2 hand_points), 
                          # - Whole_body (COCO_133: body + feet + hands), 
-                         # - Body (COCO_17). Marker augmentation won't work, Kinematic analysis will work,
+                         # - Body (COCO_17). Marker augmentation won't work, Kinematic analysis will,
                          # - Hand (HAND_21, only lightweight mode. Potentially better results with Whole_body), 
                          # - Face (FACE_106), 
                          # - Animal (ANIMAL2D_17)
@@ -189,20 +189,24 @@ calibration_type = 'convert' # 'convert' or 'calculate'
                       
 
 [triangulation]
-reproj_error_threshold_triangulation = 15 # px # keypoint not triangulated if reprojection error is above 
-likelihood_threshold_triangulation= 0.3 # keypoint ignored if 2D likelihood is below
-min_cameras_for_triangulation = 2 # Won't triangulate a point if less than N cameras see it correctly
-interp_if_gap_smaller_than = 20 # do not interpolate larger gaps
-max_distance_m = 1.0 # m # if a person is detected further than max_distance from its position on the previous frame, it will be considered as a new one
+# for each frame, each keypoint: if results are not good, we remove a camera and try again
+reproj_error_threshold_triangulation = 15 # px # if reprojection error is above, triangulation results won't be accepted
+likelihood_threshold_triangulation= 0.3 # if 2D likelihood is below, estimations for this camera won't be accepted
+min_cameras_for_triangulation = 2 # won't try below N cameras if the triangulation is still not good
 
-interpolation = 'linear' # linear, slinear, quadratic, cubic, or none
-                        # 'none' if you don't want to interpolate missing points
-remove_incomplete_frames = false # true or false (lowercase) # If true, if any keypoint cannot be triangulated, the full time frame is removed
+# gap filling
+max_distance_m = 1.0 # m # max_distance a person can jump from its previous position before being considered as a new one
+interp_if_gap_smaller_than = 20 # do not interpolate larger gaps
+interpolation = 'linear' # linear, slinear, quadratic, cubic, or none # 'none' if you don't want to interpolate missing points
+
+# cleaning up
+remove_incomplete_frames = false # true or false (lowercase) # If true, frame is kept only if all keypoints have been correctly triangulated
 sections_to_keep = 'all' # 'all', 'largest', 'first', 'last'
-                        # keep 'all' valid sections even when they are interspersed with untriangulated chunks, or the 'largest' valid section, or the 'first' one, or the 'last' one
-min_chunk_size = 10 # Minimum number of valid frames in a row to keep a chunk of data for a person
+                        # keep 'all' correctly triangulated sections, or the 'largest' valid section, or the 'first' one, or the 'last' one
+min_chunk_size = 10 # Minimum number of consecutive valid frames to make it a section to keep
 fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
 
+# output
 show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 make_c3d = true # save triangulated data in c3d format in addition to trc
 
