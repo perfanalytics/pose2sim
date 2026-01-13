@@ -90,7 +90,7 @@ def count_persons_in_json(file_path):
         return len(data.get('people', []))
     
 
-def indices_of_first_last_non_nan_chunks(series, min_chunk_size=10, chunk_choice_method='largest'):
+def indices_of_first_last_non_nan_chunks(series, min_chunk_size=10, chunk_choice_method='largest', trim_output_chunk=True):
     '''
     Find indices of the chunks of at least min_chunk_size consecutive non-NaN values.
 
@@ -98,7 +98,9 @@ def indices_of_first_last_non_nan_chunks(series, min_chunk_size=10, chunk_choice
     - series: pandas Series to trim
     - min_chunk_size: minimum size of consecutive non-NaN values to consider (default: 10)
     - chunk_choice_method: 'largest' to return the largest chunk, 'all' to return everything between the first and last non-nan chunk, 
-                          'first' to return only the first one, 'last' to return only the last one
+                           'first' to return only the first one, 'last' to return only the last one
+    - trim_output_chunk:   if True, the output chunk starts when all values are valid and ends at the first nan
+                           else, it starts when at least on value is valid and ends when none is anymore
 
     OUTPUT:
     - tuple: (start_index, end_index) of the first and last valid chunks

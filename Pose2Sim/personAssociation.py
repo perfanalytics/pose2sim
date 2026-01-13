@@ -83,7 +83,9 @@ def persons_combinations(json_files_framef):
     for c in range(n_cams):
         try:
             with open(json_files_framef[c], 'r') as js:
-                nb_persons_per_cam += [len(json.load(js)['people'])]
+                people = json.load(js)['people']
+                people = [p for p in people if not all(np.isnan(p["pose_keypoints_2d"][::3]))]
+                nb_persons_per_cam += [len(people)]
         except:
             nb_persons_per_cam += [0]
     
