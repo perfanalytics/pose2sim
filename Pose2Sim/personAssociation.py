@@ -115,12 +115,7 @@ def triangulate_comb(comb, coords, P_all, calib_params, config_dict):
     ''' 
 
     undistort_points = config_dict.get('triangulation').get('undistort_points')
-    likelihood_threshold = config_dict.get('personAssociation').get('single_person').get('likelihood_threshold_association', 0.3)
-
-    # Replace likelihood by 0. if under likelihood_threshold
-    coords[:,2][coords[:,2] < likelihood_threshold] = 0.
-    comb[coords[:,2] == 0.] = np.nan
-
+    
     # Filter coords and projection_matrices containing nans
     coords_filt = [coords[i] for i in range(len(comb)) if not np.isnan(comb[i])]
     projection_matrices_filt = [P_all[i] for i in range(len(comb)) if not np.isnan(comb[i])]
@@ -182,12 +177,21 @@ def best_persons_and_cameras_combination(config_dict, json_files_framef, persons
     error_threshold_tracking = config_dict.get('personAssociation').get('single_person').get('reproj_error_threshold_association')
     min_cameras_for_triangulation = config_dict.get('triangulation').get('min_cameras_for_triangulation')
     undistort_points = config_dict.get('triangulation').get('undistort_points')
+    likelihood_threshold = config_dict.get('personAssociation').get('likelihood_threshold_association')
 
     n_cams = len(json_files_framef)
-    error_min = np.inf 
-    nb_cams_off = 0 # cameras will be taken-off until the reprojection error is under threshold
-    Q_kpt = []
-    while error_min > error_threshold_tracking and n_cams - nb_cams_off >= min_cameras_for_triangulation:
+    error_min = np.inf
+
+    # Cameras that are NaN for ALL combinations
+    cams_always_off = np.where(np.all(np.isnan(personsIDs_combinations), axis=0))[0]
+    nb_cams_missing = len(cams_always_off)
+    nb_cams_off_extra = 0 # cameras will be taken-off until the reprojection error is under threshold
+    
+    best_error = np.inf
+    best_comb = None
+    best_Q = None
+
+    while error_min > error_threshold_tracking and n_cams - (nb_cams_missing + nb_cams_off_extra) >= min_cameras_for_triangulation:
         # Try all persons combinations
         for combination in personsIDs_combinations:
             #  Get coords from files
@@ -206,12 +210,19 @@ def best_persons_and_cameras_combination(config_dict, json_files_framef, persons
                 undistorted_points = [cv2.undistortPoints(points[i], calib_params['K'][i], calib_params['dist'][i], None, calib_params['optim_K'][i]) for i in range(n_cams)]
                 coords[:,0] = np.array([[u[i][0][0] for i in range(len(u))] for u in undistorted_points]).squeeze()
                 coords[:,1] = np.array([[u[i][0][1] for i in range(len(u))] for u in undistorted_points]).squeeze()
+            
+            # Take off cams where confidence is below threshold
+            coords[:,2][coords[:,2] < likelihood_threshold] = 0.
+            combination[coords[:,2] == 0.] = np.nan
 
-            # For each persons combination, create subsets with "nb_cams_off" cameras excluded
-            id_cams_off = list(it.combinations(range(len(combination)), nb_cams_off))
+            # For each persons combination, take off extra cams among the ones that are still on
+            active_cams = np.where(~np.isnan(combination))[0]
+            if len(active_cams) < min_cameras_for_triangulation:
+                continue    # skip combination if not enough cameras are active
+            id_cams_off = list(it.combinations(active_cams, nb_cams_off_extra))
             combinations_with_cams_off = np.array([combination.copy()]*len(id_cams_off))
-            for i, id in enumerate(id_cams_off):
-                combinations_with_cams_off[i,id] = np.nan
+            for i, cams_to_off in enumerate(id_cams_off):
+                combinations_with_cams_off[i, cams_to_off] = np.nan
 
             # Try all subsets
             error_comb_all, comb_all, Q_comb_all = [], [], []
@@ -220,17 +231,31 @@ def best_persons_and_cameras_combination(config_dict, json_files_framef, persons
                 error_comb_all.append(error_comb)
                 comb_all.append(comb)
                 Q_comb_all.append(Q_comb)
+            
+            if np.all(np.isnan(error_comb_all)):
+                continue
 
             error_min = np.nanmin(error_comb_all)
             comb_error_min = [comb_all[np.argmin(error_comb_all)]]
             Q_kpt = [Q_comb_all[np.argmin(error_comb_all)]]
+            # update global best solution
+            if error_min < best_error:
+                best_error = error_min
+                best_comb = comb_error_min
+                best_Q = Q_kpt
+
             if error_min < error_threshold_tracking:
                 break 
 
-        nb_cams_off += 1
+        nb_cams_off_extra += 1
     
-    return error_min, comb_error_min, Q_kpt
+    if best_comb is None:
+        return np.inf, [np.array([np.nan]*n_cams)], [np.array([np.nan, np.nan, np.nan])]
 
+    nb_cams_off = np.sum(np.isnan(best_comb))
+    print(f"Final reprojection error = {best_error:.2f} with {nb_cams_off} cams off and comb {best_comb}")
+    return best_error, best_comb, best_Q
+    
 
 def read_json(js_file):
     '''
