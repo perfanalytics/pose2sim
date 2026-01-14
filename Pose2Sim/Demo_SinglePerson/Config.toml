@@ -231,7 +231,7 @@ make_c3d = true # also save triangulated data in c3d format
    trust_ratio = 500 # = measurement_trust/process_trust ~= process_noise/measurement_noise
    smooth = true # should be true, unless you need real-time filtering
 
-   # Simpler and even faster alternative to Kalman filter for real-time, similar to a 1st order Butterworth but with adaptive cut-off frequency. This one is zero-phase
+   # Simpler and even faster alternative to Kalman filter for real-time but tends to blunt RoM. Similar to a 1st order Butterworth but with adaptive cut-off frequency. This one is zero-phase
    [filtering.one_euro]
    cut_off_frequency = 4.0 # Hz # cutoff frequency, similar to Butterworth but adapts to velocity (with beta)
    beta = 1.5 # cutoff adaptation to velocity: cut_off_frequency = cut_off_frequency + beta*velocity
