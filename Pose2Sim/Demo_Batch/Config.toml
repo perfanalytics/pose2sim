@@ -33,6 +33,8 @@ frame_range = 'auto' # 'auto', 'all', or range like [10,300]. If 'auto', will tr
 exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<participant_dir/trial_dir>', 'etc'].
 # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
+continue_on_error = true # If true, skip failing trials and log exceptions
+
 
 [pose]
 vid_img_extension = 'mp4' # any video or image extension
