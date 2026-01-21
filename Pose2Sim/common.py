@@ -251,7 +251,7 @@ def bounding_boxes(js_file, margin_percent=0.1, around='extremities'):
     return bounding_boxes   
 
 
-def retrieve_calib_params(calib_file):
+def retrieve_calib_params(calib_file, json_pose_dirs_names=None):
     '''
     Compute projection matrices from toml calibration file.
     
@@ -273,22 +273,35 @@ def retrieve_calib_params(calib_file):
     cal_keys = [c for c in calib.keys() 
                 if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
                 and isinstance(calib[c],dict)]
+    
+    if json_pose_dirs_names is None:
+        pose_keys = cal_keys
+    else:
+        pose_keys = [name.replace('_json', '') for name in json_pose_dirs_names]
+        missing_cams = [cam for cam in pose_keys if cam not in cal_keys]
+        if missing_cams:
+            logging.error(f"The following cameras are present in the pose folders but missing in the calibration file: {missing_cams}.")
+            raise ValueError(f"The following cameras are present in the pose folders but missing in the calibration file: {missing_cams}.")
+
+
     S, K, dist, optim_K, inv_K, R, R_mat, T = [], [], [], [], [], [], [], []
-    for c, cam in enumerate(cal_keys):
+    for cam in list(cal_keys):
+        if cam not in pose_keys:
+            continue
         S.append(np.array(calib[cam]['size']))
         K.append(np.array(calib[cam]['matrix']))
         dist.append(np.array(calib[cam]['distortions']))
-        optim_K.append(cv2.getOptimalNewCameraMatrix(K[c], dist[c], [int(s) for s in S[c]], 1, [int(s) for s in S[c]])[0])
-        inv_K.append(np.linalg.inv(K[c]))
+        optim_K.append(cv2.getOptimalNewCameraMatrix(K[-1], dist[-1], [int(s) for s in S[-1]], 1, [int(s) for s in S[-1]])[0])
+        inv_K.append(np.linalg.inv(K[-1]))
         R.append(np.array(calib[cam]['rotation']))
-        R_mat.append(cv2.Rodrigues(R[c])[0])
+        R_mat.append(cv2.Rodrigues(R[-1])[0])
         T.append(np.array(calib[cam]['translation']))
     calib_params = {'S': S, 'K': K, 'dist': dist, 'inv_K': inv_K, 'optim_K': optim_K, 'R': R, 'R_mat': R_mat, 'T': T}
             
     return calib_params
 
 
-def computeP(calib_file, undistort=False):
+def computeP(calib_file, json_pose_dirs_names=None, undistort=False):
     '''
     Compute projection matrices from toml calibration file.
     
@@ -305,8 +318,20 @@ def computeP(calib_file, undistort=False):
     cal_keys = [c for c in calib.keys() 
                 if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
                 and isinstance(calib[c],dict)]
+    
+    if json_pose_dirs_names is None:
+        pose_keys = cal_keys
+    else:
+        pose_keys = [name.replace('_json', '') for name in json_pose_dirs_names]
+        missing_cams = [cam for cam in pose_keys if cam not in cal_keys]
+        if missing_cams:
+            logging.error(f"The following cameras are present in the pose folders but missing in the calibration file: {missing_cams}.")
+            raise ValueError(f"The following cameras are present in the pose folders but missing in the calibration file: {missing_cams}.")
+
     P = []
     for cam in list(cal_keys):
+        if cam not in pose_keys:
+            continue
         K = np.array(calib[cam]['matrix'])
         if undistort:
             S = np.array(calib[cam]['size'])

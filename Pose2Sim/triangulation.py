@@ -698,7 +698,7 @@ def triangulate_all(config_dict):
     try:
         calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
     except:
-        raise Exception(f'No .toml calibration direcctory found.')
+        raise Exception(f'No .toml calibration directory found.')
     try:
         calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
         calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
@@ -707,10 +707,6 @@ def triangulate_all(config_dict):
     pose_dir = os.path.join(project_dir, 'pose')
     poseSync_dir = os.path.join(project_dir, 'pose-sync')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
-    
-    # Projection matrix from toml calibration file
-    P = computeP(calib_file, undistort=undistort_points)
-    calib_params = retrieve_calib_params(calib_file)
         
     # Retrieve keypoints from model
     try: # from skeletons.py
@@ -774,10 +770,10 @@ def triangulate_all(config_dict):
     # frame range selection
     f_range = [[0,min([len(j) for j in json_files_names])] if frame_range in ('all', 'auto', []) else frame_range][0]
     frame_nb = f_range[1] - f_range[0]
-    
-    # Check that camera number is consistent between calibration file and pose folders
-    if n_cams != len(P):
-        raise Exception(f'Error: The number of cameras is not consistent: Found {len(P)} cameras in the calibration file, and {n_cams} cameras based on the number of pose folders.')
+
+    # Projection matrix from toml calibration file
+    P = computeP(calib_file, json_dirs_names, undistort=undistort_points)
+    calib_params = retrieve_calib_params(calib_file, json_dirs_names)
     
     # Triangulation
     if multi_person:
