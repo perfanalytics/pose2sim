@@ -95,6 +95,7 @@ def trc_rotate_func(**args):
     trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4, encoding='utf-8')
     frames_col, time_col = trc_df.iloc[:,0], trc_df.iloc[:,1]
     Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
+    Q_coord = Q_coord.loc[:, ~Q_coord.columns.str.contains('^Unnamed')]
 
     # rotate coordinates
     cols = Q_coord.values.reshape(-1,3)
