@@ -29,6 +29,7 @@
 ## INIT
 import os
 import numpy as np
+import pandas as pd
 import opensim as osim
 import argparse
 from scipy import signal
@@ -218,6 +219,9 @@ def bodykin_from_mot_osim_func(*args):
         if '_rot' in col:
             loc_rot_frame_all_np[:,n] = np.unwrap(loc_rot_frame_all_np[:,n],period=2*np.pi)
 
+    # Create DataFrame
+    loc_rot_frame_all_df = pd.DataFrame(loc_rot_frame_all_np, columns=bodyHeader.split(', '))
+
     # calculate CoM velocity using the position and time data
     if calculate_com_vel:
 
@@ -228,6 +232,8 @@ def bodykin_from_mot_osim_func(*args):
 
         # calculate the velocity of the CoM using the numpy gradient function
         CoM_vel_array = np.gradient(CoM_pos_array, np.array(times), axis=0)
+
+        CoM_df = pd.DataFrame(np.hstack((np.array(times).reshape(-1, 1), CoM_pos_array, CoM_vel_array)), columns=['time', 'com_x', 'com_y', 'com_z', 'com_x_vel', 'com_y_vel', 'com_z_vel'])
 
         if save_com_file:
             # save the CoM position, velocity, and time to a file
@@ -240,7 +246,9 @@ def bodykin_from_mot_osim_func(*args):
     print(f'CSV file generated at {os.path.splitext(output_csv_file)[0]+".csv"}.\n')
 
     if calculate_com_vel:
-        return CoM_pos_array, CoM_vel_array
+        return CoM_pos_array, CoM_vel_array, loc_rot_frame_all_df, CoM_df
+    else:
+        return loc_rot_frame_all_df
     
 if __name__ == '__main__':
     main()
