@@ -55,6 +55,9 @@ dependencies = [
     # "deep-sort-realtime", # likely not required anymore
 ]
 
+[project.optional-dependencies]
+ba = ["ba-cuda>=0.1.0"]  # Bundle adjustment support (requires PyTorch with CUDA)
+
 [tool.setuptools_scm]
 
 [tool.setuptools]

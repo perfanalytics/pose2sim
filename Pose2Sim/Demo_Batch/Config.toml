@@ -205,6 +205,16 @@ fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros'
 show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 make_c3d = true # save triangulated data in c3d format in addition to trc
 
+   # Bundle Adjustment for camera extrinsic refinement using human keypoints
+   # Requires ba-cuda: pip install pose2sim[ba] or pip install ba-cuda
+   [triangulation.bundle_adjustment]
+   enabled = false # true or false (lowercase) # Set to true to refine camera extrinsics after triangulation
+   ref_cam_idx = 0 # Reference camera index (fixed during optimization, 0-indexed)
+   max_iterations = 50 # Maximum Levenberg-Marquardt iterations
+   tolerance = 1e-6 # Convergence tolerance
+   huber_delta = 1.0 # Huber loss delta for outlier robustness
+   use_confidence_weights = true # Use keypoint confidence scores as weights
+
 
 [filtering]
 reject_outliers = true      # Hampel filter for outlier rejection before other filtering methods. Can be slow. Rejects outliers that are outside of a 95% confidence interal from the median in a sliding window of size 7.

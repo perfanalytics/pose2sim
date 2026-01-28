@@ -60,6 +60,13 @@ from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulat
     sort_stringlist_by_last_number, zup2yup, convert_to_c3d
 from Pose2Sim.skeletons import *
 
+# Bundle Adjustment import (optional)
+try:
+    from Pose2Sim.bundle_adjustment import run_bundle_adjustment, update_calibration_file, check_ba_availability
+    BA_AVAILABLE = True
+except ImportError:
+    BA_AVAILABLE = False
+
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -882,6 +889,106 @@ def triangulate_all(config_dict):
     error_tot = [pd.DataFrame([error_tot_f[n] for error_tot_f in error_tot], index=range(*f_range)) for n in range(nb_persons_to_detect)]
     nb_cams_excluded_tot = [pd.DataFrame([nb_cams_excluded_tot_f[n] for nb_cams_excluded_tot_f in nb_cams_excluded_tot], index=range(*f_range)) for n in range(nb_persons_to_detect)]
     id_excluded_cams_tot = [pd.DataFrame([id_excluded_cams_tot_f[n] for id_excluded_cams_tot_f in id_excluded_cams_tot], index=range(*f_range)) for n in range(nb_persons_to_detect)]
+
+    # Bundle Adjustment for camera extrinsic refinement
+    ba_config = config_dict.get('triangulation', {}).get('bundle_adjustment', {})
+    if ba_config.get('enabled', False) and BA_AVAILABLE:
+        logging.info('\n--> Running Bundle Adjustment for camera extrinsic refinement...')
+        
+        try:
+            # Collect 2D observations and 3D points for BA
+            ba_observations_2d = [[] for _ in range(n_cams)]
+            ba_camera_indices = [[] for _ in range(n_cams)]
+            ba_confidence = [[] for _ in range(n_cams)]
+            ba_points_3d = []
+            point_idx = 0
+            
+            # Re-read 2D keypoints from JSON files for BA
+            for f_idx, f in enumerate(range(*f_range)):
+                json_files_names_f = [[j for j in json_files_names[c] if int(re.split(r'(\d+)',j)[-2])==f] for c in range(n_cams)]
+                json_files_names_f = [j for j_list in json_files_names_f for j in (j_list or ['none'])]
+                json_files_f = [os.path.join(pose_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
+                
+                x_files_ba, y_files_ba, likelihood_files_ba = extract_files_frame_f(json_files_f, keypoints_ids, nb_persons_to_detect)
+                
+                for n in range(nb_persons_to_detect):
+                    for kpt_idx in range(keypoints_nb):
+                        # Get 3D point from triangulation result
+                        q_idx = kpt_idx * 3
+                        if f_idx < len(Q_tot[n]) and q_idx + 2 < len(Q_tot[n].columns):
+                            pt_3d = Q_tot[n].iloc[f_idx, q_idx:q_idx+3].values
+                        else:
+                            continue
+                            
+                        if np.isnan(pt_3d).any():
+                            continue
+                        
+                        ba_points_3d.append(pt_3d)
+                        
+                        # Collect 2D observations from all cameras for this point
+                        for cam_idx in range(n_cams):
+                            x = x_files_ba[n][cam_idx, kpt_idx]
+                            y = y_files_ba[n][cam_idx, kpt_idx]
+                            conf = likelihood_files_ba[n][cam_idx, kpt_idx]
+                            
+                            if not np.isnan(x) and not np.isnan(y) and conf >= likelihood_threshold:
+                                ba_observations_2d[cam_idx].append([x, y])
+                                ba_camera_indices[cam_idx].append(point_idx)
+                                ba_confidence[cam_idx].append(conf)
+                        
+                        point_idx += 1
+            
+            if len(ba_points_3d) > 0:
+                ba_points_3d = np.array(ba_points_3d)
+                ba_observations_2d = [np.array(obs) if len(obs) > 0 else np.array([]).reshape(0, 2) for obs in ba_observations_2d]
+                ba_camera_indices = [np.array(idx, dtype=np.int64) for idx in ba_camera_indices]
+                ba_confidence = [np.array(conf) if len(conf) > 0 else None for conf in ba_confidence]
+                
+                # Prepare extrinsics
+                extrinsics_list = list(zip(calib_params['R'], calib_params['T']))
+                
+                # Run Bundle Adjustment
+                optimized_extrinsics, rmse, success = run_bundle_adjustment(
+                    observations_2d=ba_observations_2d,
+                    points_3d=ba_points_3d,
+                    camera_indices=ba_camera_indices,
+                    intrinsics_list=calib_params['K'],
+                    distortions_list=calib_params['dist'],
+                    extrinsics_list=extrinsics_list,
+                    ref_cam_idx=ba_config.get('ref_cam_idx', 0),
+                    max_iterations=ba_config.get('max_iterations', 50),
+                    abs_tolerance=ba_config.get('tolerance', 1e-6),
+                    rel_tolerance=ba_config.get('tolerance', 1e-6),
+                    huber_delta=ba_config.get('huber_delta', 1.0),
+                    confidence_weights=ba_confidence if ba_config.get('use_confidence_weights', True) else None
+                )
+                
+                if success:
+                    logging.info(f'Bundle Adjustment completed successfully. RMSE: {rmse:.4f} pixels')
+                    
+                    # Update calibration file
+                    refined_params = {
+                        'C': calib_params.get('C', [f'cam{i}' for i in range(n_cams)]),
+                        'R': [ext[0] for ext in optimized_extrinsics],
+                        'T': [ext[1] for ext in optimized_extrinsics]
+                    }
+                    
+                    if update_calibration_file(calib_file, refined_params):
+                        logging.info(f'Calibration file updated with refined extrinsic parameters: {calib_file}')
+                    else:
+                        logging.warning('Failed to update calibration file with BA results')
+                else:
+                    logging.warning('Bundle Adjustment did not converge, using original calibration')
+            else:
+                logging.warning('No valid 3D points for Bundle Adjustment')
+                
+        except Exception as e:
+            logging.error(f'Bundle Adjustment failed: {str(e)}')
+            logging.info('Continuing with original calibration')
+    
+    elif ba_config.get('enabled', False) and not BA_AVAILABLE:
+        logging.warning('Bundle Adjustment is enabled but ba-cuda is not installed. Skipping BA.')
+        logging.info('Install ba-cuda with: pip install ba-cuda')
 
     # Interpolate small missing sections
     for n in range(nb_persons_to_detect):
