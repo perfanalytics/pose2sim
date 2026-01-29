@@ -169,6 +169,9 @@ class Pose2SimPipeline:
             [os.path.join(self.session_dir, c) for c in os.listdir(self.session_dir) if 'calib' in c.lower() and not c.lower().endswith('.py')][0]
         except:
             self.session_dir = os.path.realpath(os.getcwd())
+
+        self.continue_on_error = bool(self.config_dicts[0].get('project', {}).get('continue_on_error', False))
+        
         use_custom_logging = self.config_dicts[0].get('logging', {}).get('use_custom_logging', False)
         if not use_custom_logging:
             setup_logging(self.session_dir)
@@ -183,6 +186,13 @@ class Pose2SimPipeline:
         logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")
         logging.info(f"Project directory: {project_dir}")
         logging.info("---------------------------------------------------------------------\n")
+
+    def _handle_step_error(self, step_name, config_dict, exc):
+        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        seq_name = os.path.basename(project_dir)
+        logging.exception(f"[{step_name}] FAILED for trial '{seq_name}' ({project_dir}). Reason: {exc}")
+        if not self.continue_on_error:
+            raise
 
     def calibration(self):
         from Pose2Sim.calibration import calibrate_cams_all
@@ -216,7 +226,11 @@ class Pose2SimPipeline:
         for config_dict in self.config_dicts:
             self._log_step_header("Pose estimation", config_dict)
             start = time.time()
-            estimate_pose_all(config_dict)
+            try:
+                estimate_pose_all(config_dict)
+            except Exception as e:
+                self._handle_step_error("Pose estimation", config_dict, e)
+                continue
             elapsed = time.time() - start
             logging.info(f'\nPose estimation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 
@@ -225,7 +239,11 @@ class Pose2SimPipeline:
         for config_dict in self.config_dicts:
             self._log_step_header("Camera synchronization", config_dict)
             start = time.time()
-            synchronize_cams_all(config_dict)
+            try:
+                synchronize_cams_all(config_dict)
+            except Exception as e:
+                self._handle_step_error("Camera synchronization", config_dict, e)
+                continue
             elapsed = time.time() - start
             logging.info(f'\nSynchronization took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 
@@ -234,7 +252,11 @@ class Pose2SimPipeline:
         for config_dict in self.config_dicts:
             self._log_step_header("Associating persons", config_dict)
             start = time.time()
-            associate_all(config_dict)
+            try:
+                associate_all(config_dict)
+            except Exception as e:
+                self._handle_step_error("Associating persons", config_dict, e)
+                continue
             elapsed = time.time() - start
             logging.info(f'\nAssociating persons took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 
@@ -243,7 +265,11 @@ class Pose2SimPipeline:
         for config_dict in self.config_dicts:
             self._log_step_header("Triangulation of 2D points", config_dict)
             start = time.time()
-            triangulate_all(config_dict)
+            try:
+                triangulate_all(config_dict)
+            except Exception as e:
+                self._handle_step_error("Triangulation", config_dict, e)
+                continue
             elapsed = time.time() - start
             logging.info(f'\nTriangulation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 
@@ -251,7 +277,11 @@ class Pose2SimPipeline:
         from Pose2Sim.filtering import filter_all
         for config_dict in self.config_dicts:
             self._log_step_header("Filtering 3D coordinates", config_dict)
-            filter_all(config_dict)
+            try:
+                filter_all(config_dict)
+            except Exception as e:
+                self._handle_step_error("Filtering", config_dict, e)
+                continue
             logging.info('\n')
 
     def markerAugmentation(self):
@@ -259,7 +289,11 @@ class Pose2SimPipeline:
         for config_dict in self.config_dicts:
             self._log_step_header("Augmentation process", config_dict)
             start = time.time()
-            augment_markers_all(config_dict)
+            try:
+                augment_markers_all(config_dict)
+            except Exception as e:
+                self._handle_step_error("Marker augmentation", config_dict, e)
+                continue
             elapsed = time.time() - start
             logging.info(f'\nMarker augmentation took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 
@@ -268,7 +302,11 @@ class Pose2SimPipeline:
         for config_dict in self.config_dicts:
             self._log_step_header("OpenSim scaling and inverse kinematics", config_dict)
             start = time.time()
-            kinematics_all(config_dict)
+            try:
+                kinematics_all(config_dict)
+            except Exception as e:
+                self._handle_step_error("Kinematics", config_dict, e)
+                continue
             elapsed = time.time() - start
             logging.info(f'\nOpenSim scaling and inverse kinematics took {time.strftime("%Hh%Mm%Ss", time.gmtime(elapsed))}.\n')
 
