@@ -1033,14 +1033,6 @@ def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, close_to_
 
     return leg_length
 
-    
-
-
-    # BEFORE ALL THAT: IN SORT, CONFIDENCE DECAY: REMOVE WHEN NOT SEEN FOR > 5*interp_gap_smaller_than?
-    # TEST POSTERS + OTHER CHALLENGING VIDS
-    # TEST POSE2SIM TRIG
-    # CHECK WHY RUGBY CUT OFF
-
 
 def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
     '''

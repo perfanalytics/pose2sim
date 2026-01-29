@@ -79,7 +79,7 @@ def trc_rotate_func(**args):
     trc_rotate -i input_trc_file --rotate90=-X      # Equivalently
     '''
 
-    trc_path = args.get('input')
+    trc_path = str(args.get('input'))
     output_trc_path = args.get('output')
     rotate90 = args.get('rotate90')
     if rotate90 is None:
