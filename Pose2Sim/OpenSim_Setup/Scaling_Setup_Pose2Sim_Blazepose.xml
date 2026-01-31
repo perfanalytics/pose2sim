@@ -33,11 +33,11 @@
 							<objects>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> left_shoulder left_hip</markers>
+									<markers> LShoulder LHip</markers>
 								</MarkerPair>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> right_shoulder right_hip</markers>
+									<markers> RShoulder RHip</markers>
 								</MarkerPair>
 							</objects>
 							<groups />
@@ -85,11 +85,11 @@
 							<objects>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> left_shoulder left_elbow</markers>
+									<markers> LShoulder LElbow</markers>
 								</MarkerPair>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> right_shoulder right_elbow</markers>
+									<markers> RShoulder RElbow</markers>
 								</MarkerPair>
 							</objects>
 							<groups />
@@ -117,11 +117,11 @@
 							<objects>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> left_elbow left_wrist</markers>
+									<markers> LElbow LWrist</markers>
 								</MarkerPair>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> right_elbow right_wrist</markers>
+									<markers> RElbow RWrist</markers>
 								</MarkerPair>
 							</objects>
 							<groups />
@@ -165,11 +165,11 @@
 							<objects>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> left_hip left_knee</markers>
+									<markers> LHip LKnee</markers>
 								</MarkerPair>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> right_hip right_knee</markers>
+									<markers> RHip RKnee</markers>
 								</MarkerPair>
 							</objects>
 							<groups />
@@ -205,11 +205,11 @@
 							<objects>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> left_knee left_ankle</markers>
+									<markers> LKnee LAnkle</markers>
 								</MarkerPair>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> right_knee right_ankle</markers>
+									<markers> RKnee RAnkle</markers>
 								</MarkerPair>
 							</objects>
 							<groups />
@@ -237,11 +237,11 @@
 							<objects>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> left_heel left_foot_index</markers>
+									<markers> LHeel LBigToe</markers>
 								</MarkerPair>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> right_heel right_foot_index</markers>
+									<markers> RHeel RBigToe</markers>
 								</MarkerPair>
 							</objects>
 							<groups />
@@ -285,7 +285,7 @@
 							<objects>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> left_eye right_eye</markers>
+									<markers> LEye REye</markers>
 								</MarkerPair>
 							</objects>
 							<groups />
@@ -304,7 +304,7 @@
 							<objects>
 								<MarkerPair>
 									<!--Names of two markers, the distance between which is used to compute a body scale factor.-->
-									<markers> left_hip right_hip</markers>
+									<markers> LHip RHip</markers>
 								</MarkerPair>
 							</objects>
 							<groups />
