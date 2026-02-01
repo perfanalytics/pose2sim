@@ -114,9 +114,14 @@ def augment_markers_all(config_dict):
     pose_3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     feet_on_floor = config_dict.get('markerAugmentation').get('feet_on_floor')
     make_c3d = config_dict.get('markerAugmentation').get('make_c3d')
+    shoulder_constraint_weight = config_dict.get('markerAugmentation').get('shoulder_constraint_weight', 1.0)
     frame_range = config_dict.get('project').get('frame_range')
     subject_height = config_dict.get('project').get('participant_height')
     subject_mass = config_dict.get('project').get('participant_mass')
+    
+    # Get body segment augmentation control parameters
+    augment_upper_limb = config_dict.get('markerAugmentation').get('augment_upper_limb', True)
+    augment_lower_limb = config_dict.get('markerAugmentation').get('augment_lower_limb', True)
     
     fastest_frames_to_remove_percent = config_dict.get('kinematics').get('fastest_frames_to_remove_percent')
     close_to_zero_speed = config_dict.get('kinematics').get('close_to_zero_speed_m')
@@ -203,10 +208,38 @@ def augment_markers_all(config_dict):
         # Upper body
         augmenterModelType_upper = '{}_upper'.format(augmenter_model)
         feature_markers_upper, response_markers_upper = getMarkers_upperExtremity_noPelvis2()        
-        augmenterModelType_all = [augmenterModelType_lower, augmenterModelType_upper]
-        feature_markers_all = [feature_markers_lower, feature_markers_upper]
-        response_markers_all = [response_markers_lower, response_markers_upper]
-        logging.info(f'Using Stanford {augmenterModelName} {augmenter_model} augmenter model. Feet are {"" if feet_on_floor else "not "}vertically offset to be at floor level.\n')
+        
+        # Build augmenter list based on configuration
+        augmenterModelType_all = []
+        feature_markers_all = []
+        response_markers_all = []
+        
+        if augment_lower_limb:
+            augmenterModelType_all.append(augmenterModelType_lower)
+            feature_markers_all.append(feature_markers_lower)
+            response_markers_all.append(response_markers_lower)
+            
+        if augment_upper_limb:
+            augmenterModelType_all.append(augmenterModelType_upper)
+            feature_markers_all.append(feature_markers_upper)
+            response_markers_all.append(response_markers_upper)
+        
+        # Log which augmenters are being used
+        augmentation_parts = []
+        if augment_lower_limb:
+            augmentation_parts.append('lower limb')
+        if augment_upper_limb:
+            augmentation_parts.append('upper limb')
+        
+        if len(augmentation_parts) == 0:
+            logging.warning(f'Both augment_upper_limb and augment_lower_limb are set to false. Skipping marker augmentation for {os.path.basename(trc_file)}.')
+            continue
+        
+        # Warn if partial augmentation when use_augmentation is true in kinematics
+        if len(augmentation_parts) < 2:
+            logging.warning(f'\nPartial marker augmentation detected (only {" and ".join(augmentation_parts)}).')
+
+        logging.info(f'Using Stanford {augmenterModelName} {augmenter_model} augmenter model for {" and ".join(augmentation_parts)}. Feet are {"" if feet_on_floor else "not "}vertically offset to be at floor level.\n')
         
         # %% Process data.
         # Import TRC file
@@ -230,7 +263,9 @@ def augment_markers_all(config_dict):
         header[2] = '\t'.join(part if i != 7 else str(frame_nb)+'\n' for i, part in enumerate(header[2].split('\t')))
 
         # Verify that all feature markers are present in the TRC file.
-        feature_markers_joined = set(feature_markers_all[0]+feature_markers_all[1])
+        feature_markers_joined = set()
+        for fm in feature_markers_all:
+            feature_markers_joined.update(fm)
         missing_markers = list(feature_markers_joined - set(markers))
         if len(missing_markers) > 0:
             raise ValueError(f'Marker augmentation requires {missing_markers} markers and they are not present in the TRC file.')
@@ -293,24 +328,100 @@ def augment_markers_all(config_dict):
 
 
             # %% Add response markers to trc_data and update markers and header.
-            trc_data_response = pd.DataFrame(unnorm2_outputs, columns=[m for m in response_markers for _ in range(3)])
+            if shoulder_constraint_weight < 1.0:
+                # Apply constraints to shoulder markers (weighted blending)
+                shoulder_markers = ['r_shoulder_study', 'L_shoulder_study', 'C7_study',
+                                   'r_sh1_study', 'r_sh2_study', 'r_sh3_study',
+                                   'L_sh1_study', 'L_sh2_study', 'L_sh3_study']
+                
+                # Create a mapping from shoulder virtual markers to original pose markers
+                shoulder_mapping = {
+                    'r_shoulder_study': 'RShoulder',
+                    'L_shoulder_study': 'LShoulder',
+                    'C7_study': None,  # Will use midpoint of shoulders
+                    'r_sh1_study': 'RShoulder',
+                    'r_sh2_study': 'RShoulder',
+                    'r_sh3_study': 'RShoulder',
+                    'L_sh1_study': 'LShoulder',
+                    'L_sh2_study': 'LShoulder',
+                    'L_sh3_study': 'LShoulder'
+                }
+                
+                # Apply constraints to each shoulder marker
+                constrained_outputs = copy.deepcopy(unnorm2_outputs)
+                for i, marker_name in enumerate(response_markers):
+                    if marker_name in shoulder_markers:
+                        original_marker = shoulder_mapping[marker_name]
+                        
+                        if marker_name == 'C7_study':
+                            # C7: use midpoint of two shoulders as reference
+                            if 'RShoulder' in markers and 'LShoulder' in markers:
+                                r_idx = markers.index('RShoulder')
+                                l_idx = markers.index('LShoulder')
+                                r_shoulder_pos = trc_data.iloc[:, r_idx*3:(r_idx+1)*3].values
+                                l_shoulder_pos = trc_data.iloc[:, l_idx*3:(l_idx+1)*3].values
+                                original_pos = (r_shoulder_pos + l_shoulder_pos) / 2
+                            else:
+                                original_pos = unnorm2_outputs[:, 3*i:3*(i+1)]  # fallback to LSTM
+                        elif original_marker and original_marker in markers:
+                            # Other shoulder markers: use corresponding original marker
+                            orig_idx = markers.index(original_marker)
+                            original_pos = trc_data.iloc[:, orig_idx*3:(orig_idx+1)*3].values
+                        else:
+                            # If original marker not found, use LSTM output
+                            original_pos = unnorm2_outputs[:, 3*i:3*(i+1)]
+                        
+                        # Weighted blending: constrained = α × LSTM + (1-α) × original
+                        lstm_pos = unnorm2_outputs[:, 3*i:3*(i+1)]
+                        constrained_outputs[:, 3*i:3*(i+1)] = (
+                            shoulder_constraint_weight * lstm_pos + 
+                            (1 - shoulder_constraint_weight) * original_pos
+                        )
+                
+                trc_data_response = pd.DataFrame(constrained_outputs, columns=[m for m in response_markers for _ in range(3)])
+                response_markers_to_add = response_markers
+                logging.info(f"Applying shoulder constraints with weight={shoulder_constraint_weight:.2f}")
+            else:
+                # No constraints, use LSTM output directly
+                trc_data_response = pd.DataFrame(unnorm2_outputs, columns=[m for m in response_markers for _ in range(3)])
+                response_markers_to_add = response_markers
+            
             trc_data = pd.concat([trc_data, trc_data_response], axis=1)
-
-            markers += response_markers
+            markers += response_markers_to_add
             
             header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
-            response_markers_str = '\t\t\t'.join(response_markers)
+            response_markers_str = '\t\t\t'.join(response_markers_to_add)
             header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{response_markers_str}\t\t\t\n')
             header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
             
         # %% Extract minimum y-position across response markers. This is used
         # to align feet and floor when visualizing.
         response_markers_conc = [m for resp in response_markers_all for m in resp]
-        min_y_pos = trc_data[response_markers_conc].iloc[:,1::3].min().min()
+        
+        # Only apply feet_on_floor if we have lower limb augmentation
+        # Otherwise, min_y_pos from upper limb markers (elbows, wrists) would be incorrect
+        has_foot_markers = any('ankle' in m.lower() or 'toe' in m.lower() or 'heel' in m.lower() or 'calc' in m.lower() 
+                              for m in response_markers_conc)
+        
+        if has_foot_markers:
+            min_y_pos = trc_data[response_markers_conc].iloc[:,1::3].min().min()
+        else:
+            # For partial augmentation without foot markers, use original marker foot positions
+            foot_markers_original = [m for m in markers if 'Ankle' in m or 'Toe' in m or 'Heel' in m]
+            if foot_markers_original:
+                min_y_pos = trc_data[foot_markers_original].iloc[:,1::3].min().min()
+                logging.info(f"Using original foot markers for ground reference (partial augmentation without lower limb)")
+            else:
+                min_y_pos = 0
+                logging.warning(f"No foot markers found, skipping feet_on_floor adjustment")
             
         # %% If offset
         if feet_on_floor:
-            trc_data.iloc[:,1::3] = trc_data.iloc[:,1::3] - (min_y_pos-0.01)
+            if has_foot_markers or foot_markers_original:
+                trc_data.iloc[:,1::3] = trc_data.iloc[:,1::3] - (min_y_pos-0.01)
+                logging.info(f"Applied feet_on_floor adjustment: offset = {min_y_pos-0.01:.4f} m")
+            else:
+                logging.warning(f"Skipping feet_on_floor adjustment: no foot markers available")
             
         # %% Return augmented .trc file   
         with open(trc_path_out, 'w') as trc_o:
