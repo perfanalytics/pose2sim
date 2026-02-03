@@ -686,10 +686,6 @@ def associate_all(config_dict):
     pose_dir = os.path.join(project_dir, 'pose')
     poseSync_dir = os.path.join(project_dir, 'pose-sync')
     poseTracked_dir = os.path.join(project_dir, 'pose-associated')
-
-    # projection matrix from toml calibration file
-    P_all = computeP(calib_file, undistort=undistort_points)
-    calib_params = retrieve_calib_params(calib_file)
         
     # selection of tracked keypoint id
     try: # from skeletons.py
@@ -736,11 +732,9 @@ def associate_all(config_dict):
     f_range = [[0,max([len(j) for j in json_files_names])] if frame_range in ('all', 'auto', []) else frame_range][0]
     n_cams = len(json_dirs_names)
 
-    # Check that camera number is consistent between calibration file and pose folders
-    if n_cams != len(P_all):
-        raise Exception(f'Error: The number of cameras is not consistent:\
-                    Found {len(P_all)} cameras in the calibration file,\
-                    and {n_cams} cameras based on the number of pose folders.')
+    # projection matrix from toml calibration file
+    P = computeP(calib_file, json_dirs_names, undistort=undistort_points)
+    calib_params = retrieve_calib_params(calib_file, json_dirs_names)
 
     if not multi_person:
         logging.info('\nSingle-person analysis selected.')
@@ -771,12 +765,12 @@ def associate_all(config_dict):
             personsIDs_comb = persons_combinations(json_files_f) 
             
             # choose persons of interest and exclude cameras with bad pose estimation
-            error_proposals, proposals, Q_kpt = best_persons_and_cameras_combination(config_dict, json_files_f, personsIDs_comb, P_all, tracked_keypoint_id, calib_params)
+            error_proposals, proposals, Q_kpt = best_persons_and_cameras_combination(config_dict, json_files_f, personsIDs_comb, P, tracked_keypoint_id, calib_params)
 
             if not np.isinf(error_proposals):
                 error_min_tot.append(np.nanmean(error_proposals))
             cameras_off_count = np.count_nonzero([np.isnan(comb) for comb in proposals]) / len(proposals)
-            cameras_off_tot.append(cameras_off_count)            
+            cameras_off_tot.append(cameras_off_count)
 
         else:
             # read data
