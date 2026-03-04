@@ -1,13 +1,10 @@
-import os
+from pathlib import Path
 import sys
-import tkinter as tk
 import customtkinter as ctk
 from tkinter import messagebox
 import subprocess
 import threading
 import webbrowser
-import cv2
-from PIL import Image, ImageTk
 
 class TutorialTab:
     def __init__(self, parent, app):
@@ -18,7 +15,7 @@ class TutorialTab:
         self.frame = ctk.CTkFrame(parent)
         
         # Initialize variables
-        self.marker_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tutorial_completed")
+        self.marker_file = Path(__file__).parent.parent / "tutorial_completed"
         
         # Video links
         self.video_links = {
@@ -30,17 +27,17 @@ class TutorialTab:
         self.dependencies = {
             "anaconda": {"installed": False, "name": "Anaconda"},
             "path": {"installed": False, "name": "Anaconda Path"},
-            "pose2sim": {"installed": False, "name": "Pose2Sim"},
+            "pose2sim": {"installed": False, "name": "Pose2Sim / Sports2D"},
             "opensim": {"installed": False, "name": "OpenSim"},
-            "pytorch": {"installed": False, "name": "PyTorch"},
-            "onnxruntime-gpu": {"installed": False, "name": "ONNX Runtime GPU"}
+            "pytorch": {"installed": False, "name": "PyTorch (optional)"},
+            "onnxruntime-gpu": {"installed": False, "name": "ONNX GPU (optional)"},
         }
         
         # Build the UI
         self.build_ui()
         
-        # Check for tutorial marker file
-        self.check_tutorial_status()
+        # # Check for tutorial marker file
+        # self.check_tutorial_status()
         
         # Start dependency check in background thread
         threading.Thread(target=self.check_dependencies, daemon=True).start()
@@ -57,34 +54,33 @@ class TutorialTab:
         """Build the tutorial UI"""
         # Create a scrollable content frame
         self.content_frame = ctk.CTkScrollableFrame(self.frame)
-        self.content_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        self.content_frame.pack(fill='both', expand=True, padx=0, pady=0)
         
         # Title
         self.title_label = ctk.CTkLabel(
             self.content_frame,
-            text="Welcome to Pose2Sim Tutorial",
+            text="Welcome to Pose2Sim",
             font=("Helvetica", 24, "bold")
         )
         self.title_label.pack(pady=(0, 20))
         
         # Video information section
         video_info_frame = ctk.CTkFrame(self.content_frame, fg_color=("gray95", "gray20"))
-        video_info_frame.pack(fill='x', pady=10, padx=20)
+        video_info_frame.pack(fill='x', pady=10, padx=0)
         
-        ctk.CTkLabel(
-            video_info_frame,
-            text="Due to size, tutorial videos are hosted on Google Drive",
-            font=("Helvetica", 16, "bold"),
-            wraplength=600
-        ).pack(pady=(10, 5))
+        # ctk.CTkLabel(
+        #     video_info_frame,
+        #     text="Due to size, tutorial videos are hosted on Google Drive",
+        #     font=("Helvetica", 16, "bold"),
+        #     wraplength=600
+        # ).pack(pady=(10, 5))
         
         # Get the analysis mode
         analysis_mode = getattr(self.app, 'analysis_mode', '3d')
         
-        # Video buttons frame
         video_buttons_frame = ctk.CTkFrame(video_info_frame, fg_color="transparent")
         video_buttons_frame.pack(pady=10)
-        
+
         # Button for current mode video
         current_mode_text = "Watch 2D Tutorial Video" if analysis_mode == '2d' else "Watch 3D Tutorial Video"
         ctk.CTkButton(
@@ -93,10 +89,8 @@ class TutorialTab:
             command=lambda: self.open_video_link(analysis_mode),
             font=("Helvetica", 14, "bold"),
             width=250,
-            height=40,
-            fg_color="#4CAF50",
-            hover_color="#388E3C"
-        ).pack(side='left', padx=10)
+            height=40
+        ).pack(padx=10, pady=5)
         
         # Button for other mode video
         other_mode = '3d' if analysis_mode == '2d' else '2d'
@@ -105,95 +99,106 @@ class TutorialTab:
             video_buttons_frame,
             text=other_mode_text,
             command=lambda: self.open_video_link(other_mode),
-            font=("Helvetica", 14),
-            width=250,
-            height=40
-        ).pack(side='left', padx=10)
+            font=("Helvetica", 12),
+            width=150,
+            height=30, 
+            text_color="grey20"
+        ).pack(padx=10, pady=5)
         
-        # Tutorial image placeholder
-        self.tutorial_img_frame = ctk.CTkFrame(self.content_frame, height=300)
-        self.tutorial_img_frame.pack(fill='x', pady=10)
+        # # Tutorial image placeholder
+        # self.tutorial_img_frame = ctk.CTkFrame(self.content_frame, height=300)
+        # self.tutorial_img_frame.pack(fill='x', pady=10)
         
-        # Load a placeholder image or tutorial screenshot if available
-        tutorial_img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "tutorial_preview.png")
-        
-        if os.path.exists(tutorial_img_path):
-            try:
-                # Load and display image
-                img = Image.open(tutorial_img_path)
-                img = img.resize((800, 300), Image.LANCZOS)
-                self.tutorial_img = ctk.CTkImage(light_image=img, dark_image=img, size=(800, 300))
+        # # Load a placeholder image or tutorial screenshot if available
+        # tutorial_img_path = Path(__file__).parent.parent / "assets" / "tutorial_preview.png"
+        # if tutorial_img_path.exists():
+        #     try:
+        #         # Load and display image
+        #         img = Image.open(tutorial_img_path)
+        #         img = img.resize((800, 300), Image.LANCZOS)
+        #         self.tutorial_img = ctk.CTkImage(light_image=img, dark_image=img, size=(800, 300))
                 
-                img_label = ctk.CTkLabel(self.tutorial_img_frame, image=self.tutorial_img, text="")
-                img_label.pack(pady=10)
-            except Exception as e:
-                ctk.CTkLabel(
-                    self.tutorial_img_frame,
-                    text="Tutorial Preview Image Not Available",
-                    font=("Helvetica", 16)
-                ).pack(expand=True)
-        else:
-            ctk.CTkLabel(
-                self.tutorial_img_frame,
-                text="Tutorial Preview Image Not Available",
-                font=("Helvetica", 16)
-            ).pack(expand=True)
+        #         img_label = ctk.CTkLabel(self.tutorial_img_frame, image=self.tutorial_img, text="")
+        #         img_label.pack(pady=10)
+        #     except Exception as e:
+        #         ctk.CTkLabel(
+        #             self.tutorial_img_frame,
+        #             text="Tutorial Preview Image Not Available",
+        #             font=("Helvetica", 16)
+        #         ).pack(expand=True)
+        # else:
+        #     ctk.CTkLabel(
+        #         self.tutorial_img_frame,
+        #         text="Tutorial Preview Image Not Available",
+        #         font=("Helvetica", 16)
+        #     ).pack(expand=True)
         
         # Add beta version message box
         self.beta_message_frame = ctk.CTkFrame(self.content_frame, fg_color="white")
-        self.beta_message_frame.pack(fill='x', pady=10, padx=40)
+        self.beta_message_frame.pack(fill='x', pady=10, padx=0)
 
         self.beta_message = ctk.CTkLabel(
             self.beta_message_frame,
-            text="This GUI is a beta version. If you have recommendations, errors, or suggestions please send them to yacine.pose2sim@gmail.com",
+            text="This GUI is a beta version. If you have suggestions or find errors, please send them to yacine.pose2sim@gmail.com and/or contact@david-pagnon.com",
             font=("Helvetica", 12),
             text_color="black",
             wraplength=600
         )
         self.beta_message.pack(pady=10, padx=10)
         
-        # Description text
-        self.description_frame = ctk.CTkFrame(self.content_frame)
-        self.description_frame.pack(fill='x', pady=10)
+        # # Description text
+        # self.description_frame = ctk.CTkFrame(self.content_frame)
+        # self.description_frame.pack(fill='x', pady=10)
         
-        self.description_text = ctk.CTkTextbox(
-            self.description_frame,
-            height=100,
-            font=("Helvetica", 12)
-        )
-        self.description_text.pack(fill='x', padx=10, pady=10)
+        # self.description_text = ctk.CTkTextbox(
+        #     self.description_frame,
+        #     height=100,
+        #     font=("Helvetica", 12)
+        # )
+        # self.description_text.pack(fill='x', padx=10, pady=10)
         
-        description = (
-            "Welcome to the Pose2Sim tutorial. This guide will help you set up and use Pose2Sim effectively.\n\n"
-            "The tutorial videos cover:\n"
-            "• Configuration workflow\n"
-            "• Data processing\n"
-            "• Advanced features\n\n"
-            "Click on the video link above to watch the complete tutorial on Google Drive."
-        )
+        # description = (
+        #     "Welcome to the Pose2Sim tutorial. This guide will help you set up and use Pose2Sim effectively.\n\n"
+        #     "The tutorial videos cover:\n"
+        #     "• Configuration workflow\n"
+        #     "• Data processing\n"
+        #     "• Advanced features\n\n"
+        #     "Click on the video link above to watch the complete tutorial on Google Drive."
+        # )
         
-        self.description_text.insert("1.0", description)
-        self.description_text.configure(state="disabled")
+        # self.description_text.insert("1.0", description)
+        # self.description_text.configure(state="disabled")
         
         # Dependency check frame
         self.dependency_frame = ctk.CTkFrame(self.content_frame)
         self.dependency_frame.pack(fill='x', pady=10)
-        
+
         ctk.CTkLabel(
             self.dependency_frame,
             text="System Requirements Check",
             font=("Helvetica", 16, "bold")
         ).pack(pady=(10, 5))
-        
-        # Create a frame for each dependency
+
+        # Create a frame for the grid layout
         self.dependency_items_frame = ctk.CTkFrame(self.dependency_frame)
         self.dependency_items_frame.pack(fill='x', padx=10, pady=10)
-        
-        # Create indicators for each dependency
-        row = 0
-        for dep_id, dep_info in self.dependencies.items():
+
+        # Configure grid with 2 columns
+        self.dependency_items_frame.grid_columnconfigure(0, weight=1)
+        self.dependency_items_frame.grid_columnconfigure(1, weight=1)
+
+        # Create indicators for each dependency in a grid (column-first order)
+        dependencies_list = list(self.dependencies.items())
+        num_deps = len(dependencies_list)
+        cols_per_row = 2
+
+        for idx, (dep_id, dep_info) in enumerate(dependencies_list):
+            # Calculate row and column (fill columns first)
+            col = idx % cols_per_row
+            row = idx // cols_per_row
+            
             dep_frame = ctk.CTkFrame(self.dependency_items_frame, fg_color="transparent")
-            dep_frame.grid(row=row, column=0, sticky="w", pady=2)
+            dep_frame.grid(row=row, column=col, sticky='ew', pady=5, padx=10)
             
             # Status indicator
             status_label = ctk.CTkLabel(
@@ -228,90 +233,95 @@ class TutorialTab:
             dep_info["status_label"] = status_label
             dep_info["install_button"] = install_button
             
-            row += 1
+        # # Add spacer frame to push buttons to bottom
+        # spacer = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        # spacer.pack(fill='x', pady=100)
+
+        # # Bottom buttons frame
+        # self.bottom_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        # self.bottom_frame.pack(side='bottom', expand=True, fill='x', pady=(10, 10))
         
-        # Bottom buttons frame
-        self.bottom_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
-        self.bottom_frame.pack(fill='x', pady=20)
-        
-        # Skip tutorial button
-        self.skip_button = ctk.CTkButton(
-            self.bottom_frame,
-            text="Skip Tutorial",
-            command=self.skip_tutorial,
-            width=150,
-            fg_color="#FF9500",
-            hover_color="#FF7000"
-        )
-        self.skip_button.pack(side='right', padx=10)
-        
-        # Complete tutorial button
-        self.complete_button = ctk.CTkButton(
-            self.bottom_frame,
-            text="Complete Tutorial",
-            command=self.complete_tutorial,
-            width=150,
-            fg_color="#4CAF50",
-            hover_color="#388E3C"
-        )
-        self.complete_button.pack(side='right', padx=10)
+        # # Complete tutorial button
+        # self.complete_button = ctk.CTkButton(
+        #     self.bottom_frame,
+        #     text="Complete Tutorial",
+        #     command=self.complete_tutorial,
+        #     height=40,
+        #     width=200,
+        #     font=("Helvetica", 14),
+        #     fg_color=("#4CAF50", "#2E7D32")
+        # )
+        # self.complete_button.pack(side='right', padx=10)
     
+        # # Skip tutorial button
+        # self.skip_button = ctk.CTkButton(
+        #     self.bottom_frame,
+        #     text="Skip Tutorial",
+        #     command=self.skip_tutorial,
+        #     height=40,
+        #     width=200,
+        #     font=("Helvetica", 14),
+        #     fg_color="#FF9500",
+        #     hover_color="#FF7000"
+        # )
+        # self.skip_button.pack(side='right', padx=10)
+        
     def open_video_link(self, mode):
         """Open the video link in a web browser"""
         if mode in self.video_links:
             webbrowser.open(self.video_links[mode])
     
-    def check_tutorial_status(self):
-        """Check if the tutorial has been completed before"""
-        if os.path.exists(self.marker_file):
-            # Tutorial has been completed before, only show skip button
-            self.complete_button.pack_forget()
-        else:
-            # First time user, show both buttons
-            pass
+    # def check_tutorial_status(self):
+    #     """Check if the tutorial has been completed before"""
+    #     if Path(self.marker_file).exists():
+    #         # Tutorial has been completed before, only show skip button
+    #         self.complete_button.pack_forget()
+    #     else:
+    #         # First time user, show both buttons
+    #         pass
     
-    def skip_tutorial(self):
-        """Skip the tutorial and move to the main app"""
-        # Confirm the user wants to skip
-        response = messagebox.askyesno(
-            "Skip Tutorial",
-            "Are you sure you want to skip the tutorial? You can access it again from the Tutorial tab later."
-        )
+    # def skip_tutorial(self):
+    #     """Skip the tutorial and move to the main app"""
+    #     # Confirm the user wants to skip
+    #     response = messagebox.askyesno(
+    #         "Skip Tutorial",
+    #         "Are you sure you want to skip the tutorial? You can access it again from the Tutorial tab later."
+    #     )
         
-        if response:
-            # Move to the next tab
-            if hasattr(self.app, 'show_tab'):
-                tab_order = list(self.app.tabs.keys())
-                current_idx = tab_order.index('tutorial')
-                if current_idx + 1 < len(tab_order):
-                    next_tab = tab_order[current_idx + 1]
-                    self.app.show_tab(next_tab)
+    #     if response:
+    #         # Move to the next tab
+    #         if hasattr(self.app, 'show_tab'):
+    #             tab_order = list(self.app.tabs.keys())
+    #             current_idx = tab_order.index('tutorial')
+    #             if current_idx + 1 < len(tab_order):
+    #                 next_tab = tab_order[current_idx + 1]
+    #                 self.app.show_tab(next_tab)
     
-    def complete_tutorial(self):
-        """Mark the tutorial as completed and continue to the app"""
-        # Create marker file to indicate tutorial completion
-        try:
-            with open(self.marker_file, 'w') as f:
-                f.write("Tutorial completed")
+    # def complete_tutorial(self):
+    #     """Mark the tutorial as completed and continue to the app"""
+    #     # Create marker file to indicate tutorial completion
+    #     try:
+    #         with open(self.marker_file, 'w') as f:
+    #             f.write("Tutorial completed")
                 
-            messagebox.showinfo(
-                "Tutorial Complete",
-                "You have completed the Pose2Sim tutorial. You can access it again at any time from the Tutorial tab."
-            )
+    #         messagebox.showinfo(
+    #             "Tutorial Complete",
+    #             "You have completed the Pose2Sim tutorial. You can access it again at any time from the Tutorial tab."
+    #         )
             
-            # Move to the next tab
-            if hasattr(self.app, 'show_tab'):
-                tab_order = list(self.app.tabs.keys())
-                current_idx = tab_order.index('tutorial')
-                if current_idx + 1 < len(tab_order):
-                    next_tab = tab_order[current_idx + 1]
-                    self.app.show_tab(next_tab)
+    #         # Move to the next tab
+    #         if hasattr(self.app, 'show_tab'):
+    #             tab_order = list(self.app.tabs.keys())
+    #             current_idx = tab_order.index('tutorial')
+    #             if current_idx + 1 < len(tab_order):
+    #                 next_tab = tab_order[current_idx + 1]
+    #                 self.app.show_tab(next_tab)
                     
-        except Exception as e:
-            messagebox.showerror(
-                "Error",
-                f"Failed to mark tutorial as completed: {str(e)}"
-            )
+    #     except Exception as e:
+    #         messagebox.showerror(
+    #             "Error",
+    #             f"Failed to mark tutorial as completed: {str(e)}"
+    #         )
     
     def check_dependencies(self):
         """Check if required dependencies are installed"""
@@ -321,12 +331,12 @@ class TutorialTab:
         # Check for anaconda in PATH
         self.check_anaconda_path()
         
-        # Check for pose2sim
-        self.check_package("pose2sim")
-        
         # Check for OpenSim
         self.check_package("opensim")
         
+        # Check for pose2sim
+        self.check_package("pose2sim")
+
         # Check for PyTorch
         self.check_pytorch()
         
@@ -356,7 +366,7 @@ class TutorialTab:
         """Check if Anaconda is in PATH"""
         try:
             # Try to run conda command
-            result = subprocess.run(["conda", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(["conda", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
             
             if result.returncode == 0:
                 self.dependencies["path"]["installed"] = True
@@ -375,7 +385,7 @@ class TutorialTab:
                 # Check with pip
                 cmd = ["pip", "show", package_name]
                 
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
             
             dep_key = package_name.lower().replace("-", "-")
             if result.returncode == 0 and result.stdout.strip():
@@ -395,7 +405,7 @@ class TutorialTab:
                 "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')"
             ]
             
-            result = subprocess.run(check_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(check_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
             
             if result.returncode == 0 and "CUDA: True" in result.stdout:
                 self.dependencies["pytorch"]["installed"] = True
@@ -428,13 +438,13 @@ class TutorialTab:
                 "message": "Anaconda is installed but not in PATH. Please add it to your system PATH.",
                 "command": None  # Manual configuration required
             },
-            "pose2sim": {
-                "message": "Installing Pose2Sim...",
-                "command": ["pip", "install", "pose2sim"]
-            },
             "opensim": {
                 "message": "Installing OpenSim...",
                 "command": ["conda", "install", "-c", "opensim-org", "opensim", "-y"]
+            },
+            "pose2sim": {
+                "message": "Installing Pose2Sim and Sports2D...",
+                "command": ["pip", "install", "sports2d"]
             },
             "pytorch": {
                 "message": "Installing PyTorch with CUDA...",
@@ -519,6 +529,7 @@ class TutorialTab:
                     
                     # Update dependency status
                     self.dependencies[dependency_id]["installed"] = True
+                    self.frame.after(0, progress.set(1.0))
                     self.frame.after(500, self.update_dependency_ui)
                 else:
                     self.frame.after(0, lambda: status_label.configure(
@@ -538,7 +549,7 @@ class TutorialTab:
                 
             except Exception as e:
                 # Show error
-                self.frame.after(0, lambda: status_label.configure(
+                self.frame.after(0, lambda e=e: status_label.configure(
                     text=f"Error: {str(e)}",
                     text_color="#F44336"
                 ))

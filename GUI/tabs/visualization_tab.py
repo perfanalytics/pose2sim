@@ -3,13 +3,10 @@ import numpy as np
 import tkinter as tk
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
-import pandas as pd
 import cv2
 from PIL import Image, ImageTk
-import re
 
 class VisualizationTab:
     def __init__(self, parent, app):

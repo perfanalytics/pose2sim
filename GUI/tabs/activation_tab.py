@@ -1,9 +1,9 @@
-import os
-import tkinter as tk
+from pathlib import Path
+import subprocess
 import customtkinter as ctk
 from tkinter import messagebox
 
-from utils import activate_pose2sim
+from GUI.utils import activate_pose2sim
 
 class ActivationTab:
     def __init__(self, parent, app, simplified=False):
@@ -28,7 +28,7 @@ class ActivationTab:
     def build_ui(self):
         # Create main container
         self.content_frame = ctk.CTkFrame(self.frame)
-        self.content_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        self.content_frame.pack(fill='both', expand=True, padx=0, pady=0)
         
         # Tab title
         ctk.CTkLabel(
@@ -46,7 +46,7 @@ class ActivationTab:
         ).pack(pady=10)
         
         # Card frame for activation options
-        card_frame = ctk.CTkFrame(self.content_frame)
+        card_frame = ctk.CTkFrame(self.content_frame, fg_color='transparent')
         card_frame.pack(pady=40)
         
         # Only show Anaconda Prompt Button
@@ -86,9 +86,9 @@ class ActivationTab:
         """Activate Pose2Sim or Sports2D with the specified method"""
         # Update the config file first
         if self.app.analysis_mode == '2d':
-            config_path = os.path.join(self.app.participant_name, 'Config_demo.toml')
+            config_path = Path(self.app.participant_name) / 'Config_demo.toml'
         else:
-            config_path = os.path.join(self.app.participant_name, 'Config.toml')
+            config_path = Path(self.app.participant_name) / 'Config.toml'
         
         # Collect all settings from tabs
         settings = {}
@@ -116,11 +116,7 @@ class ActivationTab:
             # For batch mode, also generate configs for each trial
             if self.app.process_mode == 'batch':
                 for i in range(1, self.app.num_trials + 1):
-                    trial_config_path = os.path.join(
-                        self.app.participant_name, 
-                        f'Trial_{i}', 
-                        'Config.toml'
-                    )
+                    trial_config_path = Path(self.app.participant_name) / f'Trial_{i}' / 'Config.toml'
                     success = success and self.app.config_generator.generate_3d_config(
                         trial_config_path, settings
                     )
@@ -164,12 +160,14 @@ class ActivationTab:
             )
             
             # Launch the script
-            if method == 'cmd':
-                os.system(f'start cmd /k "{script_path}"')
-            elif method == 'conda':
-                os.system(f'start {script_path}')
-            else:  # powershell
-                os.system(f'start powershell -NoExit -Command "& \'{script_path}\'"')
+            process = subprocess.Popen(script_path, 
+                                       stdout=subprocess.PIPE, 
+                                       stderr=subprocess.STDOUT, 
+                                       text=True,
+                                       shell=True)
+            for line in process.stdout:
+                print(line, end='')
+            return_code = process.wait()
             
             # Update progress
             if hasattr(self.app, 'update_tab_indicator'):

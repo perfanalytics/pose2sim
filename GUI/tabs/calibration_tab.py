@@ -1,17 +1,15 @@
-import os
+from pathlib import Path
 import tkinter as tk
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from PIL import Image
-import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import shutil
 import matplotlib
 matplotlib.use("TkAgg")  # Ensure we're using TkAgg backend
 
-from utils import generate_checkerboard_image
+from GUI.utils import generate_checkerboard_image
 
 class CalibrationTab:
     def __init__(self, parent, app):
@@ -43,11 +41,7 @@ class CalibrationTab:
         
         # Build the UI
         self.build_ui()
-    
-    def get_title(self):
-        """Return the tab title"""
-        return self.app.lang_manager.get_text('calibration_tab')
-    
+
     def get_settings(self):
         """Get the calibration settings"""
         settings = {
@@ -92,7 +86,14 @@ class CalibrationTab:
     def build_ui(self):
         # Create a two-panel layout
         self.main_panel = ctk.CTkFrame(self.frame)
-        self.main_panel.pack(fill='both', expand=True, padx=10, pady=10)
+        self.main_panel.pack(fill='both', expand=True, padx=0, pady=0)
+
+        self.title_label = ctk.CTkLabel(
+            self.main_panel,
+            text=self.app.lang_manager.get_text('calibration_tab'),
+            font=("Helvetica", 24, "bold")
+        )
+        self.title_label.pack(pady=(0, 20))
         
         # Left panel (for inputs)
         self.left_panel = ctk.CTkFrame(self.main_panel, width=600)
@@ -114,13 +115,6 @@ class CalibrationTab:
         ).pack(expand=True)
     
     def build_left_panel(self):
-        # Title
-        ctk.CTkLabel(
-            self.left_panel, 
-            text=self.get_title(),
-            font=('Helvetica', 24, 'bold')
-        ).pack(anchor='w', pady=(0, 20))
-        
         # Calibration Type
         type_frame = ctk.CTkFrame(self.left_panel)
         type_frame.pack(fill='x', pady=5)
@@ -287,9 +281,11 @@ class CalibrationTab:
             text="Confirm Configuration",
             command=self.confirm_calibration_type,
             height=40,
-            width=200
+            width=200,
+            font=("Helvetica", 14),
+            fg_color=("#4CAF50", "#2E7D32")
         )
-        self.confirm_button.pack(pady=10)
+        self.confirm_button.pack(side='bottom', pady=10)
         
         # Proceed button (initially hidden)
         self.proceed_button = ctk.CTkButton(
@@ -503,16 +499,16 @@ class CalibrationTab:
     def create_calibration_folders(self, num_cameras):
         """Create the necessary calibration folders"""
         # Define base path based on analysis mode
-        base_path = os.path.join(self.app.participant_name, 'calibration')
+        base_path = Path(self.app.participant_name) / 'calibration'
         
         # Create folders for each camera
         for cam in range(1, num_cameras + 1):
-            intrinsics_folder = os.path.join(base_path, 'intrinsics', f'int_cam{cam}_img')
-            extrinsics_folder = os.path.join(base_path, 'extrinsics', f'ext_cam{cam}_img')
+            intrinsics_folder = base_path / 'intrinsics' / f'int_cam{cam}_img'
+            extrinsics_folder = base_path / 'extrinsics' / f'ext_cam{cam}_img'
             
             # Create directories
-            os.makedirs(intrinsics_folder, exist_ok=True)
-            os.makedirs(extrinsics_folder, exist_ok=True)
+            intrinsics_folder.mkdir(parents=True, exist_ok=True)
+            extrinsics_folder.mkdir(parents=True, exist_ok=True)
     
     def input_checkerboard_videos(self, num_cameras):
         """Input checkerboard videos/images for each camera"""
@@ -521,7 +517,7 @@ class CalibrationTab:
             "Please select the checkerboard videos/images for each camera."
         )
         
-        base_path = os.path.join(self.app.participant_name, 'calibration')
+        base_path = Path(self.app.participant_name) / 'calibration'
         
         for cam in range(1, num_cameras + 1):
             file_path = filedialog.askopenfilename(
@@ -537,9 +533,10 @@ class CalibrationTab:
                 return False
             
             # Copy to appropriate folder
-            dest_folder = os.path.join(base_path, 'intrinsics', f'int_cam{cam}_img')
-            dest_path = os.path.join(dest_folder, os.path.basename(file_path))
-            shutil.copy(file_path, dest_path)
+            dest_folder = base_path / 'intrinsics' / f'int_cam{cam}_img'
+            dest_path = dest_folder / Path(file_path).name
+            if dest_path.exists(): dest_path.unlink()
+            dest_path.symlink_to(file_path)
         
         return True
     
@@ -550,7 +547,7 @@ class CalibrationTab:
             "Please select the scene videos/images for each camera."
         )
         
-        base_path = os.path.join(self.app.participant_name, 'calibration')
+        base_path = Path(self.app.participant_name) / 'calibration'
         
         for cam in range(1, num_cameras + 1):
             file_path = filedialog.askopenfilename(
@@ -566,9 +563,10 @@ class CalibrationTab:
                 return False
             
             # Copy to appropriate folder
-            dest_folder = os.path.join(base_path, 'extrinsics', f'ext_cam{cam}_img')
-            dest_path = os.path.join(dest_folder, os.path.basename(file_path))
-            shutil.copy(file_path, dest_path)
+            dest_folder = base_path / 'extrinsics' / f'ext_cam{cam}_img'
+            dest_path = dest_folder / Path(file_path).name
+            if dest_path.exists(): dest_path.unlink()
+            dest_path.symlink_to(file_path)
         
         return True
     
@@ -596,7 +594,7 @@ class CalibrationTab:
             return False
         
         # Load image from video if video file
-        if file_path.lower().endswith(('.mp4', '.avi', '.mov')):
+        if Path(file_path).suffix.lower() in ('.mp4', '.avi', '.mov'):
             cap = cv2.VideoCapture(file_path)
             ret, frame = cap.read()
             cap.release()
@@ -836,12 +834,13 @@ class CalibrationTab:
             return False
         
         # Create calibration folder
-        calibration_path = os.path.join(self.app.participant_name, 'calibration')
-        os.makedirs(calibration_path, exist_ok=True)
+        calibration_path = Path(self.app.participant_name) / 'calibration'
+        calibration_path.mkdir(parents=True, exist_ok=True)
         
         # Copy the file
-        dest_path = os.path.join(calibration_path, os.path.basename(file_path))
-        shutil.copy(file_path, dest_path)
+        dest_path = calibration_path / Path(file_path).name
+        if dest_path.exists(): dest_path.unlink()
+        dest_path.symlink_to(file_path)
         
         # Update progress now that conversion is complete
         if hasattr(self.app, 'update_tab_indicator'):

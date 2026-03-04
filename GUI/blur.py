@@ -2,29 +2,99 @@ import cv2
 import os
 import numpy as np
 import tkinter as tk
-from tkinter import filedialog, ttk, Scale, IntVar, StringVar, BooleanVar, colorchooser
+from tkinter import filedialog, ttk, IntVar, StringVar, BooleanVar, colorchooser
 from PIL import Image, ImageTk
 import time
 import json
-import sys
-import threading
 
-# Try to import RTMLib and DeepSort
+# NOTE: 23.06.2025:Import face_blurring utilities for auto mode
 try:
-    from rtmlib import PoseTracker, Wholebody
+    from Pose2Sim.Utilities.face_blurring import face_blurring_func, apply_face_obscuration
+    from Pose2Sim.poseEstimation import setup_backend_device
+    from rtmlib import Body, PoseTracker
+    FACE_BLURRING_AVAILABLE = True
+except ImportError:
+    FACE_BLURRING_AVAILABLE = False
+    print("Warning: Face blurring utilities not available. Auto mode will be disabled.")
+
+# Try to import RTMLib and DeepSort for manual mode
+# NOTE: 23.06.2025: Manual mode now uses the same Body model as auto mode for consistency (Wholebody -> Body)
+try:
+    from rtmlib import PoseTracker, Body
     RTMPOSE_AVAILABLE = True
 except ImportError:
     RTMPOSE_AVAILABLE = False
     print("Warning: RTMLib not available. Install with: pip install rtmlib")
 
-try:
-    from deep_sort_realtime.deepsort_tracker import DeepSort
-    DEEPSORT_AVAILABLE = True
-except ImportError:
-    DEEPSORT_AVAILABLE = False
-    print("Warning: DeepSort not available. Install with: pip install deep-sort-realtime")
-
 class VideoBlurApp:
+    # ===== APPLICATION CONSTANTS =====
+
+    # UI Layout Constants
+    CONTROL_PANEL_WIDTH = 300
+    CANVAS_WIDTH = 310
+    NAVIGATION_PANEL_HEIGHT = 120
+    SHAPES_LISTBOX_HEIGHT = 5
+
+    # Default Values
+    DEFAULT_BLUR_STRENGTH = 21
+    MIN_BLUR_STRENGTH = 3
+    MAX_BLUR_STRENGTH = 51
+    DEFAULT_MASK_TYPE = "blur"
+    DEFAULT_MASK_SHAPE = "oval"
+    DEFAULT_MASK_COLOR = (0, 0, 0)
+    DEFAULT_BLUR_MODE = "manual"
+
+    # Auto Mode Default Settings
+    DEFAULT_AUTO_BLUR_TYPE = "blur"
+    DEFAULT_AUTO_BLUR_ACCURACY = "medium"
+    DEFAULT_AUTO_BLUR_INTENSITY = "medium"
+    DEFAULT_AUTO_BLUR_SHAPE = "rectangle"
+    DEFAULT_AUTO_BLUR_SIZE = "medium"
+
+    # Face Detection Constants
+    FACE_KEYPOINT_INDICES = [0, 1, 2, 3, 4]  # nose, left_eye, right_eye, left_ear, right_ear
+    DETECTION_FREQUENCY = 3
+    FACE_CONFIDENCE_THRESHOLD = 0.3
+    MIN_FACE_KEYPOINTS = 2
+    MIN_FACE_KEYPOINTS_FOR_PROCESSING = 3
+
+    # Pose Tracker Settings
+    MANUAL_MODE_DET_FREQUENCY = 2
+    AUTO_MODE_DET_FREQUENCY = 10
+
+    # Mask Effect Constants
+    PIXELATE_SCALE_DIVISOR = 10
+    FOREHEAD_HEIGHT_RATIO = 0.25  # y + h // 4
+    FACE_PADDING_X_RATIO = 0.5
+    FACE_PADDING_Y_RATIO = 0.7
+
+    # File Extensions
+    SUPPORTED_VIDEO_EXTENSIONS = "*.mp4;*.avi;*.mov;*.mkv;*.wmv"
+
+    # UI Option Lists
+    MASK_TYPES = ["blur", "black", "pixelate", "solid"]
+    BLUR_MODES = ["manual", "auto"]
+    AUTO_BLUR_TYPES = ["blur", "black"]
+    AUTO_BLUR_ACCURACIES = ["low", "medium", "high"]
+    AUTO_BLUR_INTENSITIES = ["low", "medium", "high"]
+    AUTO_BLUR_SHAPES = ["polygon", "rectangle"]
+    AUTO_BLUR_SIZES = ["small", "medium", "large"]
+    CROP_TYPES = ["traditional", "mask"]
+    CROP_MASK_TYPES = ["black", "blur"]
+    SHAPE_TYPES = ["rectangle", "polygon", "freehand"]
+    FACE_MASK_SHAPES = ["rectangle", "oval", "precise"]
+
+    # RTMPose Accuracy Mapping
+    ACCURACY_MODE_MAPPING = {
+        'low': 'lightweight',
+        'medium': 'balanced',
+        'high': 'performance'
+    }
+
+    # Status Messages
+    DEFAULT_STATUS_MESSAGE = "Open a video file to begin"
+    AUTO_MODE_UNAVAILABLE_MESSAGE = "Auto mode not available - face blurring utilities not found"
+    RTMPOSE_UNAVAILABLE_MESSAGE = "Face detection requires RTMPose which is not available"
     def __init__(self, root):
         self.root = root
         self.root.title("Advanced Video Face Masking Tool")
@@ -49,13 +119,13 @@ class VideoBlurApp:
         self.drawing = False
         self.current_shape = []
         self.temp_shape_id = None
-        self.current_shape_type = "rectangle"
-        
+        self.current_shape_type = self.SHAPE_TYPES[0]  # "rectangle"
+
         # Mask settings
-        self.blur_strength = 21  # Default medium blur (kernel size)
-        self.mask_type = "blur"  # Default mask type
-        self.mask_shape = "oval"  # Default mask shape (oval works better for faces)
-        self.mask_color = (0, 0, 0)  # Default color for solid masks
+        self.blur_strength = self.DEFAULT_BLUR_STRENGTH
+        self.mask_type = self.DEFAULT_MASK_TYPE
+        self.mask_shape = self.DEFAULT_MASK_SHAPE
+        self.mask_color = self.DEFAULT_MASK_COLOR
         
         # Frame range variables
         self.blur_entire_video = BooleanVar(value=True)
@@ -72,32 +142,45 @@ class VideoBlurApp:
         self.temp_crop_rect = None
         
         # Enhanced crop settings
-        self.crop_type = StringVar(value="traditional")
-        self.crop_mask_type = StringVar(value="black")
+        self.crop_type = StringVar(value=self.CROP_TYPES[0])  # "traditional"
+        self.crop_mask_type = StringVar(value=self.CROP_MASK_TYPES[0])  # "black"
         self.crop_all_frames = BooleanVar(value=True)
         self.crop_start_frame = IntVar(value=0)
         self.crop_end_frame = IntVar(value=0)
-        
+
         # Rotation settings (new)
         self.rotation_angle = IntVar(value=0)
         self.rotation_enabled = BooleanVar(value=False)
-        
+
         # Video trimming variables
         self.trim_enabled = BooleanVar(value=False)
         self.trim_start_frame = IntVar(value=0)
         self.trim_end_frame = IntVar(value=0)
         self.dragging_start = False
         self.dragging_end = False
-        
+
         # Status variable
-        self.status_text = StringVar(value="Open a video file to begin")
-        
+        self.status_text = StringVar(value=self.DEFAULT_STATUS_MESSAGE)
+
         # Image positioning
         self.x_offset = 0
         self.y_offset = 0
-        
+
         # Face detection & tracking
         self.face_detect_var = BooleanVar(value=False)
+
+        # Auto/Manual mode settings
+        self.blur_mode = StringVar(value=self.DEFAULT_BLUR_MODE)
+        self.auto_blur_type = StringVar(value=self.DEFAULT_AUTO_BLUR_TYPE)
+        self.auto_blur_accuracy = StringVar(value=self.DEFAULT_AUTO_BLUR_ACCURACY)
+        self.auto_blur_intensity = StringVar(value=self.DEFAULT_AUTO_BLUR_INTENSITY)
+        self.auto_blur_shape = StringVar(value=self.DEFAULT_AUTO_BLUR_SHAPE)
+        self.auto_blur_size = StringVar(value=self.DEFAULT_AUTO_BLUR_SIZE)
+
+        # Auto mode pose tracker
+        self.auto_pose_tracker = None
+        self.auto_pose_initialized = False
+
         self.init_face_detection()
         
         # Create UI components
@@ -106,83 +189,124 @@ class VideoBlurApp:
         # Add status bar
         self.status_bar = ttk.Label(self.root, textvariable=self.status_text, relief=tk.SUNKEN, anchor=tk.W)
         self.status_bar.grid(row=1, column=0, columnspan=2, sticky="ew")
+
+        # Initialize UI state
+        self.on_mode_change()
         
+    def _init_pose_tracker(self, det_frequency, tracker_attr_name, initialized_attr_name, mode_name):
+        """Common pose tracker initialization logic"""
+        try:
+            # Setup backend and device
+            backend, device = setup_backend_device('auto', 'auto')
+            print(f"Using Pose2Sim settings: backend={backend}, device={device}")
+
+            # Map blur accuracy to RTMPose mode
+            mode = self.ACCURACY_MODE_MAPPING.get(self.auto_blur_accuracy.get(), 'balanced')
+
+            # Initialize pose tracker
+            tracker = PoseTracker(
+                Body,
+                det_frequency=det_frequency,
+                mode=mode,
+                backend=backend,
+                device=device,
+                tracking=False,
+                to_openpose=False
+            )
+
+            # Set tracker and initialized flag
+            setattr(self, tracker_attr_name, tracker)
+            setattr(self, initialized_attr_name, True)
+            print(f"{mode_name} initialized successfully")
+            return True
+
+        except Exception as e:
+            print(f"Error initializing {mode_name}: {e}")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Backend: {backend}, Device: {device}")
+            import traceback
+            traceback.print_exc()
+            print(f"{mode_name} initialization failed")
+            return False
+
+    # def _init_deepsort(self):
+    #     """Initialize DeepSort tracker"""
+    #     if not DEEPSORT_AVAILABLE:
+    #         return False
+
+    #     try:
+    #         self.deepsort_tracker = DeepSort(
+    #             max_age=30,
+    #             n_init=3,
+    #             nms_max_overlap=1.0,
+    #             max_cosine_distance=0.2,
+    #             nn_budget=None,
+    #             embedder='mobilenet',
+    #             half=True,
+    #             bgr=True,
+    #             embedder_gpu=True
+    #         )
+    #         self.has_deepsort = True
+    #         print("DeepSort initialized successfully")
+    #         return True
+    #     except Exception as e:
+    #         print(f"Error initializing DeepSort: {e}")
+    #         print(f"Error type: {type(e).__name__}")
+    #         import traceback
+    #         traceback.print_exc()
+    #         print("DeepSort initialization failed - basic tracking will be used")
+    #         return False
+
     def init_face_detection(self):
         """Initialize face detection and tracking components"""
         self.rtmpose_initialized = False
-        self.has_deepsort = False
+        # self.has_deepsort = False
         self.tracked_faces = []
         self.next_face_id = 0
-        self.detection_frequency = 3
-        
+        self.detection_frequency = self.DETECTION_FREQUENCY
+
+        # print("=== Face Detection Initialization ===")
+        # print(f"RTMLib available: {RTMPOSE_AVAILABLE}")
+        # print(f"DeepSort available: {DEEPSORT_AVAILABLE}")
+        # print(f"Face blurring utilities available: {FACE_BLURRING_AVAILABLE}")
+
         # Initialize RTMPose if available
         if RTMPOSE_AVAILABLE:
-            try:
-                # Setup RTMPose
-                backend = device = 'cpu'  # Default
-                try:
-                    import torch
-                    import onnxruntime as ort
-                    if torch.cuda.is_available() and 'CUDAExecutionProvider' in ort.get_available_providers():
-                        backend, device = 'onnxruntime', 'cuda'
-                except:
-                    pass
-                
-                # Initialize with Wholebody model
-                self.pose_tracker = PoseTracker(
-                    Wholebody,
-                    det_frequency=2,
-                    mode="balanced",
-                    backend=backend,
-                    device=device,
-                    tracking=False,
-                    to_openpose=False
-                )
-                self.rtmpose_initialized = True
-            except Exception as e:
-                print(f"Error initializing RTMPose: {e}")
-        
-        # Initialize DeepSort if available
-        if DEEPSORT_AVAILABLE:
-            try:
-                self.deepsort_tracker = DeepSort(
-                    max_age=30,
-                    n_init=3,
-                    nms_max_overlap=1.0,
-                    max_cosine_distance=0.2,
-                    nn_budget=None,
-                    embedder='mobilenet',
-                    half=True,
-                    bgr=True,
-                    embedder_gpu=True
-                )
-                self.has_deepsort = True
-            except Exception as e:
-                print(f"Error initializing DeepSort: {e}")
+            self._init_pose_tracker(self.MANUAL_MODE_DET_FREQUENCY, 'pose_tracker', 'rtmpose_initialized', 'RTMPose for manual mode')
+
+        # # Initialize DeepSort
+        # self._init_deepsort()
+
+    def init_auto_mode(self):
+        """Initialize auto mode pose tracker"""
+        if not FACE_BLURRING_AVAILABLE:
+            return False
+
+        return self._init_pose_tracker(self.AUTO_MODE_DET_FREQUENCY, 'auto_pose_tracker', 'auto_pose_initialized', 'Auto mode')
     
     def create_ui(self):
         """Create the main UI layout with fixed positioning"""
         # Create left panel (controls)
-        control_panel = ttk.Frame(self.root, width=300)
+        control_panel = ttk.Frame(self.root, width=self.CONTROL_PANEL_WIDTH)
         control_panel.grid(row=0, column=0, sticky="ns", padx=5, pady=5)
         control_panel.grid_propagate(False)  # Keep fixed width
-        
+
         # Create right panel (video display and navigation)
         video_panel = ttk.Frame(self.root)
         video_panel.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
         video_panel.grid_columnconfigure(0, weight=1)
         video_panel.grid_rowconfigure(0, weight=1)  # Canvas expands
         video_panel.grid_rowconfigure(1, weight=0)  # Navigation fixed height
-        
+
         # Create canvas for video display
         self.canvas_frame = ttk.Frame(video_panel)
         self.canvas_frame.grid(row=0, column=0, sticky="nsew")
-        
+
         self.canvas = tk.Canvas(self.canvas_frame, bg="black", highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True)
-        
+
         # Create navigation panel
-        nav_panel = ttk.Frame(video_panel, height=120)
+        nav_panel = ttk.Frame(video_panel, height=self.NAVIGATION_PANEL_HEIGHT)
         nav_panel.grid(row=1, column=0, sticky="ew", pady=(5,0))
         nav_panel.grid_propagate(False)  # Fix height
         
@@ -201,71 +325,71 @@ class VideoBlurApp:
     def setup_control_panel(self, parent):
         """Set up the left control panel with all controls"""
         # Create a canvas with scrollbar for the control panel
-        canvas = tk.Canvas(parent, width=280)
+        canvas = tk.Canvas(parent, width=self.CANVAS_WIDTH) # NOTE: 24.06.2025: Adjust width for visibility because width of control_panel is 300.
         scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
-        
+
         scrollable_frame.bind(
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
-        
+
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
-        
+
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        
+
         # File operations
         file_frame = ttk.LabelFrame(scrollable_frame, text="File Operations")
         file_frame.pack(fill=tk.X, pady=(0,5), padx=2)
-        
+
         ttk.Button(file_frame, text="Open Video", command=self.open_video).pack(fill=tk.X, padx=5, pady=2)
         ttk.Button(file_frame, text="Set Output Path", command=self.set_output_path).pack(fill=tk.X, padx=5, pady=2)
         ttk.Button(file_frame, text="Process Video", command=self.process_video).pack(fill=tk.X, padx=5, pady=2)
-        
+
         # Drawing tools
         draw_frame = ttk.LabelFrame(scrollable_frame, text="Drawing Tools")
         draw_frame.pack(fill=tk.X, pady=5, padx=2)
-        
+
         tool_frame = ttk.Frame(draw_frame)
         tool_frame.pack(fill=tk.X, padx=5, pady=2)
-        
-        ttk.Button(tool_frame, text="Rectangle", command=lambda: self.set_drawing_mode("rectangle")).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-        ttk.Button(tool_frame, text="Polygon", command=lambda: self.set_drawing_mode("polygon")).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-        ttk.Button(tool_frame, text="Freehand", command=lambda: self.set_drawing_mode("freehand")).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-        
+
+        ttk.Button(tool_frame, text="Rectangle", command=lambda: self.set_drawing_mode(self.SHAPE_TYPES[0])).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+        ttk.Button(tool_frame, text="Polygon", command=lambda: self.set_drawing_mode(self.SHAPE_TYPES[1])).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+        ttk.Button(tool_frame, text="Freehand", command=lambda: self.set_drawing_mode(self.SHAPE_TYPES[2])).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+
         mask_frame = ttk.Frame(draw_frame)
         mask_frame.pack(fill=tk.X, padx=5, pady=2)
-        
+
         ttk.Label(mask_frame, text="Mask Type:").pack(side=tk.LEFT)
-        self.mask_type_var = StringVar(value="blur")
-        ttk.Combobox(mask_frame, textvariable=self.mask_type_var, values=["blur", "black", "pixelate", "solid"], width=10, state="readonly").pack(side=tk.RIGHT)
+        self.mask_type_var = StringVar(value=self.DEFAULT_MASK_TYPE)
+        ttk.Combobox(mask_frame, textvariable=self.mask_type_var, values=self.MASK_TYPES, width=10, state="readonly").pack(side=tk.RIGHT)
         
         strength_frame = ttk.Frame(draw_frame)
         strength_frame.pack(fill=tk.X, padx=5, pady=2)
-        
+
         ttk.Label(strength_frame, text="Effect Strength:").pack(side=tk.LEFT)
-        self.blur_strength_var = IntVar(value=21)
-        self.strength_label = ttk.Label(strength_frame, text="21")
+        self.blur_strength_var = IntVar(value=self.DEFAULT_BLUR_STRENGTH)
+        self.strength_label = ttk.Label(strength_frame, text=str(self.DEFAULT_BLUR_STRENGTH))
         self.strength_label.pack(side=tk.RIGHT)
-        
+
         # Add a scale for blur strength
-        strength_scale = ttk.Scale(draw_frame, from_=3, to=51, orient=tk.HORIZONTAL, variable=self.blur_strength_var)
+        strength_scale = ttk.Scale(draw_frame, from_=self.MIN_BLUR_STRENGTH, to=self.MAX_BLUR_STRENGTH, orient=tk.HORIZONTAL, variable=self.blur_strength_var)
         strength_scale.pack(fill=tk.X, padx=5, pady=2)
         strength_scale.bind("<Motion>", self.update_blur_strength)
-        
+
         ttk.Button(draw_frame, text="Choose Color", command=self.choose_color).pack(fill=tk.X, padx=5, pady=2)
-        
+
         # Shape list section
         shape_frame = ttk.LabelFrame(scrollable_frame, text="Shape List")
         shape_frame.pack(fill=tk.X, pady=5, padx=2)
-        
+
         # Listbox with scrollbar
         list_frame = ttk.Frame(shape_frame)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
-        
-        self.shapes_listbox = tk.Listbox(list_frame, height=5)
+
+        self.shapes_listbox = tk.Listbox(list_frame, height=self.SHAPES_LISTBOX_HEIGHT)
         self.shapes_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.shapes_listbox.yview)
@@ -312,7 +436,7 @@ class VideoBlurApp:
         mask_type_frame.pack(fill=tk.X, padx=5, pady=2)
         
         ttk.Label(mask_type_frame, text="Outside area:").pack(side=tk.LEFT)
-        ttk.Combobox(mask_type_frame, textvariable=self.crop_mask_type, values=["black", "blur", "pixelate"], width=10, state="readonly").pack(side=tk.RIGHT)
+        ttk.Combobox(mask_type_frame, textvariable=self.crop_mask_type, values=self.CROP_MASK_TYPES + ["pixelate"], width=10, state="readonly").pack(side=tk.RIGHT)
         
         frame_range_frame = ttk.Frame(crop_frame)
         frame_range_frame.pack(fill=tk.X, padx=5, pady=2)
@@ -372,23 +496,88 @@ class VideoBlurApp:
             side=tk.LEFT, fill=tk.X, expand=True, padx=2)
         
         # Face detection section
-        face_frame = ttk.LabelFrame(scrollable_frame, text="Face Detection")
+        face_frame = ttk.LabelFrame(scrollable_frame, text="Face Detection & Blurring")
         face_frame.pack(fill=tk.X, pady=5, padx=2)
-        
-        ttk.Checkbutton(face_frame, text="Auto-detect and track faces", variable=self.face_detect_var, command=self.toggle_face_detection).pack(anchor=tk.W, padx=5, pady=2)
-        
-        face_shape_frame = ttk.Frame(face_frame)
+
+        # Mode selection
+        mode_frame = ttk.Frame(face_frame)
+        mode_frame.pack(fill=tk.X, padx=5, pady=2)
+
+        ttk.Label(mode_frame, text="Blurring Mode:").pack(side=tk.LEFT)
+        ttk.Radiobutton(mode_frame, text="Manual", variable=self.blur_mode, value="manual", command=self.on_mode_change).pack(side=tk.LEFT, padx=5)
+        ttk.Radiobutton(mode_frame, text="Auto", variable=self.blur_mode, value="auto", command=self.on_mode_change).pack(side=tk.LEFT, padx=5)
+
+        # Manual mode settings
+        self.manual_frame = ttk.LabelFrame(face_frame, text="Manual Mode Settings")
+        self.manual_frame.pack(fill=tk.X, padx=5, pady=2)
+
+        ttk.Checkbutton(self.manual_frame, text="Auto-detect and track faces", variable=self.face_detect_var, command=self.toggle_face_detection).pack(anchor=tk.W, padx=5, pady=2)
+
+        # Manual mode accuracy setting
+        manual_accuracy_frame = ttk.Frame(self.manual_frame)
+        manual_accuracy_frame.pack(fill=tk.X, padx=5, pady=2)
+
+        ttk.Label(manual_accuracy_frame, text="Detection Accuracy:").pack(side=tk.LEFT)
+        ttk.Combobox(manual_accuracy_frame, textvariable=self.auto_blur_accuracy, values=self.AUTO_BLUR_ACCURACIES, width=10, state="readonly").pack(side=tk.RIGHT)
+
+        face_shape_frame = ttk.Frame(self.manual_frame)
         face_shape_frame.pack(fill=tk.X, padx=5, pady=2)
-        
+
         ttk.Label(face_shape_frame, text="Face Mask Shape:").pack(side=tk.LEFT)
-        self.mask_shape_var = StringVar(value="oval")
-        ttk.Combobox(face_shape_frame, textvariable=self.mask_shape_var, values=["rectangle", "oval", "precise"], width=10, state="readonly").pack(side=tk.RIGHT)
-        
-        face_buttons = ttk.Frame(face_frame)
+        self.mask_shape_var = StringVar(value=self.DEFAULT_MASK_SHAPE)
+        ttk.Combobox(face_shape_frame, textvariable=self.mask_shape_var, values=self.FACE_MASK_SHAPES, width=10, state="readonly").pack(side=tk.RIGHT)
+
+        face_buttons = ttk.Frame(self.manual_frame)
         face_buttons.pack(fill=tk.X, padx=5, pady=2)
-        
+
         ttk.Button(face_buttons, text="Detect Current Frame", command=self.detect_faces_current_frame).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
         ttk.Button(face_buttons, text="Export Face Data", command=self.export_face_data).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
+
+        # Auto mode settings
+        self.auto_frame = ttk.LabelFrame(face_frame, text="Auto Mode Settings")
+        self.auto_frame.pack(fill=tk.X, padx=5, pady=2)
+
+        # Blur type
+        blur_type_frame = ttk.Frame(self.auto_frame)
+        blur_type_frame.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Label(blur_type_frame, text="Blur Type:").pack(side=tk.LEFT)
+        ttk.Combobox(blur_type_frame, textvariable=self.auto_blur_type, values=self.AUTO_BLUR_TYPES, width=10, state="readonly").pack(side=tk.RIGHT)
+
+        # Blur accuracy
+        accuracy_frame = ttk.Frame(self.auto_frame)
+        accuracy_frame.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Label(accuracy_frame, text="Blur Accuracy:").pack(side=tk.LEFT)
+        ttk.Combobox(accuracy_frame, textvariable=self.auto_blur_accuracy, values=self.AUTO_BLUR_ACCURACIES, width=10, state="readonly").pack(side=tk.RIGHT)
+
+        # Blur intensity
+        intensity_frame = ttk.Frame(self.auto_frame)
+        intensity_frame.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Label(intensity_frame, text="Blur Intensity:").pack(side=tk.LEFT)
+        ttk.Combobox(intensity_frame, textvariable=self.auto_blur_intensity, values=self.AUTO_BLUR_INTENSITIES, width=10, state="readonly").pack(side=tk.RIGHT)
+
+        # Blur shape
+        shape_frame = ttk.Frame(self.auto_frame)
+        shape_frame.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Label(shape_frame, text="Blur Shape:").pack(side=tk.LEFT)
+        ttk.Combobox(shape_frame, textvariable=self.auto_blur_shape, values=self.AUTO_BLUR_SHAPES, width=10, state="readonly").pack(side=tk.RIGHT)
+
+        # Blur size
+        size_frame = ttk.Frame(self.auto_frame)
+        size_frame.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Label(size_frame, text="Blur Size:").pack(side=tk.LEFT)
+        ttk.Combobox(size_frame, textvariable=self.auto_blur_size, values=self.AUTO_BLUR_SIZES, width=10, state="readonly").pack(side=tk.RIGHT)
+
+        # Auto mode face data saving option
+        auto_face_data_frame = ttk.Frame(self.auto_frame)
+        auto_face_data_frame.pack(fill=tk.X, padx=5, pady=2)
+        self.auto_save_face_data = BooleanVar(value=False)
+        ttk.Checkbutton(auto_face_data_frame, text="Save Face Information to JSON", variable=self.auto_save_face_data).pack(side=tk.LEFT)
+
+        # Auto mode buttons
+        auto_buttons = ttk.Frame(self.auto_frame)
+        auto_buttons.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Button(auto_buttons, text="Run Auto Mode", command=self.initialize_auto_mode).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
+        # ttk.Button(auto_buttons, text="Test on Current Frame", command=self.test_auto_mode).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
         
         # Processing Range section
         process_frame = ttk.LabelFrame(scrollable_frame, text="Processing Range")
@@ -456,6 +645,230 @@ class VideoBlurApp:
         self.trim_canvas.bind("<B1-Motion>", self.on_trim_drag)
         self.trim_canvas.bind("<ButtonRelease-1>", self.on_trim_release)
 
+    def on_mode_change(self):
+        """Handle blur mode change between auto and manual"""
+        mode = self.blur_mode.get()
+
+        if mode == "auto":
+            # Show auto frame, hide manual frame
+            self.auto_frame.pack(fill=tk.X, padx=5, pady=2)
+            self.manual_frame.pack_forget()
+
+            # Disable manual face detection
+            self.face_detect_var.set(False)
+            self.auto_detect_faces = False
+
+            # Clear manual mode face tracking data for smooth transition
+            self.tracked_faces = []
+            self.next_face_id = 0
+
+            if not FACE_BLURRING_AVAILABLE:
+                self.status_text.set(self.AUTO_MODE_UNAVAILABLE_MESSAGE)
+                self.blur_mode.set("manual")
+                self.on_mode_change()
+                return
+
+        else:  # manual mode
+            # Show manual frame, hide auto frame
+            self.manual_frame.pack(fill=tk.X, padx=5, pady=2)
+            self.auto_frame.pack_forget()
+
+            # Clear auto mode face data when switching to manual mode
+            if hasattr(self, 'auto_face_data'):
+                self.auto_face_data = None
+
+        self.status_text.set(f"Switched to {mode} mode")
+        self.show_current_frame()
+
+    def initialize_auto_mode(self):
+        """Initialize auto mode pose tracker"""
+        if not FACE_BLURRING_AVAILABLE:
+            self.status_text.set("Auto mode not available")
+            return
+
+        if self.init_auto_mode():
+            self.status_text.set("Auto mode initialized successfully")
+        else:
+            self.status_text.set("Failed to initialize auto mode")
+
+    def process_frame_auto_mode(self, frame):
+        """Process frame using auto mode (face_blurring.py functionality)"""
+        if not self.auto_pose_initialized:
+            return frame
+
+        try:
+            # Detect poses (keypoints and scores)
+            keypoints, scores = self.auto_pose_tracker(frame)
+
+            if keypoints is None or len(keypoints) == 0:
+                return frame
+
+            processed_frame = frame.copy()
+
+            # Store face data for saving if enabled
+            if self.auto_save_face_data.get():
+                if not hasattr(self, 'auto_face_data'):
+                    self.auto_face_data = {
+                        "video_file": self.input_video,
+                        "frames": {},
+                        "faces": {}
+                    }
+
+            # Process each detected person
+            for person_idx in range(len(keypoints)):
+                person_kpts = keypoints[person_idx]
+                person_scores = scores[person_idx]
+
+                # Extract face keypoints
+                face_keypoints = []
+                face_scores = []
+
+                for kpt_idx in self.FACE_KEYPOINT_INDICES:
+                    if kpt_idx < len(person_kpts):
+                        face_keypoints.append(person_kpts[kpt_idx])
+                        face_scores.append(person_scores[kpt_idx])
+
+                if len(face_keypoints) < self.MIN_FACE_KEYPOINTS_FOR_PROCESSING:
+                    continue
+
+                face_keypoints = np.array(face_keypoints)
+                face_scores = np.array(face_scores)
+
+                # Filter valid keypoints (confidence > 0.0)
+                valid_indices = face_scores > 0.0
+                if np.sum(valid_indices) < 3:
+                    continue
+
+                valid_face_kpts = face_keypoints[valid_indices]
+
+                # Estimate face region using eye and nose positions
+                points_for_hull = self.estimate_face_region(valid_face_kpts)
+
+                if points_for_hull.shape[0] >= 3:
+                    # Apply face obscuration using face_blurring.py function
+                    processed_frame = apply_face_obscuration(
+                        processed_frame,
+                        points_for_hull,
+                        self.auto_blur_type.get(),
+                        self.auto_blur_shape.get(),
+                        self.auto_blur_intensity.get()
+                    )
+
+                    # Save face data if enabled
+                    if self.auto_save_face_data.get():
+                        # Calculate bounding box from face keypoints
+                        x_coords = [kp[0] for kp in valid_face_kpts]
+                        y_coords = [kp[1] for kp in valid_face_kpts]
+
+                        x_min, x_max = min(x_coords), max(x_coords)
+                        y_min, y_max = min(y_coords), max(y_coords)
+
+                        # Add padding
+                        width = max(1, x_max - x_min)
+                        height = max(1, y_max - y_min)
+
+                        padding_x = width * self.FACE_PADDING_X_RATIO
+                        padding_y = height * self.FACE_PADDING_Y_RATIO
+
+                        x = max(0, int(x_min - padding_x))
+                        y = max(0, int(y_min - padding_y))
+                        w = min(int(width + padding_x*2), frame.shape[1] - x)
+                        h = min(int(height + padding_y*2), frame.shape[0] - y)
+
+                        # Calculate confidence
+                        confidence = np.mean(face_scores[valid_indices])
+
+                        # Store face data
+                        face_id = f"auto_face_{person_idx}"
+                        frame_key = str(self.frame_index)
+
+                        if frame_key not in self.auto_face_data["frames"]:
+                            self.auto_face_data["frames"][frame_key] = {"faces": []}
+
+                        face_data = {
+                            "face_id": face_id,
+                            "bbox": [x, y, w, h],
+                            "confidence": float(confidence),
+                            "keypoints": valid_face_kpts.tolist()
+                        }
+
+                        self.auto_face_data["frames"][frame_key]["faces"].append(face_data)
+
+                        # Store face across all frames
+                        if face_id not in self.auto_face_data["faces"]:
+                            self.auto_face_data["faces"][face_id] = {
+                                "frames": [self.frame_index],
+                                "bbox": [x, y, w, h],
+                                "confidence": float(confidence)
+                            }
+                        else:
+                            if self.frame_index not in self.auto_face_data["faces"][face_id]["frames"]:
+                                self.auto_face_data["faces"][face_id]["frames"].append(self.frame_index)
+                            self.auto_face_data["faces"][face_id]["bbox"] = [x, y, w, h]
+                            self.auto_face_data["faces"][face_id]["confidence"] = float(confidence)
+
+            return processed_frame
+
+        except Exception as e:
+            print(f"Error in auto mode processing: {e}")
+            return frame
+
+    def estimate_face_region(self, face_keypoints):
+        """Estimate face region from limited keypoints"""
+        if len(face_keypoints) < 2:
+            return face_keypoints
+
+        # Calculate center and scale
+        center = np.mean(face_keypoints, axis=0)
+
+        # Calculate average distance between points for scaling
+        distances = []
+        for i in range(len(face_keypoints)):
+            for j in range(i + 1, len(face_keypoints)):
+                dist = np.linalg.norm(face_keypoints[i] - face_keypoints[j])
+                distances.append(dist)
+
+        if not distances:
+            return face_keypoints
+
+        avg_distance = np.mean(distances)
+
+        # Scale factors based on blur size setting
+        blur_size = self.auto_blur_size.get()
+        if blur_size == "small":
+            factor_chin = 2.5
+            factor_forehead = 2.0
+        elif blur_size == "medium":
+            factor_chin = 3.0
+            factor_forehead = 2.5
+        elif blur_size == "large":
+            factor_chin = 4.0
+            factor_forehead = 3.0
+        else:
+            factor_chin = 3.0
+            factor_forehead = 2.5
+
+        # Estimate additional points for face boundary
+        additional_points = []
+
+        # Add forehead point (above center)
+        forehead_point = center + np.array([0, -avg_distance * factor_forehead])
+        additional_points.append(forehead_point)
+
+        # Add chin point (below center)
+        chin_point = center + np.array([0, avg_distance * factor_chin])
+        additional_points.append(chin_point)
+
+        # Add side points
+        left_point = center + np.array([-avg_distance * 1.5, 0])
+        right_point = center + np.array([avg_distance * 1.5, 0])
+        additional_points.extend([left_point, right_point])
+
+        # Combine original and estimated points
+        all_points = np.vstack([face_keypoints, np.array(additional_points)])
+
+        return all_points
+
     def update_blur_strength(self, event=None):
         """Update blur strength value display"""
         value = self.blur_strength_var.get()
@@ -463,7 +876,7 @@ class VideoBlurApp:
         if value % 2 == 0:
             value += 1
             self.blur_strength_var.set(value)
-        
+
         self.blur_strength = value
         self.strength_label.config(text=str(value))
     
@@ -471,7 +884,7 @@ class VideoBlurApp:
         """Toggle face detection on/off"""
         self.auto_detect_faces = self.face_detect_var.get()
         if self.auto_detect_faces and not self.rtmpose_initialized:
-            self.status_text.set("Face detection requires RTMPose which is not available")
+            self.status_text.set(self.RTMPOSE_UNAVAILABLE_MESSAGE)
             self.face_detect_var.set(False)
             self.auto_detect_faces = False
             return
@@ -667,16 +1080,18 @@ class VideoBlurApp:
         """Handle frame slider change"""
         if self.cap is None:
             return
-        
+
         # Prevent recursive updates
         if hasattr(self, 'updating_slider') and self.updating_slider:
             return
-            
+
         try:
             self.updating_slider = True
             frame_num = int(float(self.frame_slider.get()))
             if frame_num != self.frame_index:
                 self.frame_index = max(0, min(frame_num, self.total_frames - 1))
+                # Clear face tracking data
+                self._clear_face_tracking_on_frame_change()
                 self.show_current_frame()
         finally:
             self.updating_slider = False
@@ -685,37 +1100,60 @@ class VideoBlurApp:
         """Go to next frame"""
         if self.cap is None:
             return
-            
+
         if self.frame_index < self.total_frames - 1:
             self.frame_index += 1
+            # Clear face tracking data
+            self._clear_face_tracking_on_frame_change()
             self.show_current_frame()
     
     def prev_frame(self):
         """Go to previous frame"""
         if self.cap is None:
             return
-            
+
         if self.frame_index > 0:
             self.frame_index -= 1
+            # Clear face tracking data
+            self._clear_face_tracking_on_frame_change()
             self.show_current_frame()
     
     def jump_frames(self, offset):
         """Jump multiple frames forward/backward"""
         if self.cap is None:
             return
-            
+
         new_frame = max(0, min(self.frame_index + offset, self.total_frames - 1))
         if new_frame != self.frame_index:
             self.frame_index = new_frame
+            # Clear face tracking data
+            self._clear_face_tracking_on_frame_change()
             self.show_current_frame()
     
+    def _clear_face_tracking_on_frame_change(self): # NOTE: 06.27.2025: detected face should show on only current frame
+        """Clear face tracking data when frame changes manually to prevent visualization overlap"""
+        if (self.blur_mode.get() == "manual" and
+            self.auto_detect_faces and
+            hasattr(self, 'tracked_faces')):
+            # Track previous frame index to only clear when frame actually changes
+            if not hasattr(self, '_prev_frame_index'):
+                self._prev_frame_index = self.frame_index
+
+            if self._prev_frame_index != self.frame_index:
+                self.tracked_faces = []
+                # Clear DeepSort tracker only when frame actually changes (commented out for Manual Mode)
+                # if self.has_deepsort:
+                #     print(f"DEBUG: Clearing DeepSort tracker")
+                #     self.deepsort_tracker.tracker.delete_all_tracks()
+                self._prev_frame_index = self.frame_index
+
     def update_shapes_listbox(self):
         """Update shapes listbox with current items"""
         self.shapes_listbox.delete(0, tk.END)
         for i, shape in enumerate(self.shapes):
             shape_type = shape[0]
             mask_type = shape[2]
-            
+
             # Include frame range if specified
             if len(shape) >= 7:
                 start, end = shape[5], shape[6]
@@ -930,21 +1368,25 @@ class VideoBlurApp:
     def process_frame(self, frame):
         """Process frame with all active effects"""
         result = frame.copy()
-        
+
         # Apply rotation if enabled
         if self.rotation_enabled.get() and self.rotation_angle.get() != 0:
             result = self.rotate_frame(result, self.rotation_angle.get())
-        
-        # Face detection/tracking
-        if self.auto_detect_faces and self.rtmpose_initialized:
-            # Re-detect periodically
-            if self.frame_index % self.detection_frequency == 0 or not self.tracked_faces:
+
+        # Face detection/tracking based on mode
+        if self.blur_mode.get() == "auto":
+            # Use auto mode (face_blurring.py functionality)
+            result = self.process_frame_auto_mode(result)
+        else:
+            # Use manual mode (original functionality)
+            if self.auto_detect_faces and self.rtmpose_initialized:
+                # Always re-detect faces for current frame to prevent visualization overlap
                 self.tracked_faces = self.detect_faces(frame)
-                
-            if self.tracked_faces:
-                face_mask = self.create_face_mask(frame)
-                result = self.apply_mask_effect(result, face_mask, self.mask_type, 
-                                              self.blur_strength, self.mask_color)
+
+                if self.tracked_faces:
+                    face_mask = self.create_face_mask(frame)
+                    result = self.apply_mask_effect(result, face_mask, self.mask_type,
+                                                  self.blur_strength, self.mask_color)
         
         # Apply manual shapes
         for shape in self.shapes:
@@ -1269,11 +1711,11 @@ class VideoBlurApp:
         """Detect and track faces in the frame"""
         if not self.rtmpose_initialized:
             return []
-            
+
         try:
             # Get keypoints from RTMPose
             keypoints, scores = self.pose_tracker(frame)
-            
+
             # Process detected people
             detections = []
             for person_idx, (person_kps, person_scores) in enumerate(zip(keypoints, scores)):
@@ -1281,12 +1723,12 @@ class VideoBlurApp:
                 face_kps = []
                 face_scores = []
                 
-                for idx in range(5):  # First 5 points for face
-                    if idx < len(person_kps) and person_scores[idx] > 0.3:
+                for idx in self.FACE_KEYPOINT_INDICES:
+                    if idx < len(person_kps) and person_scores[idx] > self.FACE_CONFIDENCE_THRESHOLD:
                         face_kps.append((int(person_kps[idx][0]), int(person_kps[idx][1])))
                         face_scores.append(person_scores[idx])
-                
-                if len(face_kps) >= 2:
+
+                if len(face_kps) >= self.MIN_FACE_KEYPOINTS:
                     # Calculate bounding box
                     x_coords = [kp[0] for kp in face_kps]
                     y_coords = [kp[1] for kp in face_kps]
@@ -1297,9 +1739,9 @@ class VideoBlurApp:
                     # Add padding
                     width = max(1, x_max - x_min)
                     height = max(1, y_max - y_min)
-                    
-                    padding_x = width * 0.5
-                    padding_y = height * 0.7
+
+                    padding_x = width * self.FACE_PADDING_X_RATIO
+                    padding_y = height * self.FACE_PADDING_Y_RATIO
                     
                     x = max(0, int(x_min - padding_x))
                     y = max(0, int(y_min - padding_y))
@@ -1311,52 +1753,62 @@ class VideoBlurApp:
                     
                     # Add to detections
                     detections.append(([x, y, w, h], confidence, "face"))
-            
-            # Use DeepSort if available
-            if self.has_deepsort and detections:
-                tracks = self.deepsort_tracker.update_tracks(detections, frame=frame)
-                
-                tracked_faces = []
-                for track in tracks:
-                    if track.is_confirmed():
-                        track_id = track.track_id
-                        tlwh = track.to_tlwh()
-                        x, y, w, h = [int(v) for v in tlwh]
-                        
-                        tracked_faces.append([
-                            track_id,
-                            (x, y, w, h),
-                            track.get_det_conf(),
-                            self.frame_index
-                        ])
-                
-                return tracked_faces
-            else:
-                # Basic tracking without DeepSort
-                return [(i, (d[0][0], d[0][1], d[0][2], d[0][3]), d[1], self.frame_index) 
-                       for i, d in enumerate(detections)]
+
+
+            # # NOTE: 06.27.2025: commented out for Manual Mode to avoid confirmation issues
+            # if self.has_deepsort and detections:
+            #     tracks = self.deepsort_tracker.update_tracks(detections, frame=frame)
+            #     print(f"DEBUG: DeepSort returned {len(tracks)} tracks")
+            #
+            #     tracked_faces = []
+            #     for track in tracks:
+            #         print(f"DEBUG: Track {track.track_id} is_confirmed: {track.is_confirmed()}")
+            #         if track.is_confirmed():
+            #             track_id = track.track_id
+            #             tlwh = track.to_tlwh()
+            #             x, y, w, h = [int(v) for v in tlwh]
+            #
+            #             tracked_faces.append([
+            #                 track_id,
+            #                 (x, y, w, h),
+            #                 track.get_det_conf(),
+            #                 self.frame_index
+            #             ])
+            #
+            #     print(f"DEBUG: Confirmed tracks: {len(tracked_faces)}")
+            #     return tracked_faces
+            # else:
+            # Basic tracking without DeepSort (used for Manual Mode)
+            return [(i, (d[0][0], d[0][1], d[0][2], d[0][3]), d[1], self.frame_index)
+                   for i, d in enumerate(detections)]
                 
         except Exception as e:
             print(f"Error in face detection: {e}")
             return []
     
+    # HACK: 06.27.2025: added to prevent cv2.ellipse error when bounding box is too small
     def create_face_mask(self, frame):
         """Create a mask for tracked faces"""
         height, width = frame.shape[:2]
         mask = np.zeros((height, width), dtype=np.uint8)
         
         for face_id, (x, y, w, h), confidence, _ in self.tracked_faces:
+            # Skip invalid bounding boxes
+            if w <= 0 or h <= 0:
+                continue
+
             if self.mask_shape == "rectangle":
                 cv2.rectangle(mask, (x, y), (x+w, y+h), 255, -1)
-                
+
             elif self.mask_shape == "oval":
                 center = (x + w // 2, y + h // 2)
-                axes = (w // 2, h // 2)
+                # Ensure axes are at least 1 to avoid OpenCV error (is this proper way to handle this?)
+                axes = (max(1, w // 2), max(1, h // 2))
                 cv2.ellipse(mask, center, axes, 0, 0, 360, 255, -1)
-                
+
                 # Add forehead
-                forehead_center = (center[0], y + h // 4)
-                forehead_size = (w // 2, h // 2)
+                forehead_center = (center[0], y + int(h * self.FOREHEAD_HEIGHT_RATIO))
+                forehead_size = (max(1, w // 2), max(1, h // 2))
                 cv2.ellipse(mask, forehead_center, forehead_size, 0, 0, 180, 255, -1)
                 
             elif self.mask_shape == "precise":
@@ -1403,7 +1855,7 @@ class VideoBlurApp:
             result = np.where(mask[:, :, np.newaxis] == 255, blurred, result)
             
         elif mask_type == "pixelate":
-            scale = max(1, blur_strength // 10)
+            scale = max(1, blur_strength // self.PIXELATE_SCALE_DIVISOR)
             temp = cv2.resize(frame, (frame.shape[1] // scale, frame.shape[0] // scale), 
                              interpolation=cv2.INTER_LINEAR)
             pixelated = cv2.resize(temp, (frame.shape[1], frame.shape[0]), 
@@ -1498,41 +1950,83 @@ class VideoBlurApp:
         self.show_current_frame()
         self.status_text.set(f"Added {len(faces)} detected faces as shapes")
     
+    # NOTE: 06.27.2025: add common function for better usability
+    def save_face_data_to_json(self, face_data, mode="manual", filename_suffix=""):
+        """Common function to save face data to JSON file
+
+        Args:
+            face_data: Dictionary containing face data
+            mode: "manual" or "auto" to distinguish the source
+            filename_suffix: Additional suffix for filename (optional)
+        """
+        if not face_data or not face_data.get("faces") or self.input_video is None:
+            self.status_text.set("No face data to save")
+            return None
+
+        input_filename = os.path.basename(self.input_video)
+        base_name = os.path.splitext(input_filename)[0]
+
+        # Generate filename based on mode and suffix
+        if filename_suffix:
+            json_filename = f"{base_name}_faces_{mode}_{filename_suffix}.json"
+        else:
+            json_filename = f"{base_name}_faces_{mode}.json"
+
+        if self.output_path:
+            json_path = os.path.join(self.output_path, json_filename)
+        else:
+            input_path = os.path.dirname(self.input_video)
+            output_dir = os.path.join(input_path, "FaceData")
+            os.makedirs(output_dir, exist_ok=True)
+            json_path = os.path.join(output_dir, json_filename)
+
+        try:
+            with open(json_path, 'w') as f:
+                json.dump(face_data, f, indent=4)
+
+            self.status_text.set(f"{mode.capitalize()} mode face data saved to {json_path}")
+            return json_path
+        except Exception as e:
+            self.status_text.set(f"Error saving face data: {str(e)}")
+            return None
+
     def export_face_data(self):
-        """Export face data to JSON"""
+        """Export current frame face data to JSON (Manual Mode)"""
         if not self.tracked_faces or self.input_video is None:
             self.status_text.set("No faces to export")
             return
-            
-        input_filename = os.path.basename(self.input_video)
-        base_name = os.path.splitext(input_filename)[0]
-        
+
+        # Convert tracked_faces to standard format
         face_data = {
             "video_file": self.input_video,
+            "frames": {
+                str(self.frame_index): {
+                    "faces": []
+                }
+            },
             "faces": {}
         }
-        
+
         for face_id, (x, y, w, h), confidence, frame_idx in self.tracked_faces:
-            face_data["faces"][str(face_id)] = {
+            face_info = {
+                "face_id": face_id,
                 "bbox": [x, y, w, h],
-                "confidence": float(confidence) if confidence is not None else 0.0,
-                "frame": int(frame_idx)
+                "confidence": float(confidence) if confidence is not None else 0.0
             }
-        
-        if self.output_path:
-            json_path = os.path.join(self.output_path, f"{base_name}_faces.json")
-        else:
-            json_path = f"{base_name}_faces.json"
-            
-        with open(json_path, 'w') as f:
-            json.dump(face_data, f, indent=4)
-            
-        self.status_text.set(f"Exported face data to {json_path}")
+
+            face_data["frames"][str(self.frame_index)]["faces"].append(face_info)
+            face_data["faces"][str(face_id)] = {
+                "frames": [int(frame_idx)],
+                "bbox": [x, y, w, h],
+                "confidence": float(confidence) if confidence is not None else 0.0
+            }
+
+        self.save_face_data_to_json(face_data, "manual", "current_frame")
     
     def open_video(self):
         """Open a video file"""
         video_path = filedialog.askopenfilename(filetypes=[
-            ("Video files", "*.mp4;*.avi;*.mov;*.mkv;*.wmv"),
+            ("Video files", self.SUPPORTED_VIDEO_EXTENSIONS),
             ("All files", "*.*")
         ])
         
@@ -1579,8 +2073,8 @@ class VideoBlurApp:
         # Reset trackers
         if self.rtmpose_initialized:
             self.pose_tracker.reset()
-        if self.has_deepsort:
-            self.deepsort_tracker.tracker.delete_all_tracks()
+        # if self.has_deepsort:
+        #     self.deepsort_tracker.tracker.delete_all_tracks()
         
         # Get video properties
         width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -1597,11 +2091,23 @@ class VideoBlurApp:
                            f"{width}x{height} | FPS: {fps:.2f} | Frames: {self.total_frames}")
     
     def set_output_path(self):
-        """Set output directory"""
-        path = filedialog.askdirectory()
+        """Set output directory with default as input folder"""
+        # Set default directory to input video folder if available
+        initial_dir = None
+        if self.input_video:
+            initial_dir = os.path.dirname(self.input_video)
+        else:
+            initial_dir = os.getcwd()  # Use current working directory as fallback
+
+        path = filedialog.askdirectory(initialdir=initial_dir)
         if path:
             self.output_path = path
             self.status_text.set(f"Output path set to: {path}")
+        else:
+            # If user cancels and no output path is set, use input folder as default
+            if not self.output_path and self.input_video:
+                self.output_path = os.path.dirname(self.input_video)
+                self.status_text.set(f"Using input folder as output: {self.output_path}")
     
     def get_video_writer(self, output_path, width, height, fps):
         """Create a video writer with appropriate codec"""
@@ -1640,15 +2146,35 @@ class VideoBlurApp:
     def process_video(self):
         """Process video and apply all effects"""
         # Validate inputs
-        if self.input_video is None or self.output_path is None:
-            self.status_text.set("Please select input video and output path")
+        # if self.input_video is None or self.output_path is None:
+        #     self.status_text.set("Please select input video and output path")
+        #     return
+        
+        if self.input_video is None:
+            self.status_text.set("Please select input video")
             return
+
+        # Initialize auto mode if selected
+        if self.blur_mode.get() == "auto":
+            if not FACE_BLURRING_AVAILABLE:
+                self.status_text.set(self.AUTO_MODE_UNAVAILABLE_MESSAGE)
+                return
+            if not self.auto_pose_initialized:
+                if not self.init_auto_mode():
+                    self.status_text.set("Failed to initialize auto mode")
+                    return
             
         # Determine output filename
         input_filename = os.path.basename(self.input_video)
         base_name, ext = os.path.splitext(input_filename)
         output_filename = f"processed_{base_name}{ext}"
-        output_path = os.path.join(self.output_path, output_filename)
+        if self.output_path:
+            output_path = os.path.join(self.output_path, output_filename)
+        else:
+            input_path = os.path.dirname(self.input_video)
+            output_dir = os.path.join(input_path, "processed_videos")
+            os.makedirs(output_dir, exist_ok=True)
+            output_path = os.path.join(output_dir, output_filename)
         
         # Get video properties
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
@@ -1709,8 +2235,8 @@ class VideoBlurApp:
         # Reset trackers
         if self.rtmpose_initialized:
             self.pose_tracker.reset()
-        if self.has_deepsort:
-            self.deepsort_tracker.tracker.delete_all_tracks()
+        # if self.has_deepsort:
+        #     self.deepsort_tracker.tracker.delete_all_tracks()
             
         # Start processing
         total_frames = end_frame - start_frame + 1
@@ -1745,19 +2271,17 @@ class VideoBlurApp:
                     status_label.config(text=status_text)
                     progress_window.update()
                 
-                # Process frame - apply all effects
-                # Apply rotation first if enabled
-                if self.rotation_enabled.get() and self.rotation_angle.get() != 0:
-                    result_frame = self.rotate_frame(frame, self.rotation_angle.get())
-                else:
-                    result_frame = frame.copy()
-                
-                # Face detection and tracking
-                if self.auto_detect_faces and self.rtmpose_initialized:
+                # Process frame - apply all effects using existing process_frame method
+                # Temporarily set frame_index for processing context
+                original_frame_index = self.frame_index
+                self.frame_index = current_frame_idx
+
+                # Store face tracking data for manual mode
+                if self.blur_mode.get() == "manual" and self.auto_detect_faces and self.rtmpose_initialized:
                     # Detect faces periodically
                     if frame_count % self.detection_frequency == 0 or not self.tracked_faces:
                         self.tracked_faces = self.detect_faces(frame)
-                        
+
                     # Store tracking data
                     if self.tracked_faces:
                         frame_faces = []
@@ -1769,7 +2293,7 @@ class VideoBlurApp:
                                 "confidence": float(confidence) if confidence is not None else 0.0
                             }
                             frame_faces.append(face_data)
-                            
+
                             # Store face across all frames
                             if str(face_id) not in face_tracking_data["faces"]:
                                 face_tracking_data["faces"][str(face_id)] = {
@@ -1780,94 +2304,17 @@ class VideoBlurApp:
                             else:
                                 face_tracking_data["faces"][str(face_id)]["frames"].append(current_frame_idx)
                                 face_tracking_data["faces"][str(face_id)]["bbox"] = [x, y, w, h]
-                                
+
                         # Store frame data
                         face_tracking_data["frames"][str(current_frame_idx)] = {
                             "faces": frame_faces
                         }
-                        
-                        # Apply face masking
-                        face_mask = self.create_face_mask(frame)
-                        result_frame = self.apply_mask_effect(
-                            result_frame, face_mask, self.mask_type,
-                            self.blur_strength, self.mask_color
-                        )
-                
-                # Apply manual shapes
-                for shape in self.shapes:
-                    # Check if active in this frame
-                    if len(shape) >= 7:
-                        shape_start, shape_end = shape[5], shape[6]
-                        if current_frame_idx < shape_start or current_frame_idx > shape_end:
-                            continue
-                    
-                    # Apply shape mask
-                    shape_type, points, mask_type, strength, color = shape[:5]
-                    
-                    # Create mask
-                    shape_mask = np.zeros((height, width), dtype=np.uint8)
-                    
-                    if shape_type == "rectangle":
-                        x1, y1 = points[0]
-                        x2, y2 = points[1]
-                        x_min, x_max = min(x1, x2), max(x1, x2)
-                        y_min, y_max = min(y1, y2), max(y1, y2)
-                        cv2.rectangle(shape_mask, (x_min, y_min), (x_max, y_max), 255, -1)
-                        
-                    elif shape_type in ("polygon", "freehand"):
-                        points_array = np.array(points, np.int32).reshape((-1, 1, 2))
-                        cv2.fillPoly(shape_mask, [points_array], 255)
-                    
-                    # Apply effect
-                    result_frame = self.apply_mask_effect(
-                        result_frame, shape_mask, mask_type, strength, color
-                    )
-                
-                # Apply crop if enabled
-                if self.crop_enabled.get() and self.crop_width > 0 and self.crop_height > 0:
-                    # Check if this frame should be cropped
-                    frame_in_crop_range = True
-                    if not self.crop_all_frames.get():
-                        crop_start = self.crop_start_frame.get()
-                        crop_end = self.crop_end_frame.get()
-                        frame_in_crop_range = (crop_start <= current_frame_idx <= crop_end)
-                        
-                    if frame_in_crop_range:
-                        if self.crop_type.get() == "traditional":
-                            # Cut out the region
-                            x, y = self.crop_x, self.crop_y
-                            w, h = self.crop_width, self.crop_height
-                            
-                            # Ensure within bounds
-                            x = max(0, min(x, width - 1))
-                            y = max(0, min(y, height - 1))
-                            w = min(w, width - x)
-                            h = min(h, height - y)
-                            
-                            # Crop
-                            result_frame = result_frame[y:y+h, x:x+w]
-                        else:
-                            # Mask outside region
-                            crop_mask = np.ones((height, width), dtype=np.uint8) * 255
-                            
-                            # Define region to keep
-                            x, y = self.crop_x, self.crop_y
-                            w, h = self.crop_width, self.crop_height
-                            
-                            # Ensure within bounds
-                            x = max(0, min(x, width - 1))
-                            y = max(0, min(y, height - 1))
-                            w = min(w, width - x)
-                            h = min(h, height - y)
-                            
-                            # Clear mask in crop region
-                            crop_mask[y:y+h, x:x+w] = 0
-                            
-                            # Apply effect to outside area
-                            result_frame = self.apply_mask_effect(
-                                result_frame, crop_mask, self.crop_mask_type.get(),
-                                self.blur_strength, self.mask_color
-                            )
+
+                # Apply all effects using the unified process_frame method
+                result_frame = self.process_frame(frame)
+
+                # Restore original frame index
+                self.frame_index = original_frame_index
                 
                 # Write frame
                 try:
@@ -1879,13 +2326,16 @@ class VideoBlurApp:
                 current_frame_idx += 1
                 frame_count += 1
             
-            # Export face tracking data if available
+            # Export face tracking data if available (Manual Mode)
             if self.auto_detect_faces and self.rtmpose_initialized and face_tracking_data["faces"]:
-                json_path = os.path.join(self.output_path, f"{base_name}_faces.json")
-                with open(json_path, 'w') as f:
-                    json.dump(face_tracking_data, f, indent=4)
-                
-                self.status_text.set(f"Face tracking data saved to {json_path}")
+                self.save_face_data_to_json(face_tracking_data, "manual", "video_processing")
+
+            # Export auto mode face data if available
+            if (self.blur_mode.get() == "auto" and
+                self.auto_save_face_data.get() and
+                hasattr(self, 'auto_face_data') and
+                self.auto_face_data["faces"]):
+                self.save_face_data_to_json(self.auto_face_data, "auto", "video_processing")
         
         except Exception as e:
             self.status_text.set(f"Error during processing: {str(e)}")
