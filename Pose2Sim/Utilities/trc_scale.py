@@ -4,15 +4,15 @@
 
 '''
     ##################################################
-    ## Convert trc Z-up files to Y-up files         ##
+    ## Scale trc coordinates                        ##
     ##################################################
     
-    Convert trc files with Z-up system coordinates to Y-up files.
+    Scale trc coordinates by a desired factor.
     
     Usage: 
-    from Pose2Sim.Utilities import trc_Zup_to_Yup; trc_Zup_to_Yup.trc_Zup_to_Yup_func(r'<input_trc_file>', r'<output_trc_file>')
-    trc_Zup_to_Yup -i input_trc_file
-    trc_Zup_to_Yup -i input_trc_file -o output_trc_file
+    from Pose2Sim.Utilities import trc_scale; trc_scale.trc_scaled_func(r'<input_trc_file>', 0.001, r'<output_trc_file>')
+    trc_scale -i input_trc_file -s 0.001
+    trc_scale -i input_trc_file -s 0.001 -o output_trc_file
 '''
 
 
@@ -39,33 +39,36 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', required = True, help='trc Zup input file')
     parser.add_argument('-o', '--output', required=False, help='trc Yup output file')
+    parser.add_argument('-s', '--scale_factor', required=True, type=float, help='scaling factor to apply to the trc coordinates. mm to m would be 0.001')
     args = vars(parser.parse_args())
     
-    trc_Zup_to_Yup_func(args)
+    trc_scale_func(args)
 
 
-def trc_Zup_to_Yup_func(*args):
+def trc_scale_func(*args):
     '''
-    Turns trc files with Z-up system coordinates into Y-up files.
-
+    Scale trc coordinates by a desired factor.
+    
     Usage: 
-    import trc_Zup_to_Yup; trc_Zup_to_Yup.trc_Zup_to_Yup_func(r'<input_trc_file>', r'<output_trc_file>')
-    trcZup_to_Yup -i input_trc_file
-    trcZup_to_Yup -i input_trc_file -o output_trc_file
+    from Pose2Sim.Utilities import trc_scale; trc_scale.trc_scaled_func(r'<input_trc_file>', 0.001, r'<output_trc_file>')
+    trc_scale -i input_trc_file -s 0.001
+    trc_scale -i input_trc_file -s 0.001 -o output_trc_file
     '''
 
     try:
         trc_path = args[0]['input'] # invoked with argparse
+        scale_factor = args[0]['scale_factor']
         if args[0]['output'] == None:
-            trc_yup_path = trc_path.replace('.trc', '_Yup.trc')
+            trc_scaled_path = trc_path.replace('.trc', '_scaled.trc')
         else:
-            trc_yup_path = args[0]['output']
+            trc_scaled_path = args[0]['output']
     except:
         trc_path = args[0] # invoked as a function
+        scale_factor = args[1]
         try:
-            trc_yup_path = args[1]
+            trc_scaled_path = args[2]
         except:
-            trc_yup_path = trc_path.replace('.trc', '_Yup.trc')
+            trc_scaled_path = trc_path.replace('.trc', '_scaled.trc')
 
     # header
     with open(trc_path, 'r') as trc_file:
@@ -76,21 +79,17 @@ def trc_Zup_to_Yup_func(*args):
     frames_col, time_col = trc_df.iloc[:,0], trc_df.iloc[:,1]
     Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
 
-    # Y->Z, Z->Y
-    cols = list(Q_coord.columns)
-    cols = np.array([[cols[i*3+1],cols[i*3+2],cols[i*3]] for i in range(int(len(cols)/3))]).flatten() # X->Y, Y->Z, Z->X
-    # cols = np.array([[cols[i*3],cols[i*3+2],cols[i*3+1]] for i in range(int(len(cols)/3))]).flatten() # Y->Z, Z->-Y
-    Q_Yup = Q_coord[cols]
-    # Q_Yup.iloc[:,2::3] = - Q_Yup.iloc[:,2::3]
+    # scaling
+    Q_scaled = Q_coord * scale_factor
 
     # write file
-    with open(trc_yup_path, 'w') as trc_o:
+    with open(trc_scaled_path, 'w') as trc_o:
         [trc_o.write(line) for line in header]
-        Q_Yup.insert(0, 'Frame#', frames_col)
-        Q_Yup.insert(1, 'Time', time_col)
-        Q_Yup.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+        Q_scaled.insert(0, 'Frame#', frames_col)
+        Q_scaled.insert(1, 'Time', time_col)
+        Q_scaled.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
 
-    print(f"trc file converted from Z-up to Y-up: {trc_yup_path}")
+    print(f"trc file scaled with a {scale_factor} factor. Saved to {trc_scaled_path}")
     
 if __name__ == '__main__':
     main()

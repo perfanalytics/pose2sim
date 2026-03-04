@@ -24,6 +24,7 @@ OUTPUT:
 ## INIT
 import os
 import glob
+import math
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import pandas as pd
@@ -79,6 +80,82 @@ def hampel_filter(col, window_size=7, n_sigma=2):
             modified_z_score = 0.6745 * (col[i] - median) / mad #75% percentile from median
             if np.abs(modified_z_score) > n_sigma:
                 col_filtered[i] = median
+    
+    return col_filtered
+
+
+def one_euro_filter_1d(config_dict, frame_rate, col):
+    '''
+    Zero-phase OneEuro filter for 1D signal with NaN handling
+    
+    INPUT:
+    - config_dict: Dictionary containing filtering parameters
+    - frame_rate: Sampling frequency in Hz
+    - col: Pandas Series (single column of scalar values)
+    
+    OUTPUT:
+    - col_filtered: Filtered pandas Series
+    '''
+    
+    # Get parameters from config
+    min_cutoff = config_dict.get('filtering').get('one_euro').get('cut_off_frequency', 2.5)
+    beta = config_dict.get('filtering').get('one_euro').get('beta', 0.9)
+    d_cutoff = config_dict.get('filtering').get('one_euro').get('d_cut_off_frequency', 1.0)
+    dt = 1.0 / frame_rate
+    
+    def smoothing_factor(dt, cutoff):
+        '''
+        Equivalent to a 1st order butterworth filter
+        '''
+        r = 2 * np.pi * cutoff * dt
+        return r / (r + 1)
+
+    def apply_filter(data):
+        '''
+        Apply OneEuro filter to 1D data
+        '''
+
+        if len(data) < 2:
+            return data
+
+        filtered = [data[0]]
+        x_prev = data[0]
+        dx_prev = 0.0
+        for i in range(1, len(data)):
+            x = data[i]
+            
+            # Filter derivative
+            alpha_d = smoothing_factor(dt, d_cutoff)
+            dx = (x-x_prev) / dt
+            dx_hat = alpha_d*dx + (1-alpha_d)*dx_prev
+            
+            # Adaptive cutoff and filter signal
+            cutoff = min_cutoff + beta*abs(dx_hat) # cutoff = min_cutoff + beta*velocity
+            alpha = smoothing_factor(dt, cutoff) # equivalent to a 1st order butterworth filter
+            x_hat = alpha*x + (1-alpha)*x_prev # same as 1st order Butterworth filter: more or less sensitive to previous value
+            
+            filtered.append(x_hat)
+            x_prev = x_hat
+            dx_prev = dx_hat
+        
+        return np.array(filtered)
+    
+    col_filtered = col.copy()
+    mask = np.isnan(col_filtered)
+    falsemask_indices = np.where(~mask)[0]
+    gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1
+    idx_sequences = np.split(falsemask_indices, gaps)
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 2]
+
+    # Filter each valid sequence
+    for seq in idx_sequences_to_filter:
+        data = col_filtered[seq].values
+        
+        # Forward and backward passes (for zero-phase filtering)
+        filtered_forward = apply_filter(data)
+        filtered_backward = apply_filter(filtered_forward[::-1])[::-1]
+        
+        col_filtered[seq] = filtered_backward
     
     return col_filtered
 
@@ -194,45 +271,44 @@ def gcv_spline_filter_1d(config_dict, frame_rate, col):
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    if idx_sequences[0].size > 0:
-        idx_sequences_to_filter = [seq for seq in idx_sequences]
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 2]
     
-        # Filter each of the selected sequences
-        for seq_f in idx_sequences_to_filter:
-            x = np.arange(len(col_filtered[seq_f]))
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        x = np.arange(len(col_filtered[seq_f]))
 
-            # Automatically determine optimal lambda value when cutoff is 'auto'
-            if cutoff == 'auto': 
-                # Normalize col around 1, because zero mean leads to unstabilities
-                median_col = np.median(col_filtered[seq_f]) # median of time series
-                mad_col = np.median(np.abs(col_filtered[seq_f] - median_col)) # median absolute deviation from median
-                mad_col = mad_col if mad_col > 0 else 1.0
-                col_norm = 1 + (col_filtered[seq_f] - median_col) / (1.4826 * mad_col) # 1.4826*mad_col equivalent to dividing by std (for col_norm to have a std of 1)
+        # Automatically determine optimal lambda value when cutoff is 'auto'
+        if cutoff == 'auto': 
+            # Normalize col around 1, because zero mean leads to unstabilities
+            median_col = np.median(col_filtered[seq_f]) # median of time series
+            mad_col = np.median(np.abs(col_filtered[seq_f] - median_col)) # median absolute deviation from median
+            mad_col = mad_col if mad_col > 0 else 1.0
+            col_norm = 1 + (col_filtered[seq_f] - median_col) / (1.4826 * mad_col) # 1.4826*mad_col equivalent to dividing by std (for col_norm to have a std of 1)
 
-                # Compute optimal lam 
-                # See https://stackoverflow.com/a/79740481/12196632
-                lam =  _compute_optimal_gcv_parameter_numstable(x, col_norm)
-                
-                # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
-                lam *= smoothing_factor
+            # Compute optimal lam 
+            # See https://stackoverflow.com/a/79740481/12196632
+            lam =  _compute_optimal_gcv_parameter_numstable(x, col_norm)
+            
+            # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
+            lam *= smoothing_factor
 
-                # Compute spline
-                spline = make_smoothing_spline(x, col_norm, w=None, lam=lam)
-                col_filtered_norm = spline(x)
-                                
-                # Denormalize data
-                col_filtered[seq_f] = (col_filtered_norm - 1) * (1.4826 * mad_col) + median_col
+            # Compute spline
+            spline = make_smoothing_spline(x, col_norm, w=None, lam=lam)
+            col_filtered_norm = spline(x)
+                            
+            # Denormalize data
+            col_filtered[seq_f] = (col_filtered_norm - 1) * (1.4826 * mad_col) + median_col
 
-            else:
-                # Estimate lam from cutoff frequency
-                lam = ((frame_rate / (2 * np.pi * float(cutoff))) ** 4)
-                
-                # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
-                lam *= smoothing_factor
+        else:
+            # Estimate lam from cutoff frequency
+            lam = ((frame_rate / (2 * np.pi * float(cutoff))) ** 4)
+            
+            # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
+            lam *= smoothing_factor
 
-                # Compute spline
-                spline = make_smoothing_spline(x, col_filtered[seq_f], w=None, lam=lam)
-                col_filtered[seq_f] = spline(x)
+            # Compute spline
+            spline = make_smoothing_spline(x, col_filtered[seq_f], w=None, lam=lam)
+            col_filtered[seq_f] = spline(x)
 
     return col_filtered
 
@@ -278,7 +354,7 @@ def kalman_filter(coords, frame_rate, measurement_noise, process_noise, nb_dimen
     F_per_coord = np.zeros((int(dim_x/nb_dimensions), int(dim_x/nb_dimensions)))
     for i in range(nb_derivatives):
         for j in range(min(i+1, nb_derivatives)):
-            F_per_coord[j,i] = dt**(i-j) / np.math.factorial(i - j)
+            F_per_coord[j,i] = dt**(i-j) / math.factorial(i - j)
     f.F = np.kron(np.eye(nb_dimensions),F_per_coord) 
     # F_per_coord= [[1, dt, dt**2/2], 
                  # [ 0, 1,  dt     ],
@@ -349,12 +425,11 @@ def kalman_filter_1d(config_dict, frame_rate, col):
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    if idx_sequences[0].size > 0:
-        idx_sequences_to_filter = [seq for seq in idx_sequences]
-    
-        # Filter each of the selected sequences
-        for seq_f in idx_sequences_to_filter:
-            col_filtered[seq_f] = kalman_filter(col_filtered[seq_f], frame_rate, measurement_noise, process_noise, nb_dimensions=1, nb_derivatives=3, smooth=smooth).flatten()
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 2]
+
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        col_filtered[seq_f] = kalman_filter(col_filtered[seq_f], frame_rate, measurement_noise, process_noise, nb_dimensions=1, nb_derivatives=3, smooth=smooth).flatten()
 
     return col_filtered
 
@@ -387,12 +462,11 @@ def butterworth_filter_1d(config_dict, frame_rate, col):
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    if idx_sequences[0].size > 0:
-        idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > padlen]
-    
-        # Filter each of the selected sequences
-        for seq_f in idx_sequences_to_filter:
-            col_filtered[seq_f] = signal.filtfilt(b, a, col_filtered[seq_f])
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > padlen]
+
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        col_filtered[seq_f] = signal.filtfilt(b, a, col_filtered[seq_f])
     
     return col_filtered
     
@@ -426,12 +500,11 @@ def butterworth_on_speed_filter_1d(config_dict, frame_rate, col):
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    if idx_sequences[0].size > 0:
-        idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > padlen]
-    
-        # Filter each of the selected sequences
-        for seq_f in idx_sequences_to_filter:
-            col_filtered_diff[seq_f] = signal.filtfilt(b, a, col_filtered_diff[seq_f])
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > padlen]
+
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        col_filtered_diff[seq_f] = signal.filtfilt(b, a, col_filtered_diff[seq_f])
     col_filtered = col_filtered_diff.cumsum() + col.iloc[0] # integrate filtered derivative
     
     return col_filtered
@@ -476,12 +549,11 @@ def loess_filter_1d(config_dict, frame_rate, col):
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    if idx_sequences[0].size > 0:
-        idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > kernel]
-    
-        # Filter each of the selected sequences
-        for seq_f in idx_sequences_to_filter:
-            col_filtered[seq_f] = lowess(col_filtered[seq_f], seq_f, is_sorted=True, frac=kernel/len(seq_f), it=0)[:,1]
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > kernel]
+
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        col_filtered[seq_f] = lowess(col_filtered[seq_f], seq_f, is_sorted=True, frac=kernel/len(seq_f), it=0)[:,1]
 
     return col_filtered
     
@@ -576,6 +648,7 @@ def filter1d(col, config_dict, filter_type, frame_rate):
     # Choose filter
     filter_mapping = {
         'butterworth': butterworth_filter_1d, 
+        'one_euro': one_euro_filter_1d,
         'gcv_spline': gcv_spline_filter_1d,
         'kalman': kalman_filter_1d,
         'butterworth_on_speed': butterworth_on_speed_filter_1d, 
@@ -615,6 +688,9 @@ def recap_filter3d(config_dict, trc_path):
     butterworth_filter_cutoff = int(config_dict.get('filtering').get('butterworth').get('cut_off_frequency'))
     gcv_filter_cutoff = config_dict.get('filtering').get('gcv_spline', {}).get('cut_off_frequency', 'auto')
     gcv_filter_smoothing_factor = float(config_dict.get('filtering').get('gcv_spline', {}).get('smoothing_factor', 1.0))
+    one_euro_filter_1d_min_cutoff = config_dict.get('filtering').get('one_euro').get('cut_off_frequency', 2.5)
+    one_euro_filter_1d_beta = config_dict.get('filtering').get('one_euro').get('beta', 0.9)
+    one_euro_filter_1d_d_cutoff = config_dict.get('filtering').get('one_euro').get('d_cut_off_frequency', 1.0)
     butter_speed_filter_type = 'low' # config_dict.get('filtering').get('butterworth_on_speed').get('type')
     butter_speed_filter_order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
     butter_speed_filter_cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
@@ -631,7 +707,8 @@ def recap_filter3d(config_dict, trc_path):
     if do_filter:
         filter_mapping_recap = {
             'butterworth': f'--> Filter type: Butterworth {butterworth_filter_type}-pass. Order {butterworth_filter_order}, Cut-off frequency {butterworth_filter_cutoff} Hz.', 
-            'gcv_spline': f'--> Filter type: Generalized Cross-Validation Spline. {"Optimal parameters automatically estimated with smoothing factor {gcv_filter_smoothing_factor}" if gcv_filter_cutoff == "auto" else "Cut-off frequency {gcv_filter_cutoff} Hz"}.',
+            'one_euro': f'--> Filter type: OneEuro (zero-phase). Min cutoff frequency: {one_euro_filter_1d_min_cutoff} Hz, Beta: {one_euro_filter_1d_beta}, Derivative cutoff frequency: {one_euro_filter_1d_d_cutoff} Hz.',
+            'gcv_spline': f'--> Filter type: Generalized Cross-Validation Spline. {f"Optimal parameters automatically estimated with smoothing factor {gcv_filter_smoothing_factor}" if gcv_filter_cutoff == "auto" else "Cut-off frequency {gcv_filter_cutoff} Hz"}.',
             'kalman': f'--> Filter type: Kalman {kalman_filter_smooth_str}. Measurements trusted {kalman_filter_trustratio} times as much as previous data, assuming a constant acceleration process.', 
             'butterworth_on_speed': f'--> Filter type: Butterworth on speed {butter_speed_filter_type}-pass. Order {butter_speed_filter_order}, Cut-off frequency {butter_speed_filter_cutoff} Hz.', 
             'gaussian': f'--> Filter type: Gaussian. Standard deviation kernel: {gaussian_filter_sigma_kernel}', 
@@ -688,7 +765,8 @@ def filter_all(config_dict):
                 raise
             frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
-            frame_rate = 60
+            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            frame_rate = 30  
     
     # Trc paths
     trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in file]
@@ -699,7 +777,7 @@ def filter_all(config_dict):
         Q_coords, frames_col, time_col, markers, header = read_trc(t_path_in)
 
         # frame range selection
-        f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if frame_range in ('all', 'auto', []) else frame_range][0]
+        f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if (frame_range in ('all', 'auto', []) or frames_col.iloc[0]>frame_range[0] or frames_col.iloc[1]<frame_range[1]) else frame_range][0]
         frame_nb = f_range[1] - f_range[0]
         f_index = [frames_col[frames_col==f_range[0]].index[0], frames_col[frames_col==f_range[1]-1].index[0]+1]
         Q_coords = Q_coords.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
