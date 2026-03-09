@@ -556,8 +556,8 @@ If you already have a calibration file, set `calibration_type` type to `convert`
     > *N.B.:* _Intrinsic parameters:_ camera properties (focal length, optical center, distortion), usually need to be calculated only once in their lifetime. In theory, cameras with same model and same settings will have identical intrinsic parameters.\
     > *N.B.:* If you already calculated intrinsic parameters earlier, you can skip this step by setting `overwrite_intrinsics` to false.
 
-    - Create a folder for each camera in your `Calibration\intrinsics` folder.
     - For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
+    - Create a folder for each camera in your `Calibration\intrinsics` folder and copy your images or videos in them.
     - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
     - Make sure that the board:
       - is filmed from different angles, covers a large part of the video frame, and is in focus.
@@ -574,20 +574,21 @@ If you already have a calibration file, set `calibration_type` type to `convert`
   > *N.B.:* _Extrinsic parameters:_ camera placement in space (position and orientation), need to be calculated every time a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates.\
   > *N.B.:* If there is no measurable item in the scene, you can temporarily bring something in (a table, for example), perform calibration, and then remove it before you start capturing motion.
 
-  - Create a folder for each camera in your `Calibration\extrinsics` folder.
-  - Once your cameras are in place, shortly film either a board laid on the floor, or the raw scene\
-  (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format).
-  - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
-  - Then,
+  - 3 available methods:
     - **With a checkerboard:**\
       Make sure that it is seen by all cameras. \
-      It should preferably be larger than the one used for intrinsics, as results will not be very accurate out of the covered zone.
+      Can be set horizontally (default) or vertically (set `board_position = 'vertical'` in Config.toml). \
+      It should preferably be rather large, as results will not be very accurate out of the covered zone.
     - **With scene measurements** (more flexible and potentially more accurate if points are spread out):\
       Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, boxes, treadmill dimensions...). These points should be as spread out as possible. Replace `object_coords_3d` by these coordinates in Config.toml.\
       Then you will click on the corresponding image points for each view.
     - **With keypoints:**\
-      For a more automatic calibration, OpenPose keypoints could also be used for calibration.\
+      For a more automatic calibration, pose keypoints could also be used for calibration.\
       **COMING SOON!**
+  - Once your cameras are in place, make a quicke recording of the checkerboard laid on the floor, or the raw scene (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format). \
+    You can remove the checkerboard or the calibration object for the actual capture of your participants.
+  - Copy your files in the èxtrinsics` folder.
+  - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
   <img src="Content/Calib_ext.png" width="920">
   
