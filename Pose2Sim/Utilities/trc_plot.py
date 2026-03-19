@@ -23,11 +23,11 @@ import matplotlib as mpl
 import platform
 os_name = platform.system()
 if os_name == 'Windows':
-    mpl.use('qt5agg') # windows
+    mpl.use('qtagg') # windows
 mpl.rc('figure', max_open_warning=0)
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+from PySide6.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
 from scipy import signal
 from scipy.ndimage import gaussian_filter1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
@@ -96,7 +96,7 @@ class plotWindow():
         self.tab_handles.append(new_tab)
 
     def show(self):
-        self.app.exec_() 
+        self.app.exec()
 
 
 ## FUNCTIONS

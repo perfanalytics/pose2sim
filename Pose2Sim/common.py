@@ -28,9 +28,9 @@ from anytree import PreOrderIter
 
 import tkinter as tk
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+from PySide6.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="c3d")
 
@@ -142,7 +142,7 @@ class plotWindow():
         self.tab_handles.append(new_tab)
 
     def show(self):
-        self.app.exec_() 
+        self.app.exec()
 
 
 ## FUNCTIONS
