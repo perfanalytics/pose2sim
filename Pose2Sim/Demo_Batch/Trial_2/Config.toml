@@ -79,6 +79,12 @@ participant_mass = [70.0, 63.5]     # float (eg 70.0), or list of floats (eg [70
                   # # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
 # device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 # backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
+# parallel_pose_detection = 'off' # 'off' = sequential (default), 'auto' = one thread per video,
+#                                # or an integer (e.g., 2) to specify the number of threads.
+#                                # Each thread loads its own ONNX model into VRAM (~0.5-2GB each).
+#                                # Higher thread counts (4+) need good CPU, GPU, and VRAM.
+#                                # Try with 2 first, monitor CPU/GPU utilisation, then increase.
+#                                # Falls back to sequential if display_detection is true or device is not a GPU (CUDA/MPS/ROCM).
 
 # tracking_mode = 'sports2d' # 'none', 'sports2d' or 'deepsort'. 'deepsort' is slower but more robust in difficult configurations
 # max_distance_px = 100  # px # If a person is detected further than max_distance from its position on the previous frame, it will be considered as a new one

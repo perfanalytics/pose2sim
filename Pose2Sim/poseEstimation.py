@@ -551,6 +551,24 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
         cv2.destroyAllWindows()
 
 
+def _process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
+                           pose_model, output_format, save_video, save_images,
+                           display_detection, frame_range, tracking_mode, multi_person,
+                           max_distance_px, deepsort_params):
+    '''
+    Worker function for parallel pose estimation. Creates its own PoseTracker
+    and optional DeepSort tracker, then processes one video independently.
+    '''
+    pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+    deepsort_tracker = None
+    if tracking_mode == 'deepsort' and multi_person:
+        from deep_sort_realtime.deepsort_tracker import DeepSort
+        deepsort_tracker = DeepSort(**deepsort_params)
+    process_video(video_path, pose_tracker, pose_model, output_format,
+                  save_video, save_images, display_detection, frame_range,
+                  tracking_mode, max_distance_px, deepsort_tracker)
+
+
 def estimate_pose_all(config_dict):
     '''
     Estimate pose from a video file or a folder of images and 
@@ -611,6 +629,15 @@ def estimate_pose_all(config_dict):
         deepsort_tracker = DeepSort(**deepsort_params)
     else:
         deepsort_tracker = None
+        deepsort_params = {}
+
+    parallel_pose_cfg = config_dict.get('pose').get('parallel_pose_detection', 'off')
+    if isinstance(parallel_pose_cfg, bool):  # backward compat with old boolean format
+        parallel_pose_cfg = 'auto' if parallel_pose_cfg else 'off'
+    parallel_pose_cfg = str(parallel_pose_cfg).strip().lower()
+    if display_detection and parallel_pose_cfg != 'off':
+        logging.warning('display_detection enabled: falling back to sequential pose tracking.')
+        parallel_pose_cfg = 'off'
 
     backend = config_dict['pose']['backend']
     device = config_dict['pose']['device']
@@ -645,6 +672,11 @@ def estimate_pose_all(config_dict):
     # Select device and backend
     backend, device = setup_backend_device(backend=backend, device=device)
 
+    if parallel_pose_cfg != 'off' and device.upper() not in {'CUDA', 'MPS', 'ROCM'}:
+        logging.warning(f'Parallel pose detection requires a GPU device (CUDA/MPS/ROCM), '
+                        f'but got \'{device.upper()}\': falling back to sequential.')
+        parallel_pose_cfg = 'off'
+
     # Estimate pose
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
@@ -671,14 +703,43 @@ def estimate_pose_all(config_dict):
         logging.info(f'Tracking is performed with {tracking_mode}{"" if not tracking_mode=="deepsort" else f" with parameters: {deepsort_params}"}.\n')
 
         video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
-        if not len(video_files) == 0: 
+        if not len(video_files) == 0:
             # Process video files
-            logging.info(f'Found video files with {vid_img_extension} extension.')
-            for video_path in video_files:
-                pose_tracker.reset()
-                if tracking_mode == 'deepsort': 
-                    deepsort_tracker.tracker.delete_all_tracks()
-                process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker)
+            logging.info(f'Found {len(video_files)} video files with {vid_img_extension} extension.')
+
+            if parallel_pose_cfg != 'off' and len(video_files) > 1:
+                # Parallel: each thread gets its own PoseTracker + ONNX session
+                MAX_PARALLEL_WORKERS = 8
+                if parallel_pose_cfg == 'auto':
+                    num_workers = min(len(video_files), MAX_PARALLEL_WORKERS)
+                else:
+                    num_workers = min(int(parallel_pose_cfg), len(video_files), MAX_PARALLEL_WORKERS)
+                logging.info(f'Processing {len(video_files)} videos in parallel ({num_workers} workers).')
+
+                from concurrent.futures import ThreadPoolExecutor, as_completed
+                with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                    futures = {
+                        executor.submit(
+                            _process_video_worker, vp,
+                            ModelClass, det_frequency, mode, backend, device,
+                            pose_model, output_format, save_video, save_images,
+                            display_detection, frame_range, tracking_mode, multi_person,
+                            max_distance_px, deepsort_params
+                        ): vp for vp in video_files
+                    }
+                    for future in as_completed(futures):
+                        vp = futures[future]
+                        try:
+                            future.result()
+                        except Exception as e:
+                            logging.error(f'Failed processing {os.path.basename(vp)}: {e}')
+            else:
+                # Sequential: original behavior, single shared tracker
+                for video_path in video_files:
+                    pose_tracker.reset()
+                    if tracking_mode == 'deepsort':
+                        deepsort_tracker.tracker.delete_all_tracks()
+                    process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker)
 
         else:
             # Process image folders
