@@ -28,9 +28,6 @@ from anytree import PreOrderIter
 
 import tkinter as tk
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
-from PySide6.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="c3d")
 
@@ -108,6 +105,19 @@ class plotWindow():
     '''
 
     def __init__(self, parent=None):
+        # Lazy imports: PySide6 requires a display server and crashes on headless
+        # environments (e.g. CI runners) if imported at module level. Since
+        # common.py is imported by nearly every module, we defer Qt imports to
+        # here so only code that actually creates a plotWindow needs a display.
+        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+        from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+        from PySide6.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
+
+        self.FigureCanvas = FigureCanvas
+        self.NavigationToolbar = NavigationToolbar
+        self.QWidget = QWidget
+        self.QVBoxLayout = QVBoxLayout
+
         self.app = QApplication.instance()
         if not self.app:
             self.app = QApplication(sys.argv)
@@ -124,13 +134,13 @@ class plotWindow():
         self.MainWindow.show()
 
     def addPlot(self, title, figure):
-        new_tab = QWidget()
-        layout = QVBoxLayout()
+        new_tab = self.QWidget()
+        layout = self.QVBoxLayout()
         new_tab.setLayout(layout)
 
         figure.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.91, wspace=0.2, hspace=0.2)
-        new_canvas = FigureCanvas(figure)
-        new_toolbar = NavigationToolbar(new_canvas, new_tab)
+        new_canvas = self.FigureCanvas(figure)
+        new_toolbar = self.NavigationToolbar(new_canvas, new_tab)
 
         layout.addWidget(new_canvas)
         layout.addWidget(new_toolbar)
