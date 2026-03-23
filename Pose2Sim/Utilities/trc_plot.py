@@ -61,7 +61,8 @@ class plotWindow():
 
     def __init__(self, parent=None):
         # Lazy imports: PySide6 requires a display server and crashes on headless
-        # environments (e.g. CI runners) if imported at module level. Deferred
+        # environments (e.g. CI runners) if imported at module level. Since
+        # common.py is imported by nearly every module, we defer Qt imports to
         # here so only code that actually creates a plotWindow needs a display.
         from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
         from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -72,9 +73,10 @@ class plotWindow():
         self.QWidget = QWidget
         self.QVBoxLayout = QVBoxLayout
 
-        self.app = QApplication(sys.argv)
+        self.app = QApplication.instance()
+        if not self.app:
+            self.app = QApplication(sys.argv)
         self.MainWindow = QMainWindow()
-        self.MainWindow.__init__()
         self.MainWindow.setWindowTitle("Multitabs figure")
         self.canvases = []
         self.figure_handles = []
@@ -174,7 +176,7 @@ def trc_plot_func(*args):
     Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
 
     # Display figures
-    keypoints_names = pd.read_csv(trc_path, sep="\t", skiprows=3, nrows=0).columns[2::3].tolist()
+    keypoints_names = pd.read_csv(trc_path, sep="\t", skiprows=3, nrows=0).columns[2::3][:-1].to_numpy()
     display_figures_fun(Q_coord, time_col, keypoints_names)
 
 

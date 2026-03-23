@@ -19,11 +19,11 @@
     Butterworth filter on speed, low-pass, 4th order, cut off frequency 6 Hz:
         trc_filter -i input_trc_file -t butterworth_on_speed -p low -n 4 -f 6
     Gaussian filter, kernel 5:
-        trc_filter -i input_trc_file -t gaussian, -k 5
+        trc_filter -i input_trc_file -t gaussian -k 5
     LOESS filter, kernel 5: NB: frac = kernel * frames_number
-        trc_filter -i input_trc_file -t loess, -k 5
+        trc_filter -i input_trc_file -t loess -k 5
     Median filter, kernel 5:
-        trc_filter -i input_trc_file -t gaussian, -k 5
+        trc_filter -i input_trc_file -t median -k 5
 '''
 
 
@@ -65,9 +65,9 @@ def main():
     parser.add_argument('-o', '--output_file', required=False, help='filtered trc output file')
     
     parser.add_argument('-p', '--pass_type', required=False, help='"low" or "high" pass filter')
-    parser.add_argument('-n', '--order', required=False, help='filter order')
-    parser.add_argument('-f', '--cut_off_frequency', required=False, help='cut-off frequency')
-    parser.add_argument('-k', '--kernel', required=False, help='kernel of the median, gaussian, or loess filter')
+    parser.add_argument('-n', '--order', required=False, type=int, help='filter order')
+    parser.add_argument('-f', '--cut_off_frequency', required=False, type=int, help='cut-off frequency')
+    parser.add_argument('-k', '--kernel', required=False, type=int, help='kernel of the median, gaussian, or loess filter')
 
     args = vars(parser.parse_args())
     
@@ -91,7 +91,8 @@ class plotWindow():
 
     def __init__(self, parent=None):
         # Lazy imports: PySide6 requires a display server and crashes on headless
-        # environments (e.g. CI runners) if imported at module level. Deferred
+        # environments (e.g. CI runners) if imported at module level. Since
+        # common.py is imported by nearly every module, we defer Qt imports to
         # here so only code that actually creates a plotWindow needs a display.
         from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
         from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -102,9 +103,10 @@ class plotWindow():
         self.QWidget = QWidget
         self.QVBoxLayout = QVBoxLayout
 
-        self.app = QApplication(sys.argv)
+        self.app = QApplication.instance()
+        if not self.app:
+            self.app = QApplication(sys.argv)
         self.MainWindow = QMainWindow()
-        self.MainWindow.__init__()
         self.MainWindow.setWindowTitle("Multitabs figure")
         self.canvases = []
         self.figure_handles = []
@@ -334,13 +336,13 @@ def trc_filter_func(**args):
         OR trc_filter -i input_trc_file -o output_trc_file -d True -t butterworth -p low -n 4 -f 6
         OR trc_filter -i input_trc_file -t butterworth, -p low -n 4 -f 6
     Butterworth filter on speed, low-pass, 4th order, cut off frequency 6 Hz:
-        trc_filter -i input_trc_file -t butterworth_on_speed, -p low -n 4 -f 6
+        trc_filter -i input_trc_file -t butterworth_on_speed -p low -n 4 -f 6
     Gaussian filter, kernel 5:
-        trc_filter -i input_trc_file -t gaussian, -k 5
+        trc_filter -i input_trc_file -t gaussian -k 5
     LOESS filter, kernel 5: NB: frac = kernel * frames_number
-        trc_filter -i input_trc_file -t loess, -k 5
+        trc_filter -i input_trc_file -t loess -k 5
     Median filter, kernel 5:
-        trc_filter -i input_trc_file -t gaussian, -k 5
+        trc_filter -i input_trc_file -t median -k 5
     '''
 
     # Read trc header
@@ -360,7 +362,7 @@ def trc_filter_func(**args):
     # Display figures
     display = args.get('display')
     if display == True or display == 'True':
-        keypoints_names = pd.read_csv(trc_path_in, sep="\t", skiprows=3, nrows=0).columns[2::3].tolist()
+        keypoints_names = pd.read_csv(trc_path_in, sep="\t", skiprows=3, nrows=0).columns[2::3][:-1].to_numpy()
         display_figures_fun(Q_coord, Q_filt, time_col, keypoints_names)
 
     # Reconstruct trc file with filtered coordinates
