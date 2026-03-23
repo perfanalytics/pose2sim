@@ -595,7 +595,7 @@ def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0
 
     os_name = platform.system()
     if os_name == 'Windows':
-        mpl.use('qt5agg') # windows
+        mpl.use('qtagg') # windows
     mpl.rc('figure', max_open_warning=0)
 
     pw = plotWindow()
