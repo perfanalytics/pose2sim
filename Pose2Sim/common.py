@@ -869,20 +869,20 @@ def add_neck_hip_coords(kpt_name, p_X, p_Y, p_scores, kpt_ids, kpt_names):
     return p_X, p_Y, p_scores
 
 
-def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, close_to_zero_speed=0.2, large_hip_knee_angles=45):
+def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, slowest_frames_to_remove_percent=0.2, large_hip_knee_angles=45):
     '''
     Compute the best coordinates for measurements, after removing:
     - 20% fastest frames (may be outliers)
-    - frames when speed is close to zero (person is out of frame): 0.2 m/frame, or 50 px/frame
+    - 20% slowest frames (may be outliers)
     - frames when hip and knee angle below 45° (imprecise coordinates when person is crouching)
     
     INPUTS:
     - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
     - keypoints_names: list. The list of marker names
     - fastest_frames_to_remove_percent: float
-    - close_to_zero_speed: float (sum for all keypoints: about 50 px/frame or 0.2 m/frame)
+    - slowest_frames_to_remove_percent: float
     - large_hip_knee_angles: int
-    - trimmed_extrema_percent
+    - trimmed_extrema_percent: float
 
     OUTPUT:
     - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
@@ -901,15 +901,19 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
         Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_Hip), axis=1)
     n_markers = len(keypoints_names)
 
-    # Using 80% slowest frames
+    # Excluding 20% slowest and fastest frames
     sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords[kpt].diff(), axis=1) for kpt in keypoints_names], axis=0))
-    sum_speeds = sum_speeds[sum_speeds>close_to_zero_speed] # Removing when speeds close to zero (out of frame)
-    if len(sum_speeds)==0:
-        logging.warning('All frames have speed close to zero. Make sure the person is moving and correctly detected, or change close_to_zero_speed to a lower value. Not restricting the speeds to be above any threshold.')
+    try:
+        n_frames = len(sum_speeds)
+        sorted_speed_indices = sum_speeds.abs().sort_values().index
+        reasonable_speed_indices = sorted_speed_indices[int(n_frames * slowest_frames_to_remove_percent) :
+                                                        n_frames - int(n_frames * fastest_frames_to_remove_percent)]
+        Q_coords_low_speeds = Q_coords.iloc[reasonable_speed_indices].reset_index(drop=True)
+        if len(Q_coords_low_speeds) == 0:
+            logging.warning(f'No frames left after excluding the {slowest_frames_to_remove_percent:.0%} slowest and {fastest_frames_to_remove_percent:.0%} fastest frames. Make sure the person is moving and correctly detected, or change slowest_frames_to_remove_percent and fastest_frames_to_remove_percent. Not excluding any frames as a fallback.')
+            raise ValueError(f'No frames left after excluding the {slowest_frames_to_remove_percent:.0%} slowest and {fastest_frames_to_remove_percent:.0%} fastest frames. Make sure the person is moving and correctly detected, or change slowest_frames_to_remove_percent and fastest_frames_to_remove_percent. Not excluding any frames as a fallback.')
+    except:
         Q_coords_low_speeds = Q_coords
-    else:
-        min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
-        Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
     
     # Only keep frames with hip and knee flexion angles below 45% 
     # (if more than 50 of them, else take 50 smallest values)
@@ -920,10 +924,10 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
             Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
     except:
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds
-        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}°.")
+        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}° as a fallback.")
 
     if Q_coords_low_speeds_low_angles.empty:
-        logging.warning('The selected person might not move, or is crouching for the whole sequence, or is not well detected. Taking all available data instead of filtering them.')
+        logging.warning('The selected person might not move, or is crouching for the whole sequence, or is not well detected. Taking all available data instead of filtering them as a fallback.')
         Q_coords_low_speeds_low_angles = Q_coords.copy()
     
     if n_markers_init < n_markers:
@@ -932,7 +936,7 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     return Q_coords_low_speeds_low_angles
 
 
-def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, slowest_frames_to_remove_percent=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Compute the height of the person from the trc data.
 
@@ -940,7 +944,7 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
     - keypoints_names: list. The list of marker names
     - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
-    - close_to_zero_speed: float. Sum for all keypoints: about 50 px/frame or 0.2 m/frame
+    - slowest_frames_to_remove_percent: float. Frames with low speed are considered as outliers
     - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
     - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
     
@@ -950,7 +954,7 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     
     # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
     Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, keypoints_names, 
-                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, close_to_zero_speed=close_to_zero_speed, large_hip_knee_angles=large_hip_knee_angles)
+                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, slowest_frames_to_remove_percent=slowest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles)
 
     # Automatically compute the height of the person
     feet_pairs = [['RHeel', 'RAnkle'], ['LHeel', 'LAnkle']]
@@ -990,14 +994,14 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     return height
 
 
-def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, slowest_frames_to_remove_percent=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Compute the leg length of the person from the trc data.
 
     INPUTS:
     - Q_coords: path to the trc file (can be in m or px)
     - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
-    - close_to_zero_speed: float. Sum for all keypoints: about 50 px/frame or 0.2 m/frame
+    - slowest_frames_to_remove_percent: float. Frames with low speed are considered as outliers
     - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
     - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
 
@@ -1010,7 +1014,7 @@ def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, close_to_
     # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
     Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers,
                                                                   fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
-                                                                  close_to_zero_speed=close_to_zero_speed,
+                                                                  slowest_frames_to_remove_percent=slowest_frames_to_remove_percent,
                                                                   large_hip_knee_angles=large_hip_knee_angles)
 
     # leg length will be considered as the distance from the hip joint centre to the ankle joint centre
@@ -1032,6 +1036,14 @@ def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, close_to_
     leg_length = trimmed_mean(lengths, trimmed_extrema_percent)
 
     return leg_length
+
+    
+
+
+    # BEFORE ALL THAT: IN SORT, CONFIDENCE DECAY: REMOVE WHEN NOT SEEN FOR > 5*interp_gap_smaller_than?
+    # TEST POSTERS + OTHER CHALLENGING VIDS
+    # TEST POSE2SIM TRIG
+    # CHECK WHY RUGBY CUT OFF
 
 
 def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):

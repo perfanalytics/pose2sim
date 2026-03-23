@@ -119,7 +119,7 @@ def augment_markers_all(config_dict):
     subject_mass = config_dict.get('project').get('participant_mass')
     
     fastest_frames_to_remove_percent = config_dict.get('kinematics').get('fastest_frames_to_remove_percent')
-    close_to_zero_speed = config_dict.get('kinematics').get('close_to_zero_speed_m')
+    slowest_frames_to_remove_percent = config_dict.get('kinematics').get('slowest_frames_to_remove_percent')
     large_hip_knee_angles = config_dict.get('kinematics').get('large_hip_knee_angles')
     trimmed_extrema_percent = config_dict.get('kinematics').get('trimmed_extrema_percent')
     default_height = config_dict.get('kinematics').get('default_height')
@@ -162,7 +162,7 @@ def augment_markers_all(config_dict):
                     trc_data,
                     markers,
                     fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
-                    close_to_zero_speed=close_to_zero_speed,
+                    slowest_frames_to_remove_percent=slowest_frames_to_remove_percent,
                     large_hip_knee_angles=large_hip_knee_angles,
                     trimmed_extrema_percent=trimmed_extrema_percent
                 )
@@ -170,11 +170,11 @@ def augment_markers_all(config_dict):
                     logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m\n")
                 else:
                     logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
-                    logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, close_to_zero_speed_m, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
+                    logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, slowest_frames_to_remove_percent, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
                     height = default_height
             except Exception as e:
                 logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
-                logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, close_to_zero_speed_m, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
+                logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, slowest_frames_to_remove_percent, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
                 height = default_height
             subject_height.append(height)
     elif not type(subject_height) == list: # int or float
