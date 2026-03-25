@@ -707,7 +707,7 @@ def interpolate_zeros_nans(col, *args):
     if 'kind' not in locals(): # 'linear', 'slinear', 'quadratic', 'cubic'
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind="linear", bounds_error=False)
     else:
-        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, fill_value='extrapolate', bounds_error=False)
+        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, bounds_error=False)
     col_interp = col.where(mask, f_interp(col.index)) #replace at false index with interpolated values
     
     # Reintroduce nans if length of sequence > N
