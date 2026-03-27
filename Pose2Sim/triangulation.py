@@ -781,7 +781,9 @@ def triangulate_all(config_dict):
     
     # Triangulation
     if multi_person:
+        logging.info('Counting the number of persons... This can take a while if you use numerous cameras or recorded for a long time.')
         nb_persons_to_detect = max(max(count_persons_in_json(os.path.join(pose_dir, json_dirs_names[c], json_fname)) for json_fname in json_files_names[c]) for c in range(n_cams))
+        logging.info(f'{nb_persons_to_detect} person(s) detected. Triangulating now...')
     else:
         nb_persons_to_detect = 1
 

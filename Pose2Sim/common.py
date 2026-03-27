@@ -45,6 +45,9 @@ __status__ = "Development"
 
 
 ## CONSTANTS
+# 4 points joint angle: between knee and ankle, and toe and heel. Add 90° offset and multiply by -1
+# 3 points joint angle: between ankle, knee, hip. -180° offset, multiply by -1
+# 2 points segment angle: between horizontal and ankle and knee, 0° offset, multiply by 1 (except trunk and head: -1)
 angle_dict = { # lowercase!
     # joint angles
     'right ankle': [['RKnee', 'RAnkle', 'RBigToe', 'RHeel'], 'dorsiflexion', 90, 1],
@@ -729,8 +732,8 @@ def points_to_angles(points_list):
     If len(points_list)==4, computes clockwise angle between vectors ab and cd (e.g. Neck Hip, RKnee RHip)
     
     Points can be 2D or 3D.
-    If parameters are float, returns a float between 0.0 and 360.0
-    If parameters are arrays, returns an array of floats between 0.0 and 360.0
+    If parameters are float, returns a float between -180.0 and 180.0
+    If parameters are arrays, returns an array of floats between -180.0 and 180.0
 
     INPUTS:
     - points_list: list of arrays of points
@@ -747,10 +750,16 @@ def points_to_angles(points_list):
 
     if len(points_list) == 2:
         vector_u = points_array[0] - points_array[1]
-        if len(points_array.shape)==2:
-            vector_v = np.array([1, 0, 0]) # Here vector X, could be any horizontal vector
+        if dimensions == 2:
+            # Segment angle w.r.t. horizontal: atan2(dy, dx) directly
+            ang = np.arctan2(vector_u[1], vector_u[0])
+            ang_deg = np.degrees(ang)
+            return ang_deg
         else:
-            vector_v = np.array([[1, 0, 0],] * points_array.shape[1]) 
+            if len(points_array.shape)==2:
+                vector_v = np.array([1, 0, 0])
+            else:
+                vector_v = np.array([[1, 0, 0],] * points_array.shape[1])
 
     elif len(points_list) == 3:
         vector_u = points_array[0] - points_array[1]
@@ -763,24 +772,27 @@ def points_to_angles(points_list):
     else:
         return np.nan
 
-    if dimensions == 2: 
-        vector_u = vector_u[:2]
-        vector_v = vector_v[:2]
-        ang = np.arctan2(vector_u[1], vector_u[0]) - np.arctan2(vector_v[1], vector_v[0])
+    if dimensions == 2:
+        # atan2(cross, dot) gives angle from u to v (CCW positive).
+        # Negate to get angle from v to u, matching the old atan2(u)-atan2(v) convention.
+        # Range: (-180, 180) instead of (-360, 360), eliminating discontinuities.
+        cross = vector_u[0] * vector_v[1] - vector_u[1] * vector_v[0]
+        dot = vector_u[0] * vector_v[0] + vector_u[1] * vector_v[1]
+        ang = -np.arctan2(cross, dot)
     else:
         cross_product = np.cross(vector_u, vector_v)
-        dot_product = np.einsum('ij,ij->i', vector_u, vector_v) # np.dot(vector_u, vector_v) # does not work with time series
-        ang = np.arctan2(np.linalg.norm(cross_product,axis=1), dot_product)
+        dot_product = np.einsum('ij,ij->i', vector_u, vector_v) # np.dot(vector_u, vector_v) does not work with time series
+        ang = np.arctan2(np.linalg.norm(cross_product, axis=-1), dot_product)
 
     ang_deg = np.degrees(ang)
-    # ang_deg = np.array(np.degrees(np.unwrap(ang*2)/2))
     
     return ang_deg
 
 
 def fixed_angles(points_list, ang_name):
     '''
-    Add offset and multiplying factor to angles
+    Compute angle and apply offset and scaling factor.
+    Wraps result to (-180, 180] for most angles, or (-90, 90] for pelvis/shoulders.
 
     INPUTS:
     - points_list: list of arrays of points
@@ -792,14 +804,12 @@ def fixed_angles(points_list, ang_name):
 
     ang_params = angle_dict[ang_name]
     ang = points_to_angles(points_list)
-    ang += ang_params[2]
-    ang *= ang_params[3]
+    ang = (ang + ang_params[2]) * ang_params[3]
+    
     if ang_name in ['pelvis', 'shoulders']:
-        ang = np.where(ang>90, ang-180, ang)
-        ang = np.where(ang<-90, ang+180, ang)
+        ang = (ang + 90) % 180 - 90
     else:
-        ang = np.where(ang>180, ang-360, ang)
-        ang = np.where(ang<-180, ang+360, ang)
+        ang = (ang + 180) % 360 - 180
 
     return ang
 
