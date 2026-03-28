@@ -38,9 +38,7 @@ import json
 import re
 import logging
 import ast
-from functools import partial
 from tqdm import tqdm
-from anytree.importer import DictImporter
 from anytree import RenderTree
 import numpy as np
 import cv2
@@ -212,11 +210,11 @@ def setup_backend_device(backend='auto', device='auto'):
             if torch.cuda.is_available() == True and 'CUDAExecutionProvider' in ort.get_available_providers():
                 device = 'cuda'
                 backend = 'onnxruntime'
-                logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
+                logging.info(f"Valid CUDA installation found: using ONNXRuntime backend with GPU.")
             elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
                 device = 'rocm'
                 backend = 'onnxruntime'
-                logging.info(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
+                logging.info(f"Valid ROCM installation found: using ONNXRuntime backend with GPU.")
             else:
                 raise 
         except:
@@ -225,14 +223,17 @@ def setup_backend_device(backend='auto', device='auto'):
                 if 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
                     device = 'mps'
                     backend = 'onnxruntime'
-                    logging.info(f"\nValid MPS installation found: using ONNXRuntime backend with GPU.")
+                    logging.info(f"Valid MPS installation found: using ONNXRuntime backend with GPU.")
                 else:
                     raise
             except:
                 device = 'cpu'
                 backend = 'openvino'
-                logging.info(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
-        
+                logging.info(f"No valid CUDA installation found: using OpenVINO backend with CPU.")
+
+    else:
+        logging.info(f"Using {device} device with {backend} backend.")    
+    
     return backend, device
 
 
@@ -465,12 +466,15 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
     img_output_dir = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_img')
 
     image_files = glob.glob(os.path.join(image_folder_path, '*'+vid_img_extension))
-    sorted(image_files, key=natural_sort_key)
+    image_files = sorted(image_files, key=natural_sort_key)
+
+    if save_video or display_detection:
+        first_frame = cv2.imread(image_files[0])
+        H, W = first_frame.shape[:2]
 
     if save_video: # Set up video writer
         logging.warning('Using default framerate of 60 fps.')
         fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
-        W, H = cv2.imread(image_files[0]).shape[:2][::-1] # Get the width and height from the first image (assuming all images have the same size)
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
 
     if display_detection:
@@ -488,7 +492,6 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
         if frame_idx in range(*f_range):
             try:
                 frame = cv2.imread(image_file)
-                frame_idx += 1
             except:
                 raise NameError(f"{image_file} is not an image. Videos must be put in the video directory, not in subdirectories.")
             
@@ -551,7 +554,7 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
         cv2.destroyAllWindows()
 
 
-def _process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
+def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
                            pose_model, output_format, save_video, save_images,
                            display_detection, frame_range, tracking_mode, multi_person,
                            max_distance_px, deepsort_params):
@@ -612,9 +615,12 @@ def estimate_pose_all(config_dict):
     output_format = config_dict['pose']['output_format']
     save_video = True if 'to_video' in config_dict['pose']['save_video'] else False
     save_images = True if 'to_images' in config_dict['pose']['save_video'] else False
+    det_frequency = config_dict['pose']['det_frequency']
+    backend = config_dict['pose']['backend']
+    device = config_dict['pose']['device']
+    parallel_pose = config_dict.get('pose').get('parallel_pose', 'auto')
     display_detection = config_dict['pose']['display_detection']
     overwrite_pose = config_dict['pose']['overwrite_pose']
-    det_frequency = config_dict['pose']['det_frequency']
     tracking_mode = config_dict.get('pose').get('tracking_mode')
     max_distance_px = config_dict.get('pose').get('max_distance_px', None)
     if tracking_mode == 'deepsort' and multi_person:
@@ -631,19 +637,8 @@ def estimate_pose_all(config_dict):
         deepsort_tracker = None
         deepsort_params = {}
 
-    parallel_pose_cfg = config_dict.get('pose').get('parallel_pose_detection', 'off')
-    if isinstance(parallel_pose_cfg, bool):  # backward compat with old boolean format
-        parallel_pose_cfg = 'auto' if parallel_pose_cfg else 'off'
-    parallel_pose_cfg = str(parallel_pose_cfg).strip().lower()
-    if display_detection and parallel_pose_cfg != 'off':
-        logging.warning('display_detection enabled: falling back to sequential pose tracking.')
-        parallel_pose_cfg = 'off'
-
-    backend = config_dict['pose']['backend']
-    device = config_dict['pose']['device']
-
     # Determine frame rate
-    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+    video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
     frame_rate = config_dict.get('project').get('frame_rate')
     if frame_rate == 'auto': 
         try:
@@ -656,26 +651,11 @@ def estimate_pose_all(config_dict):
             logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
             frame_rate = 30  
 
-    # Set detection frequency
-    if det_frequency>1:
-        logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points.')
-    elif det_frequency==1:
-        logging.info(f'Inference run on every single frame.')
-    else:
-        raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
 
     # Select the appropriate model based on the model_type
-    logging.info('\nEstimating pose...')
+    logging.info('Estimating pose...\n')
     pose_model_name = pose_model
     pose_model, ModelClass, mode = setup_model_class_mode(pose_model, mode, config_dict)
-
-    # Select device and backend
-    backend, device = setup_backend_device(backend=backend, device=device)
-
-    if parallel_pose_cfg != 'off' and device.upper() not in {'CUDA', 'MPS', 'ROCM'}:
-        logging.warning(f'Parallel pose detection requires a GPU device (CUDA/MPS/ROCM), '
-                        f'but got \'{device.upper()}\': falling back to sequential.')
-        parallel_pose_cfg = 'off'
 
     # Estimate pose
     try:
@@ -688,53 +668,82 @@ def estimate_pose_all(config_dict):
             raise
             
     except:
-        # Set up pose tracker
-        try:
-            pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
-        except:
-            logging.error('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
-            raise ValueError('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
-
+        # Set up model and mode
+        logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
+        logging.info(f'Mode: {mode}.')
+        
+        # Set up detection frequency
+        if det_frequency>1:
+            logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points.')
+        elif det_frequency==1:
+            logging.info(f'Inference run on every single frame.')
+        else:
+            raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
+        
+        # Select device and backend
+        backend, device = setup_backend_device(backend=backend, device=device)
+        
+        # Set up parallelization
+        if not isinstance(parallel_pose, int) and parallel_pose != 'auto':
+            raise ValueError(f"Invalid parallel_pose value: {parallel_pose}. Must be an integer greater or equal to 1, or 'auto'.")
+        if parallel_pose == 1:
+            logging.info(f'Pose estimation will not be processed in parallel as parallel_pose is set to 1.')
+        else:
+            if display_detection:
+                logging.warning(f'Cannot run pose estimation in parallel with display_detection=true: "parallel_pose" deactivated.')
+                parallel_pose = 1
+            elif device.upper() not in {'CPU', 'CUDA', 'MPS', 'ROCM'}:
+                logging.warning(f'Parallel pose estimation is not supported for device "{device.upper()}": falling back to sequential.')
+                parallel_pose = 1
+            else:
+                MAX_PARALLEL_WORKERS_GPU = 8
+                MAX_PARALLEL_WORKERS_CPU = 4  # conservative: each worker loads its own model into RAM
+                max_workers_cap = MAX_PARALLEL_WORKERS_CPU if device.upper() == 'CPU' else MAX_PARALLEL_WORKERS_GPU
+                if parallel_pose == 'auto':
+                    parallel_pose = min(len(video_files), max_workers_cap)
+                    parallel_message = f'{parallel_pose} threads, (1 per video, limited to {max_workers_cap})'
+                else:
+                    parallel_message = f'{parallel_pose} threads (limited to {max_workers_cap})'
+                    parallel_pose = min(int(parallel_pose), len(video_files), max_workers_cap)
+                logging.info(f'Pose estimation processed in parallel on {parallel_message}.')
+        
+        # Tracking
         if tracking_mode not in ['deepsort', 'sports2d']:
             logging.warning(f"Tracking mode {tracking_mode} not recognized. Using sports2d method.")
             tracking_mode = 'sports2d'
-        logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
-        logging.info(f'Mode: {mode}.')
         logging.info(f'Tracking is performed with {tracking_mode}{"" if not tracking_mode=="deepsort" else f" with parameters: {deepsort_params}"}.\n')
 
-        video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
         if not len(video_files) == 0:
             # Process video files
             logging.info(f'Found {len(video_files)} video files with {vid_img_extension} extension.')
 
-            if parallel_pose_cfg != 'off' and len(video_files) > 1:
-                # Parallel: each thread gets its own PoseTracker + ONNX session
-                MAX_PARALLEL_WORKERS = 8
-                if parallel_pose_cfg == 'auto':
-                    num_workers = min(len(video_files), MAX_PARALLEL_WORKERS)
-                else:
-                    num_workers = min(int(parallel_pose_cfg), len(video_files), MAX_PARALLEL_WORKERS)
-                logging.info(f'Processing {len(video_files)} videos in parallel ({num_workers} workers).')
-
+            # In parallel
+            if parallel_pose != 1 and len(video_files) > 1:
                 from concurrent.futures import ThreadPoolExecutor, as_completed
-                with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                with ThreadPoolExecutor(max_workers=parallel_pose) as executor:
                     futures = {
                         executor.submit(
-                            _process_video_worker, vp,
+                            process_video_worker, video_path,
                             ModelClass, det_frequency, mode, backend, device,
                             pose_model, output_format, save_video, save_images,
                             display_detection, frame_range, tracking_mode, multi_person,
                             max_distance_px, deepsort_params
-                        ): vp for vp in video_files
+                        ): video_path for video_path in video_files
                     }
                     for future in as_completed(futures):
-                        vp = futures[future]
+                        video_path = futures[future]
                         try:
                             future.result()
                         except Exception as e:
-                            logging.error(f'Failed processing {os.path.basename(vp)}: {e}')
+                            logging.error(f'Failed processing {os.path.basename(video_path)}: {e}')
+    
+            # Sequentially
             else:
-                # Sequential: original behavior, single shared tracker
+                try:
+                    pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+                except:
+                    logging.error('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
+                    raise ValueError('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
                 for video_path in video_files:
                     pose_tracker.reset()
                     if tracking_mode == 'deepsort':
@@ -751,6 +760,11 @@ def estimate_pose_all(config_dict):
                 raise NameError(f'No image folders containing files with {vid_img_extension} extension found in {video_dir}.')
             else:
                 logging.info(f'Found image folders with {vid_img_extension} extension.')
+                try:
+                    pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+                except:
+                    logging.error('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
+                    raise ValueError('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
                 for image_folder in image_folders:
                     pose_tracker.reset()
                     image_folder_path = os.path.join(video_dir, image_folder)

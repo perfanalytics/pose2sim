@@ -76,27 +76,25 @@
 # #          'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.zip',
 # #          'pose_input_size':[256,256]}"""
 
-# det_frequency = 4 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (keypoint detection is still run on all frames). 
-                  # # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
+# det_frequency = 4 # Run person detection only every N frames, and inbetween track previously detected bounding boxes (pose estimation is still run on all frames). 
+#                   # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
 # device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 # backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
-# parallel_pose_detection = 'off' # 'off' = sequential (default), 'auto' = one thread per video,
-#                                # or an integer (e.g., 2) to specify the number of threads.
-#                                # Each thread loads its own ONNX model into VRAM (~0.5-2GB each).
-#                                # Higher thread counts (4+) need good CPU, GPU, and VRAM.
-#                                # Try with 2 first, monitor CPU/GPU utilisation, then increase.
-#                                # Falls back to sequential if display_detection is true or device is not a GPU (CUDA/MPS/ROCM).
+# parallel_pose = 'auto' # 'auto' or integer (number of threads). 'auto': one thread per video (ie 4 on the Demo data).
+#                             # Requires display_detection = false, otherwise falls back to sequential (ie parallel_pose = 1).
+
+# display_detection = true # Real-time display of the videos with pose estimation
+# overwrite_pose = false # Set to false if you don't want to recalculate pose estimation when it has already been done
+# save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
+# output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 # tracking_mode = 'sports2d' # 'none', 'sports2d' or 'deepsort'. 'deepsort' is slower but more robust in difficult configurations
 # max_distance_px = 100  # px # If a person is detected further than max_distance from its position on the previous frame, it will be considered as a new one
 # deepsort_params = """{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8}""" # """{dictionary between 3 double quotes}"""
 #                   # More robust in crowded scenes but Can be tricky to parametrize. More information there: https://github.com/levan92/deep_sort_realtime/blob/master/deep_sort_realtime/deepsort_tracker.py#L51
 #                   # Note: For faster and more robust tracking, use {'embedder_gpu': True, embedder':'torchreid'}, which uses the GPU and runs osnet_ain_x1_0 by default. requires `pip install torch torchvision torchreid gdown tensorboard`
-
-# display_detection = true
-# overwrite_pose = false # set to false if you don't want to recalculate pose estimation when it has already been done
-# save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
-# output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
+# handle_LR_swap = false # Not implemented yet. Might be useful if cameras film from the sagittal plane and the right and left sides are hard to differenciate to your eye.
+# undistort_points = false # Not implemented yet. Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
 
 
 # [synchronization]
