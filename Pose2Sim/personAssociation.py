@@ -253,7 +253,7 @@ def best_persons_and_cameras_combination(config_dict, json_files_framef, persons
         return np.inf, [np.array([np.nan]*n_cams)], [np.array([np.nan, np.nan, np.nan])]
 
     nb_cams_off = np.sum(np.isnan(best_comb))
-    print(f"Final reprojection error = {best_error:.2f} with {nb_cams_off} cams off and comb {best_comb}")
+    # print(f"Final reprojection error = {best_error:.2f} with {nb_cams_off} cams off and comb {best_comb}")
     return best_error, best_comb, best_Q
     
 

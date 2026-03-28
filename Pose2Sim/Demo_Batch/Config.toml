@@ -84,7 +84,7 @@ backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
 parallel_pose = 'auto' # 'auto' or integer (number of threads). 'auto': one thread per video (ie 4 on the Demo data).
                             # Requires display_detection = false, otherwise falls back to sequential (ie parallel_pose = 1).
 
-display_detection = true # Real-time display of the videos with pose estimation
+display_detection = false # Real-time display of the videos with pose estimation
 overwrite_pose = false # Set to false if you don't want to recalculate pose estimation when it has already been done
 save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
