@@ -323,15 +323,18 @@ First of all, set `multi_person = True` in your `Config.toml`file, and remove al
 - `Pose2Sim.calibration()`:\
   Run it only when your cameras are moved or changed. If they are not, just copy a previous calibration.toml file into your new calibration folder.
 - `Pose2Sim.poseEstimation()`:
-  - **Use your GPU**: This makes pose estimation significantly faster, without any impact on accuracy. See [Installation](#installation) section for more information.
-  - Set `det_frequency = 100` in Config.toml. Run the bounding box detector and the pose estimator on the first frame; for all subsequent frames, only run pose estimation: 
-  *150 s -> 30 s on my laptop with the Demo videos*
-  - Use `mode = 'lightweight'`: Will use a lighter version of RTMPose, which is faster but less accurate\
-  *30 s -> 20 s*
-  - Set `display_detection = false`. Do not display results in real time\
-  *20 s -> 15 s*
+  - **Use your GPU**: This makes pose estimation significantly faster, without any impact on accuracy. See [Installation](#installation) section for more information.\
+  *1 min 23 s -> 38 s on my average laptop*
+  - Set `display_detection = false`. Do not display results in real time.\
+  *38 s -> 30 s*
+  - Set `parallel_pose = 'auto'` or an integer (number of threads). 'auto': one thread per video (ie 4 on the Demo data). This requires `display_detection = false`. No impact on accuracy either.\
+  *30 s -> 19 s*
+  - Set `det_frequency = 100` in Config.toml. Run the bounding box detector and the pose estimator on the first frame; for all subsequent frames, only run pose estimation. No impact on accuracy but may miss detection or swap some person IDs if several persons are in the scene.\
+  *19 s -> 9 s*
+  - Use `mode = 'lightweight'`: Will use a lighter version of RTMPose, which is faster but less accurate.\
+  *9 s -> 6.5 s*
   - Set `save_video = 'none'`. Do not save images and videos\
-  *15 s -> 9 s*
+  *6.5 s -> 5 s*
   - Set `tracking_mode = 'sports2d'` or `tracking_mode = 'none'`. If several persons are in the scene, use the sports2d tracker or no tracker at all, but not 'deepsort' (sports2d tracking is almost instantaneous though).
 - `Pose2Sim.synchronization()`:\
   Do not run if your cameras are natively synchronized.
