@@ -557,12 +557,16 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
 def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
                            pose_model, output_format, save_video, save_images,
                            display_detection, frame_range, tracking_mode, multi_person,
-                           max_distance_px, deepsort_params):
+                           max_distance_px, deepsort_params, _init_lock):
     '''
     Worker function for parallel pose estimation. Creates its own PoseTracker
     and optional DeepSort tracker, then processes one video independently.
     '''
-    pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+    if _init_lock is not None:
+        with _init_lock:
+            pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+    else:
+        pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
     deepsort_tracker = None
     if tracking_mode == 'deepsort' and multi_person:
         from deep_sort_realtime.deepsort_tracker import DeepSort
@@ -719,6 +723,8 @@ def estimate_pose_all(config_dict):
 
             # In parallel
             if parallel_pose != 1 and len(video_files) > 1:
+                import threading
+                init_lock = threading.Lock()
                 from concurrent.futures import ThreadPoolExecutor, as_completed
                 with ThreadPoolExecutor(max_workers=parallel_pose) as executor:
                     futures = {
@@ -727,7 +733,7 @@ def estimate_pose_all(config_dict):
                             ModelClass, det_frequency, mode, backend, device,
                             pose_model, output_format, save_video, save_images,
                             display_detection, frame_range, tracking_mode, multi_person,
-                            max_distance_px, deepsort_params
+                            max_distance_px, deepsort_params, init_lock
                         ): video_path for video_path in video_files
                     }
                     for future in as_completed(futures):
@@ -736,6 +742,7 @@ def estimate_pose_all(config_dict):
                             future.result()
                         except Exception as e:
                             logging.error(f'Failed processing {os.path.basename(video_path)}: {e}')
+                            raise RuntimeError(f'Failed processing {os.path.basename(video_path)}: {e}')
     
             # Sequentially
             else:
