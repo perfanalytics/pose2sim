@@ -557,13 +557,13 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
 def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
                            pose_model, output_format, save_video, save_images,
                            display_detection, frame_range, tracking_mode, multi_person,
-                           max_distance_px, deepsort_params, _init_lock):
+                           max_distance_px, deepsort_params, init_lock=None):
     '''
     Worker function for parallel pose estimation. Creates its own PoseTracker
     and optional DeepSort tracker, then processes one video independently.
     '''
-    if _init_lock is not None:
-        with _init_lock:
+    if init_lock is not None:
+        with init_lock:
             pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
     else:
         pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)

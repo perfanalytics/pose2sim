@@ -1225,7 +1225,7 @@ def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], 
                                 for p in json_data_all
                                 for keypoints in [np.array([p['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])]
                                 ]
-                    max_area_person = json_data_all[np.argmax(bbox_area)]
+                    max_area_person = json_data_all[np.nanargmax(bbox_area)]
                     json_data = np.array([max_area_person['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
 
                 elif synchronization_gui:
@@ -1434,6 +1434,7 @@ def synchronize_cams_all(config_dict):
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
 
     # List json files
+    logging.info('Synchronizing...')
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
         os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
@@ -1488,7 +1489,6 @@ def synchronize_cams_all(config_dict):
 
 
     # Extract, interpolate, and filter keypoint coordinates
-    logging.info('Synchronizing...')
     df_coords = []
     b, a = signal.butter(int(filter_order/2), filter_cutoff/(fps/2), 'low', analog = False)
     json_files_names_range = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*frames_cam)] for (json_files_cam, frames_cam) in zip(json_files_names,search_around_frames)]
@@ -1528,7 +1528,7 @@ def synchronize_cams_all(config_dict):
     else:
         selected_id_list = [None] * cam_nb
         if isinstance(approx_time_maxspeed, list): # search around max speed
-            logging.info(f'Synchronization is calculated around the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
+            logging.info(f'Synchronization is calculated at time {approx_time_maxspeed} ± {time_range_around_maxspeed} s.')
         elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
             logging.info('Synchronization is calculated on the whole sequence. This may take a while.')
         else:
