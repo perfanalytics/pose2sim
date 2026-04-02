@@ -11,6 +11,7 @@ Functions shared between modules, and other utilities
 '''
 
 ## INIT
+import os
 import toml
 import json
 import numpy as np
@@ -159,6 +160,36 @@ class plotWindow():
 
 
 ## FUNCTIONS
+def is_video_file(path):
+    '''
+    Check if the given path is a video file based on its extension.
+    
+    INPUTS:
+    - path (str): The file path to check.
+
+    OUTPUTS:
+    - bool: True if the path is a video file, False otherwise.
+    '''
+
+    video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.mpeg', '.mpg'}
+    return os.path.isfile(path) and os.path.splitext(path)[1].lower() in video_extensions
+
+
+def is_image_file(path):
+    '''
+    Check if the given path is an image file based on its extension.
+    
+    INPUTS:
+    - path (str): The file path to check.
+
+    OUTPUTS:
+    - bool: True if the path is an image file, False otherwise.
+    '''
+
+    image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.webp'}
+    return os.path.isfile(path) and os.path.splitext(path)[1].lower() in image_extensions
+
+
 def read_trc(trc_path):
     '''
     Read a TRC file and extract its contents.

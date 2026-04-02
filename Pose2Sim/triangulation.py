@@ -57,7 +57,7 @@ import logging
 
 from Pose2Sim.common import retrieve_calib_params, computeP, weighted_triangulation, \
     reprojection, euclidean_distance, sort_people_sports2d, interpolate_zeros_nans, \
-    sort_stringlist_by_last_number, zup2yup, convert_to_c3d
+    sort_stringlist_by_last_number, zup2yup, convert_to_c3d, is_video_file
 from Pose2Sim.skeletons import *
 
 
@@ -172,8 +172,7 @@ def make_trc(config_dict, Q, keypoints_names, id_person=-1):
 
     # Get frame_rate
     video_dir = os.path.join(project_dir, 'videos')
-    vid_img_extension = config_dict.get('pose', {}).get('vid_img_extension', 'mp4')
-    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+    video_files = sorted([f for f in glob.glob(os.path.join(video_dir, '*')) if is_video_file(f)])
     frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
     if frame_rate == 'auto': 
         try:
@@ -183,7 +182,7 @@ def make_trc(config_dict, Q, keypoints_names, id_person=-1):
                 raise
             frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
-            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
             frame_rate = 30  
 
     trc_f = f'{seq_name}_{Q.index[0]}-{Q.index[-1]}.trc'

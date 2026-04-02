@@ -45,7 +45,7 @@ from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
 from Pose2Sim.common import plotWindow
-from Pose2Sim.common import convert_to_c3d, read_trc
+from Pose2Sim.common import convert_to_c3d, read_trc, is_video_file
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -754,8 +754,7 @@ def filter_all(config_dict):
     # Get frame_rate
     video_dir = os.path.join(project_dir, 'videos')
     frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
-    vid_img_extension = config_dict.get('pose', {}).get('vid_img_extension', 'mp4')
-    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+    video_files = sorted([f for f in glob.glob(os.path.join(video_dir, '*')) if is_video_file(f)])
     frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
     if frame_rate == 'auto': 
         try:
@@ -765,7 +764,7 @@ def filter_all(config_dict):
                 raise
             frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
-            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
             frame_rate = 30  
     
     # Trc paths

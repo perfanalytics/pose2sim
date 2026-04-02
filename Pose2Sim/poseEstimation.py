@@ -47,7 +47,7 @@ from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, dra
 from rtmlib.tools.object_detection.post_processings import nms
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort,\
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel, bbox_xyxy_compute, \
-                        get_screen_size, calculate_display_size
+                        get_screen_size, calculate_display_size, is_video_file, is_image_file
 from Pose2Sim.skeletons import *
 
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
@@ -275,7 +275,7 @@ def save_to_openpose(json_file_path, keypoints, scores):
     
     # Save JSON output for each frame
     json_output_dir = os.path.abspath(os.path.join(json_file_path, '..'))
-    if not os.path.isdir(json_output_dir): os.makedirs(json_output_dir)
+    os.makedirs(json_output_dir, exist_ok=True)
     with open(json_file_path, 'w') as json_file:
         json.dump(json_output, json_file)
 
@@ -310,7 +310,7 @@ def process_video(video_path, pose_tracker, pose_model, frame_range, average_lik
         raise NameError(f"{video_path} is not a video. Images must be put in one subdirectory per camera.")
     
     pose_dir = os.path.abspath(os.path.join(video_path, '..', '..', 'pose'))
-    if not os.path.isdir(pose_dir): os.makedirs(pose_dir)
+    os.makedirs(pose_dir, exist_ok=True)
     video_name_wo_ext = os.path.splitext(os.path.basename(video_path))[0]
     json_output_dir = os.path.join(pose_dir, f'{video_name_wo_ext}_json')
     output_video_path = os.path.join(pose_dir, f'{video_name_wo_ext}_pose.mp4')
@@ -437,13 +437,12 @@ def process_video(video_path, pose_tracker, pose_model, frame_range, average_lik
         cv2.destroyAllWindows()
 
 
-def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker):
+def process_images(image_folder_path, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker):
     '''
     Estimate pose estimation from a folder of images
     
     INPUTS:
     - image_folder_path: str. Path to the input image folder
-    - vid_img_extension: str. Extension of the image files
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
     - pose_model: str. The pose model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
@@ -461,13 +460,14 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
     '''    
 
     pose_dir = os.path.abspath(os.path.join(image_folder_path, '..', '..', 'pose'))
-    if not os.path.isdir(pose_dir): os.makedirs(pose_dir)
+    os.makedirs(pose_dir, exist_ok=True)
     json_output_dir = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_json')
     output_video_path = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_pose.mp4')
     img_output_dir = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_img')
 
-    image_files = glob.glob(os.path.join(image_folder_path, '*'+vid_img_extension))
-    image_files = sorted(image_files, key=natural_sort_key)
+    image_files = sorted([f for f in glob.glob(os.path.join(image_folder_path, '*')) if is_image_file(f)], key=natural_sort_key)
+    if len(image_files) == 0:
+        raise NameError(f'No image files found in {image_folder_path}.')
 
     if save_video or display_detection:
         first_frame = cv2.imread(image_files[0])
@@ -615,7 +615,6 @@ def estimate_pose_all(config_dict):
 
     pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet')
     mode = config_dict.get('pose', {}).get('mode', 'balanced')
-    vid_img_extension = config_dict.get('pose', {}).get('vid_img_extension', 'mp4')
     
     output_format = config_dict.get('pose', {}).get('output_format', 'openpose')
     save_video = True if 'to_video' in config_dict.get('pose', {}).get('save_video', 'to_video') else False
@@ -644,7 +643,7 @@ def estimate_pose_all(config_dict):
         deepsort_params = {}
 
     # Determine frame rate
-    video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
+    video_files = sorted([f for f in glob.glob(os.path.join(video_dir, '*')) if is_video_file(f)], key=natural_sort_key)
     frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
     if frame_rate == 'auto': 
         try:
@@ -654,9 +653,8 @@ def estimate_pose_all(config_dict):
                 raise
             frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
-            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
             frame_rate = 30  
-
 
     # Select the appropriate model based on the model_type
     logging.info('Estimating pose...\n')
@@ -722,7 +720,7 @@ def estimate_pose_all(config_dict):
 
         if not len(video_files) == 0:
             # Process video files
-            logging.info(f'Found {len(video_files)} video files with {vid_img_extension} extension.')
+            logging.info(f'Found {len(video_files)} video files in {video_dir}.')
 
             # In parallel
             if parallel_pose != 1 and len(video_files) > 1:
@@ -762,22 +760,11 @@ def estimate_pose_all(config_dict):
 
         else:
             # Process image folders
-            image_folders = sorted([os.path.join(video_dir,f) for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
-            empty_folders = [folder for folder in image_folders if len(glob.glob(os.path.join(folder, '*'+vid_img_extension)))==0]
-            if len(empty_folders) != 0:
-                raise NameError(f'No image files with {vid_img_extension} extension found in {empty_folders}.')
-            elif len(image_folders) == 0:
-                raise NameError(f'No image folders containing files with {vid_img_extension} extension found in {video_dir}.')
+            image_folders = sorted([os.path.join(video_dir, f) for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
+            # Keep only folders that contain at least one image file
+            image_folders = [folder for folder in image_folders 
+                            if any(is_image_file(os.path.join(folder, f)) for f in os.listdir(folder))]
+            if len(image_folders) == 0:
+                raise NameError(f'No video files and no image folders with recognized image extensions found in {video_dir}.')
             else:
-                logging.info(f'Found image folders with {vid_img_extension} extension.')
-                try:
-                    pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
-                except:
-                    logging.error('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
-                    raise ValueError('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
-                for image_folder in image_folders:
-                    pose_tracker.reset()
-                    image_folder_path = os.path.join(video_dir, image_folder)
-                    if tracking_mode == 'deepsort': 
-                        deepsort_tracker.tracker.delete_all_tracks()                
-                    process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, output_format, frame_rate, save_video, save_images, display_detection, tracking_mode, max_distance_px, deepsort_tracker)
+                logging.info(f'No video files found. Found {len(image_folders)} image folders in {video_dir}.')

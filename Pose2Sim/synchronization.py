@@ -50,7 +50,8 @@ from anytree.importer import DictImporter
 from matplotlib.widgets import TextBox, Button
 import logging
 
-from Pose2Sim.common import sort_stringlist_by_last_number, bounding_boxes, interpolate_zeros_nans
+from Pose2Sim.common import sort_stringlist_by_last_number, bounding_boxes, interpolate_zeros_nans, \
+                            is_video_file, is_image_file
 from Pose2Sim.skeletons import *
 
 
@@ -1390,13 +1391,14 @@ def synchronize_cams_all(config_dict):
 
     # Determine frame rate
     video_dir = os.path.join(project_dir, 'videos')
-    vid_img_extension = config_dict.get('pose', {}).get('vid_img_extension', 'mp4')
-    vid_or_img_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+    vid_or_img_files = sorted([f for f in glob.glob(os.path.join(video_dir, '*')) if is_video_file(f)])
     if not vid_or_img_files: # video_files is then img_dirs
         try:
             image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
             for image_folder in image_folders:
-                vid_or_img_files.append(glob.glob(os.path.join(video_dir, image_folder, '*'+vid_img_extension)))
+                img_files = sorted([f for f in glob.glob(os.path.join(video_dir, image_folder, '*')) if is_image_file(f)])
+                if img_files:
+                    vid_or_img_files.append(img_files)
         except:
             logging.warning(f'No video files nor image directories found in {video_dir}.')
 
@@ -1408,7 +1410,7 @@ def synchronize_cams_all(config_dict):
                 raise
             fps = round(cap.get(cv2.CAP_PROP_FPS))
         except: 
-            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
             fps = 30
     lag_range = time_range_around_maxspeed*fps # frames
 

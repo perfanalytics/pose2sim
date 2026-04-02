@@ -34,8 +34,6 @@ participant_mass = [70.0, 63.5]     # float (eg 70.0), or list of floats (eg [70
 # # e.g. ['S00_P00_Participant/S00_P00_T00_StaticTrial', 'S00_P00_Participant/S00_P00_T01_BalancingTrial']
 
 # [pose]
-# vid_img_extension = 'mp4' # any video or image extension
-
 # pose_model = 'Body_with_feet'  #With RTMLib: 
 #                          # - Body_with_feet (default HALPE_26 model), 
 #                          # - Whole_body_wrist (COCO_133_WRIST: body + feet + 2 hand_points), 
