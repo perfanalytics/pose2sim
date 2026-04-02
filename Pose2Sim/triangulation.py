@@ -162,8 +162,8 @@ def make_trc(config_dict, Q, keypoints_names, id_person=-1):
     '''
 
     # Read config_dict
-    project_dir = config_dict.get('project').get('project_dir')
-    multi_person = config_dict.get('project').get('multi_person')
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
+    multi_person = config_dict.get('project', {}).get('multi_person', False)
     if multi_person:
         seq_name = f'{os.path.basename(os.path.realpath(project_dir))}_P{id_person}'
     else:
@@ -172,9 +172,9 @@ def make_trc(config_dict, Q, keypoints_names, id_person=-1):
 
     # Get frame_rate
     video_dir = os.path.join(project_dir, 'videos')
-    vid_img_extension = config_dict['pose']['vid_img_extension']
+    vid_img_extension = config_dict.get('pose', {}).get('vid_img_extension', 'mp4')
     video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-    frame_rate = config_dict.get('project').get('frame_rate')
+    frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
     if frame_rate == 'auto': 
         try:
             cap = cv2.VideoCapture(video_files[0])
@@ -386,11 +386,11 @@ def triangulation_from_best_cameras(config_dict, coords_2D_kpt, coords_2D_kpt_sw
     '''
     
     # Read config_dict
-    error_threshold_triangulation = config_dict.get('triangulation').get('reproj_error_threshold_triangulation')
-    min_cameras_for_triangulation = config_dict.get('triangulation').get('min_cameras_for_triangulation')
-    handle_LR_swap = config_dict.get('triangulation').get('handle_LR_swap')
+    error_threshold_triangulation = config_dict.get('triangulation', {}).get('reproj_error_threshold_triangulation', 15)
+    min_cameras_for_triangulation = config_dict.get('triangulation', {}).get('min_cameras_for_triangulation', 2)
+    handle_LR_swap = config_dict.get('triangulation', {}).get('handle_LR_swap', False)
 
-    undistort_points = config_dict.get('triangulation').get('undistort_points')
+    undistort_points = config_dict.get('triangulation', {}).get('undistort_points', False)
     if undistort_points:
         calib_params_K = calib_params['K']
         calib_params_dist = calib_params['dist']
@@ -675,25 +675,25 @@ def triangulate_all(config_dict):
     '''
     
     # Read config_dict
-    project_dir = config_dict.get('project').get('project_dir')
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..'))
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-    multi_person = config_dict.get('project').get('multi_person')
-    pose_model = config_dict.get('pose').get('pose_model')
-    frame_range = config_dict.get('project').get('frame_range')
-    likelihood_threshold = config_dict.get('triangulation').get('likelihood_threshold_triangulation')
-    interpolation_kind = config_dict.get('triangulation').get('interpolation')
-    interp_gap_smaller_than = config_dict.get('triangulation').get('interp_if_gap_smaller_than')
-    max_distance_m = config_dict.get('triangulation').get('max_distance_m', None)
-    remove_incomplete_frames = config_dict.get('triangulation').get('remove_incomplete_frames', False)
-    sections_to_keep = config_dict.get('triangulation').get('sections_to_keep')
-    min_chunk_size = config_dict.get('triangulation').get('min_chunk_size', 10)
-    fill_large_gaps_with = config_dict.get('triangulation').get('fill_large_gaps_with')
-    show_interp_indices = config_dict.get('triangulation').get('show_interp_indices')
-    undistort_points = config_dict.get('triangulation').get('undistort_points')
-    make_c3d = config_dict.get('triangulation').get('make_c3d')
+    multi_person = config_dict.get('project', {}).get('multi_person', False)
+    pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet')
+    frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
+    likelihood_threshold = config_dict.get('triangulation', {}).get('likelihood_threshold_triangulation', 0.3)
+    interpolation_kind = config_dict.get('triangulation', {}).get('interpolation', 'linear')
+    interp_gap_smaller_than = config_dict.get('triangulation', {}).get('interp_if_gap_smaller_than', 20)
+    max_distance_m = config_dict.get('triangulation', {}).get('max_distance_m', 1.0)
+    remove_incomplete_frames = config_dict.get('triangulation', {}).get('remove_incomplete_frames', False)
+    sections_to_keep = config_dict.get('triangulation', {}).get('sections_to_keep', 'all')
+    min_chunk_size = config_dict.get('triangulation', {}).get('min_chunk_size', 10)
+    fill_large_gaps_with = config_dict.get('triangulation', {}).get('fill_large_gaps_with', 'last_value')
+    show_interp_indices = config_dict.get('triangulation', {}).get('show_interp_indices', True)
+    undistort_points = config_dict.get('triangulation', {}).get('undistort_points', False)
+    make_c3d = config_dict.get('triangulation', {}).get('make_c3d', True)
     
     try:
         calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]

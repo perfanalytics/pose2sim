@@ -1369,28 +1369,28 @@ def synchronize_cams_all(config_dict):
     '''
     
     # Get parameters from Config.toml
-    project_dir = config_dict.get('project').get('project_dir')
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
     pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
     sync_dir = os.path.abspath(os.path.join(pose_dir, '..', 'pose-sync'))
     os.makedirs(sync_dir, exist_ok=True)
-    pose_model = config_dict.get('pose').get('pose_model')
-    # multi_person = config_dict.get('project').get('multi_person')
-    fps =  config_dict.get('project').get('frame_rate')
-    frame_range = config_dict.get('project').get('frame_range')
-    display_sync_plots = config_dict.get('synchronization').get('display_sync_plots', True)
-    save_plots = config_dict.get('synchronization').get('save_sync_plots', True)
-    keypoints_to_consider = config_dict.get('synchronization').get('keypoints_to_consider')
-    approx_time_maxspeed = config_dict.get('synchronization').get('approx_time_maxspeed') 
-    time_range_around_maxspeed = config_dict.get('synchronization').get('time_range_around_maxspeed')
-    synchronization_gui = config_dict.get('synchronization').get('synchronization_gui')
+    pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet')
+    # multi_person = config_dict.get('project', {}).get('multi_person', False)
+    fps =  config_dict.get('project', {}).get('frame_rate', 'auto')
+    frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
+    display_sync_plots = config_dict.get('synchronization', {}).get('display_sync_plots', True)
+    save_plots = config_dict.get('synchronization', {}).get('save_sync_plots', True)
+    keypoints_to_consider = config_dict.get('synchronization', {}).get('keypoints_to_consider', 'all')
+    approx_time_maxspeed = config_dict.get('synchronization', {}).get('approx_time_maxspeed', 'auto')
+    time_range_around_maxspeed = config_dict.get('synchronization', {}).get('time_range_around_maxspeed', 2.0)
+    synchronization_gui = config_dict.get('synchronization', {}).get('synchronization_gui', True)
 
-    likelihood_threshold = config_dict.get('synchronization').get('likelihood_threshold_synchronization')
-    filter_cutoff = int(config_dict.get('synchronization').get('filter_cutoff'))
-    filter_order = int(config_dict.get('synchronization').get('filter_order'))
+    likelihood_threshold = config_dict.get('synchronization', {}).get('likelihood_threshold_synchronization', 0.4)
+    filter_cutoff = int(config_dict.get('synchronization', {}).get('filter_cutoff', 6))
+    filter_order = int(config_dict.get('synchronization', {}).get('filter_order', 4))
 
     # Determine frame rate
     video_dir = os.path.join(project_dir, 'videos')
-    vid_img_extension = config_dict['pose']['vid_img_extension']
+    vid_img_extension = config_dict.get('pose', {}).get('vid_img_extension', 'mp4')
     vid_or_img_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
     if not vid_or_img_files: # video_files is then img_dirs
         try:

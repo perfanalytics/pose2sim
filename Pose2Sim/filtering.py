@@ -98,9 +98,9 @@ def one_euro_filter_1d(config_dict, frame_rate, col):
     '''
     
     # Get parameters from config
-    min_cutoff = config_dict.get('filtering').get('one_euro').get('cut_off_frequency', 2.5)
-    beta = config_dict.get('filtering').get('one_euro').get('beta', 0.9)
-    d_cutoff = config_dict.get('filtering').get('one_euro').get('d_cut_off_frequency', 1.0)
+    min_cutoff = config_dict.get('filtering', {}).get('one_euro', {}).get('cut_off_frequency', 2.5)
+    beta = config_dict.get('filtering', {}).get('one_euro', {}).get('beta', 0.9)
+    d_cutoff = config_dict.get('filtering', {}).get('one_euro', {}).get('d_cut_off_frequency', 1.0)
     dt = 1.0 / frame_rate
     
     def smoothing_factor(dt, cutoff):
@@ -261,8 +261,8 @@ def gcv_spline_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    cutoff = config_dict.get('filtering').get('gcv_spline', {}).get('cut_off_frequency', 'auto')
-    smoothing_factor = float(config_dict.get('filtering').get('gcv_spline', {}).get('smoothing_factor', 1.0))
+    cutoff = config_dict.get('filtering', {}).get('gcv_spline', {}).get('cut_off_frequency', 'auto')
+    smoothing_factor = float(config_dict.get('filtering', {}).get('gcv_spline', {}).get('smoothing_factor', 1.0))
 
     # Split into sequences of not nans
     # print('\n', col.name)
@@ -414,8 +414,8 @@ def kalman_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    trustratio = int(config_dict.get('filtering').get('kalman').get('trust_ratio'))
-    smooth = int(config_dict.get('filtering').get('kalman').get('smooth'))
+    trustratio = int(config_dict.get('filtering', {}).get('kalman', {}).get('trust_ratio', 500))
+    smooth = int(config_dict.get('filtering', {}).get('kalman', {}).get('smooth', True))
     measurement_noise = 20
     process_noise = measurement_noise * trustratio
 
@@ -449,9 +449,9 @@ def butterworth_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    type = 'low' #config_dict.get('filtering').get('butterworth').get('type')
-    order = int(config_dict.get('filtering').get('butterworth').get('order'))
-    cutoff = int(config_dict.get('filtering').get('butterworth').get('cut_off_frequency'))    
+    type = 'low' #config_dict.get('filtering', {}).get('butterworth', {}).get('type')
+    order = int(config_dict.get('filtering', {}).get('butterworth', {}).get('order', 4))
+    cutoff = int(config_dict.get('filtering', {}).get('butterworth', {}).get('cut_off_frequency', 6))    
 
     b, a = signal.butter(order/2, cutoff/(frame_rate/2), type, analog = False) 
     padlen = 3 * max(len(a), len(b))
@@ -483,9 +483,9 @@ def butterworth_on_speed_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    type = 'low' # config_dict.get('filtering').get('butterworth_on_speed').get('type')
-    order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
-    cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
+    type = 'low' # config_dict.get('filtering', {}).get('butterworth_on_speed', {}).get('type')
+    order = int(config_dict.get('filtering', {}).get('butterworth_on_speed', {}).get('order', 4))
+    cutoff = int(config_dict.get('filtering', {}).get('butterworth_on_speed', {}).get('cut_off_frequency', 10))
 
     b, a = signal.butter(order/2, cutoff/(frame_rate/2), type, analog = False)
     padlen = 3 * max(len(a), len(b))
@@ -542,7 +542,7 @@ def loess_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    kernel = config_dict.get('filtering').get('loess', config_dict.get('filtering').get('LOESS')).get('nb_values_used')
+    kernel = config_dict.get('filtering', {}).get('loess', config_dict.get('filtering', {}).get('LOESS', {})).get('nb_values_used', 5)
 
     col_filtered = col.copy()
     mask = np.isnan(col_filtered) 
@@ -570,7 +570,7 @@ def median_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
     
-    median_filter_kernel_size = config_dict.get('filtering').get('median').get('kernel_size')
+    median_filter_kernel_size = config_dict.get('filtering', {}).get('median', {}).get('kernel_size', 3)
     
     col_filtered = signal.medfilt(col, kernel_size=median_filter_kernel_size)
 
@@ -673,31 +673,31 @@ def recap_filter3d(config_dict, trc_path):
     '''
 
     # Read Config
-    project_dir = config_dict.get('project').get('project_dir')
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    save_plots = config_dict.get('filtering').get('save_filt_plots', True)
+    save_plots = config_dict.get('filtering', {}).get('save_filt_plots', True)
     plots_output_dir = os.path.join(pose3d_dir, 'filtering_plots')
-    do_filter = config_dict.get('filtering').get('filter', True)
-    reject_outliers = config_dict.get('filtering').get('reject_outliers', False)
-    filter_type = config_dict.get('filtering').get('type')
-    kalman_filter_trustratio = int(config_dict.get('filtering').get('kalman').get('trust_ratio'))
-    kalman_filter_smooth = int(config_dict.get('filtering').get('kalman').get('smooth'))
+    do_filter = config_dict.get('filtering', {}).get('filter', True)
+    reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
+    filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
+    kalman_filter_trustratio = int(config_dict.get('filtering', {}).get('kalman', {}).get('trust_ratio', 500))
+    kalman_filter_smooth = int(config_dict.get('filtering', {}).get('kalman', {}).get('smooth', True))
     kalman_filter_smooth_str = 'smoother' if kalman_filter_smooth else 'filter'
-    butterworth_filter_type = 'low' # config_dict.get('filtering').get('butterworth').get('type')
-    butterworth_filter_order = int(config_dict.get('filtering').get('butterworth').get('order'))
-    butterworth_filter_cutoff = int(config_dict.get('filtering').get('butterworth').get('cut_off_frequency'))
-    gcv_filter_cutoff = config_dict.get('filtering').get('gcv_spline', {}).get('cut_off_frequency', 'auto')
-    gcv_filter_smoothing_factor = float(config_dict.get('filtering').get('gcv_spline', {}).get('smoothing_factor', 1.0))
-    one_euro_filter_1d_min_cutoff = config_dict.get('filtering').get('one_euro').get('cut_off_frequency', 2.5)
-    one_euro_filter_1d_beta = config_dict.get('filtering').get('one_euro').get('beta', 0.9)
-    one_euro_filter_1d_d_cutoff = config_dict.get('filtering').get('one_euro').get('d_cut_off_frequency', 1.0)
-    butter_speed_filter_type = 'low' # config_dict.get('filtering').get('butterworth_on_speed').get('type')
-    butter_speed_filter_order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
-    butter_speed_filter_cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
-    gaussian_filter_sigma_kernel = int(config_dict.get('filtering').get('gaussian').get('sigma_kernel'))
-    loess_filter_nb_values = config_dict.get('filtering').get('loess', config_dict.get('filtering').get('LOESS')).get('nb_values_used')
-    median_filter_kernel_size = config_dict.get('filtering').get('median').get('kernel_size')
-    make_c3d = config_dict.get('filtering').get('make_c3d')
+    butterworth_filter_type = 'low' # config_dict.get('filtering', {}).get('butterworth', {}).get('type')
+    butterworth_filter_order = int(config_dict.get('filtering', {}).get('butterworth', {}).get('order', 4))
+    butterworth_filter_cutoff = int(config_dict.get('filtering', {}).get('butterworth', {}).get('cut_off_frequency', 6))
+    gcv_filter_cutoff = config_dict.get('filtering', {}).get('gcv_spline', {}).get('cut_off_frequency', 'auto')
+    gcv_filter_smoothing_factor = float(config_dict.get('filtering', {}).get('gcv_spline', {}).get('smoothing_factor', 1.0))
+    one_euro_filter_1d_min_cutoff = config_dict.get('filtering', {}).get('one_euro', {}).get('cut_off_frequency', 2.5)
+    one_euro_filter_1d_beta = config_dict.get('filtering', {}).get('one_euro', {}).get('beta', 0.9)
+    one_euro_filter_1d_d_cutoff = config_dict.get('filtering', {}).get('one_euro', {}).get('d_cut_off_frequency', 1.0)
+    butter_speed_filter_type = 'low' # config_dict.get('filtering', {}).get('butterworth_on_speed', {}).get('type')
+    butter_speed_filter_order = int(config_dict.get('filtering', {}).get('butterworth_on_speed', {}).get('order', 4))
+    butter_speed_filter_cutoff = int(config_dict.get('filtering', {}).get('butterworth_on_speed', {}).get('cut_off_frequency', 10))
+    gaussian_filter_sigma_kernel = int(config_dict.get('filtering', {}).get('gaussian', {}).get('sigma_kernel', 1))
+    loess_filter_nb_values = config_dict.get('filtering', {}).get('loess', config_dict.get('filtering', {}).get('LOESS', {})).get('nb_values_used', 5)
+    median_filter_kernel_size = config_dict.get('filtering', {}).get('median', {}).get('kernel_size', 3)
+    make_c3d = config_dict.get('filtering', {}).get('make_c3d', True)
     
     # Recap
     if reject_outliers:
@@ -739,24 +739,24 @@ def filter_all(config_dict):
     '''
 
     # Read config_dict
-    project_dir = config_dict.get('project').get('project_dir')
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    display_figures = config_dict.get('filtering').get('display_figures', True)
-    save_plots = config_dict.get('filtering').get('save_filt_plots', True)
+    display_figures = config_dict.get('filtering', {}).get('display_figures', True)
+    save_plots = config_dict.get('filtering', {}).get('save_filt_plots', True)
     plots_output_dir = os.path.join(pose3d_dir, 'filtering_plots')
-    do_filter = config_dict.get('filtering').get('filter', True)
-    reject_outliers = config_dict.get('filtering').get('reject_outliers', False)
-    filter_type = config_dict.get('filtering').get('type')
-    make_c3d = config_dict.get('filtering').get('make_c3d')
+    do_filter = config_dict.get('filtering', {}).get('filter', True)
+    reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
+    filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
+    make_c3d = config_dict.get('filtering', {}).get('make_c3d', True)
     if save_plots and not os.path.exists(plots_output_dir):
         os.makedirs(plots_output_dir)
 
     # Get frame_rate
     video_dir = os.path.join(project_dir, 'videos')
-    frame_range = config_dict.get('project').get('frame_range')
-    vid_img_extension = config_dict['pose']['vid_img_extension']
+    frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
+    vid_img_extension = config_dict.get('pose', {}).get('vid_img_extension', 'mp4')
     video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-    frame_rate = config_dict.get('project').get('frame_rate')
+    frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
     if frame_rate == 'auto': 
         try:
             cap = cv2.VideoCapture(video_files[0])

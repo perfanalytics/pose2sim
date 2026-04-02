@@ -484,8 +484,8 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
     - T: extrinsic translation: list of arrays of floats
     '''
     
-    overwrite_intrinsics = intrinsics_config_dict.get('overwrite_intrinsics')
-    calculate_extrinsics = extrinsics_config_dict.get('calculate_extrinsics')
+    overwrite_intrinsics = intrinsics_config_dict.get('overwrite_intrinsics', False)
+    calculate_extrinsics = extrinsics_config_dict.get('calculate_extrinsics', True)
 
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
     try:
@@ -691,12 +691,12 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
     except StopIteration:
         logging.exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
         raise Exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
-    intrinsics_extension = intrinsics_config_dict.get('intrinsics_extension')
-    extract_every_N_sec = intrinsics_config_dict.get('extract_every_N_sec')
+    intrinsics_extension = intrinsics_config_dict.get('intrinsics_extension', 'jpg')
+    extract_every_N_sec = intrinsics_config_dict.get('extract_every_N_sec', 1)
     overwrite_extraction = False
-    show_detection_intrinsics = intrinsics_config_dict.get('show_detection_intrinsics')
-    intrinsics_corners_nb = intrinsics_config_dict.get('intrinsics_corners_nb')
-    intrinsics_square_size = intrinsics_config_dict.get('intrinsics_square_size') / 1000 # convert to meters
+    show_detection_intrinsics = intrinsics_config_dict.get('show_detection_intrinsics', True)
+    intrinsics_corners_nb = intrinsics_config_dict.get('intrinsics_corners_nb', [4, 7])
+    intrinsics_square_size = intrinsics_config_dict.get('intrinsics_square_size', 60) / 1000 # convert to meters
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
 
     # Load clicked image points if exist
@@ -816,20 +816,20 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
     - T: extrinsic translation: list of arrays of floats
     '''
 
-    extrinsics_method = extrinsics_config_dict.get('extrinsics_method')
-    extrinsics_extension = extrinsics_config_dict.get('extrinsics_extension')
-    show_reprojection_error = extrinsics_config_dict.get('show_reprojection_error')
-    board_position = extrinsics_config_dict.get('board').get('board_position')
-    extrinsics_corners_nb = extrinsics_config_dict.get('board').get('extrinsics_corners_nb')
-    extrinsics_square_size = extrinsics_config_dict.get('board').get('extrinsics_square_size') / 1000 # convert to meters
-    object_coords_3d = np.array(extrinsics_config_dict.get('scene').get('object_coords_3d'), np.float32)
+    extrinsics_method = extrinsics_config_dict.get('extrinsics_method', 'scene')
+    extrinsics_extension = extrinsics_config_dict.get('extrinsics_extension', 'png')
+    show_reprojection_error = extrinsics_config_dict.get('show_reprojection_error', True)
+    board_position = extrinsics_config_dict.get('board', {}).get('board_position', 'vertical')
+    extrinsics_corners_nb = extrinsics_config_dict.get('board', {}).get('extrinsics_corners_nb', [4, 7])
+    extrinsics_square_size = extrinsics_config_dict.get('board', {}).get('extrinsics_square_size', 60) / 1000 # convert to meters
+    object_coords_3d = np.array(extrinsics_config_dict.get('scene', {}).get('object_coords_3d', []), np.float32)
     # backwards compatibility
     if not extrinsics_extension: 
-        extrinsics_extension = [extrinsics_config_dict.get('extrinsics_extension') if extrinsics_method == 'board'
-                            else extrinsics_config_dict.get('scene').get('extrinsics_extension')][0]
+        extrinsics_extension = [extrinsics_config_dict.get('extrinsics_extension', 'png') if extrinsics_method == 'board'
+                            else extrinsics_config_dict.get('scene', {}).get('extrinsics_extension', 'png')][0]
     if show_reprojection_error is None:
-        show_reprojection_error = [extrinsics_config_dict.get('board').get('show_reprojection_error') if extrinsics_method == 'board'
-                                    else extrinsics_config_dict.get('scene').get('show_reprojection_error')][0]
+        show_reprojection_error = [extrinsics_config_dict.get('board', {}).get('show_reprojection_error', True) if extrinsics_method == 'board'
+                                    else extrinsics_config_dict.get('scene', {}).get('show_reprojection_error', True)][0]
 
     try:
         img_vid_files = sorted(glob.glob(os.path.join(calib_dir, 'extrinsics', '*', f'*.{extrinsics_extension}')))
@@ -1546,17 +1546,17 @@ def calibrate_cams_all(config_dict):
     '''
 
     # Read config_dict
-    project_dir = config_dict.get('project').get('session_dir')
+    project_dir = config_dict.get('project', {}).get('session_dir', '.')
     calib_dir = [os.path.join(project_dir, c) for c in os.listdir(project_dir) if ('Calib' in c or 'calib' in c)][0]
-    calib_type = config_dict.get('calibration').get('calibration_type')
+    calib_type = config_dict.get('calibration', {}).get('calibration_type', 'convert')
 
     if calib_type=='convert':
-        convert_filetype = config_dict.get('calibration').get('convert').get('convert_from')
+        convert_filetype = config_dict.get('calibration', {}).get('convert', {}).get('convert_from', 'qualisys')
         try:
             if convert_filetype=='qualisys':
                 convert_ext = '.qca.txt'
                 file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
-                binning_factor = config_dict.get('calibration').get('convert').get('qualisys').get('binning_factor')
+                binning_factor = config_dict.get('calibration', {}).get('convert', {}).get('qualisys', {}).get('binning_factor', 1)
             elif convert_filetype=='optitrack':
                 file_to_convert_path = ['']
                 binning_factor = 1
@@ -1596,10 +1596,10 @@ def calibrate_cams_all(config_dict):
         args_calib_fun = [file_to_convert_path, binning_factor]
         
     elif calib_type=='calculate':
-        intrinsics_config_dict = config_dict.get('calibration').get('calculate').get('intrinsics')
-        extrinsics_config_dict = config_dict.get('calibration').get('calculate').get('extrinsics')
-        save_debug_images = config_dict.get('calibration').get('calculate').get('save_debug_images', True)
-        extrinsics_method = extrinsics_config_dict.get('extrinsics_method')
+        intrinsics_config_dict = config_dict.get('calibration', {}).get('calculate', {}).get('intrinsics', {})
+        extrinsics_config_dict = config_dict.get('calibration', {}).get('calculate', {}).get('extrinsics', {})
+        save_debug_images = config_dict.get('calibration', {}).get('calculate', {}).get('save_debug_images', True)
+        extrinsics_method = extrinsics_config_dict.get('extrinsics_method', 'scene')
 
         calib_output_path = os.path.join(calib_dir, f'Calib_{extrinsics_method}.toml')
         calib_full_type = calib_type

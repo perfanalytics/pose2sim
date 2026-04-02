@@ -544,26 +544,26 @@ def kinematics_all(config_dict):
     '''
 
     # Read config_dict
-    project_dir = config_dict.get('project').get('project_dir')
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
     # if batch
     session_dir = Path(project_dir) / '..'
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
 
-    use_augmentation = config_dict.get('kinematics').get('use_augmentation')
-    use_simple_model = config_dict.get('kinematics').get('use_simple_model', False)
-    right_left_symmetry = config_dict.get('kinematics').get('right_left_symmetry')
-    subject_height = config_dict.get('project').get('participant_height')
-    subject_mass = config_dict.get('project').get('participant_mass')
+    use_augmentation = config_dict.get('kinematics', {}).get('use_augmentation', True)
+    use_simple_model = config_dict.get('kinematics', {}).get('use_simple_model', False)
+    right_left_symmetry = config_dict.get('kinematics', {}).get('right_left_symmetry', True)
+    subject_height = config_dict.get('project', {}).get('participant_height', 'auto')
+    subject_mass = config_dict.get('project', {}).get('participant_mass', 70.0)
 
-    fastest_frames_to_remove_percent = config_dict.get('kinematics').get('fastest_frames_to_remove_percent')
-    slowest_frames_to_remove_percent = config_dict.get('kinematics').get('slowest_frames_to_remove_percent')
-    large_hip_knee_angles = config_dict.get('kinematics').get('large_hip_knee_angles')
-    trimmed_extrema_percent = config_dict.get('kinematics').get('trimmed_extrema_percent')
-    default_height = config_dict.get('kinematics').get('default_height')
+    fastest_frames_to_remove_percent = config_dict.get('kinematics', {}).get('fastest_frames_to_remove_percent', 0.1)
+    slowest_frames_to_remove_percent = config_dict.get('kinematics', {}).get('slowest_frames_to_remove_percent', 0.1)
+    large_hip_knee_angles = config_dict.get('kinematics', {}).get('large_hip_knee_angles', 45)
+    trimmed_extrema_percent = config_dict.get('kinematics', {}).get('trimmed_extrema_percent', 0.5)
+    default_height = config_dict.get('kinematics', {}).get('default_height', 1.7)
 
-    remove_scaling_setup = config_dict.get('kinematics').get('remove_individual_scaling_setup')
-    remove_IK_setup = config_dict.get('kinematics').get('remove_individual_ik_setup')
+    remove_scaling_setup = config_dict.get('kinematics', {}).get('remove_individual_scaling_setup', True)
+    remove_IK_setup = config_dict.get('kinematics', {}).get('remove_individual_ik_setup', True)
 
     pose3d_dir = Path(project_dir) / 'pose-3d'
     kinematics_dir = Path(project_dir) / 'kinematics'
@@ -581,7 +581,7 @@ def kinematics_all(config_dict):
     if use_augmentation:
         trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' in f.name]
         if len(trc_files) == 0:
-            pose_model = config_dict.get('pose').get('pose_model').upper()
+            pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet').upper()
             use_augmentation = False
             logging.warning("No LSTM trc files found. Using non augmented trc files instead.")
     if len(trc_files) == 0: # filtered files by default
@@ -595,7 +595,7 @@ def kinematics_all(config_dict):
     if use_augmentation: 
         pose_model = 'LSTM'
     else: 
-        pose_model = config_dict.get('pose').get('pose_model').upper()
+        pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet').upper()
         if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
         elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
         elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'

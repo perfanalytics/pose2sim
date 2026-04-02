@@ -603,34 +603,34 @@ def estimate_pose_all(config_dict):
     '''
 
     # Read config
-    project_dir = config_dict['project']['project_dir']
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..'))
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-    frame_range = config_dict.get('project').get('frame_range')
-    multi_person = config_dict.get('project').get('multi_person')
+    frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
+    multi_person = config_dict.get('project', {}).get('multi_person', False)
     video_dir = os.path.join(project_dir, 'videos')
     pose_dir = os.path.join(project_dir, 'pose')
 
-    pose_model = config_dict['pose']['pose_model']
-    mode = config_dict['pose']['mode'] # lightweight, balanced, performance
-    vid_img_extension = config_dict['pose']['vid_img_extension']
+    pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet')
+    mode = config_dict.get('pose', {}).get('mode', 'balanced')
+    vid_img_extension = config_dict.get('pose', {}).get('vid_img_extension', 'mp4')
     
-    output_format = config_dict['pose']['output_format']
-    save_video = True if 'to_video' in config_dict['pose']['save_video'] else False
-    save_images = True if 'to_images' in config_dict['pose']['save_video'] else False
-    det_frequency = config_dict['pose']['det_frequency']
-    backend = config_dict['pose']['backend']
-    device = config_dict['pose']['device']
-    parallel_pose = config_dict.get('pose').get('parallel_pose', 'auto')
-    display_detection = config_dict['pose']['display_detection']
-    overwrite_pose = config_dict['pose']['overwrite_pose']
-    average_likelihood_threshold_pose = config_dict['pose'].get('average_likelihood_threshold_pose', 0.5)
-    tracking_mode = config_dict.get('pose').get('tracking_mode')
-    max_distance_px = config_dict.get('pose').get('max_distance_px', None)
+    output_format = config_dict.get('pose', {}).get('output_format', 'openpose')
+    save_video = True if 'to_video' in config_dict.get('pose', {}).get('save_video', 'to_video') else False
+    save_images = True if 'to_images' in config_dict.get('pose', {}).get('save_video', 'to_video') else False
+    det_frequency = config_dict.get('pose', {}).get('det_frequency', 4)
+    backend = config_dict.get('pose', {}).get('backend', 'auto')
+    device = config_dict.get('pose', {}).get('device', 'auto')
+    parallel_pose = config_dict.get('pose', {}).get('parallel_pose', 'auto')
+    display_detection = config_dict.get('pose', {}).get('display_detection', True)
+    overwrite_pose = config_dict.get('pose', {}).get('overwrite_pose', False)
+    average_likelihood_threshold_pose = config_dict.get('pose', {}).get('average_likelihood_threshold_pose', 0.5)
+    tracking_mode = config_dict.get('pose', {}).get('tracking_mode', 'sports2d')
+    max_distance_px = config_dict.get('pose', {}).get('max_distance_px', 100)
     if tracking_mode == 'deepsort' and multi_person:
-        deepsort_params = config_dict.get('pose').get('deepsort_params')
+        deepsort_params = config_dict.get('pose', {}).get('deepsort_params', '{}')
         try:
             deepsort_params = ast.literal_eval(deepsort_params)
         except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
@@ -645,7 +645,7 @@ def estimate_pose_all(config_dict):
 
     # Determine frame rate
     video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
-    frame_rate = config_dict.get('project').get('frame_rate')
+    frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
     if frame_rate == 'auto': 
         try:
             cap = cv2.VideoCapture(video_files[0])

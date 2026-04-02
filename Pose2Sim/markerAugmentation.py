@@ -110,19 +110,19 @@ def getMarkers_upperExtremity_noPelvis2():
 
 def augment_markers_all(config_dict):
     # get parameters from Config.toml
-    project_dir = config_dict.get('project').get('project_dir')
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
     pose_3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    feet_on_floor = config_dict.get('markerAugmentation').get('feet_on_floor')
-    make_c3d = config_dict.get('markerAugmentation').get('make_c3d')
-    frame_range = config_dict.get('project').get('frame_range')
-    subject_height = config_dict.get('project').get('participant_height')
-    subject_mass = config_dict.get('project').get('participant_mass')
+    feet_on_floor = config_dict.get('markerAugmentation', {}).get('feet_on_floor', False)
+    make_c3d = config_dict.get('markerAugmentation', {}).get('make_c3d', True)
+    frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
+    subject_height = config_dict.get('project', {}).get('participant_height', 'auto')
+    subject_mass = config_dict.get('project', {}).get('participant_mass', 70.0)
     
-    fastest_frames_to_remove_percent = config_dict.get('kinematics').get('fastest_frames_to_remove_percent')
-    slowest_frames_to_remove_percent = config_dict.get('kinematics').get('slowest_frames_to_remove_percent')
-    large_hip_knee_angles = config_dict.get('kinematics').get('large_hip_knee_angles')
-    trimmed_extrema_percent = config_dict.get('kinematics').get('trimmed_extrema_percent')
-    default_height = config_dict.get('kinematics').get('default_height')
+    fastest_frames_to_remove_percent = config_dict.get('kinematics', {}).get('fastest_frames_to_remove_percent', 0.1)
+    slowest_frames_to_remove_percent = config_dict.get('kinematics', {}).get('slowest_frames_to_remove_percent', 0.1)
+    large_hip_knee_angles = config_dict.get('kinematics', {}).get('large_hip_knee_angles', 45)
+    trimmed_extrema_percent = config_dict.get('kinematics', {}).get('trimmed_extrema_percent', 0.5)
+    default_height = config_dict.get('kinematics', {}).get('default_height', 1.7)
 
     augmenterDir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'MarkerAugmenter')
     augmenterModelName = 'LSTM'
