@@ -1244,8 +1244,8 @@ def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], 
     df_json_coords = pd.DataFrame(json_coords)
 
     if df_json_coords.isnull().all().all():
-        logging.error('No valid coordinates found in the JSON files. There may be a mismatch between the "pose_model" specified for pose estimation and for synchronization. If not, make sure that your likelihood_threshold for synchronization is not set too high.')
-        raise ValueError('No valid coordinates found in the JSON files. There may be a mismatch between the "pose_model" specified for pose estimation and for synchronization. If not, make sure that your likelihood_threshold for synchronization is not set too high.')
+        logging.error('No valid coordinates found in the JSON files. There may be a mismatch between the "pose_model" specified for pose estimation and for synchronization. If not, make sure that your likelihood_threshold_synchronization for synchronization is not set too high.')
+        raise ValueError('No valid coordinates found in the JSON files. There may be a mismatch between the "pose_model" specified for pose estimation and for synchronization. If not, make sure that your likelihood_threshold_synchronization for synchronization is not set too high.')
 
     return df_json_coords
 
@@ -1384,7 +1384,7 @@ def synchronize_cams_all(config_dict):
     time_range_around_maxspeed = config_dict.get('synchronization').get('time_range_around_maxspeed')
     synchronization_gui = config_dict.get('synchronization').get('synchronization_gui')
 
-    likelihood_threshold = config_dict.get('synchronization').get('likelihood_threshold')
+    likelihood_threshold = config_dict.get('synchronization').get('likelihood_threshold_synchronization')
     filter_cutoff = int(config_dict.get('synchronization').get('filter_cutoff'))
     filter_order = int(config_dict.get('synchronization').get('filter_order'))
 

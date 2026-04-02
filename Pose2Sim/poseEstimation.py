@@ -280,7 +280,7 @@ def save_to_openpose(json_file_path, keypoints, scores):
         json.dump(json_output, json_file)
 
 
-def process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker):
+def process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, max_distance_px, deepsort_tracker):
     '''
     Estimate pose from a video file
     
@@ -288,13 +288,14 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     - video_path: str. Path to the input video file
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
     - pose_model: str. The pose model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
+    - frame_range: list. Range of frames to process
+    - average_likelihood_threshold_pose: float. If the average confidence score of the detected keypoints for a person is below this threshold, the person will be dropped (default: 0.5)
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
     - display_detection: bool. Whether to show real-time visualization
-    - frame_range: list. Range of frames to process
-    - multi_person: bool. Whether to detect multiple people in the video
     - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
+    - max_distance_px: int. The maximum distance in pixels for associating detections across frames in sports2d tracking mode (default: 100)
     - deepsort_tracker: DeepSort tracker object or None
 
     OUTPUTS:
@@ -358,9 +359,9 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                     likely_keypoints = np.where(mask_scores[:, np.newaxis, np.newaxis], keypoints, np.nan)
                     likely_scores = np.where(mask_scores[:, np.newaxis], scores, np.nan)
                     likely_bboxes = bbox_xyxy_compute(frame_shape, likely_keypoints, padding=0)
-                    score_likely_bboxes = np.nanmean(likely_scores, axis=1)
+                    score_likely_bboxes = np.nanmean(np.where(np.isnan(likely_scores), 0, likely_scores), axis=1)
 
-                    valid_indices = np.where(~np.isnan(score_likely_bboxes))[0]
+                    valid_indices = np.where(score_likely_bboxes > average_likelihood_threshold_pose)[0]
                     if len(valid_indices) > 0:
                         valid_bboxes = likely_bboxes[valid_indices]
                         valid_scores = score_likely_bboxes[valid_indices]
@@ -555,9 +556,9 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
 
 
 def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
-                           pose_model, output_format, save_video, save_images,
-                           display_detection, frame_range, tracking_mode, multi_person,
-                           max_distance_px, deepsort_params, init_lock=None):
+                           pose_model, frame_range, average_likelihood_threshold_pose, 
+                           output_format, save_video, save_images, display_detection, 
+                           tracking_mode, max_distance_px, deepsort_params, init_lock=None):
     '''
     Worker function for parallel pose estimation. Creates its own PoseTracker
     and optional DeepSort tracker, then processes one video independently.
@@ -571,8 +572,8 @@ def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, d
     if tracking_mode == 'deepsort' and multi_person:
         from deep_sort_realtime.deepsort_tracker import DeepSort
         deepsort_tracker = DeepSort(**deepsort_params)
-    process_video(video_path, pose_tracker, pose_model, output_format,
-                  save_video, save_images, display_detection, frame_range,
+    process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, 
+                  output_format, save_video, save_images, display_detection,
                   tracking_mode, max_distance_px, deepsort_tracker)
 
 
@@ -625,6 +626,7 @@ def estimate_pose_all(config_dict):
     parallel_pose = config_dict.get('pose').get('parallel_pose', 'auto')
     display_detection = config_dict['pose']['display_detection']
     overwrite_pose = config_dict['pose']['overwrite_pose']
+    average_likelihood_threshold_pose = config_dict['pose'].get('average_likelihood_threshold_pose', 0.5)
     tracking_mode = config_dict.get('pose').get('tracking_mode')
     max_distance_px = config_dict.get('pose').get('max_distance_px', None)
     if tracking_mode == 'deepsort' and multi_person:
@@ -677,10 +679,11 @@ def estimate_pose_all(config_dict):
         logging.info(f'Mode: {mode}.')
         
         # Set up detection frequency
+        low_likelihood_message = f'Detections are dropped if their average keypoint likelihood is below {average_likelihood_threshold_pose}.'
         if det_frequency>1:
-            logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points.')
+            logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points. {low_likelihood_message}')
         elif det_frequency==1:
-            logging.info(f'Inference run on every single frame.')
+            logging.info(f'Inference run on every single frame. {low_likelihood_message}')
         else:
             raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
         
@@ -731,8 +734,8 @@ def estimate_pose_all(config_dict):
                         executor.submit(
                             process_video_worker, video_path,
                             ModelClass, det_frequency, mode, backend, device,
-                            pose_model, output_format, save_video, save_images,
-                            display_detection, frame_range, tracking_mode, multi_person,
+                            pose_model, frame_range, average_likelihood_threshold_pose, 
+                            output_format, save_video, save_images, display_detection, tracking_mode,
                             max_distance_px, deepsort_params, init_lock
                         ): video_path for video_path in video_files
                     }
@@ -755,7 +758,7 @@ def estimate_pose_all(config_dict):
                     pose_tracker.reset()
                     if tracking_mode == 'deepsort':
                         deepsort_tracker.tracker.delete_all_tracks()
-                    process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker)
+                    process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, max_distance_px, deepsort_tracker)
 
         else:
             # Process image folders
@@ -777,4 +780,4 @@ def estimate_pose_all(config_dict):
                     image_folder_path = os.path.join(video_dir, image_folder)
                     if tracking_mode == 'deepsort': 
                         deepsort_tracker.tracker.delete_all_tracks()                
-                    process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker)
+                    process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, output_format, frame_rate, save_video, save_images, display_detection, tracking_mode, max_distance_px, deepsort_tracker)

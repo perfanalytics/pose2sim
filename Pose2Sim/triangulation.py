@@ -698,7 +698,7 @@ def triangulate_all(config_dict):
     try:
         calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
     except:
-        raise Exception(f'No .toml calibration direcctory found.')
+        raise Exception(f'No .toml calibration directory found.')
     try:
         calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
         calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
