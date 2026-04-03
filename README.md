@@ -161,7 +161,7 @@ Install the OpenSim Python API (if you do not want to install via conda, refer [
   <!-- print(f'torch version: {torch.__version__}, cuda version: {torch.version.cuda}, cudnn version: {torch.backends.cudnn.version()}, onnxruntime version: {ort.__version__}') -->
 
 > **Note on storage use:**\
-     A full installation takes up to 10 GB of storage spate. However, GPU support is not mandatory and takes about 6 GB. A minimal installation with carefully chosen pose models and without GPU support **would take less than 3 GB**.\
+     A full installation takes up to 10 GB of storage space. However, GPU support is not mandatory and takes about 6 GB. A minimal installation with carefully chosen pose models and without GPU support **would take less than 3 GB**.\
     <img src="Content/Storage.png" width="760">
 
 
@@ -327,7 +327,7 @@ First of all, set `multi_person = True` in your `Config.toml`file, and remove al
   *1 min 23 s -> 38 s on my average laptop*
   - Set `display_detection = false`. Do not display results in real time.\
   *38 s -> 30 s*
-  - Set `parallel_pose = 'auto'` or an integer (number of threads). 'auto': one thread per video (ie 4 on the Demo data). This requires `display_detection = false`. No impact on accuracy either.\
+  - Set `parallel_workers_pose = 'auto'` or an integer (number of threads). 'auto': one thread per video (ie 4 on the Demo data). This requires `display_detection = false`. No impact on accuracy either.\
   *30 s -> 19 s*
   - Set `det_frequency = 100` in Config.toml. Run the bounding box detector and the pose estimator on the first frame; for all subsequent frames, only run pose estimation. No impact on accuracy but may miss detection or swap some person IDs if several persons are in the scene.\
   *19 s -> 9 s*
@@ -348,7 +348,8 @@ First of all, set `multi_person = True` in your `Config.toml`file, and remove al
   Very fast, too. Note that marker augmentation won't necessarily improve results so you can consider skipping it.
 - `Pose2Sim.kinematics()`:\
   Set `use_simple_model = true`. Use a simpler OpenSim model, without muscles and constraints. Note that the spine will be stiff and shoulders will be a simple ball joint, but this is accurate enough for most gait-related tasks\
-  *9 s -> 0.7 s*
+  *9 s -> 0.7 s*\
+  Set `parallel_workers_kinematics = 'auto'` or an integer (number of processes). Only works in multi-person mode.
 
 
 </br></br>

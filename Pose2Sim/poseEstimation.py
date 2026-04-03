@@ -47,7 +47,7 @@ from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, dra
 from rtmlib.tools.object_detection.post_processings import nms
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort,\
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel, bbox_xyxy_compute, \
-                        get_screen_size, calculate_display_size, is_video_file, is_image_file
+                        get_screen_size, calculate_display_size, is_video_file, is_image_file, get_max_workers
 from Pose2Sim.skeletons import *
 
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
@@ -437,6 +437,28 @@ def process_video(video_path, pose_tracker, pose_model, frame_range, average_lik
         cv2.destroyAllWindows()
 
 
+def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
+                           pose_model, frame_range, average_likelihood_threshold_pose, 
+                           output_format, save_video, save_images, display_detection, 
+                           tracking_mode, max_distance_px, deepsort_params, init_lock=None):
+    '''
+    Worker function for parallel pose estimation. Creates its own PoseTracker
+    and optional DeepSort tracker, then processes one video independently.
+    '''
+    if init_lock is not None:
+        with init_lock:
+            pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+    else:
+        pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+    deepsort_tracker = None
+    if tracking_mode == 'deepsort' and multi_person:
+        from deep_sort_realtime.deepsort_tracker import DeepSort
+        deepsort_tracker = DeepSort(**deepsort_params)
+    process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, 
+                  output_format, save_video, save_images, display_detection,
+                  tracking_mode, max_distance_px, deepsort_tracker)
+
+
 def process_images(image_folder_path, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker):
     '''
     Estimate pose estimation from a folder of images
@@ -555,28 +577,6 @@ def process_images(image_folder_path, pose_tracker, pose_model, output_format, f
         cv2.destroyAllWindows()
 
 
-def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
-                           pose_model, frame_range, average_likelihood_threshold_pose, 
-                           output_format, save_video, save_images, display_detection, 
-                           tracking_mode, max_distance_px, deepsort_params, init_lock=None):
-    '''
-    Worker function for parallel pose estimation. Creates its own PoseTracker
-    and optional DeepSort tracker, then processes one video independently.
-    '''
-    if init_lock is not None:
-        with init_lock:
-            pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
-    else:
-        pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
-    deepsort_tracker = None
-    if tracking_mode == 'deepsort' and multi_person:
-        from deep_sort_realtime.deepsort_tracker import DeepSort
-        deepsort_tracker = DeepSort(**deepsort_params)
-    process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, 
-                  output_format, save_video, save_images, display_detection,
-                  tracking_mode, max_distance_px, deepsort_tracker)
-
-
 def estimate_pose_all(config_dict):
     '''
     Estimate pose from a video file or a folder of images and 
@@ -610,6 +610,7 @@ def estimate_pose_all(config_dict):
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
     multi_person = config_dict.get('project', {}).get('multi_person', False)
+    max_workers_input = config_dict.get('pose', {}).get('parallel_workers_pose', False)
     video_dir = os.path.join(project_dir, 'videos')
     pose_dir = os.path.join(project_dir, 'pose')
 
@@ -622,7 +623,6 @@ def estimate_pose_all(config_dict):
     det_frequency = config_dict.get('pose', {}).get('det_frequency', 4)
     backend = config_dict.get('pose', {}).get('backend', 'auto')
     device = config_dict.get('pose', {}).get('device', 'auto')
-    parallel_pose = config_dict.get('pose', {}).get('parallel_pose', 'auto')
     display_detection = config_dict.get('pose', {}).get('display_detection', True)
     overwrite_pose = config_dict.get('pose', {}).get('overwrite_pose', False)
     average_likelihood_threshold_pose = config_dict.get('pose', {}).get('average_likelihood_threshold_pose', 0.5)
@@ -689,29 +689,26 @@ def estimate_pose_all(config_dict):
         backend, device = setup_backend_device(backend=backend, device=device)
         
         # Set up parallelization
-        if not isinstance(parallel_pose, int) and parallel_pose != 'auto':
-            raise ValueError(f"Invalid parallel_pose value: {parallel_pose}. Must be an integer greater or equal to 1, or 'auto'.")
-        if parallel_pose == 1:
-            logging.info(f'Pose estimation will not be processed in parallel as parallel_pose is set to 1.')
+        if not isinstance(max_workers_input, int) and max_workers_input != 'auto' and max_workers_input != False:
+            raise ValueError(f"Invalid parallel_workers_pose value: {max_workers_input}. Must be an integer greater or equal to 1, 'auto', or false.")
+        if max_workers_input == 1 or max_workers_input == False:
+            logging.info(f'Pose estimation will not be processed in parallel as parallel_workers_pose is set to {max_workers_input}.')
         else:
             if display_detection:
-                logging.warning(f'Cannot run pose estimation in parallel with display_detection=true: "parallel_pose" deactivated.')
+                logging.warning(f'Cannot run pose estimation in parallel with display_detection=true. Set it to false for faster pose estimation.')
                 parallel_pose = 1
-            elif device.upper() not in {'CPU', 'CUDA', 'MPS', 'ROCM'}:
+            elif device not in {'cpu', 'cuda', 'mps', 'rocm'}:
                 logging.warning(f'Parallel pose estimation is not supported for device "{device.upper()}": falling back to sequential.')
                 parallel_pose = 1
             else:
-                MAX_PARALLEL_WORKERS_GPU = 8
-                MAX_PARALLEL_WORKERS_CPU = 4  # conservative: each worker loads its own model into RAM
-                max_workers_cap = MAX_PARALLEL_WORKERS_CPU if device.upper() == 'CPU' else MAX_PARALLEL_WORKERS_GPU
-                if parallel_pose == 'auto':
-                    parallel_pose = min(len(video_files), max_workers_cap)
-                    parallel_message = f'{parallel_pose} threads, (1 per video, limited to {max_workers_cap})'
+                max_workers_calc = get_max_workers(device)
+                requested = max_workers_calc if max_workers_input == 'auto' else int(max_workers_input)
+                parallel_pose = min(requested, len(video_files))
+                if requested > max_workers_calc:
+                    logging.warning(f'Going with the requested {requested} workers, but the recommended limit with this hardware is {max_workers_calc}.')
                 else:
-                    parallel_message = f'{parallel_pose} threads (limited to {max_workers_cap})'
-                    parallel_pose = min(int(parallel_pose), len(video_files), max_workers_cap)
-                logging.info(f'Pose estimation processed in parallel on {parallel_message}.')
-        
+                    logging.info(f'Using {parallel_pose} parallel workers.')
+                    
         # Tracking
         if tracking_mode not in ['deepsort', 'sports2d']:
             logging.warning(f"Tracking mode {tracking_mode} not recognized. Using sports2d method.")

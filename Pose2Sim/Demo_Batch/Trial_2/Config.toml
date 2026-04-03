@@ -77,8 +77,8 @@ participant_mass = [70.0, 63.5]     # float (eg 70.0), or list of floats (eg [70
 #                   # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
 # device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 # backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
-# parallel_pose = 'auto' # 'auto' or integer (number of threads). 'auto': one thread per video (ie 4 on the Demo data).
-#                             # Requires display_detection = false, otherwise falls back to sequential (ie parallel_pose = 1).
+# parallel_workers_pose = 'auto' # 'auto', int, or false # One worker per video, using GPU if available
+#                                # Requires display_detection = false, otherwise falls back to sequential (ie parallel_workers_pose = 1/false).
 
 # display_detection = true # Real-time display of the videos with pose estimation
 # overwrite_pose = false # Set to false if you don't want to recalculate pose estimation when it has already been done
@@ -191,7 +191,8 @@ keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, f
 # # for each frame, each keypoint: if results are not good, we remove a camera and try again
 # reproj_error_threshold_triangulation = 15 # px # if reprojection error is above, triangulation results won't be accepted
 # likelihood_threshold_triangulation= 0.3 # if 2D likelihood is below, estimations for this camera won't be accepted
-# min_cameras_for_triangulation = 2 # won't try below N cameras if the triangulation is still not good
+# min_cameras_for_triangulation = 2 # stops trying to triangulate if results still not good with min_cameras_for_triangulation cameras. 
+#                                   Increase if you have many cameras and want to be more robust to occlusions
 
 # # gap filling
 # max_distance_m = 1.0 # m # max_distance a person can jump from its previous position before being considered as a new one
@@ -261,6 +262,7 @@ keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, f
 
 
 # [kinematics]
+# parallel_workers_kinematics = 'auto' # 'auto', int, or false # One worker per person, uses CPU. Only available in multi-person mode.
 # use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
 # use_simple_model = false # true or false # >10 times faster IK if true. No muscles, no constraints (eg stiff spine and shoulders, no patella)
 # right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)

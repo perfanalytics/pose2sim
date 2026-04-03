@@ -142,7 +142,7 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("project").update({"frame_rate":60})
         config_dict.get("pose").update({"det_frequency":10})
         config_dict.get("pose").update({"mode":'balanced'})
-        config_dict.get("pose").update({"parallel_pose":1})
+        config_dict.get("pose").update({"parallel_workers_pose":2})
         config_dict.get("pose").update({"overwrite_pose":True})
         config_dict.get("pose").update({"save_video":'none'})
         config_dict.get('synchronization').update({'keypoints_to_consider':['RWrist']})

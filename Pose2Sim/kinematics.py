@@ -39,13 +39,13 @@ from pathlib import Path
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 from lxml import etree
-import logging
+import logging, logging.handlers
 from anytree import PreOrderIter
 
 import opensim
 
 from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean, read_trc, \
-                            best_coords_for_measurements, compute_height
+                            best_coords_for_measurements, compute_height, get_max_workers
 from Pose2Sim.skeletons import *
 
 import locale 
@@ -517,6 +517,31 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_s
         raise
 
 
+def perform_IK_worker(args):
+    '''
+    Run inverse kinematics for a single person/TRC file.
+    Top-level function for ProcessPoolExecutor compatibility (must be picklable).
+    Each process gets its own OpenSim instance.
+    '''
+   
+    trc_file, pose_model, kinematics_dir, osim_setup_dir, remove_IK_setup, session_dir = args
+    opensim_logs_file = kinematics_dir / 'opensim_logs.txt'
+
+    # Reimport and reset settings in each worker process
+    if not logging.getLogger().handlers:
+        logging.basicConfig(format='%(message)s', level=logging.INFO, 
+            handlers=[logging.handlers.TimedRotatingFileHandler(os.path.join(session_dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
+    locale.setlocale(locale.LC_NUMERIC, 'C')
+    opensim.Logger.setLevelString('Info')
+    opensim.Logger.removeFileSink()
+    opensim.Logger.addFileSink(str(opensim_logs_file))
+    opensim.ModelVisualizer.addDirToGeometrySearchPaths(str(osim_setup_dir / 'Geometry'))
+
+    logging.info(f"Running inverse kinematics on {trc_file.resolve()}")
+    perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_setup=remove_IK_setup)
+    logging.info(f"\tDone. Joint angle data saved to {str((kinematics_dir / (trc_file.stem + '.mot')).resolve())}\n")
+
+
 def kinematics_all(config_dict):
     '''
     Runs OpenSim scaling and inverse kinematics
@@ -552,6 +577,8 @@ def kinematics_all(config_dict):
 
     use_augmentation = config_dict.get('kinematics', {}).get('use_augmentation', True)
     use_simple_model = config_dict.get('kinematics', {}).get('use_simple_model', False)
+    multi_person = config_dict.get('project', {}).get('multi_person', False)
+    parallel_workers = config_dict.get('kinematics', {}).get('parallel_workers_kinematics', 'auto')
     right_left_symmetry = config_dict.get('kinematics', {}).get('right_left_symmetry', True)
     subject_height = config_dict.get('project', {}).get('participant_height', 'auto')
     subject_mass = config_dict.get('project', {}).get('participant_mass', 70.0)
@@ -624,7 +651,7 @@ def kinematics_all(config_dict):
                     trimmed_extrema_percent=trimmed_extrema_percent
                 )
                 if not np.isnan(height):
-                    logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m\n")
+                    logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m")
                 else:
                     logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
                     logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, slowest_frames_to_remove_percent, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
@@ -650,21 +677,32 @@ def kinematics_all(config_dict):
         logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.\n")
         subject_mass += [70] * (len(trc_files) - len(subject_mass))
 
-    # Perform scaling and IK for each trc file
+    # Scaling
     for p, trc_file in enumerate(trc_files):
-        logging.info(f"Processing TRC file: {trc_file.resolve()}")
-
-        logging.info("\nScaling...")
+        logging.info(f"\nScaling TRC file: {trc_file.resolve()}...")
         perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir, use_simple_model, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], 
                         remove_scaling_setup=remove_scaling_setup, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, slowest_frames_to_remove_percent=slowest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, trimmed_extrema_percent=trimmed_extrema_percent)
-        logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
-        logging.info(f"\tScaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
-        
-        logging.info("\nInverse Kinematics...")
-        import time
-        start_time = time.time()
-        perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_setup=remove_IK_setup)
-        end_time = time.time()
-        print(f"\tIK took {round(end_time - start_time, 2)} seconds for {trc_file.name}.")
-        logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
-        logging.info(f"\tJoint angle data saved to {(kinematics_dir / (trc_file.stem + '.mot')).resolve()}\n")
+        logging.info(f"\tDone. Scaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
+
+    # Inverse Kinematics
+    use_parallel_ik = multi_person and len(trc_files) > 1 and parallel_workers not in (False, 1)
+    n_workers = min(get_max_workers(device='cpu') if parallel_workers == 'auto' else int(parallel_workers), len(trc_files)) if use_parallel_ik else 1
+    logging.info(f"\nRunning inverse kinematics{f' in parallel on {n_workers} workers' if n_workers > 1 else ''}...")
+
+    # In parallel
+    if n_workers > 1:
+        from concurrent.futures import ProcessPoolExecutor
+        with ProcessPoolExecutor(max_workers=n_workers) as executor:
+            try:
+                ik_args = [(f, pose_model, kinematics_dir, osim_setup_dir, remove_IK_setup, session_dir) for f in trc_files]
+                list(executor.map(perform_IK_worker, ik_args))
+            except KeyboardInterrupt:
+                raise
+    # Sequentially
+    else:
+        for trc_file in trc_files:
+            logging.info(f"Running inverse kinematics on {trc_file.resolve()}")
+            perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_setup=remove_IK_setup)
+            logging.info(f"\tDone. Joint angle data saved to {str((kinematics_dir / (trc_file.stem + '.mot')).resolve())}\n")
+
+    logging.info(f"OpenSim logs saved to {opensim_logs_file.resolve()}.")

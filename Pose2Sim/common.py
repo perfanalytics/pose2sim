@@ -190,6 +190,37 @@ def is_image_file(path):
     return os.path.isfile(path) and os.path.splitext(path)[1].lower() in image_extensions
 
 
+def get_max_workers(device='cpu'):
+    '''
+    Determine the number of parallel workers for pose estimation.
+    
+    INPUTS:
+        device: 'cpu', 'cuda', 'mps', 'rocm'
+    
+    OUTPUTS:
+        max_workers: Number of workers (>= 1)
+    '''
+    
+    if device == 'cpu':
+        # Half of the CPU cores
+        cpu_count = os.cpu_count() or 4
+        max_workers = max(1, cpu_count // 2)
+    
+    else:
+        # ~1 GB per worker, 20% headroom
+        try: 
+            # 'cuda' or 'rocm'
+            import torch
+            vram_gb = torch.cuda.mem_get_info(0)[0] / 1e9
+            max_workers = max(1, int(vram_gb * 0.8)) 
+        except Exception: 
+            # 'mps' or fallback
+            max_workers = 4
+
+    return max_workers
+
+
+
 def read_trc(trc_path):
     '''
     Read a TRC file and extract its contents.
