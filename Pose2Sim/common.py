@@ -1541,31 +1541,29 @@ def calculate_display_size(W, H, screen_width, screen_height, margin=100):
 def set_always_on_top(fig):
     '''
     Set a matplotlib figure window to be always on top.
-    Works with Tkinter, PyQt5, and PySide2 backends.
+    Works with Tkinter and Qt backends (PySide6, PyQt5, PySide2).
     
     INPUTS:
     - fig: matplotlib figure object
     '''
 
     try:
-        # Try Tk method first
+        # Tk backend
         fig.canvas.manager.window.wm_attributes("-topmost", True)
-        print("Set always on top using Tk method")
     except AttributeError:
+        # Qt backend
         try:
-            # Try Qt method
-            from PyQt5.QtCore import Qt
-            window = fig.canvas.manager.window
-            window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
-            window.show()
-            print("Set always on top using Qt method")
-        except (ImportError, AttributeError):
             try:
-                # Try PySide2
-                from PySide2.QtCore import Qt
-                window = fig.canvas.manager.window
-                window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
-                window.show()
-                print("Set always on top using PySide2 method")
-            except (ImportError, AttributeError):
-                print("Could not set always on top - backend not supported")
+                from PySide6.QtCore import Qt
+                hint = Qt.WindowType.WindowStaysOnTopHint
+            except ImportError:
+                try:
+                    from PyQt5.QtCore import Qt
+                except ImportError:
+                    from PySide2.QtCore import Qt
+                hint = Qt.WindowStaysOnTopHint
+            window = fig.canvas.manager.window
+            window.setWindowFlags(window.windowFlags() | hint)
+            window.show()
+        except (ImportError, AttributeError):
+            pass
