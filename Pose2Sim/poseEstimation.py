@@ -42,6 +42,7 @@ from tqdm import tqdm
 from anytree import RenderTree
 import numpy as np
 import cv2
+import threading
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
 from rtmlib.tools.object_detection.post_processings import nms
@@ -280,7 +281,7 @@ def save_to_openpose(json_file_path, keypoints, scores):
         json.dump(json_output, json_file)
 
 
-def process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, max_distance_px, deepsort_tracker):
+def process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, max_distance_px, deepsort_tracker, cancel_event=None):
     '''
     Estimate pose from a video file
     
@@ -297,6 +298,7 @@ def process_video(video_path, pose_tracker, pose_model, frame_range, average_lik
     - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
     - max_distance_px: int. The maximum distance in pixels for associating detections across frames in sports2d tracking mode (default: 100)
     - deepsort_tracker: DeepSort tracker object or None
+    - cancel_event: threading. Event object to signal cancellation of processing
 
     OUTPUTS:
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
@@ -346,6 +348,8 @@ def process_video(video_path, pose_tracker, pose_model, frame_range, average_lik
                 # print('\nFrame ', frame_idx)
                 success, frame = cap.read()
                 if not success:
+                    break
+                if cancel_event and cancel_event.is_set():
                     break
             
                 try: # Frames with no detection cause errors on MacOS CoreMLExecutionProvider
@@ -438,9 +442,9 @@ def process_video(video_path, pose_tracker, pose_model, frame_range, average_lik
 
 
 def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
-                           pose_model, frame_range, average_likelihood_threshold_pose, 
-                           output_format, save_video, save_images, display_detection, 
-                           tracking_mode, max_distance_px, deepsort_params, init_lock=None):
+                         pose_model, frame_range, average_likelihood_threshold_pose,
+                         output_format, save_video, save_images, display_detection, tracking_mode,
+                         max_distance_px, deepsort_params, init_lock, cancel_event):
     '''
     Worker function for parallel pose estimation. Creates its own PoseTracker
     and optional DeepSort tracker, then processes one video independently.
@@ -456,7 +460,7 @@ def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, d
         deepsort_tracker = DeepSort(**deepsort_params)
     process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, 
                   output_format, save_video, save_images, display_detection,
-                  tracking_mode, max_distance_px, deepsort_tracker)
+                  tracking_mode, max_distance_px, deepsort_tracker, cancel_event=cancel_event)
 
 
 def process_images(image_folder_path, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker):
@@ -610,7 +614,7 @@ def estimate_pose_all(config_dict):
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
     frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
     multi_person = config_dict.get('project', {}).get('multi_person', False)
-    max_workers_input = config_dict.get('pose', {}).get('parallel_workers_pose', False)
+    max_workers_input = config_dict.get('pose', {}).get('parallel_workers_pose', 'auto')
     video_dir = os.path.join(project_dir, 'videos')
     pose_dir = os.path.join(project_dir, 'pose')
 
@@ -692,6 +696,7 @@ def estimate_pose_all(config_dict):
         if not isinstance(max_workers_input, int) and max_workers_input != 'auto' and max_workers_input != False:
             raise ValueError(f"Invalid parallel_workers_pose value: {max_workers_input}. Must be an integer greater or equal to 1, 'auto', or false.")
         if max_workers_input == 1 or max_workers_input == False:
+            parallel_pose = 1
             logging.info(f'Pose estimation will not be processed in parallel as parallel_workers_pose is set to {max_workers_input}.')
         else:
             if display_detection:
@@ -721,26 +726,39 @@ def estimate_pose_all(config_dict):
 
             # In parallel
             if parallel_pose != 1 and len(video_files) > 1:
-                import threading
                 init_lock = threading.Lock()
-                from concurrent.futures import ThreadPoolExecutor, as_completed
+                cancel_event = threading.Event()
+                from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
                 with ThreadPoolExecutor(max_workers=parallel_pose) as executor:
                     futures = {
                         executor.submit(
                             process_video_worker, video_path,
                             ModelClass, det_frequency, mode, backend, device,
-                            pose_model, frame_range, average_likelihood_threshold_pose, 
+                            pose_model, frame_range, average_likelihood_threshold_pose,
                             output_format, save_video, save_images, display_detection, tracking_mode,
-                            max_distance_px, deepsort_params, init_lock
+                            max_distance_px, deepsort_params, init_lock, cancel_event
                         ): video_path for video_path in video_files
                     }
-                    for future in as_completed(futures):
-                        video_path = futures[future]
-                        try:
-                            future.result()
-                        except Exception as e:
-                            logging.error(f'Failed processing {os.path.basename(video_path)}: {e}')
-                            raise RuntimeError(f'Failed processing {os.path.basename(video_path)}: {e}')
+                    try:
+                        # Periodically checks that no cancel event has been set. If so, cancels everything and raises error
+                        remaining = set(futures.keys())
+                        while remaining:
+                            done = set()
+                            for future in remaining:
+                                try:
+                                    future.result(timeout=0.1)
+                                    done.add(future)
+                                except TimeoutError: # once timeout=0.1 is reached, we check cancel event
+                                    pass
+                                except Exception as e: 
+                                    cancel_event.set()
+                                    raise
+                            remaining -= done
+                    except KeyboardInterrupt:
+                        logging.warning('Pose estimation interrupted by user. Shutting down...')
+                        cancel_event.set()
+                        executor.shutdown(wait=True, cancel_futures=True)
+                        raise KeyboardInterrupt('Pose estimation interrupted by user. Shutting down...')
     
             # Sequentially
             else:
