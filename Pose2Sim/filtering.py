@@ -45,7 +45,7 @@ from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
 from Pose2Sim.common import plotWindow
-from Pose2Sim.common import convert_to_c3d, read_trc, is_video_file
+from Pose2Sim.common import convert_to_c3d, read_trc, read_mot, write_mot, is_video_file
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -577,7 +577,7 @@ def median_filter_1d(config_dict, frame_rate, col):
     return col_filtered
 
 
-def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0, show=True):
+def display_figures_trc(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0, show=True):
     '''
     Displays filtered and unfiltered data for comparison
 
@@ -632,6 +632,48 @@ def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0
     return pw
 
 
+def display_figures_mot(Q_unfilt, Q_filt, time_col, col_names, person_id=0, show=True):
+    '''
+    Displays filtered and unfiltered mot data for comparison.
+    Each column gets its own tab.
+
+    INPUTS:
+    - Q_unfilt: pandas dataframe of unfiltered data
+    - Q_filt: pandas dataframe of filtered data
+    - time_col: pandas Series of time values
+    - col_names: array of column names
+    - person_id: int
+    - show: boolean
+
+    OUTPUT:
+    - plotWindow with tabbed figures
+    '''
+
+    os_name = platform.system()
+    if os_name == 'Windows':
+        mpl.use('qtagg')
+    mpl.rc('figure', max_open_warning=0)
+
+    pw = plotWindow()
+    pw.MainWindow.setWindowTitle('Person ' + str(person_id) + ' mot data')
+    
+    for id, col_name in enumerate(col_names):
+        f = plt.figure()
+        ax = plt.subplot(111)
+        plt.plot(time_col.to_numpy(), Q_unfilt.iloc[:, id].to_numpy(), label='unfiltered')
+        plt.plot(time_col.to_numpy(), Q_filt.iloc[:, id].to_numpy(), label='filtered')
+        ax.set_ylabel(col_name)
+        ax.set_xlabel('Time (s)')
+        plt.legend()
+        plt.title(col_name)
+        pw.addPlot(col_name, f)
+    
+    if show:
+        pw.show()
+
+    return pw
+
+
 def filter1d(col, config_dict, filter_type, frame_rate):
     '''
     Choose filter type and filter column
@@ -664,7 +706,7 @@ def filter1d(col, config_dict, filter_type, frame_rate):
     return col_filtered
 
 
-def recap_filter3d(config_dict, trc_path):
+def recap_filter3d(config_dict, output_path):
     '''
     Print a log message giving filtering parameters. Also stored in User/logs.txt.
 
@@ -680,6 +722,7 @@ def recap_filter3d(config_dict, trc_path):
     do_filter = config_dict.get('filtering', {}).get('filter', True)
     reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
     filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
+    filter_ik = config_dict.get('filtering', {}).get('filter_ik', False)
     kalman_filter_trustratio = int(config_dict.get('filtering', {}).get('kalman', {}).get('trust_ratio', 500))
     kalman_filter_smooth = int(config_dict.get('filtering', {}).get('kalman', {}).get('smooth', True))
     kalman_filter_smooth_str = 'smoother' if kalman_filter_smooth else 'filter'
@@ -718,8 +761,8 @@ def recap_filter3d(config_dict, trc_path):
         logging.info(filter_mapping_recap[filter_type])
     else:
         logging.info('--> No filtering applied. Set filtering to true in Config.toml to filter coordinates.')
-    logging.info(f'Filtered 3D coordinates are stored at {trc_path}.')
-    if make_c3d:
+    logging.info(f'Filtered {"IK .mot" if filter_ik else "3D .trc"} coordinates are stored at {output_path}.')
+    if make_c3d and not filter_ik:
         logging.info('All filtered trc files have been converted to c3d.')
     if save_plots:
         logging.info(f'Filtering plots are saved in {plots_output_dir}.')
@@ -727,15 +770,16 @@ def recap_filter3d(config_dict, trc_path):
 
 def filter_all(config_dict):
     '''
-    Filter the 3D coordinates of the trc file.
+    Filter the 3D coordinates of trc files, or IK results from mot files.
+    Set filter_ik to true in Config.toml to filter mot files instead of trc files.
     Displays filtered coordinates for checking.
 
     INPUTS:
-    - a trc file
+    - trc or mot files
     - filtration parameters from Config.toml
 
     OUTPUT:
-    - a filtered trc file
+    - filtered trc or mot files
     '''
 
     # Read config_dict
@@ -747,6 +791,7 @@ def filter_all(config_dict):
     do_filter = config_dict.get('filtering', {}).get('filter', True)
     reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
     filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
+    filter_ik = config_dict.get('filtering', {}).get('filter_ik', False)
     make_c3d = config_dict.get('filtering', {}).get('make_c3d', True)
     if save_plots and not os.path.exists(plots_output_dir):
         os.makedirs(plots_output_dir)
@@ -767,27 +812,43 @@ def filter_all(config_dict):
             logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
             frame_rate = 30  
     
-    # Trc paths
-    trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in file]
-    for person_id, t_path_in in enumerate(trc_path_in):
-        logging.info(f'\nFiltering 3D coordinates for person {person_id}...')
-        # Read trc coordinate values
-        t_file_in = os.path.basename(t_path_in)
-        Q_coords, frames_col, time_col, markers, header = read_trc(t_path_in)
+    # Find input files
+    if filter_ik:
+        kinematics_dir = os.path.realpath(os.path.join(project_dir, 'kinematics'))
+        files_in = [f for f in glob.glob(os.path.join(kinematics_dir, '*.mot')) if f.count('filt') <= 1]
+        if not files_in:
+            logging.error(f'No .mot files found in {kinematics_dir}. '
+                        f'Make sure inverse kinematics has been run before filtering mot files, '
+                        f'or set filter_ik to false in Config.toml to filter trc files instead.')
+            raise FileNotFoundError(f'No .mot files found in {kinematics_dir} or {pose3d_dir}. '
+                                    f'Make sure inverse kinematics has been run before filtering mot files, '
+                                    f'or set filter_ik to false in Config.toml to filter trc files instead.')
+    else:
+        files_in = [f for f in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in f]
 
-        # frame range selection
-        f_range = [[frames_col.iloc[0], frames_col.iloc[-1]] if (frame_range in ('all', 'auto', []) or frames_col.iloc[0]>frame_range[0] or frames_col.iloc[1]<frame_range[1]) else frame_range][0]
-        frame_nb = f_range[1] - f_range[0]
-        f_index = [frames_col[frames_col==f_range[0]].index[0], frames_col[frames_col==f_range[1]-1].index[0]+1]
-        Q_coords = Q_coords.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
-        frames_col = frames_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
-        time_col = time_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
+    for person_id, file_path_in in enumerate(files_in):
+        logging.info(f'\nFiltering {"IK mot" if filter_ik else "3D trc"} data for person {person_id}...')
 
-        t_path_out = t_path_in.replace(t_path_in.split('_')[-1], f'{f_range[0]}-{f_range[1]}_filt_{filter_type}.trc')
-        t_file_out = os.path.basename(t_path_out)
-        header[0] = header[0].replace(t_file_in, t_file_out)
-        header[2] = '\t'.join(part if i != 2 else str(frame_nb) for i, part in enumerate(header[2].split('\t')))
-        header[2] = '\t'.join(part if i != 7 else str(frame_nb)+'\n' for i, part in enumerate(header[2].split('\t')))
+        # Read file
+        if filter_ik:
+            Q_coords, time_col, header = read_mot(file_path_in)
+        else:
+            Q_coords, frames_col, time_col, markers, header = read_trc(file_path_in)
+
+        # Frame range selection
+        if filter_ik:
+            file_path_out = file_path_in.replace('.mot', f'_filt_{filter_type}.mot')
+        else:
+            f_range = [[frames_col.iloc[0], frames_col.iloc[-1]]
+                       if (frame_range in ('all', 'auto', []) or frames_col.iloc[0]>frame_range[0] or frames_col.iloc[1]<frame_range[1]) 
+                       else frame_range][0]
+            f_index = [frames_col[frames_col==f_range[0]].index[0], frames_col[frames_col==f_range[1]-1].index[0]+1]
+            Q_coords = Q_coords.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
+            frames_col = frames_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
+            time_col = time_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
+            file_path_out = file_path_in.replace(file_path_in.split('_')[-1], f'{f_range[0]}-{f_range[1]}_filt_{filter_type}.trc')
+            file_out = os.path.basename(file_path_out)
+            header[0] = header[0].replace(os.path.basename(file_path_in), file_out)
 
         # Filter coordinates
         if reject_outliers:
@@ -797,33 +858,34 @@ def filter_all(config_dict):
             Q_filt = Q_coords.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
 
         if not do_filter and not reject_outliers:
-            logging.warning(f'reject_outliers and filter have been set to false. No further processing done on {t_path_in}.\n')
+            logging.warning(f'reject_outliers and filter have been set to false. No further processing done on {file_path_in}.\n')
         
         else:
             # Display figures
             if display_figures or save_plots:
-                # Retrieve keypoints
-                keypoints_names = pd.read_csv(t_path_in, sep="\t", skiprows=3, nrows=0).columns[2::3][:-1].to_numpy()
-                pw = display_figures_fun(Q_coords, Q_filt, time_col, keypoints_names, person_id, show=display_figures)
+                col_names = Q_coords.columns.to_numpy() if filter_ik else Q_coords.columns.to_numpy()[::3]
+                fig_args = Q_coords, Q_filt, time_col, col_names, person_id, display_figures
+                pw = display_figures_mot(*fig_args) if filter_ik else display_figures_trc(*fig_args)
                 if save_plots:
                     for n, f in enumerate(pw.figure_handles):
-                        dpi = pw.canvases[person_id].figure.dpi
+                        dpi = pw.canvases[0].figure.dpi
                         f.set_size_inches(1280/dpi, 720/dpi)
                         title = pw.tabs.tabText(n)
                         plot_path = os.path.join(plots_output_dir, f'person{person_id:02d}_{title.replace(" ","_").replace("/","_")}.png')
                         f.savefig(plot_path, dpi=dpi, bbox_inches='tight')
 
-            # Reconstruct trc file with filtered coordinates
-            with open(t_path_out, 'w') as trc_o:
-                [trc_o.write(line) for line in header]
-                Q_filt.insert(0, 'Frame#', frames_col)
-                Q_filt.insert(1, 'Time', time_col)
-                # Q_filt = Q_filt.fillna(' ')
-                Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
-
-            # Save c3d
-            if make_c3d:
-                convert_to_c3d(t_path_out)
+            # Write output file
+            if filter_ik:
+                write_mot(file_path_out, Q_filt, time_col, header)
+            else:
+                with open(file_path_out, 'w') as trc_o:
+                    [trc_o.write(line) for line in header]
+                    Q_filt.insert(0, 'Frame#', frames_col)
+                    Q_filt.insert(1, 'Time', time_col)
+                    # Q_filt = Q_filt.fillna(' ')
+                    Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+                if make_c3d:
+                    convert_to_c3d(file_path_out)
 
             # Recap
-            recap_filter3d(config_dict, t_path_out)
+            recap_filter3d(config_dict, file_path_out)

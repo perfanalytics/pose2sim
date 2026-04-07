@@ -90,6 +90,7 @@ class TestWorkflow(unittest.TestCase):
             Testing det_frequency 1 and 10.
             Testing synchronization with all markers or only ['RWrist'].
             Testing with and without marker augmentation.
+            Testing filtering trc files or IK mot files.
             
             N.B.: Calibration from scene dimensions is not tested, as it requires the 
             user to click points on the image. 
@@ -169,6 +170,7 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("synchronization").update({"synchronization_gui":False})
         config_dict.get("synchronization").update({"display_sync_plots":False})
         config_dict.get("synchronization").update({"save_sync_plots":False})
+        config_dict.get("filtering").update({"filter_ik":True})
         config_dict.get("filtering").update({"display_figures":False})
         config_dict.get("filtering").update({"save_filt_plots":False})
         config_dict.get('kinematics').update({'use_simple_model':True})

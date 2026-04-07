@@ -220,16 +220,75 @@ def get_max_workers(device='cpu'):
     return max_workers
 
 
+def read_mot(mot_path):
+    '''
+    Read an OpenSim .mot file
+    
+    INPUT:
+    - mot_path: path to the .mot file
+    
+    OUTPUT:
+    - data: pandas DataFrame with all data columns, excluding time
+    - time_col: pandas Series of time values
+    - header: list of header lines
+    '''
+    
+    header_lines = []
+    header_end_line = 0
+    with open(mot_path, 'r') as f:
+        lines = f.readlines()
+    
+    # Find the end of the header (line with "endheader")
+    for i, line in enumerate(lines):
+        if line.strip().lower() == 'endheader':
+            header_end_line = i
+            break
+        
+    header_lines = lines[:header_end_line + 1]
+    
+    # Read the data portion
+    data = pd.read_csv(mot_path, sep='\t', skiprows=header_end_line + 1)
+    
+    # Separate time column from data columns
+    time_col = data.iloc[:, 0]  # first column is time
+    data_cols = data.iloc[:, 1:]  # remaining columns are data
+    
+    return data_cols, time_col, header_lines
+
+
+def write_mot(mot_path, data, time_col, header_lines):
+    '''
+    Write a .mot file (OpenSim motion file).
+    
+    INPUT:
+    - mot_path: path to the output .mot file
+    - data: pandas DataFrame of filtered data columns
+    - time_col: pandas Series of time values
+    - header_lines: list of header lines
+    '''
+    
+    with open(mot_path, 'w') as f:
+        for line in header_lines:
+            f.write(line)
+        # Combine time and data
+        output = data.copy()
+        output.insert(0, time_col.name if time_col.name else 'time', time_col)
+        output.to_csv(f, sep='\t', index=False, lineterminator='\n')
+
 
 def read_trc(trc_path):
     '''
-    Read a TRC file and extract its contents.
+    Read an OpenSim .trc file and extract its contents.
 
     INPUTS:
     - trc_path (str): The path to the TRC file.
 
     OUTPUTS:
-    - tuple: A tuple containing the Q coordinates, frames column, time column, marker names, and header.
+    - Q_coords (DataFrame): A DataFrame containing the Q coordinates of the markers.
+    - frames_col (Series): A Series containing the frame numbers.
+    - time_col (Series): A Series containing the time values.
+    - markers (list): A list of marker names.
+    - header (list): A list of header lines.
     '''
 
     try:

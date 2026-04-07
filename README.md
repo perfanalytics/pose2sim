@@ -684,7 +684,8 @@ If your triangulation is not satisfying, try and release the constraints in the 
 
 ### Filtering 3D coordinates
 > _**Filter your 3D coordinates.**_\
-> Butterworth, Kalman, Butterworth on speed, Gaussian, LOESS, Median filters are available and can be tuned accordingly.
+> - Butterworth, Kalman, OneEuro, GCV spline, LOESS, Gaussian, Median, Butterworth on speed filters are available and can be tuned accordingly
+> - Instead of filtering triangulated trc coordinates, you can also filter angle .mot files after inverse kinematics by setting `filter_ik = true` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
 Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
 Type `ipython`.
