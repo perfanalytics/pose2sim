@@ -679,6 +679,7 @@ def kinematics_all(config_dict):
 
     # Scaling
     for p, trc_file in enumerate(trc_files):
+        logging.info(f"Subject mass: {round(subject_mass[p],2)} kg")
         logging.info(f"\nScaling TRC file: {trc_file.resolve()}...")
         perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir, use_simple_model, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], 
                         remove_scaling_setup=remove_scaling_setup, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, slowest_frames_to_remove_percent=slowest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, trimmed_extrema_percent=trimmed_extrema_percent)
