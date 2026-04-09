@@ -1029,10 +1029,14 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
     '''
 
+    # Remove nans
+    Q_coords = Q_coords.dropna(how='all')
+
     # Add MidShoulder column
-    df_MidShoulder = pd.DataFrame((Q_coords['RShoulder'].values + Q_coords['LShoulder'].values) /2)
-    df_MidShoulder.columns = ['MidShoulder']*3
-    Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_MidShoulder), axis=1)
+    if 'MidShoulder' not in Q_coords.columns:
+        df_MidShoulder = pd.DataFrame((Q_coords['RShoulder'].values + Q_coords['LShoulder'].values) /2)
+        df_MidShoulder.columns = ['MidShoulder']*3
+        Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_MidShoulder), axis=1)
 
     # Add Hip column if not present
     n_markers_init = len(keypoints_names)
