@@ -710,7 +710,7 @@ Output:\
 > _**Use the Stanford LSTM model to estimate the position of 47 virtual markers.**_\
 _**Note that inverse kinematic results are not necessarily better after marker augmentation.**_ Skip if results are not convincing.
 
-*N.B.:* Marker augmentation tends to give a more stable, but less precise output. In practice, it is mostly beneficial when using less than 4 cameras. 
+*N.B.:* Marker augmentation tends to give a more stable, but less precise output. In practice, it is mostly beneficial when using fewer than 4 cameras. 
 
 **Make sure that `participant_height` is correct in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.** `participant_mass` is mostly optional for IK.\
 Only works with models estimating at least the following keypoints (e.g., not COCO):
