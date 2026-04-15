@@ -678,7 +678,7 @@ def triangulate_all(config_dict):
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..'))
     # if single trial
-    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
+    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else project_dir if 'Config.toml' in os.listdir(project_dir) else os.getcwd()
     multi_person = config_dict.get('project', {}).get('multi_person', False)
     pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet')
     frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
