@@ -39,13 +39,13 @@ from pathlib import Path
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 from lxml import etree
-import logging
+import logging, logging.handlers
 from anytree import PreOrderIter
 
 import opensim
 
 from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean, read_trc, \
-                            best_coords_for_measurements, compute_height
+                            best_coords_for_measurements, compute_height, get_max_workers
 from Pose2Sim.skeletons import *
 
 import locale 
@@ -382,7 +382,7 @@ def update_scale_values(scaling_root, segment_ratio_dict):
 
 def perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir, 
                     use_simple_model=False, right_left_symmetry=True, subject_height=1.75, subject_mass=70, 
-                    remove_scaling_setup=True, fastest_frames_to_remove_percent=0.1,close_to_zero_speed_m=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+                    remove_scaling_setup=True, fastest_frames_to_remove_percent=0.1, slowest_frames_to_remove_percent=0.1, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Perform model scaling based on the (not necessarily static) TRC file:
     - Remove 10% fastest frames (potential outliers)
@@ -432,11 +432,11 @@ def perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir,
         
         # Remove fastest frames, frames with null speed, and frames with large hip and knee angles
         Q_coords, _, _, markers, _ = read_trc(trc_file)
-        Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, close_to_zero_speed=close_to_zero_speed_m)
+        Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, slowest_frames_to_remove_percent=slowest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles)
 
         if Q_coords_low_speeds_low_angles.size == 0:
             logging.warning(f"\nNo frames left after removing fastest frames, frames with null speed, and frames with large hip and knee angles for {trc_file}. The person may be static, or crouched, or incorrectly detected.")
-            logging.warning(f"Running with fastest_frames_to_remove_percent=0, close_to_zero_speed_m=0, large_hip_knee_angles=0, trimmed_extrema_percent=0. You can edit these parameters in your Config.toml file.\n")
+            logging.warning(f"Running with fastest_frames_to_remove_percent=0, slowest_frames_to_remove_percent=0, large_hip_knee_angles=0, trimmed_extrema_percent=0. You can edit these parameters in your Config.toml file.\n")
             Q_coords_low_speeds_low_angles = Q_coords
 
         # Get manual scale values (mean from remaining frames after trimming the 20% most extreme values)
@@ -517,6 +517,31 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_s
         raise
 
 
+def perform_IK_worker(args):
+    '''
+    Run inverse kinematics for a single person/TRC file.
+    Top-level function for ProcessPoolExecutor compatibility (must be picklable).
+    Each process gets its own OpenSim instance.
+    '''
+   
+    trc_file, pose_model, kinematics_dir, osim_setup_dir, remove_IK_setup, session_dir = args
+    opensim_logs_file = kinematics_dir / 'opensim_logs.txt'
+
+    # Reimport and reset settings in each worker process
+    if not logging.getLogger().handlers:
+        logging.basicConfig(format='%(message)s', level=logging.INFO, 
+            handlers=[logging.handlers.TimedRotatingFileHandler(os.path.join(session_dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
+    locale.setlocale(locale.LC_NUMERIC, 'C')
+    opensim.Logger.setLevelString('Info')
+    opensim.Logger.removeFileSink()
+    opensim.Logger.addFileSink(str(opensim_logs_file))
+    opensim.ModelVisualizer.addDirToGeometrySearchPaths(str(osim_setup_dir / 'Geometry'))
+
+    logging.info(f"Running inverse kinematics on {trc_file.resolve()}")
+    perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_setup=remove_IK_setup)
+    logging.info(f"\tDone. Joint angle data saved to {str((kinematics_dir / (trc_file.stem + '.mot')).resolve())}\n")
+
+
 def kinematics_all(config_dict):
     '''
     Runs OpenSim scaling and inverse kinematics
@@ -544,26 +569,28 @@ def kinematics_all(config_dict):
     '''
 
     # Read config_dict
-    project_dir = config_dict.get('project').get('project_dir')
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
     # if batch
     session_dir = Path(project_dir) / '..'
     # if single trial
-    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
+    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else project_dir if 'Config.toml' in os.listdir(project_dir) else os.getcwd()
 
-    use_augmentation = config_dict.get('kinematics').get('use_augmentation')
-    use_simple_model = config_dict.get('kinematics').get('use_simple_model', False)
-    right_left_symmetry = config_dict.get('kinematics').get('right_left_symmetry')
-    subject_height = config_dict.get('project').get('participant_height')
-    subject_mass = config_dict.get('project').get('participant_mass')
+    use_augmentation = config_dict.get('kinematics', {}).get('use_augmentation', True)
+    use_simple_model = config_dict.get('kinematics', {}).get('use_simple_model', False)
+    multi_person = config_dict.get('project', {}).get('multi_person', False)
+    parallel_workers = config_dict.get('kinematics', {}).get('parallel_workers_kinematics', 'auto')
+    right_left_symmetry = config_dict.get('kinematics', {}).get('right_left_symmetry', True)
+    subject_height = config_dict.get('project', {}).get('participant_height', 'auto')
+    subject_mass = config_dict.get('project', {}).get('participant_mass', 70.0)
 
-    fastest_frames_to_remove_percent = config_dict.get('kinematics').get('fastest_frames_to_remove_percent')
-    large_hip_knee_angles = config_dict.get('kinematics').get('large_hip_knee_angles')
-    trimmed_extrema_percent = config_dict.get('kinematics').get('trimmed_extrema_percent')
-    close_to_zero_speed = config_dict.get('kinematics').get('close_to_zero_speed_m')
-    default_height = config_dict.get('kinematics').get('default_height')
+    fastest_frames_to_remove_percent = config_dict.get('kinematics', {}).get('fastest_frames_to_remove_percent', 0.1)
+    slowest_frames_to_remove_percent = config_dict.get('kinematics', {}).get('slowest_frames_to_remove_percent', 0.1)
+    large_hip_knee_angles = config_dict.get('kinematics', {}).get('large_hip_knee_angles', 45)
+    trimmed_extrema_percent = config_dict.get('kinematics', {}).get('trimmed_extrema_percent', 0.5)
+    default_height = config_dict.get('kinematics', {}).get('default_height', 1.7)
 
-    remove_scaling_setup = config_dict.get('kinematics').get('remove_individual_scaling_setup')
-    remove_IK_setup = config_dict.get('kinematics').get('remove_individual_ik_setup')
+    remove_scaling_setup = config_dict.get('kinematics', {}).get('remove_individual_scaling_setup', True)
+    remove_IK_setup = config_dict.get('kinematics', {}).get('remove_individual_ik_setup', True)
 
     pose3d_dir = Path(project_dir) / 'pose-3d'
     kinematics_dir = Path(project_dir) / 'kinematics'
@@ -581,7 +608,7 @@ def kinematics_all(config_dict):
     if use_augmentation:
         trc_files = [f for f in pose3d_dir.glob('*.trc') if '_LSTM' in f.name]
         if len(trc_files) == 0:
-            pose_model = config_dict.get('pose').get('pose_model').upper()
+            pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet').upper()
             use_augmentation = False
             logging.warning("No LSTM trc files found. Using non augmented trc files instead.")
     if len(trc_files) == 0: # filtered files by default
@@ -595,7 +622,7 @@ def kinematics_all(config_dict):
     if use_augmentation: 
         pose_model = 'LSTM'
     else: 
-        pose_model = config_dict.get('pose').get('pose_model').upper()
+        pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet').upper()
         if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
         elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
         elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
@@ -619,19 +646,19 @@ def kinematics_all(config_dict):
                     trc_data,
                     markers,
                     fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
-                    close_to_zero_speed=close_to_zero_speed,
+                    slowest_frames_to_remove_percent=slowest_frames_to_remove_percent,
                     large_hip_knee_angles=large_hip_knee_angles,
                     trimmed_extrema_percent=trimmed_extrema_percent
                 )
                 if not np.isnan(height):
-                    logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m\n")
+                    logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m")
                 else:
                     logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
-                    logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, close_to_zero_speed_m, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
+                    logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, slowest_frames_to_remove_percent, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
                     height = default_height
             except Exception as e:
                 logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
-                logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, close_to_zero_speed_m, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
+                logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, slowest_frames_to_remove_percent, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
                 height = default_height
             subject_height.append(height)
     elif not type(subject_height) == list: # int or float
@@ -650,21 +677,33 @@ def kinematics_all(config_dict):
         logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.\n")
         subject_mass += [70] * (len(trc_files) - len(subject_mass))
 
-    # Perform scaling and IK for each trc file
+    # Scaling
     for p, trc_file in enumerate(trc_files):
-        logging.info(f"Processing TRC file: {trc_file.resolve()}")
-
-        logging.info("\nScaling...")
+        logging.info(f"Subject mass: {round(subject_mass[p],2)} kg")
+        logging.info(f"\nScaling TRC file: {trc_file.resolve()}...")
         perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir, use_simple_model, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], 
-                        remove_scaling_setup=remove_scaling_setup, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, trimmed_extrema_percent=trimmed_extrema_percent,close_to_zero_speed_m=close_to_zero_speed)
-        logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
-        logging.info(f"\tScaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
-        
-        logging.info("\nInverse Kinematics...")
-        import time
-        start_time = time.time()
-        perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_setup=remove_IK_setup)
-        end_time = time.time()
-        print(f"\tIK took {round(end_time - start_time, 2)} seconds for {trc_file.name}.")
-        logging.info(f"\tDone. OpenSim logs saved to {opensim_logs_file.resolve()}.")
-        logging.info(f"\tJoint angle data saved to {(kinematics_dir / (trc_file.stem + '.mot')).resolve()}\n")
+                        remove_scaling_setup=remove_scaling_setup, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, slowest_frames_to_remove_percent=slowest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, trimmed_extrema_percent=trimmed_extrema_percent)
+        logging.info(f"\tDone. Scaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
+
+    # Inverse Kinematics
+    use_parallel_ik = multi_person and len(trc_files) > 1 and parallel_workers not in (False, 1)
+    n_workers = min(get_max_workers(device='cpu') if parallel_workers == 'auto' else int(parallel_workers), len(trc_files)) if use_parallel_ik else 1
+    logging.info(f"\nRunning inverse kinematics{f' in parallel on {n_workers} workers' if n_workers > 1 else ''}...")
+
+    # In parallel
+    if n_workers > 1:
+        from concurrent.futures import ProcessPoolExecutor
+        with ProcessPoolExecutor(max_workers=n_workers) as executor:
+            try:
+                ik_args = [(f, pose_model, kinematics_dir, osim_setup_dir, remove_IK_setup, session_dir) for f in trc_files]
+                list(executor.map(perform_IK_worker, ik_args))
+            except KeyboardInterrupt:
+                raise
+    # Sequentially
+    else:
+        for trc_file in trc_files:
+            logging.info(f"Running inverse kinematics on {trc_file.resolve()}")
+            perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_setup=remove_IK_setup)
+            logging.info(f"\tDone. Joint angle data saved to {str((kinematics_dir / (trc_file.stem + '.mot')).resolve())}\n")
+
+    logging.info(f"OpenSim logs saved to {opensim_logs_file.resolve()}.")

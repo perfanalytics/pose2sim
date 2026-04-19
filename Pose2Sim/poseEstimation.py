@@ -38,24 +38,25 @@ import json
 import re
 import logging
 import ast
-from functools import partial
 from tqdm import tqdm
-from anytree.importer import DictImporter
 from anytree import RenderTree
 import numpy as np
 import cv2
+import threading
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
 from rtmlib.tools.object_detection.post_processings import nms
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort,\
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel, bbox_xyxy_compute, \
-                        get_screen_size, calculate_display_size
+                        get_screen_size, calculate_display_size, is_video_file, is_image_file, get_max_workers
 from Pose2Sim.skeletons import *
 
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
-import warnings # Silence numpy "RuntimeWarning: Mean of empty slice"
+import warnings # Silence numpy and CoreML warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning, message="Mean of empty slice")
 warnings.filterwarnings("ignore", category=RuntimeWarning, message="All-NaN slice encountered")
+warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in scalar divide")
+warnings.filterwarnings("ignore", message=".*Input.*has a dynamic shape.*but the runtime shape.*has zero elements.*")
 
 # Not safe, but to be used until OpenMMLab/RTMlib's SSL certificates are updated
 import ssl
@@ -210,11 +211,11 @@ def setup_backend_device(backend='auto', device='auto'):
             if torch.cuda.is_available() == True and 'CUDAExecutionProvider' in ort.get_available_providers():
                 device = 'cuda'
                 backend = 'onnxruntime'
-                logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
+                logging.info(f"Valid CUDA installation found: using ONNXRuntime backend with GPU.")
             elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
                 device = 'rocm'
                 backend = 'onnxruntime'
-                logging.info(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
+                logging.info(f"Valid ROCM installation found: using ONNXRuntime backend with GPU.")
             else:
                 raise 
         except:
@@ -223,14 +224,17 @@ def setup_backend_device(backend='auto', device='auto'):
                 if 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
                     device = 'mps'
                     backend = 'onnxruntime'
-                    logging.info(f"\nValid MPS installation found: using ONNXRuntime backend with GPU.")
+                    logging.info(f"Valid MPS installation found: using ONNXRuntime backend with GPU.")
                 else:
                     raise
             except:
                 device = 'cpu'
                 backend = 'openvino'
-                logging.info(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
-        
+                logging.info(f"No valid CUDA installation found: using OpenVINO backend with CPU.")
+
+    else:
+        logging.info(f"Using {device} device with {backend} backend.")    
+    
     return backend, device
 
 
@@ -272,12 +276,12 @@ def save_to_openpose(json_file_path, keypoints, scores):
     
     # Save JSON output for each frame
     json_output_dir = os.path.abspath(os.path.join(json_file_path, '..'))
-    if not os.path.isdir(json_output_dir): os.makedirs(json_output_dir)
+    os.makedirs(json_output_dir, exist_ok=True)
     with open(json_file_path, 'w') as json_file:
         json.dump(json_output, json_file)
 
 
-def process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker):
+def process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, max_distance_px, deepsort_tracker, cancel_event=None):
     '''
     Estimate pose from a video file
     
@@ -285,14 +289,16 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
     - video_path: str. Path to the input video file
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
     - pose_model: str. The pose model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
+    - frame_range: list. Range of frames to process
+    - average_likelihood_threshold_pose: float. If the average confidence score of the detected keypoints for a person is below this threshold, the person will be dropped (default: 0.5)
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
     - display_detection: bool. Whether to show real-time visualization
-    - frame_range: list. Range of frames to process
-    - multi_person: bool. Whether to detect multiple people in the video
     - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
+    - max_distance_px: int. The maximum distance in pixels for associating detections across frames in sports2d tracking mode (default: 100)
     - deepsort_tracker: DeepSort tracker object or None
+    - cancel_event: threading. Event object to signal cancellation of processing
 
     OUTPUTS:
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
@@ -306,7 +312,7 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
         raise NameError(f"{video_path} is not a video. Images must be put in one subdirectory per camera.")
     
     pose_dir = os.path.abspath(os.path.join(video_path, '..', '..', 'pose'))
-    if not os.path.isdir(pose_dir): os.makedirs(pose_dir)
+    os.makedirs(pose_dir, exist_ok=True)
     video_name_wo_ext = os.path.splitext(os.path.basename(video_path))[0]
     json_output_dir = os.path.join(pose_dir, f'{video_name_wo_ext}_json')
     output_video_path = os.path.join(pose_dir, f'{video_name_wo_ext}_pose.mp4')
@@ -343,6 +349,8 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                 success, frame = cap.read()
                 if not success:
                     break
+                if cancel_event and cancel_event.is_set():
+                    break
             
                 try: # Frames with no detection cause errors on MacOS CoreMLExecutionProvider
                     # Detect poses
@@ -355,9 +363,9 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
                     likely_keypoints = np.where(mask_scores[:, np.newaxis, np.newaxis], keypoints, np.nan)
                     likely_scores = np.where(mask_scores[:, np.newaxis], scores, np.nan)
                     likely_bboxes = bbox_xyxy_compute(frame_shape, likely_keypoints, padding=0)
-                    score_likely_bboxes = np.nanmean(likely_scores, axis=1)
+                    score_likely_bboxes = np.nanmean(np.where(np.isnan(likely_scores), 0, likely_scores), axis=1)
 
-                    valid_indices = np.where(~np.isnan(score_likely_bboxes))[0]
+                    valid_indices = np.where(score_likely_bboxes > average_likelihood_threshold_pose)[0]
                     if len(valid_indices) > 0:
                         valid_bboxes = likely_bboxes[valid_indices]
                         valid_scores = score_likely_bboxes[valid_indices]
@@ -433,13 +441,34 @@ def process_video(video_path, pose_tracker, pose_model, output_format, save_vide
         cv2.destroyAllWindows()
 
 
-def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker):
+def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
+                         pose_model, frame_range, average_likelihood_threshold_pose,
+                         output_format, save_video, save_images, display_detection, tracking_mode,
+                         max_distance_px, deepsort_params, init_lock, cancel_event):
+    '''
+    Worker function for parallel pose estimation. Creates its own PoseTracker
+    and optional DeepSort tracker, then processes one video independently.
+    '''
+    if init_lock is not None:
+        with init_lock:
+            pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+    else:
+        pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+    deepsort_tracker = None
+    if tracking_mode == 'deepsort' and multi_person:
+        from deep_sort_realtime.deepsort_tracker import DeepSort
+        deepsort_tracker = DeepSort(**deepsort_params)
+    process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, 
+                  output_format, save_video, save_images, display_detection,
+                  tracking_mode, max_distance_px, deepsort_tracker, cancel_event=cancel_event)
+
+
+def process_images(image_folder_path, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker):
     '''
     Estimate pose estimation from a folder of images
     
     INPUTS:
     - image_folder_path: str. Path to the input image folder
-    - vid_img_extension: str. Extension of the image files
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
     - pose_model: str. The pose model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
@@ -457,18 +486,22 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
     '''    
 
     pose_dir = os.path.abspath(os.path.join(image_folder_path, '..', '..', 'pose'))
-    if not os.path.isdir(pose_dir): os.makedirs(pose_dir)
+    os.makedirs(pose_dir, exist_ok=True)
     json_output_dir = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_json')
     output_video_path = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_pose.mp4')
     img_output_dir = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_img')
 
-    image_files = glob.glob(os.path.join(image_folder_path, '*'+vid_img_extension))
-    sorted(image_files, key=natural_sort_key)
+    image_files = sorted([f for f in glob.glob(os.path.join(image_folder_path, '*')) if is_image_file(f)], key=natural_sort_key)
+    if len(image_files) == 0:
+        raise NameError(f'No image files found in {image_folder_path}.')
+
+    if save_video or display_detection:
+        first_frame = cv2.imread(image_files[0])
+        H, W = first_frame.shape[:2]
 
     if save_video: # Set up video writer
         logging.warning('Using default framerate of 60 fps.')
         fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
-        W, H = cv2.imread(image_files[0]).shape[:2][::-1] # Get the width and height from the first image (assuming all images have the same size)
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
 
     if display_detection:
@@ -486,7 +519,6 @@ def process_images(image_folder_path, vid_img_extension, pose_tracker, pose_mode
         if frame_idx in range(*f_range):
             try:
                 frame = cv2.imread(image_file)
-                frame_idx += 1
             except:
                 raise NameError(f"{image_file} is not an image. Videos must be put in the video directory, not in subdirectories.")
             
@@ -575,30 +607,33 @@ def estimate_pose_all(config_dict):
     '''
 
     # Read config
-    project_dir = config_dict['project']['project_dir']
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..'))
     # if single trial
-    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
-    frame_range = config_dict.get('project').get('frame_range')
-    multi_person = config_dict.get('project').get('multi_person')
+    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else project_dir if 'Config.toml' in os.listdir(project_dir) else os.getcwd()
+    frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
+    multi_person = config_dict.get('project', {}).get('multi_person', False)
+    max_workers_input = config_dict.get('pose', {}).get('parallel_workers_pose', 'auto')
     video_dir = os.path.join(project_dir, 'videos')
     pose_dir = os.path.join(project_dir, 'pose')
 
-    pose_model = config_dict['pose']['pose_model']
-    mode = config_dict['pose']['mode'] # lightweight, balanced, performance
-    vid_img_extension = config_dict['pose']['vid_img_extension']
+    pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet')
+    mode = config_dict.get('pose', {}).get('mode', 'balanced')
     
-    output_format = config_dict['pose']['output_format']
-    save_video = True if 'to_video' in config_dict['pose']['save_video'] else False
-    save_images = True if 'to_images' in config_dict['pose']['save_video'] else False
-    display_detection = config_dict['pose']['display_detection']
-    overwrite_pose = config_dict['pose']['overwrite_pose']
-    det_frequency = config_dict['pose']['det_frequency']
-    tracking_mode = config_dict.get('pose').get('tracking_mode')
-    max_distance_px = config_dict.get('pose').get('max_distance_px', None)
+    output_format = config_dict.get('pose', {}).get('output_format', 'openpose')
+    save_video = True if 'to_video' in config_dict.get('pose', {}).get('save_video', 'to_video') else False
+    save_images = True if 'to_images' in config_dict.get('pose', {}).get('save_video', 'to_video') else False
+    det_frequency = config_dict.get('pose', {}).get('det_frequency', 4)
+    backend = config_dict.get('pose', {}).get('backend', 'auto')
+    device = config_dict.get('pose', {}).get('device', 'auto')
+    display_detection = config_dict.get('pose', {}).get('display_detection', True)
+    overwrite_pose = config_dict.get('pose', {}).get('overwrite_pose', False)
+    average_likelihood_threshold_pose = config_dict.get('pose', {}).get('average_likelihood_threshold_pose', 0.5)
+    tracking_mode = config_dict.get('pose', {}).get('tracking_mode', 'sports2d')
+    max_distance_px = config_dict.get('pose', {}).get('max_distance_px', 100)
     if tracking_mode == 'deepsort' and multi_person:
-        deepsort_params = config_dict.get('pose').get('deepsort_params')
+        deepsort_params = config_dict.get('pose', {}).get('deepsort_params', '{}')
         try:
             deepsort_params = ast.literal_eval(deepsort_params)
         except: # if within single quotes instead of double quotes when run with sports2d --mode """{dictionary}"""
@@ -609,13 +644,11 @@ def estimate_pose_all(config_dict):
         deepsort_tracker = DeepSort(**deepsort_params)
     else:
         deepsort_tracker = None
-
-    backend = config_dict['pose']['backend']
-    device = config_dict['pose']['device']
+        deepsort_params = {}
 
     # Determine frame rate
-    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-    frame_rate = config_dict.get('project').get('frame_rate')
+    video_files = sorted([f for f in glob.glob(os.path.join(video_dir, '*')) if is_video_file(f)], key=natural_sort_key)
+    frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
     if frame_rate == 'auto': 
         try:
             cap = cv2.VideoCapture(video_files[0])
@@ -624,24 +657,13 @@ def estimate_pose_all(config_dict):
                 raise
             frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
-            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
             frame_rate = 30  
 
-    # Set detection frequency
-    if det_frequency>1:
-        logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points.')
-    elif det_frequency==1:
-        logging.info(f'Inference run on every single frame.')
-    else:
-        raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
-
     # Select the appropriate model based on the model_type
-    logging.info('\nEstimating pose...')
+    logging.info('Estimating pose...\n')
     pose_model_name = pose_model
     pose_model, ModelClass, mode = setup_model_class_mode(pose_model, mode, config_dict)
-
-    # Select device and backend
-    backend, device = setup_backend_device(backend=backend, device=device)
 
     # Estimate pose
     try:
@@ -654,43 +676,110 @@ def estimate_pose_all(config_dict):
             raise
             
     except:
-        # Set up pose tracker
-        try:
-            pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
-        except:
-            logging.error('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
-            raise ValueError('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
-
+        # Set up model and mode
+        logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
+        logging.info(f'Mode: {mode}.')
+        
+        # Set up detection frequency
+        low_likelihood_message = f'Detections are dropped if their average keypoint likelihood is below {average_likelihood_threshold_pose}.'
+        if det_frequency>1:
+            logging.info(f'Inference run only every {det_frequency} frames. Inbetween, pose estimation tracks previously detected points. {low_likelihood_message}')
+        elif det_frequency==1:
+            logging.info(f'Inference run on every single frame. {low_likelihood_message}')
+        else:
+            raise ValueError(f"Invalid det_frequency: {det_frequency}. Must be an integer greater or equal to 1.")
+        
+        # Select device and backend
+        backend, device = setup_backend_device(backend=backend, device=device)
+        
+        # Set up parallelization
+        if not isinstance(max_workers_input, int) and max_workers_input != 'auto' and max_workers_input != False:
+            raise ValueError(f"Invalid parallel_workers_pose value: {max_workers_input}. Must be an integer greater or equal to 1, 'auto', or false.")
+        if max_workers_input == 1 or max_workers_input == False:
+            parallel_pose = 1
+            logging.info(f'Pose estimation will not be processed in parallel as parallel_workers_pose is set to {max_workers_input}.')
+        else:
+            if display_detection:
+                logging.warning(f'Cannot run pose estimation in parallel with display_detection=true. Set it to false for faster pose estimation.')
+                parallel_pose = 1
+            elif device not in {'cpu', 'cuda', 'mps', 'rocm'}:
+                logging.warning(f'Parallel pose estimation is not supported for device "{device.upper()}": falling back to sequential.')
+                parallel_pose = 1
+            else:
+                max_workers_calc = get_max_workers(device)
+                requested = max_workers_calc if max_workers_input == 'auto' else int(max_workers_input)
+                parallel_pose = min(requested, len(video_files))
+                if requested > max_workers_calc:
+                    logging.warning(f'Going with the requested {requested} workers, but the recommended limit with this hardware is {max_workers_calc}.')
+                else:
+                    logging.info(f'Using {parallel_pose} parallel workers.')
+                    
+        # Tracking
         if tracking_mode not in ['deepsort', 'sports2d']:
             logging.warning(f"Tracking mode {tracking_mode} not recognized. Using sports2d method.")
             tracking_mode = 'sports2d'
-        logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
-        logging.info(f'Mode: {mode}.')
         logging.info(f'Tracking is performed with {tracking_mode}{"" if not tracking_mode=="deepsort" else f" with parameters: {deepsort_params}"}.\n')
 
-        video_files = sorted(glob.glob(os.path.join(video_dir, '*'+vid_img_extension)))
-        if not len(video_files) == 0: 
+        if not len(video_files) == 0:
             # Process video files
-            logging.info(f'Found video files with {vid_img_extension} extension.')
-            for video_path in video_files:
-                pose_tracker.reset()
-                if tracking_mode == 'deepsort': 
-                    deepsort_tracker.tracker.delete_all_tracks()
-                process_video(video_path, pose_tracker, pose_model, output_format, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker)
+            logging.info(f'Found {len(video_files)} video files in {video_dir}.')
+
+            # In parallel
+            if parallel_pose != 1 and len(video_files) > 1:
+                init_lock = threading.Lock()
+                cancel_event = threading.Event()
+                from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
+                with ThreadPoolExecutor(max_workers=parallel_pose) as executor:
+                    futures = {
+                        executor.submit(
+                            process_video_worker, video_path,
+                            ModelClass, det_frequency, mode, backend, device,
+                            pose_model, frame_range, average_likelihood_threshold_pose,
+                            output_format, save_video, save_images, display_detection, tracking_mode,
+                            max_distance_px, deepsort_params, init_lock, cancel_event
+                        ): video_path for video_path in video_files
+                    }
+                    try:
+                        # Periodically checks that no cancel event has been set. If so, cancels everything and raises error
+                        remaining = set(futures.keys())
+                        while remaining:
+                            done = set()
+                            for future in remaining:
+                                try:
+                                    future.result(timeout=0.1)
+                                    done.add(future)
+                                except TimeoutError: # once timeout=0.1 is reached, we check cancel event
+                                    pass
+                                except Exception as e: 
+                                    cancel_event.set()
+                                    raise
+                            remaining -= done
+                    except KeyboardInterrupt:
+                        logging.warning('Pose estimation interrupted by user. Shutting down...')
+                        cancel_event.set()
+                        executor.shutdown(wait=True, cancel_futures=True)
+                        raise KeyboardInterrupt('Pose estimation interrupted by user. Shutting down...')
+    
+            # Sequentially
+            else:
+                try:
+                    pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+                except:
+                    logging.error('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
+                    raise ValueError('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
+                for video_path in video_files:
+                    pose_tracker.reset()
+                    if tracking_mode == 'deepsort':
+                        deepsort_tracker.tracker.delete_all_tracks()
+                    process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, max_distance_px, deepsort_tracker)
 
         else:
             # Process image folders
-            image_folders = sorted([os.path.join(video_dir,f) for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
-            empty_folders = [folder for folder in image_folders if len(glob.glob(os.path.join(folder, '*'+vid_img_extension)))==0]
-            if len(empty_folders) != 0:
-                raise NameError(f'No image files with {vid_img_extension} extension found in {empty_folders}.')
-            elif len(image_folders) == 0:
-                raise NameError(f'No image folders containing files with {vid_img_extension} extension found in {video_dir}.')
+            image_folders = sorted([os.path.join(video_dir, f) for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
+            # Keep only folders that contain at least one image file
+            image_folders = [folder for folder in image_folders 
+                            if any(is_image_file(os.path.join(folder, f)) for f in os.listdir(folder))]
+            if len(image_folders) == 0:
+                raise NameError(f'No video files and no image folders with recognized image extensions found in {video_dir}.')
             else:
-                logging.info(f'Found image folders with {vid_img_extension} extension.')
-                for image_folder in image_folders:
-                    pose_tracker.reset()
-                    image_folder_path = os.path.join(video_dir, image_folder)
-                    if tracking_mode == 'deepsort': 
-                        deepsort_tracker.tracker.delete_all_tracks()                
-                    process_images(image_folder_path, vid_img_extension, pose_tracker, pose_model, output_format, frame_rate, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker)
+                logging.info(f'No video files found. Found {len(image_folders)} image folders in {video_dir}.')

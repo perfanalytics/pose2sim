@@ -39,7 +39,7 @@ dependencies = [
     "lxml",
     "matplotlib",
     "mpl_interactions",
-    "PyQt5",
+    "PySide6",
     "tqdm",
     "anytree",
     "pandas>=1.5",

@@ -50,7 +50,8 @@ from anytree.importer import DictImporter
 from matplotlib.widgets import TextBox, Button
 import logging
 
-from Pose2Sim.common import sort_stringlist_by_last_number, bounding_boxes, interpolate_zeros_nans
+from Pose2Sim.common import sort_stringlist_by_last_number, bounding_boxes, interpolate_zeros_nans, \
+                            is_video_file, is_image_file
 from Pose2Sim.skeletons import *
 
 
@@ -1225,7 +1226,7 @@ def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], 
                                 for p in json_data_all
                                 for keypoints in [np.array([p['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])]
                                 ]
-                    max_area_person = json_data_all[np.argmax(bbox_area)]
+                    max_area_person = json_data_all[np.nanargmax(bbox_area)]
                     json_data = np.array([max_area_person['pose_keypoints_2d'][3*i:3*i+3] for i in keypoints_ids])
 
                 elif synchronization_gui:
@@ -1244,8 +1245,8 @@ def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], 
     df_json_coords = pd.DataFrame(json_coords)
 
     if df_json_coords.isnull().all().all():
-        logging.error('No valid coordinates found in the JSON files. There may be a mismatch between the "pose_model" specified for pose estimation and for synchronization. If not, make sure that your likelihood_threshold for synchronization is not set too high.')
-        raise ValueError('No valid coordinates found in the JSON files. There may be a mismatch between the "pose_model" specified for pose estimation and for synchronization. If not, make sure that your likelihood_threshold for synchronization is not set too high.')
+        logging.error('No valid coordinates found in the JSON files. There may be a mismatch between the "pose_model" specified for pose estimation and for synchronization. If not, make sure that your likelihood_threshold_synchronization for synchronization is not set too high.')
+        raise ValueError('No valid coordinates found in the JSON files. There may be a mismatch between the "pose_model" specified for pose estimation and for synchronization. If not, make sure that your likelihood_threshold_synchronization for synchronization is not set too high.')
 
     return df_json_coords
 
@@ -1369,34 +1370,35 @@ def synchronize_cams_all(config_dict):
     '''
     
     # Get parameters from Config.toml
-    project_dir = config_dict.get('project').get('project_dir')
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
     pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
     sync_dir = os.path.abspath(os.path.join(pose_dir, '..', 'pose-sync'))
     os.makedirs(sync_dir, exist_ok=True)
-    pose_model = config_dict.get('pose').get('pose_model')
-    # multi_person = config_dict.get('project').get('multi_person')
-    fps =  config_dict.get('project').get('frame_rate')
-    frame_range = config_dict.get('project').get('frame_range')
-    display_sync_plots = config_dict.get('synchronization').get('display_sync_plots', True)
-    save_plots = config_dict.get('synchronization').get('save_sync_plots', True)
-    keypoints_to_consider = config_dict.get('synchronization').get('keypoints_to_consider')
-    approx_time_maxspeed = config_dict.get('synchronization').get('approx_time_maxspeed') 
-    time_range_around_maxspeed = config_dict.get('synchronization').get('time_range_around_maxspeed')
-    synchronization_gui = config_dict.get('synchronization').get('synchronization_gui')
+    pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet')
+    # multi_person = config_dict.get('project', {}).get('multi_person', False)
+    fps =  config_dict.get('project', {}).get('frame_rate', 'auto')
+    frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
+    display_sync_plots = config_dict.get('synchronization', {}).get('display_sync_plots', True)
+    save_plots = config_dict.get('synchronization', {}).get('save_sync_plots', True)
+    keypoints_to_consider = config_dict.get('synchronization', {}).get('keypoints_to_consider', 'all')
+    approx_time_maxspeed = config_dict.get('synchronization', {}).get('approx_time_maxspeed', 'auto')
+    time_range_around_maxspeed = config_dict.get('synchronization', {}).get('time_range_around_maxspeed', 2.0)
+    synchronization_gui = config_dict.get('synchronization', {}).get('synchronization_gui', True)
 
-    likelihood_threshold = config_dict.get('synchronization').get('likelihood_threshold')
-    filter_cutoff = int(config_dict.get('synchronization').get('filter_cutoff'))
-    filter_order = int(config_dict.get('synchronization').get('filter_order'))
+    likelihood_threshold = config_dict.get('synchronization', {}).get('likelihood_threshold_synchronization', 0.4)
+    filter_cutoff = int(config_dict.get('synchronization', {}).get('filter_cutoff', 6))
+    filter_order = int(config_dict.get('synchronization', {}).get('filter_order', 4))
 
     # Determine frame rate
     video_dir = os.path.join(project_dir, 'videos')
-    vid_img_extension = config_dict['pose']['vid_img_extension']
-    vid_or_img_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
+    vid_or_img_files = sorted([f for f in glob.glob(os.path.join(video_dir, '*')) if is_video_file(f)])
     if not vid_or_img_files: # video_files is then img_dirs
         try:
             image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
             for image_folder in image_folders:
-                vid_or_img_files.append(glob.glob(os.path.join(video_dir, image_folder, '*'+vid_img_extension)))
+                img_files = sorted([f for f in glob.glob(os.path.join(video_dir, image_folder, '*')) if is_image_file(f)])
+                if img_files:
+                    vid_or_img_files.append(img_files)
         except:
             logging.warning(f'No video files nor image directories found in {video_dir}.')
 
@@ -1408,7 +1410,7 @@ def synchronize_cams_all(config_dict):
                 raise
             fps = round(cap.get(cv2.CAP_PROP_FPS))
         except: 
-            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
             fps = 30
     lag_range = time_range_around_maxspeed*fps # frames
 
@@ -1434,6 +1436,7 @@ def synchronize_cams_all(config_dict):
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
 
     # List json files
+    logging.info('Synchronizing...')
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
         os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
@@ -1488,7 +1491,6 @@ def synchronize_cams_all(config_dict):
 
 
     # Extract, interpolate, and filter keypoint coordinates
-    logging.info('Synchronizing...')
     df_coords = []
     b, a = signal.butter(int(filter_order/2), filter_cutoff/(fps/2), 'low', analog = False)
     json_files_names_range = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*frames_cam)] for (json_files_cam, frames_cam) in zip(json_files_names,search_around_frames)]
@@ -1528,7 +1530,7 @@ def synchronize_cams_all(config_dict):
     else:
         selected_id_list = [None] * cam_nb
         if isinstance(approx_time_maxspeed, list): # search around max speed
-            logging.info(f'Synchronization is calculated around the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
+            logging.info(f'Synchronization is calculated at time {approx_time_maxspeed} ± {time_range_around_maxspeed} s.')
         elif approx_time_maxspeed == 'auto': # search on the whole sequence (slower if long sequence)
             logging.info('Synchronization is calculated on the whole sequence. This may take a while.')
         else:

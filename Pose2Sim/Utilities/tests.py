@@ -90,6 +90,7 @@ class TestWorkflow(unittest.TestCase):
             Testing det_frequency 1 and 10.
             Testing synchronization with all markers or only ['RWrist'].
             Testing with and without marker augmentation.
+            Testing filtering trc files or IK mot files.
             
             N.B.: Calibration from scene dimensions is not tested, as it requires the 
             user to click points on the image. 
@@ -137,11 +138,12 @@ class TestWorkflow(unittest.TestCase):
 
 
         # Run all
-        # overwrite pose, balanced
+        # overwrite pose, balanced, no parallel pose estimation
         config_dict.get("project").update({"participant_height":1.7})
         config_dict.get("project").update({"frame_rate":60})
         config_dict.get("pose").update({"det_frequency":10})
         config_dict.get("pose").update({"mode":'balanced'})
+        config_dict.get("pose").update({"parallel_workers_pose":2})
         config_dict.get("pose").update({"overwrite_pose":True})
         config_dict.get("pose").update({"save_video":'none'})
         config_dict.get('synchronization').update({'keypoints_to_consider':['RWrist']})
@@ -168,6 +170,7 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("synchronization").update({"synchronization_gui":False})
         config_dict.get("synchronization").update({"display_sync_plots":False})
         config_dict.get("synchronization").update({"save_sync_plots":False})
+        config_dict.get("filtering").update({"filter_ik":True})
         config_dict.get("filtering").update({"display_figures":False})
         config_dict.get("filtering").update({"save_filt_plots":False})
         config_dict.get('kinematics').update({'use_simple_model':True})
@@ -178,9 +181,9 @@ class TestWorkflow(unittest.TestCase):
         # Pose2Sim.synchronization(config_dict) # No test for synchronization for multi-person
         Pose2Sim.personAssociation(config_dict)
         Pose2Sim.triangulation(config_dict)
-        Pose2Sim.filtering(config_dict)
         # Pose2Sim.markerAugmentation(config_dict) # Marker augmentation requires markers that are not provided by RTMO: ['RHeel', 'RBigToe', 'RSmallToe', 'LSmallToe', 'LHeel', 'LBigToe']
         Pose2Sim.kinematics(config_dict)
+        Pose2Sim.filtering(config_dict) # on IK mot files instead of trc files
 
         # Run all
         # No filtering, no marker augmentation

@@ -24,6 +24,7 @@ OUTPUT:
 ## INIT
 import os
 import glob
+import math
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import pandas as pd
@@ -44,7 +45,7 @@ from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
 from Pose2Sim.common import plotWindow
-from Pose2Sim.common import convert_to_c3d, read_trc
+from Pose2Sim.common import convert_to_c3d, read_trc, read_mot, write_mot, is_video_file
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -79,6 +80,82 @@ def hampel_filter(col, window_size=7, n_sigma=2):
             modified_z_score = 0.6745 * (col[i] - median) / mad #75% percentile from median
             if np.abs(modified_z_score) > n_sigma:
                 col_filtered[i] = median
+    
+    return col_filtered
+
+
+def one_euro_filter_1d(config_dict, frame_rate, col):
+    '''
+    Zero-phase OneEuro filter for 1D signal with NaN handling
+    
+    INPUT:
+    - config_dict: Dictionary containing filtering parameters
+    - frame_rate: Sampling frequency in Hz
+    - col: Pandas Series (single column of scalar values)
+    
+    OUTPUT:
+    - col_filtered: Filtered pandas Series
+    '''
+    
+    # Get parameters from config
+    min_cutoff = config_dict.get('filtering', {}).get('one_euro', {}).get('cut_off_frequency', 2.5)
+    beta = config_dict.get('filtering', {}).get('one_euro', {}).get('beta', 0.9)
+    d_cutoff = config_dict.get('filtering', {}).get('one_euro', {}).get('d_cut_off_frequency', 1.0)
+    dt = 1.0 / frame_rate
+    
+    def smoothing_factor(dt, cutoff):
+        '''
+        Equivalent to a 1st order butterworth filter
+        '''
+        r = 2 * np.pi * cutoff * dt
+        return r / (r + 1)
+
+    def apply_filter(data):
+        '''
+        Apply OneEuro filter to 1D data
+        '''
+
+        if len(data) < 2:
+            return data
+
+        filtered = [data[0]]
+        x_prev = data[0]
+        dx_prev = 0.0
+        for i in range(1, len(data)):
+            x = data[i]
+            
+            # Filter derivative
+            alpha_d = smoothing_factor(dt, d_cutoff)
+            dx = (x-x_prev) / dt
+            dx_hat = alpha_d*dx + (1-alpha_d)*dx_prev
+            
+            # Adaptive cutoff and filter signal
+            cutoff = min_cutoff + beta*abs(dx_hat) # cutoff = min_cutoff + beta*velocity
+            alpha = smoothing_factor(dt, cutoff) # equivalent to a 1st order butterworth filter
+            x_hat = alpha*x + (1-alpha)*x_prev # same as 1st order Butterworth filter: more or less sensitive to previous value
+            
+            filtered.append(x_hat)
+            x_prev = x_hat
+            dx_prev = dx_hat
+        
+        return np.array(filtered)
+    
+    col_filtered = col.copy()
+    mask = np.isnan(col_filtered)
+    falsemask_indices = np.where(~mask)[0]
+    gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1
+    idx_sequences = np.split(falsemask_indices, gaps)
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 2]
+
+    # Filter each valid sequence
+    for seq in idx_sequences_to_filter:
+        data = col_filtered[seq].values
+        
+        # Forward and backward passes (for zero-phase filtering)
+        filtered_forward = apply_filter(data)
+        filtered_backward = apply_filter(filtered_forward[::-1])[::-1]
+        
+        col_filtered[seq] = filtered_backward
     
     return col_filtered
 
@@ -184,8 +261,8 @@ def gcv_spline_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    cutoff = config_dict.get('filtering').get('gcv_spline', {}).get('cut_off_frequency', 'auto')
-    smoothing_factor = float(config_dict.get('filtering').get('gcv_spline', {}).get('smoothing_factor', 1.0))
+    cutoff = config_dict.get('filtering', {}).get('gcv_spline', {}).get('cut_off_frequency', 'auto')
+    smoothing_factor = float(config_dict.get('filtering', {}).get('gcv_spline', {}).get('smoothing_factor', 1.0))
 
     # Split into sequences of not nans
     # print('\n', col.name)
@@ -194,45 +271,44 @@ def gcv_spline_filter_1d(config_dict, frame_rate, col):
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    if idx_sequences[0].size > 0:
-        idx_sequences_to_filter = [seq for seq in idx_sequences]
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 2]
     
-        # Filter each of the selected sequences
-        for seq_f in idx_sequences_to_filter:
-            x = np.arange(len(col_filtered[seq_f]))
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        x = np.arange(len(col_filtered[seq_f]))
 
-            # Automatically determine optimal lambda value when cutoff is 'auto'
-            if cutoff == 'auto': 
-                # Normalize col around 1, because zero mean leads to unstabilities
-                median_col = np.median(col_filtered[seq_f]) # median of time series
-                mad_col = np.median(np.abs(col_filtered[seq_f] - median_col)) # median absolute deviation from median
-                mad_col = mad_col if mad_col > 0 else 1.0
-                col_norm = 1 + (col_filtered[seq_f] - median_col) / (1.4826 * mad_col) # 1.4826*mad_col equivalent to dividing by std (for col_norm to have a std of 1)
+        # Automatically determine optimal lambda value when cutoff is 'auto'
+        if cutoff == 'auto': 
+            # Normalize col around 1, because zero mean leads to unstabilities
+            median_col = np.median(col_filtered[seq_f]) # median of time series
+            mad_col = np.median(np.abs(col_filtered[seq_f] - median_col)) # median absolute deviation from median
+            mad_col = mad_col if mad_col > 0 else 1.0
+            col_norm = 1 + (col_filtered[seq_f] - median_col) / (1.4826 * mad_col) # 1.4826*mad_col equivalent to dividing by std (for col_norm to have a std of 1)
 
-                # Compute optimal lam 
-                # See https://stackoverflow.com/a/79740481/12196632
-                lam =  _compute_optimal_gcv_parameter_numstable(x, col_norm)
-                
-                # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
-                lam *= smoothing_factor
+            # Compute optimal lam 
+            # See https://stackoverflow.com/a/79740481/12196632
+            lam =  _compute_optimal_gcv_parameter_numstable(x, col_norm)
+            
+            # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
+            lam *= smoothing_factor
 
-                # Compute spline
-                spline = make_smoothing_spline(x, col_norm, w=None, lam=lam)
-                col_filtered_norm = spline(x)
-                                
-                # Denormalize data
-                col_filtered[seq_f] = (col_filtered_norm - 1) * (1.4826 * mad_col) + median_col
+            # Compute spline
+            spline = make_smoothing_spline(x, col_norm, w=None, lam=lam)
+            col_filtered_norm = spline(x)
+                            
+            # Denormalize data
+            col_filtered[seq_f] = (col_filtered_norm - 1) * (1.4826 * mad_col) + median_col
 
-            else:
-                # Estimate lam from cutoff frequency
-                lam = ((frame_rate / (2 * np.pi * float(cutoff))) ** 4)
-                
-                # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
-                lam *= smoothing_factor
+        else:
+            # Estimate lam from cutoff frequency
+            lam = ((frame_rate / (2 * np.pi * float(cutoff))) ** 4)
+            
+            # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
+            lam *= smoothing_factor
 
-                # Compute spline
-                spline = make_smoothing_spline(x, col_filtered[seq_f], w=None, lam=lam)
-                col_filtered[seq_f] = spline(x)
+            # Compute spline
+            spline = make_smoothing_spline(x, col_filtered[seq_f], w=None, lam=lam)
+            col_filtered[seq_f] = spline(x)
 
     return col_filtered
 
@@ -278,7 +354,7 @@ def kalman_filter(coords, frame_rate, measurement_noise, process_noise, nb_dimen
     F_per_coord = np.zeros((int(dim_x/nb_dimensions), int(dim_x/nb_dimensions)))
     for i in range(nb_derivatives):
         for j in range(min(i+1, nb_derivatives)):
-            F_per_coord[j,i] = dt**(i-j) / np.math.factorial(i - j)
+            F_per_coord[j,i] = dt**(i-j) / math.factorial(i - j)
     f.F = np.kron(np.eye(nb_dimensions),F_per_coord) 
     # F_per_coord= [[1, dt, dt**2/2], 
                  # [ 0, 1,  dt     ],
@@ -338,8 +414,8 @@ def kalman_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    trustratio = int(config_dict.get('filtering').get('kalman').get('trust_ratio'))
-    smooth = int(config_dict.get('filtering').get('kalman').get('smooth'))
+    trustratio = int(config_dict.get('filtering', {}).get('kalman', {}).get('trust_ratio', 500))
+    smooth = int(config_dict.get('filtering', {}).get('kalman', {}).get('smooth', True))
     measurement_noise = 20
     process_noise = measurement_noise * trustratio
 
@@ -349,12 +425,11 @@ def kalman_filter_1d(config_dict, frame_rate, col):
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    if idx_sequences[0].size > 0:
-        idx_sequences_to_filter = [seq for seq in idx_sequences]
-    
-        # Filter each of the selected sequences
-        for seq_f in idx_sequences_to_filter:
-            col_filtered[seq_f] = kalman_filter(col_filtered[seq_f], frame_rate, measurement_noise, process_noise, nb_dimensions=1, nb_derivatives=3, smooth=smooth).flatten()
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 2]
+
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        col_filtered[seq_f] = kalman_filter(col_filtered[seq_f], frame_rate, measurement_noise, process_noise, nb_dimensions=1, nb_derivatives=3, smooth=smooth).flatten()
 
     return col_filtered
 
@@ -374,9 +449,9 @@ def butterworth_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    type = 'low' #config_dict.get('filtering').get('butterworth').get('type')
-    order = int(config_dict.get('filtering').get('butterworth').get('order'))
-    cutoff = int(config_dict.get('filtering').get('butterworth').get('cut_off_frequency'))    
+    type = 'low' #config_dict.get('filtering', {}).get('butterworth', {}).get('type')
+    order = int(config_dict.get('filtering', {}).get('butterworth', {}).get('order', 4))
+    cutoff = int(config_dict.get('filtering', {}).get('butterworth', {}).get('cut_off_frequency', 6))    
 
     b, a = signal.butter(order/2, cutoff/(frame_rate/2), type, analog = False) 
     padlen = 3 * max(len(a), len(b))
@@ -387,12 +462,11 @@ def butterworth_filter_1d(config_dict, frame_rate, col):
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    if idx_sequences[0].size > 0:
-        idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > padlen]
-    
-        # Filter each of the selected sequences
-        for seq_f in idx_sequences_to_filter:
-            col_filtered[seq_f] = signal.filtfilt(b, a, col_filtered[seq_f])
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > padlen]
+
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        col_filtered[seq_f] = signal.filtfilt(b, a, col_filtered[seq_f])
     
     return col_filtered
     
@@ -409,9 +483,9 @@ def butterworth_on_speed_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    type = 'low' # config_dict.get('filtering').get('butterworth_on_speed').get('type')
-    order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
-    cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
+    type = 'low' # config_dict.get('filtering', {}).get('butterworth_on_speed', {}).get('type')
+    order = int(config_dict.get('filtering', {}).get('butterworth_on_speed', {}).get('order', 4))
+    cutoff = int(config_dict.get('filtering', {}).get('butterworth_on_speed', {}).get('cut_off_frequency', 10))
 
     b, a = signal.butter(order/2, cutoff/(frame_rate/2), type, analog = False)
     padlen = 3 * max(len(a), len(b))
@@ -426,12 +500,11 @@ def butterworth_on_speed_filter_1d(config_dict, frame_rate, col):
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    if idx_sequences[0].size > 0:
-        idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > padlen]
-    
-        # Filter each of the selected sequences
-        for seq_f in idx_sequences_to_filter:
-            col_filtered_diff[seq_f] = signal.filtfilt(b, a, col_filtered_diff[seq_f])
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > padlen]
+
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        col_filtered_diff[seq_f] = signal.filtfilt(b, a, col_filtered_diff[seq_f])
     col_filtered = col_filtered_diff.cumsum() + col.iloc[0] # integrate filtered derivative
     
     return col_filtered
@@ -469,19 +542,18 @@ def loess_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    kernel = config_dict.get('filtering').get('loess', config_dict.get('filtering').get('LOESS')).get('nb_values_used')
+    kernel = config_dict.get('filtering', {}).get('loess', config_dict.get('filtering', {}).get('LOESS', {})).get('nb_values_used', 5)
 
     col_filtered = col.copy()
     mask = np.isnan(col_filtered) 
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    if idx_sequences[0].size > 0:
-        idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > kernel]
-    
-        # Filter each of the selected sequences
-        for seq_f in idx_sequences_to_filter:
-            col_filtered[seq_f] = lowess(col_filtered[seq_f], seq_f, is_sorted=True, frac=kernel/len(seq_f), it=0)[:,1]
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) > kernel]
+
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        col_filtered[seq_f] = lowess(col_filtered[seq_f], seq_f, is_sorted=True, frac=kernel/len(seq_f), it=0)[:,1]
 
     return col_filtered
     
@@ -498,14 +570,14 @@ def median_filter_1d(config_dict, frame_rate, col):
     - col_filtered: Filtered pandas dataframe column
     '''
     
-    median_filter_kernel_size = config_dict.get('filtering').get('median').get('kernel_size')
+    median_filter_kernel_size = config_dict.get('filtering', {}).get('median', {}).get('kernel_size', 3)
     
     col_filtered = signal.medfilt(col, kernel_size=median_filter_kernel_size)
 
     return col_filtered
 
 
-def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0, show=True):
+def display_figures_trc(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0, show=True):
     '''
     Displays filtered and unfiltered data for comparison
 
@@ -523,7 +595,7 @@ def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0
 
     os_name = platform.system()
     if os_name == 'Windows':
-        mpl.use('qt5agg') # windows
+        mpl.use('qtagg') # windows
     mpl.rc('figure', max_open_warning=0)
 
     pw = plotWindow()
@@ -560,6 +632,48 @@ def display_figures_fun(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0
     return pw
 
 
+def display_figures_mot(Q_unfilt, Q_filt, time_col, col_names, person_id=0, show=True):
+    '''
+    Displays filtered and unfiltered mot data for comparison.
+    Each column gets its own tab.
+
+    INPUTS:
+    - Q_unfilt: pandas dataframe of unfiltered data
+    - Q_filt: pandas dataframe of filtered data
+    - time_col: pandas Series of time values
+    - col_names: array of column names
+    - person_id: int
+    - show: boolean
+
+    OUTPUT:
+    - plotWindow with tabbed figures
+    '''
+
+    os_name = platform.system()
+    if os_name == 'Windows':
+        mpl.use('qtagg')
+    mpl.rc('figure', max_open_warning=0)
+
+    pw = plotWindow()
+    pw.MainWindow.setWindowTitle('Person ' + str(person_id) + ' mot data')
+    
+    for id, col_name in enumerate(col_names):
+        f = plt.figure()
+        ax = plt.subplot(111)
+        plt.plot(time_col.to_numpy(), Q_unfilt.iloc[:, id].to_numpy(), label='unfiltered')
+        plt.plot(time_col.to_numpy(), Q_filt.iloc[:, id].to_numpy(), label='filtered')
+        ax.set_ylabel(col_name)
+        ax.set_xlabel('Time (s)')
+        plt.legend()
+        plt.title(col_name)
+        pw.addPlot(col_name, f)
+    
+    if show:
+        pw.show()
+
+    return pw
+
+
 def filter1d(col, config_dict, filter_type, frame_rate):
     '''
     Choose filter type and filter column
@@ -576,6 +690,7 @@ def filter1d(col, config_dict, filter_type, frame_rate):
     # Choose filter
     filter_mapping = {
         'butterworth': butterworth_filter_1d, 
+        'one_euro': one_euro_filter_1d,
         'gcv_spline': gcv_spline_filter_1d,
         'kalman': kalman_filter_1d,
         'butterworth_on_speed': butterworth_on_speed_filter_1d, 
@@ -591,7 +706,7 @@ def filter1d(col, config_dict, filter_type, frame_rate):
     return col_filtered
 
 
-def recap_filter3d(config_dict, trc_path):
+def recap_filter3d(config_dict, output_path):
     '''
     Print a log message giving filtering parameters. Also stored in User/logs.txt.
 
@@ -600,28 +715,32 @@ def recap_filter3d(config_dict, trc_path):
     '''
 
     # Read Config
-    project_dir = config_dict.get('project').get('project_dir')
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    save_plots = config_dict.get('filtering').get('save_filt_plots', True)
+    save_plots = config_dict.get('filtering', {}).get('save_filt_plots', True)
     plots_output_dir = os.path.join(pose3d_dir, 'filtering_plots')
-    do_filter = config_dict.get('filtering').get('filter', True)
-    reject_outliers = config_dict.get('filtering').get('reject_outliers', False)
-    filter_type = config_dict.get('filtering').get('type')
-    kalman_filter_trustratio = int(config_dict.get('filtering').get('kalman').get('trust_ratio'))
-    kalman_filter_smooth = int(config_dict.get('filtering').get('kalman').get('smooth'))
+    do_filter = config_dict.get('filtering', {}).get('filter', True)
+    reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
+    filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
+    filter_ik = config_dict.get('filtering', {}).get('filter_ik', False)
+    kalman_filter_trustratio = int(config_dict.get('filtering', {}).get('kalman', {}).get('trust_ratio', 500))
+    kalman_filter_smooth = int(config_dict.get('filtering', {}).get('kalman', {}).get('smooth', True))
     kalman_filter_smooth_str = 'smoother' if kalman_filter_smooth else 'filter'
-    butterworth_filter_type = 'low' # config_dict.get('filtering').get('butterworth').get('type')
-    butterworth_filter_order = int(config_dict.get('filtering').get('butterworth').get('order'))
-    butterworth_filter_cutoff = int(config_dict.get('filtering').get('butterworth').get('cut_off_frequency'))
-    gcv_filter_cutoff = config_dict.get('filtering').get('gcv_spline', {}).get('cut_off_frequency', 'auto')
-    gcv_filter_smoothing_factor = float(config_dict.get('filtering').get('gcv_spline', {}).get('smoothing_factor', 1.0))
-    butter_speed_filter_type = 'low' # config_dict.get('filtering').get('butterworth_on_speed').get('type')
-    butter_speed_filter_order = int(config_dict.get('filtering').get('butterworth_on_speed').get('order'))
-    butter_speed_filter_cutoff = int(config_dict.get('filtering').get('butterworth_on_speed').get('cut_off_frequency'))
-    gaussian_filter_sigma_kernel = int(config_dict.get('filtering').get('gaussian').get('sigma_kernel'))
-    loess_filter_nb_values = config_dict.get('filtering').get('loess', config_dict.get('filtering').get('LOESS')).get('nb_values_used')
-    median_filter_kernel_size = config_dict.get('filtering').get('median').get('kernel_size')
-    make_c3d = config_dict.get('filtering').get('make_c3d')
+    butterworth_filter_type = 'low' # config_dict.get('filtering', {}).get('butterworth', {}).get('type')
+    butterworth_filter_order = int(config_dict.get('filtering', {}).get('butterworth', {}).get('order', 4))
+    butterworth_filter_cutoff = int(config_dict.get('filtering', {}).get('butterworth', {}).get('cut_off_frequency', 6))
+    gcv_filter_cutoff = config_dict.get('filtering', {}).get('gcv_spline', {}).get('cut_off_frequency', 'auto')
+    gcv_filter_smoothing_factor = float(config_dict.get('filtering', {}).get('gcv_spline', {}).get('smoothing_factor', 1.0))
+    one_euro_filter_1d_min_cutoff = config_dict.get('filtering', {}).get('one_euro', {}).get('cut_off_frequency', 2.5)
+    one_euro_filter_1d_beta = config_dict.get('filtering', {}).get('one_euro', {}).get('beta', 0.9)
+    one_euro_filter_1d_d_cutoff = config_dict.get('filtering', {}).get('one_euro', {}).get('d_cut_off_frequency', 1.0)
+    butter_speed_filter_type = 'low' # config_dict.get('filtering', {}).get('butterworth_on_speed', {}).get('type')
+    butter_speed_filter_order = int(config_dict.get('filtering', {}).get('butterworth_on_speed', {}).get('order', 4))
+    butter_speed_filter_cutoff = int(config_dict.get('filtering', {}).get('butterworth_on_speed', {}).get('cut_off_frequency', 10))
+    gaussian_filter_sigma_kernel = int(config_dict.get('filtering', {}).get('gaussian', {}).get('sigma_kernel', 1))
+    loess_filter_nb_values = config_dict.get('filtering', {}).get('loess', config_dict.get('filtering', {}).get('LOESS', {})).get('nb_values_used', 5)
+    median_filter_kernel_size = config_dict.get('filtering', {}).get('median', {}).get('kernel_size', 3)
+    make_c3d = config_dict.get('filtering', {}).get('make_c3d', True)
     
     # Recap
     if reject_outliers:
@@ -631,7 +750,8 @@ def recap_filter3d(config_dict, trc_path):
     if do_filter:
         filter_mapping_recap = {
             'butterworth': f'--> Filter type: Butterworth {butterworth_filter_type}-pass. Order {butterworth_filter_order}, Cut-off frequency {butterworth_filter_cutoff} Hz.', 
-            'gcv_spline': f'--> Filter type: Generalized Cross-Validation Spline. {"Optimal parameters automatically estimated with smoothing factor {gcv_filter_smoothing_factor}" if gcv_filter_cutoff == "auto" else "Cut-off frequency {gcv_filter_cutoff} Hz"}.',
+            'one_euro': f'--> Filter type: OneEuro (zero-phase). Min cutoff frequency: {one_euro_filter_1d_min_cutoff} Hz, Beta: {one_euro_filter_1d_beta}, Derivative cutoff frequency: {one_euro_filter_1d_d_cutoff} Hz.',
+            'gcv_spline': f'--> Filter type: Generalized Cross-Validation Spline. {f"Optimal parameters automatically estimated with smoothing factor {gcv_filter_smoothing_factor}" if gcv_filter_cutoff == "auto" else "Cut-off frequency {gcv_filter_cutoff} Hz"}.',
             'kalman': f'--> Filter type: Kalman {kalman_filter_smooth_str}. Measurements trusted {kalman_filter_trustratio} times as much as previous data, assuming a constant acceleration process.', 
             'butterworth_on_speed': f'--> Filter type: Butterworth on speed {butter_speed_filter_type}-pass. Order {butter_speed_filter_order}, Cut-off frequency {butter_speed_filter_cutoff} Hz.', 
             'gaussian': f'--> Filter type: Gaussian. Standard deviation kernel: {gaussian_filter_sigma_kernel}', 
@@ -641,8 +761,8 @@ def recap_filter3d(config_dict, trc_path):
         logging.info(filter_mapping_recap[filter_type])
     else:
         logging.info('--> No filtering applied. Set filtering to true in Config.toml to filter coordinates.')
-    logging.info(f'Filtered 3D coordinates are stored at {trc_path}.')
-    if make_c3d:
+    logging.info(f'Filtered {"IK .mot" if filter_ik else "3D .trc"} coordinates are stored at {output_path}.')
+    if make_c3d and not filter_ik:
         logging.info('All filtered trc files have been converted to c3d.')
     if save_plots:
         logging.info(f'Filtering plots are saved in {plots_output_dir}.')
@@ -650,36 +770,37 @@ def recap_filter3d(config_dict, trc_path):
 
 def filter_all(config_dict):
     '''
-    Filter the 3D coordinates of the trc file.
+    Filter the 3D coordinates of trc files, or IK results from mot files.
+    Set filter_ik to true in Config.toml to filter mot files instead of trc files.
     Displays filtered coordinates for checking.
 
     INPUTS:
-    - a trc file
+    - trc or mot files
     - filtration parameters from Config.toml
 
     OUTPUT:
-    - a filtered trc file
+    - filtered trc or mot files
     '''
 
     # Read config_dict
-    project_dir = config_dict.get('project').get('project_dir')
+    project_dir = config_dict.get('project', {}).get('project_dir', '.')
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    display_figures = config_dict.get('filtering').get('display_figures', True)
-    save_plots = config_dict.get('filtering').get('save_filt_plots', True)
+    display_figures = config_dict.get('filtering', {}).get('display_figures', True)
+    save_plots = config_dict.get('filtering', {}).get('save_filt_plots', True)
     plots_output_dir = os.path.join(pose3d_dir, 'filtering_plots')
-    do_filter = config_dict.get('filtering').get('filter', True)
-    reject_outliers = config_dict.get('filtering').get('reject_outliers', False)
-    filter_type = config_dict.get('filtering').get('type')
-    make_c3d = config_dict.get('filtering').get('make_c3d')
+    do_filter = config_dict.get('filtering', {}).get('filter', True)
+    reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
+    filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
+    filter_ik = config_dict.get('filtering', {}).get('filter_ik', False)
+    make_c3d = config_dict.get('filtering', {}).get('make_c3d', True)
     if save_plots and not os.path.exists(plots_output_dir):
         os.makedirs(plots_output_dir)
 
     # Get frame_rate
     video_dir = os.path.join(project_dir, 'videos')
-    frame_range = config_dict.get('project').get('frame_range')
-    vid_img_extension = config_dict['pose']['vid_img_extension']
-    video_files = glob.glob(os.path.join(video_dir, '*'+vid_img_extension))
-    frame_rate = config_dict.get('project').get('frame_rate')
+    frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
+    video_files = sorted([f for f in glob.glob(os.path.join(video_dir, '*')) if is_video_file(f)])
+    frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
     if frame_rate == 'auto': 
         try:
             cap = cv2.VideoCapture(video_files[0])
@@ -688,30 +809,46 @@ def filter_all(config_dict):
                 raise
             frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
-            logging.warning(f'Cannot read video. Frame rate will be set to 60 fps.')
+            logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
             frame_rate = 30  
     
-    # Trc paths
-    trc_path_in = [file for file in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in file]
-    for person_id, t_path_in in enumerate(trc_path_in):
-        logging.info(f'\nFiltering 3D coordinates for person {person_id}...')
-        # Read trc coordinate values
-        t_file_in = os.path.basename(t_path_in)
-        Q_coords, frames_col, time_col, markers, header = read_trc(t_path_in)
+    # Find input files
+    if filter_ik:
+        kinematics_dir = os.path.realpath(os.path.join(project_dir, 'kinematics'))
+        files_in = [f for f in glob.glob(os.path.join(kinematics_dir, '*.mot')) if f.count('filt') <= 1]
+        if not files_in:
+            logging.error(f'No .mot files found in {kinematics_dir}. '
+                        f'Make sure inverse kinematics has been run before filtering mot files, '
+                        f'or set filter_ik to false in Config.toml to filter trc files instead.')
+            raise FileNotFoundError(f'No .mot files found in {kinematics_dir} or {pose3d_dir}. '
+                                    f'Make sure inverse kinematics has been run before filtering mot files, '
+                                    f'or set filter_ik to false in Config.toml to filter trc files instead.')
+    else:
+        files_in = [f for f in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in f]
 
-        # frame range selection
-        f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if (frame_range in ('all', 'auto', []) or frames_col.iloc[0]>frame_range[0] or frames_col.iloc[1]<frame_range[1]) else frame_range][0]
-        frame_nb = f_range[1] - f_range[0]
-        f_index = [frames_col[frames_col==f_range[0]].index[0], frames_col[frames_col==f_range[1]-1].index[0]+1]
-        Q_coords = Q_coords.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
-        frames_col = frames_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
-        time_col = time_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
+    for person_id, file_path_in in enumerate(files_in):
+        logging.info(f'\nFiltering {"IK mot" if filter_ik else "3D trc"} data for person {person_id}...')
 
-        t_path_out = t_path_in.replace(t_path_in.split('_')[-1], f'{f_range[0]}-{f_range[1]}_filt_{filter_type}.trc')
-        t_file_out = os.path.basename(t_path_out)
-        header[0] = header[0].replace(t_file_in, t_file_out)
-        header[2] = '\t'.join(part if i != 2 else str(frame_nb) for i, part in enumerate(header[2].split('\t')))
-        header[2] = '\t'.join(part if i != 7 else str(frame_nb)+'\n' for i, part in enumerate(header[2].split('\t')))
+        # Read file
+        if filter_ik:
+            Q_coords, time_col, header = read_mot(file_path_in)
+        else:
+            Q_coords, frames_col, time_col, markers, header = read_trc(file_path_in)
+
+        # Frame range selection
+        if filter_ik:
+            file_path_out = file_path_in.replace('.mot', f'_filt_{filter_type}.mot')
+        else:
+            f_range = [[frames_col.iloc[0], frames_col.iloc[-1]]
+                       if (frame_range in ('all', 'auto', []) or frames_col.iloc[0]>frame_range[0] or frames_col.iloc[1]<frame_range[1]) 
+                       else frame_range][0]
+            f_index = [frames_col[frames_col==f_range[0]].index[0], frames_col[frames_col==f_range[1]-1].index[0]+1]
+            Q_coords = Q_coords.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
+            frames_col = frames_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
+            time_col = time_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
+            file_path_out = file_path_in.replace(file_path_in.split('_')[-1], f'{f_range[0]}-{f_range[1]}_filt_{filter_type}.trc')
+            file_out = os.path.basename(file_path_out)
+            header[0] = header[0].replace(os.path.basename(file_path_in), file_out)
 
         # Filter coordinates
         if reject_outliers:
@@ -721,33 +858,34 @@ def filter_all(config_dict):
             Q_filt = Q_coords.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
 
         if not do_filter and not reject_outliers:
-            logging.warning(f'reject_outliers and filter have been set to false. No further processing done on {t_path_in}.\n')
+            logging.warning(f'reject_outliers and filter have been set to false. No further processing done on {file_path_in}.\n')
         
         else:
             # Display figures
             if display_figures or save_plots:
-                # Retrieve keypoints
-                keypoints_names = pd.read_csv(t_path_in, sep="\t", skiprows=3, nrows=0).columns[2::3][:-1].to_numpy()
-                pw = display_figures_fun(Q_coords, Q_filt, time_col, keypoints_names, person_id, show=display_figures)
+                col_names = Q_coords.columns.to_numpy() if filter_ik else Q_coords.columns.to_numpy()[::3]
+                fig_args = Q_coords, Q_filt, time_col, col_names, person_id, display_figures
+                pw = display_figures_mot(*fig_args) if filter_ik else display_figures_trc(*fig_args)
                 if save_plots:
                     for n, f in enumerate(pw.figure_handles):
-                        dpi = pw.canvases[person_id].figure.dpi
+                        dpi = pw.canvases[0].figure.dpi
                         f.set_size_inches(1280/dpi, 720/dpi)
                         title = pw.tabs.tabText(n)
                         plot_path = os.path.join(plots_output_dir, f'person{person_id:02d}_{title.replace(" ","_").replace("/","_")}.png')
                         f.savefig(plot_path, dpi=dpi, bbox_inches='tight')
 
-            # Reconstruct trc file with filtered coordinates
-            with open(t_path_out, 'w') as trc_o:
-                [trc_o.write(line) for line in header]
-                Q_filt.insert(0, 'Frame#', frames_col)
-                Q_filt.insert(1, 'Time', time_col)
-                # Q_filt = Q_filt.fillna(' ')
-                Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
-
-            # Save c3d
-            if make_c3d:
-                convert_to_c3d(t_path_out)
+            # Write output file
+            if filter_ik:
+                write_mot(file_path_out, Q_filt, time_col, header)
+            else:
+                with open(file_path_out, 'w') as trc_o:
+                    [trc_o.write(line) for line in header]
+                    Q_filt.insert(0, 'Frame#', frames_col)
+                    Q_filt.insert(1, 'Time', time_col)
+                    # Q_filt = Q_filt.fillna(' ')
+                    Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+                if make_c3d:
+                    convert_to_c3d(file_path_out)
 
             # Recap
-            recap_filter3d(config_dict, t_path_out)
+            recap_filter3d(config_dict, file_path_out)

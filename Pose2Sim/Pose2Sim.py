@@ -120,8 +120,8 @@ def read_config_files(config):
     if type(config)==dict:
         level = 2 # log_dir = os.getcwd()
         config_dicts = [config]
-        if config_dicts[0].get('project').get('project_dir') == None:
-            config_dicts[0].get('project').get('project_dir') == '.'
+        if config_dicts[0].get('project', {}).get('project_dir') == None:
+            config_dicts[0].get('project', {}).get('project_dir') == '.'
             logging.warning('Project directory not specified in config dictionary: using current directory.')
 
             # raise ValueError('Please specify the project directory in config_dict:\n \
@@ -141,7 +141,7 @@ def read_config_files(config):
             except:
                 # if single trial
                 session_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
-            session_config_dict.get("project").update({"project_dir":config_dir})
+            session_config_dict.get("project", {}).update({"project_dir":config_dir})
             config_dicts = [session_config_dict]
 
         # Root level
@@ -155,8 +155,8 @@ def read_config_files(config):
                     # deep copy, otherwise session_config_dict is modified at each iteration within the config_dicts list
                     temp_dict = deepcopy(session_config_dict)
                     temp_dict = recursive_update(temp_dict,trial_config_dict)
-                    temp_dict.get("project").update({"project_dir":os.path.join(config_dir, os.path.relpath(root))})
-                    if not os.path.basename(root) in temp_dict.get("project").get('exclude_from_batch'):
+                    temp_dict.get("project", {}).update({"project_dir":os.path.join(config_dir, os.path.relpath(root))})
+                    if not os.path.basename(root) in temp_dict.get("project", {}).get('exclude_from_batch', []):
                         config_dicts.append(temp_dict)
 
     return level, config_dicts
@@ -165,18 +165,23 @@ class Pose2SimPipeline:
     def __init__(self, config=None):
         self.level, self.config_dicts = read_config_files(config)
         try:
-            self.session_dir = os.path.realpath([os.getcwd() if self.level==2 else os.path.join(os.getcwd(), '..')][0])
+            if type(config) == dict:
+                # Use project_dir from the config dict instead of os.getcwd()
+                project_dir = config.get('project', {}).get('project_dir', os.getcwd())
+                self.session_dir = os.path.realpath([project_dir if self.level==2 else os.path.join(project_dir, '..')][0])
+            else:
+                self.session_dir = os.path.realpath([os.getcwd() if self.level==2 else os.path.join(os.getcwd(), '..')][0])
             [os.path.join(self.session_dir, c) for c in os.listdir(self.session_dir) if 'calib' in c.lower() and not c.lower().endswith('.py')][0]
         except:
-            self.session_dir = os.path.realpath(os.getcwd())
+            self.session_dir = os.path.realpath(config.get('project', {}).get('project_dir', os.getcwd()) if type(config) == dict else os.getcwd())
         use_custom_logging = self.config_dicts[0].get('logging', {}).get('use_custom_logging', False)
         if not use_custom_logging:
             setup_logging(self.session_dir)
 
     def _log_step_header(self, step_name, config_dict):
-        project_dir = os.path.realpath(config_dict.get('project').get('project_dir'))
+        project_dir = os.path.realpath(config_dict.get('project', {}).get('project_dir', '.'))
         seq_name = os.path.basename(project_dir)
-        frame_range = config_dict.get('project').get('frame_range')
+        frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
         frames = "all frames" if not frame_range or frame_range in ('all','auto') else f"frames {frame_range[0]} to {frame_range[1]}"
         logging.info("\n---------------------------------------------------------------------")
         logging.info(f"{step_name} for {seq_name}, for {frames}.")
@@ -187,7 +192,7 @@ class Pose2SimPipeline:
     def calibration(self):
         from Pose2Sim.calibration import calibrate_cams_all
         config_dict = self.config_dicts[0]
-        config_dict.get("project").update({"session_dir": self.session_dir})
+        config_dict.get("project", {}).update({"session_dir": self.session_dir})
 
         try:
             calib_dirs = [

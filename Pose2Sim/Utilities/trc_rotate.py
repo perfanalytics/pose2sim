@@ -79,7 +79,7 @@ def trc_rotate_func(**args):
     trc_rotate -i input_trc_file --rotate90=-X      # Equivalently
     '''
 
-    trc_path = args.get('input')
+    trc_path = str(args.get('input'))
     output_trc_path = args.get('output')
     rotate90 = args.get('rotate90')
     if rotate90 is None:
@@ -95,6 +95,7 @@ def trc_rotate_func(**args):
     trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4, encoding='utf-8')
     frames_col, time_col = trc_df.iloc[:,0], trc_df.iloc[:,1]
     Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
+    Q_coord = Q_coord.loc[:, ~Q_coord.columns.str.contains('^Unnamed')]
 
     # rotate coordinates
     cols = Q_coord.values.reshape(-1,3)

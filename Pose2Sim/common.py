@@ -11,6 +11,7 @@ Functions shared between modules, and other utilities
 '''
 
 ## INIT
+import os
 import toml
 import json
 import numpy as np
@@ -28,9 +29,6 @@ from anytree import PreOrderIter
 
 import tkinter as tk
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="c3d")
 
@@ -48,6 +46,9 @@ __status__ = "Development"
 
 
 ## CONSTANTS
+# 4 points joint angle: between knee and ankle, and toe and heel. Add 90° offset and multiply by -1
+# 3 points joint angle: between ankle, knee, hip. -180° offset, multiply by -1
+# 2 points segment angle: between horizontal and ankle and knee, 0° offset, multiply by 1 (except trunk and head: -1)
 angle_dict = { # lowercase!
     # joint angles
     'right ankle': [['RKnee', 'RAnkle', 'RBigToe', 'RHeel'], 'dorsiflexion', 90, 1],
@@ -108,6 +109,19 @@ class plotWindow():
     '''
 
     def __init__(self, parent=None):
+        # Lazy imports: PySide6 requires a display server and crashes on headless
+        # environments (e.g. CI runners) if imported at module level. Since
+        # common.py is imported by nearly every module, we defer Qt imports to
+        # here so only code that actually creates a plotWindow needs a display.
+        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+        from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+        from PySide6.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
+
+        self.FigureCanvas = FigureCanvas
+        self.NavigationToolbar = NavigationToolbar
+        self.QWidget = QWidget
+        self.QVBoxLayout = QVBoxLayout
+
         self.app = QApplication.instance()
         if not self.app:
             self.app = QApplication(sys.argv)
@@ -124,13 +138,13 @@ class plotWindow():
         self.MainWindow.show()
 
     def addPlot(self, title, figure):
-        new_tab = QWidget()
-        layout = QVBoxLayout()
+        new_tab = self.QWidget()
+        layout = self.QVBoxLayout()
         new_tab.setLayout(layout)
 
         figure.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.91, wspace=0.2, hspace=0.2)
-        new_canvas = FigureCanvas(figure)
-        new_toolbar = NavigationToolbar(new_canvas, new_tab)
+        new_canvas = self.FigureCanvas(figure)
+        new_toolbar = self.NavigationToolbar(new_canvas, new_tab)
 
         layout.addWidget(new_canvas)
         layout.addWidget(new_toolbar)
@@ -142,19 +156,139 @@ class plotWindow():
         self.tab_handles.append(new_tab)
 
     def show(self):
-        self.app.exec_() 
+        self.app.exec()
 
 
 ## FUNCTIONS
+def is_video_file(path):
+    '''
+    Check if the given path is a video file based on its extension.
+    
+    INPUTS:
+    - path (str): The file path to check.
+
+    OUTPUTS:
+    - bool: True if the path is a video file, False otherwise.
+    '''
+
+    video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.mpeg', '.mpg'}
+    return os.path.isfile(path) and os.path.splitext(path)[1].lower() in video_extensions
+
+
+def is_image_file(path):
+    '''
+    Check if the given path is an image file based on its extension.
+    
+    INPUTS:
+    - path (str): The file path to check.
+
+    OUTPUTS:
+    - bool: True if the path is an image file, False otherwise.
+    '''
+
+    image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.webp'}
+    return os.path.isfile(path) and os.path.splitext(path)[1].lower() in image_extensions
+
+
+def get_max_workers(device='cpu'):
+    '''
+    Determine the number of parallel workers for pose estimation.
+    
+    INPUTS:
+        device: 'cpu', 'cuda', 'mps', 'rocm'
+    
+    OUTPUTS:
+        max_workers: Number of workers (>= 1)
+    '''
+    
+    if device == 'cpu':
+        # Half of the CPU cores
+        cpu_count = os.cpu_count() or 4
+        max_workers = max(1, cpu_count // 2)
+    
+    else:
+        # ~1 GB per worker, 20% headroom
+        try: 
+            # 'cuda' or 'rocm'
+            import torch
+            vram_gb = torch.cuda.mem_get_info(0)[0] / 1e9
+            max_workers = max(1, int(vram_gb * 0.8)) 
+        except Exception: 
+            # 'mps' or fallback
+            max_workers = 4
+
+    return max_workers
+
+
+def read_mot(mot_path):
+    '''
+    Read an OpenSim .mot file
+    
+    INPUT:
+    - mot_path: path to the .mot file
+    
+    OUTPUT:
+    - data: pandas DataFrame with all data columns, excluding time
+    - time_col: pandas Series of time values
+    - header: list of header lines
+    '''
+    
+    header_lines = []
+    header_end_line = 0
+    with open(mot_path, 'r') as f:
+        lines = f.readlines()
+    
+    # Find the end of the header (line with "endheader")
+    for i, line in enumerate(lines):
+        if line.strip().lower() == 'endheader':
+            header_end_line = i
+            break
+        
+    header_lines = lines[:header_end_line + 1]
+    
+    # Read the data portion
+    data = pd.read_csv(mot_path, sep='\t', skiprows=header_end_line + 1)
+    
+    # Separate time column from data columns
+    time_col = data.iloc[:, 0]  # first column is time
+    data_cols = data.iloc[:, 1:]  # remaining columns are data
+    
+    return data_cols, time_col, header_lines
+
+
+def write_mot(mot_path, data, time_col, header_lines):
+    '''
+    Write a .mot file (OpenSim motion file).
+    
+    INPUT:
+    - mot_path: path to the output .mot file
+    - data: pandas DataFrame of filtered data columns
+    - time_col: pandas Series of time values
+    - header_lines: list of header lines
+    '''
+    
+    with open(mot_path, 'w') as f:
+        for line in header_lines:
+            f.write(line)
+        # Combine time and data
+        output = data.copy()
+        output.insert(0, time_col.name if time_col.name else 'time', time_col)
+        output.to_csv(f, sep='\t', index=False, lineterminator='\n')
+
+
 def read_trc(trc_path):
     '''
-    Read a TRC file and extract its contents.
+    Read an OpenSim .trc file and extract its contents.
 
     INPUTS:
     - trc_path (str): The path to the TRC file.
 
     OUTPUTS:
-    - tuple: A tuple containing the Q coordinates, frames column, time column, marker names, and header.
+    - Q_coords (DataFrame): A DataFrame containing the Q coordinates of the markers.
+    - frames_col (Series): A Series containing the frame numbers.
+    - time_col (Series): A Series containing the time values.
+    - markers (list): A list of marker names.
+    - header (list): A list of header lines.
     '''
 
     try:
@@ -697,7 +831,7 @@ def interpolate_zeros_nans(col, *args):
     if 'kind' not in locals(): # 'linear', 'slinear', 'quadratic', 'cubic'
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind="linear", bounds_error=False)
     else:
-        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, fill_value='extrapolate', bounds_error=False)
+        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, bounds_error=False)
     col_interp = col.where(mask, f_interp(col.index)) #replace at false index with interpolated values
     
     # Reintroduce nans if length of sequence > N
@@ -719,8 +853,8 @@ def points_to_angles(points_list):
     If len(points_list)==4, computes clockwise angle between vectors ab and cd (e.g. Neck Hip, RKnee RHip)
     
     Points can be 2D or 3D.
-    If parameters are float, returns a float between 0.0 and 360.0
-    If parameters are arrays, returns an array of floats between 0.0 and 360.0
+    If parameters are float, returns a float between -180.0 and 180.0
+    If parameters are arrays, returns an array of floats between -180.0 and 180.0
 
     INPUTS:
     - points_list: list of arrays of points
@@ -737,10 +871,16 @@ def points_to_angles(points_list):
 
     if len(points_list) == 2:
         vector_u = points_array[0] - points_array[1]
-        if len(points_array.shape)==2:
-            vector_v = np.array([1, 0, 0]) # Here vector X, could be any horizontal vector
+        if dimensions == 2:
+            # Segment angle w.r.t. horizontal: atan2(dy, dx) directly
+            ang = np.arctan2(vector_u[1], vector_u[0])
+            ang_deg = np.degrees(ang)
+            return ang_deg
         else:
-            vector_v = np.array([[1, 0, 0],] * points_array.shape[1]) 
+            if len(points_array.shape)==2:
+                vector_v = np.array([1, 0, 0])
+            else:
+                vector_v = np.array([[1, 0, 0],] * points_array.shape[1])
 
     elif len(points_list) == 3:
         vector_u = points_array[0] - points_array[1]
@@ -753,24 +893,27 @@ def points_to_angles(points_list):
     else:
         return np.nan
 
-    if dimensions == 2: 
-        vector_u = vector_u[:2]
-        vector_v = vector_v[:2]
-        ang = np.arctan2(vector_u[1], vector_u[0]) - np.arctan2(vector_v[1], vector_v[0])
+    if dimensions == 2:
+        # atan2(cross, dot) gives angle from u to v (CCW positive).
+        # Negate to get angle from v to u, matching the old atan2(u)-atan2(v) convention.
+        # Range: (-180, 180) instead of (-360, 360), eliminating discontinuities.
+        cross = vector_u[0] * vector_v[1] - vector_u[1] * vector_v[0]
+        dot = vector_u[0] * vector_v[0] + vector_u[1] * vector_v[1]
+        ang = -np.arctan2(cross, dot)
     else:
         cross_product = np.cross(vector_u, vector_v)
-        dot_product = np.einsum('ij,ij->i', vector_u, vector_v) # np.dot(vector_u, vector_v) # does not work with time series
-        ang = np.arctan2(np.linalg.norm(cross_product,axis=1), dot_product)
+        dot_product = np.einsum('ij,ij->i', vector_u, vector_v) # np.dot(vector_u, vector_v) does not work with time series
+        ang = np.arctan2(np.linalg.norm(cross_product, axis=-1), dot_product)
 
     ang_deg = np.degrees(ang)
-    # ang_deg = np.array(np.degrees(np.unwrap(ang*2)/2))
     
     return ang_deg
 
 
 def fixed_angles(points_list, ang_name):
     '''
-    Add offset and multiplying factor to angles
+    Compute angle and apply offset and scaling factor.
+    Wraps result to (-180, 180] for most angles, or (-90, 90] for pelvis/shoulders.
 
     INPUTS:
     - points_list: list of arrays of points
@@ -782,14 +925,12 @@ def fixed_angles(points_list, ang_name):
 
     ang_params = angle_dict[ang_name]
     ang = points_to_angles(points_list)
-    ang += ang_params[2]
-    ang *= ang_params[3]
+    ang = (ang + ang_params[2]) * ang_params[3]
+    
     if ang_name in ['pelvis', 'shoulders']:
-        ang = np.where(ang>90, ang-180, ang)
-        ang = np.where(ang<-90, ang+180, ang)
+        ang = (ang + 90) % 180 - 90
     else:
-        ang = np.where(ang>180, ang-360, ang)
-        ang = np.where(ang<-180, ang+360, ang)
+        ang = (ang + 180) % 360 - 180
 
     return ang
 
@@ -869,29 +1010,33 @@ def add_neck_hip_coords(kpt_name, p_X, p_Y, p_scores, kpt_ids, kpt_names):
     return p_X, p_Y, p_scores
 
 
-def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, close_to_zero_speed=0.2, large_hip_knee_angles=45):
+def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, slowest_frames_to_remove_percent=0.2, large_hip_knee_angles=45):
     '''
     Compute the best coordinates for measurements, after removing:
     - 20% fastest frames (may be outliers)
-    - frames when speed is close to zero (person is out of frame): 0.2 m/frame, or 50 px/frame
+    - 20% slowest frames (may be outliers)
     - frames when hip and knee angle below 45° (imprecise coordinates when person is crouching)
     
     INPUTS:
     - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
     - keypoints_names: list. The list of marker names
     - fastest_frames_to_remove_percent: float
-    - close_to_zero_speed: float (sum for all keypoints: about 50 px/frame or 0.2 m/frame)
+    - slowest_frames_to_remove_percent: float
     - large_hip_knee_angles: int
-    - trimmed_extrema_percent
+    - trimmed_extrema_percent: float
 
     OUTPUT:
     - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
     '''
 
+    # Remove nans
+    Q_coords = Q_coords.dropna(how='all')
+
     # Add MidShoulder column
-    df_MidShoulder = pd.DataFrame((Q_coords['RShoulder'].values + Q_coords['LShoulder'].values) /2)
-    df_MidShoulder.columns = ['MidShoulder']*3
-    Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_MidShoulder), axis=1)
+    if 'MidShoulder' not in Q_coords.columns:
+        df_MidShoulder = pd.DataFrame((Q_coords['RShoulder'].values + Q_coords['LShoulder'].values) /2)
+        df_MidShoulder.columns = ['MidShoulder']*3
+        Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_MidShoulder), axis=1)
 
     # Add Hip column if not present
     n_markers_init = len(keypoints_names)
@@ -901,15 +1046,19 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
         Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_Hip), axis=1)
     n_markers = len(keypoints_names)
 
-    # Using 80% slowest frames
+    # Excluding 20% slowest and fastest frames
     sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords[kpt].diff(), axis=1) for kpt in keypoints_names], axis=0))
-    sum_speeds = sum_speeds[sum_speeds>close_to_zero_speed] # Removing when speeds close to zero (out of frame)
-    if len(sum_speeds)==0:
-        logging.warning('All frames have speed close to zero. Make sure the person is moving and correctly detected, or change close_to_zero_speed to a lower value. Not restricting the speeds to be above any threshold.')
+    try:
+        n_frames = len(sum_speeds)
+        sorted_speed_indices = sum_speeds.abs().sort_values().index
+        reasonable_speed_indices = sorted_speed_indices[int(n_frames * slowest_frames_to_remove_percent) :
+                                                        n_frames - int(n_frames * fastest_frames_to_remove_percent)]
+        Q_coords_low_speeds = Q_coords.iloc[reasonable_speed_indices].reset_index(drop=True)
+        if len(Q_coords_low_speeds) == 0:
+            logging.warning(f'No frames left after excluding the {slowest_frames_to_remove_percent:.0%} slowest and {fastest_frames_to_remove_percent:.0%} fastest frames. Make sure the person is moving and correctly detected, or change slowest_frames_to_remove_percent and fastest_frames_to_remove_percent. Not excluding any frames as a fallback.')
+            raise ValueError(f'No frames left after excluding the {slowest_frames_to_remove_percent:.0%} slowest and {fastest_frames_to_remove_percent:.0%} fastest frames. Make sure the person is moving and correctly detected, or change slowest_frames_to_remove_percent and fastest_frames_to_remove_percent. Not excluding any frames as a fallback.')
+    except:
         Q_coords_low_speeds = Q_coords
-    else:
-        min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
-        Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
     
     # Only keep frames with hip and knee flexion angles below 45% 
     # (if more than 50 of them, else take 50 smallest values)
@@ -920,10 +1069,10 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
             Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
     except:
         Q_coords_low_speeds_low_angles = Q_coords_low_speeds
-        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}°.")
+        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}° as a fallback.")
 
     if Q_coords_low_speeds_low_angles.empty:
-        logging.warning('The selected person might not move, or is crouching for the whole sequence, or is not well detected. Taking all available data instead of filtering them.')
+        logging.warning('The selected person might not move, or is crouching for the whole sequence, or is not well detected. Taking all available data instead of filtering them as a fallback.')
         Q_coords_low_speeds_low_angles = Q_coords.copy()
     
     if n_markers_init < n_markers:
@@ -932,7 +1081,7 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
     return Q_coords_low_speeds_low_angles
 
 
-def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, slowest_frames_to_remove_percent=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Compute the height of the person from the trc data.
 
@@ -940,7 +1089,7 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
     - keypoints_names: list. The list of marker names
     - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
-    - close_to_zero_speed: float. Sum for all keypoints: about 50 px/frame or 0.2 m/frame
+    - slowest_frames_to_remove_percent: float. Frames with low speed are considered as outliers
     - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
     - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
     
@@ -950,7 +1099,7 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     
     # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
     Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, keypoints_names, 
-                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, close_to_zero_speed=close_to_zero_speed, large_hip_knee_angles=large_hip_knee_angles)
+                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, slowest_frames_to_remove_percent=slowest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles)
 
     # Automatically compute the height of the person
     feet_pairs = [['RHeel', 'RAnkle'], ['LHeel', 'LAnkle']]
@@ -990,14 +1139,14 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     return height
 
 
-def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, slowest_frames_to_remove_percent=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Compute the leg length of the person from the trc data.
 
     INPUTS:
     - Q_coords: path to the trc file (can be in m or px)
     - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
-    - close_to_zero_speed: float. Sum for all keypoints: about 50 px/frame or 0.2 m/frame
+    - slowest_frames_to_remove_percent: float. Frames with low speed are considered as outliers
     - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
     - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
 
@@ -1010,7 +1159,7 @@ def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, close_to_
     # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
     Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers,
                                                                   fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
-                                                                  close_to_zero_speed=close_to_zero_speed,
+                                                                  slowest_frames_to_remove_percent=slowest_frames_to_remove_percent,
                                                                   large_hip_knee_angles=large_hip_knee_angles)
 
     # leg length will be considered as the distance from the hip joint centre to the ankle joint centre
@@ -1455,31 +1604,29 @@ def calculate_display_size(W, H, screen_width, screen_height, margin=100):
 def set_always_on_top(fig):
     '''
     Set a matplotlib figure window to be always on top.
-    Works with Tkinter, PyQt5, and PySide2 backends.
+    Works with Tkinter and Qt backends (PySide6, PyQt5, PySide2).
     
     INPUTS:
     - fig: matplotlib figure object
     '''
 
     try:
-        # Try Tk method first
+        # Tk backend
         fig.canvas.manager.window.wm_attributes("-topmost", True)
-        print("Set always on top using Tk method")
     except AttributeError:
+        # Qt backend
         try:
-            # Try Qt method
-            from PyQt5.QtCore import Qt
-            window = fig.canvas.manager.window
-            window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
-            window.show()
-            print("Set always on top using Qt method")
-        except (ImportError, AttributeError):
             try:
-                # Try PySide2
-                from PySide2.QtCore import Qt
-                window = fig.canvas.manager.window
-                window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
-                window.show()
-                print("Set always on top using PySide2 method")
-            except (ImportError, AttributeError):
-                print("Could not set always on top - backend not supported")
+                from PySide6.QtCore import Qt
+                hint = Qt.WindowType.WindowStaysOnTopHint
+            except ImportError:
+                try:
+                    from PyQt5.QtCore import Qt
+                except ImportError:
+                    from PySide2.QtCore import Qt
+                hint = Qt.WindowStaysOnTopHint
+            window = fig.canvas.manager.window
+            window.setWindowFlags(window.windowFlags() | hint)
+            window.show()
+        except (ImportError, AttributeError):
+            pass

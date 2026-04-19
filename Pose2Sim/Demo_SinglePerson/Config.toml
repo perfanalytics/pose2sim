@@ -34,13 +34,11 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 
 [pose]
-vid_img_extension = 'mp4' # any video or image extension
-
 pose_model = 'Body_with_feet'  #With RTMLib: 
                          # - Body_with_feet (default HALPE_26 model), 
                          # - Whole_body_wrist (COCO_133_WRIST: body + feet + 2 hand_points), 
                          # - Whole_body (COCO_133: body + feet + hands), 
-                         # - Body (COCO_17). Marker augmentation won't work, Kinematic analysis will work,
+                         # - Body (COCO_17). Marker augmentation won't work, Kinematic analysis will,
                          # - Hand (HAND_21, only lightweight mode. Potentially better results with Whole_body), 
                          # - Face (FACE_106), 
                          # - Animal (ANIMAL2D_17)
@@ -79,20 +77,21 @@ det_frequency = 4 # Run person detection only every N frames, and inbetween trac
                   # Equal to or greater than 1, can be as high as you want in simple uncrowded cases. Much faster, but might be less accurate. 
 device = 'auto' # 'auto', 'CPU', 'CUDA', 'MPS', 'ROCM'
 backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
+parallel_workers_pose = 'auto' # 'auto', int, or false # One worker per video, using GPU if available
+                               # Requires display_detection = false, otherwise falls back to sequential (ie parallel_workers_pose = 1/false).
+display_detection = true # Real-time display of the videos with pose estimation. Set to false for parallel processing.
+overwrite_pose = false # Set to false if you don't want to recalculate pose estimation when it has already been done
+save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
+output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
+average_likelihood_threshold_pose = 0.5 # Detections dropped if their average keypoint likelihood is below average_likelihood_threshold_pose
 tracking_mode = 'sports2d' # 'none', 'sports2d' or 'deepsort'. 'deepsort' is slower but more robust in difficult configurations
 max_distance_px = 100  # px # If a person is detected further than max_distance from its position on the previous frame, it will be considered as a new one
 deepsort_params = """{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8}""" # """{dictionary between 3 double quotes}"""
                   # More robust in crowded scenes but Can be tricky to parametrize. More information there: https://github.com/levan92/deep_sort_realtime/blob/master/deep_sort_realtime/deepsort_tracker.py#L51
                   # Note: For faster and more robust tracking, use {'embedder_gpu': True, embedder':'torchreid'}, which uses the GPU and runs osnet_ain_x1_0 by default. requires `pip install torch torchvision torchreid gdown tensorboard`
-
-handle_LR_swap = false # Might be useful if cameras film from the sagittal plane and the right and left sides are hard to differenciate to your eye.
-undistort_points = false # Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
-
-display_detection = true # Real-time display of the videos with pose estimation
-overwrite_pose = false # Set to false if you don't want to recalculate pose estimation when it has already been done
-save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
-output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
+handle_LR_swap = false # Not implemented yet. Might be useful if cameras film from the sagittal plane and the right and left sides are hard to differenciate to your eye.
+undistort_points = false # Not implemented yet. Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
 
 
 [synchronization]
@@ -104,7 +103,7 @@ keypoints_to_consider = 'all' # 'all' if all points should be considered, for ex
 approx_time_maxspeed = 'auto' # 'auto' if you want to consider the whole capture (default, slower if long sequences)
                            # [10.0, 2.0, 8.0, 11.0] list of times (seconds) if you want to specify the approximate time of a clear vertical event for each camera
 time_range_around_maxspeed = 2.0 # Search for best correlation in the range [approx_time_maxspeed - time_range_around_maxspeed, approx_time_maxspeed  + time_range_around_maxspeed]
-likelihood_threshold = 0.4 # Keypoints whose likelihood is below likelihood_threshold are filtered out
+likelihood_threshold_synchronization = 0.4 # Keypoints whose likelihood is below likelihood_threshold are filtered out
 filter_cutoff = 6 # time series are smoothed to get coherent time-lagged correlation
 filter_order = 4
 
@@ -189,20 +188,25 @@ calibration_type = 'convert' # 'convert' or 'calculate'
                       
 
 [triangulation]
-reproj_error_threshold_triangulation = 15 # px # keypoint not triangulated if reprojection error is above 
-likelihood_threshold_triangulation= 0.3 # keypoint ignored if 2D likelihood is below
-min_cameras_for_triangulation = 2 # Won't triangulate a point if less than N cameras see it correctly
-interp_if_gap_smaller_than = 20 # do not interpolate larger gaps
-max_distance_m = 1.0 # m # if a person is detected further than max_distance from its position on the previous frame, it will be considered as a new one
+# for each frame, each keypoint: if results are not good, we remove a camera and try again
+reproj_error_threshold_triangulation = 15 # px # if reprojection error is above, triangulation results won't be accepted
+likelihood_threshold_triangulation= 0.3 # if 2D likelihood is below, estimations for this camera won't be accepted
+min_cameras_for_triangulation = 2 # stops trying to triangulate if results still not good with min_cameras_for_triangulation cameras. 
+                                  # Increase if you have many cameras and want to be more robust to occlusions
 
-interpolation = 'linear' # linear, slinear, quadratic, cubic, or none
-                        # 'none' if you don't want to interpolate missing points
-remove_incomplete_frames = false # true or false (lowercase) # If true, if any keypoint cannot be triangulated, the full time frame is removed
+# gap filling
+max_distance_m = 1.0 # m # max_distance a person can jump from its previous position before being considered as a new one
+interp_if_gap_smaller_than = 20 # do not interpolate larger gaps
+interpolation = 'linear' # linear, slinear, quadratic, cubic, or none # 'none' if you don't want to interpolate missing points
+
+# cleaning up
+remove_incomplete_frames = false # true or false (lowercase) # If true, frame is kept only if all keypoints have been correctly triangulated
 sections_to_keep = 'all' # 'all', 'largest', 'first', 'last'
-                        # keep 'all' valid sections even when they are interspersed with untriangulated chunks, or the 'largest' valid section, or the 'first' one, or the 'last' one
-min_chunk_size = 10 # Minimum number of valid frames in a row to keep a chunk of data for a person
+                        # keep 'all' correctly triangulated sections, or the 'largest' valid section, or the 'first' one, or the 'last' one
+min_chunk_size = 10 # Minimum number of consecutive valid frames to make it a section to keep
 fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
 
+# output
 show_interp_indices = true # true or false (lowercase). For each keypoint, return the frames that need to be interpolated
 make_c3d = true # save triangulated data in c3d format in addition to trc
 
@@ -210,7 +214,8 @@ make_c3d = true # save triangulated data in c3d format in addition to trc
 [filtering]
 reject_outliers = true      # Hampel filter for outlier rejection before other filtering methods. Can be slow. Rejects outliers that are outside of a 95% confidence interal from the median in a sliding window of size 7.
 filter = true               # Proceed to further filtering after outlier rejection.
-type = 'butterworth' # butterworth, kalman, gvc_spline, gaussian, LOESS, median, butterworth_on_speed
+filter_ik = false           # If true, will attempt to filter IK .mot files instead of triangulated .trc files
+type = 'butterworth' # butterworth, kalman, one_euro, gvc_spline, gaussian, LOESS, median, butterworth_on_speed
 
 display_figures = true # true or false (lowercase) 
 save_filt_plots = true # true or false (lowercase) # save filtering plots
@@ -221,11 +226,17 @@ make_c3d = true # also save triangulated data in c3d format
    cut_off_frequency = 6 # Hz # Will be divided by slowmo_factor to be equivalent to non slowed-down video
    order = 4 
 
-   # Used in countless applications, this one is a simplified Kalman filter 
+   # Used in countless applications, especially real-time. This one is a simplified Kalman filter 
    [filtering.kalman]
    # How much more do you trust triangulation results (measurements), than the assumption of constant acceleration(process)?
    trust_ratio = 500 # = measurement_trust/process_trust ~= process_noise/measurement_noise
    smooth = true # should be true, unless you need real-time filtering
+
+   # Simpler and even faster alternative to Kalman filter for real-time, but tends to blunt RoM. Similar to a 1st order Butterworth but with adaptive cut-off frequency. This one is zero-phase
+   [filtering.one_euro]
+   cut_off_frequency = 4.0 # Hz # cutoff frequency, similar to Butterworth but adapts to velocity (with beta)
+   beta = 1.5 # cutoff adaptation to velocity: cut_off_frequency = cut_off_frequency + beta*velocity
+   d_cut_off_frequency = 1.0 # Hz # cutoff frequency for derivative (1.0 is usually good)
 
    # Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips).
    [filtering.gcv_spline]
@@ -254,13 +265,14 @@ make_c3d = true # save triangulated data in c3d format in addition to trc
 [kinematics]
 use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
 use_simple_model = false # true or false # >10 times faster IK if true. No muscles, no constraints (eg stiff spine and shoulders, no patella)
+parallel_workers_kinematics = 'auto' # 'auto', int, or false # One worker per person, uses CPU. Only available in multi-person mode.
 right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)
 
 default_height = 1.7 # meters # If automatic height calculation did not work, this value is used to scale the model
 remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
 remove_individual_ik_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
 fastest_frames_to_remove_percent = 0.1 # Frames with high speed are considered as outliers
-close_to_zero_speed_m = 0.2 # Sum for all keypoints: about 50 px/frame or 0.2 m/frame
+slowest_frames_to_remove_percent = 0.1 # Frames with low speed are considered as outliers
 large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
 trimmed_extrema_percent = 0.5 # Proportion of the most extreme segment values to remove before calculating their mean)
 
