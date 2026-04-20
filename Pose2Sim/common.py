@@ -1014,7 +1014,7 @@ def add_neck_hip_coords(kpt_name, p_X, p_Y, p_scores, kpt_ids, kpt_names):
     return p_X, p_Y, p_scores
 
 
-def best_coords_for_measurements(Q_coords, large_hip_knee_angles=45):
+def best_coords_for_measurements(Q_coords, large_hip_knee_angles=135):
     '''
     Compute the best coordinates for measurements, after removing the
     frames where hip and knee angle are below 45° 
@@ -1026,7 +1026,7 @@ def best_coords_for_measurements(Q_coords, large_hip_knee_angles=45):
     - trimmed_extrema_percent: float
 
     OUTPUT:
-    - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
+    - Q_coords_low_angles: pd.DataFrame. The best coordinates for measurements
     '''
 
     # Remove nans
@@ -1036,21 +1036,21 @@ def best_coords_for_measurements(Q_coords, large_hip_knee_angles=45):
     # (if more than 50 of them, else take 50 smallest values)
     try:
         ang_mean = mean_angles(Q_coords, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
-        Q_coords_low_speeds_low_angles = Q_coords[ang_mean < large_hip_knee_angles]
-        if len(Q_coords_low_speeds_low_angles) < 50:
-            Q_coords_low_speeds_low_angles = Q_coords.iloc[pd.Series(ang_mean).nsmallest(50).index]
+        Q_coords_low_angles = Q_coords[ang_mean < large_hip_knee_angles]
+        if len(Q_coords_low_angles) < 50:
+            Q_coords_low_angles = Q_coords.iloc[pd.Series(ang_mean).nsmallest(50).index]
     except:
-        Q_coords_low_speeds_low_angles = Q_coords
+        Q_coords_low_angles = Q_coords
         logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}° as a fallback.")
 
-    if Q_coords_low_speeds_low_angles.empty:
+    if Q_coords_low_angles.empty:
         logging.warning('The selected person might not move, or is crouching for the whole sequence, or is not well detected. Taking all available data instead of filtering them as a fallback.')
-        Q_coords_low_speeds_low_angles = Q_coords.copy()
+        Q_coords_low_angles = Q_coords.copy()
     
-    return Q_coords_low_speeds_low_angles
+    return Q_coords_low_angles
 
 
-def compute_height(Q_coords, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_height(Q_coords, large_hip_knee_angles=135, trimmed_extrema_percent=0.5):
     '''
     Compute the height of the person from the trc data.
 
@@ -1116,7 +1116,7 @@ def compute_height(Q_coords, large_hip_knee_angles=45, trimmed_extrema_percent=0
     return height
 
 
-def compute_leg_length(trc_path, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_leg_length(trc_path, large_hip_knee_angles=135, trimmed_extrema_percent=0.5):
     '''
     Compute the leg length of the person from the trc data.
 
@@ -1132,14 +1132,14 @@ def compute_leg_length(trc_path, large_hip_knee_angles=45, trimmed_extrema_perce
     Q_coords, frames_col, time_col, markers, header = read_trc(trc_path)
 
     # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
-    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, large_hip_knee_angles=large_hip_knee_angles)
+    Q_coords_low_angles = best_coords_for_measurements(Q_coords, large_hip_knee_angles=large_hip_knee_angles)
 
     # leg length will be considered as the distance from the hip joint centre to the ankle joint centre
     hip_to_ankle_pairs = [['RAnkle', 'RKnee'], ['LAnkle', 'LKnee'], ['RKnee', 'RHip'], ['LKnee', 'LHip']]
 
     # calculate the distance between each of the pairs of points
     try:
-        rshank, lshank, rthigh, lthigh = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]], Q_coords_low_speeds_low_angles[pair[1]]) for pair in hip_to_ankle_pairs]
+        rshank, lshank, rthigh, lthigh = [euclidean_distance(Q_coords_low_angles[pair[0]], Q_coords_low_angles[pair[1]]) for pair in hip_to_ankle_pairs]
     except:
         logging.error('At least one of the following markers is missing for computing the leg length of the person:\
                                     RAnkle, RKnee, RHip, LAnkle, LKnee, LHip.')

@@ -272,7 +272,7 @@ right_left_symmetry = true # true or false (lowercase) # Set to false only if yo
 default_height = 1.7 # meters # If automatic height calculation did not work, this value is used to scale the model
 remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
 remove_individual_ik_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
-large_hip_knee_angles = 45 # Hip and knee angles below this value are considered as imprecise
+large_hip_knee_angles = 135 # Hip and knee angles beyond this value are considered as imprecise
 trimmed_extrema_percent = 0.5 # Proportion of the most extreme segment values to remove before calculating their mean)
 
 
