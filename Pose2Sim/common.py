@@ -1132,7 +1132,7 @@ def compute_leg_length(trc_path, large_hip_knee_angles=45, trimmed_extrema_perce
     Q_coords, frames_col, time_col, markers, header = read_trc(trc_path)
 
     # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
-    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers, large_hip_knee_angles=large_hip_knee_angles)
+    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, large_hip_knee_angles=large_hip_knee_angles)
 
     # leg length will be considered as the distance from the hip joint centre to the ankle joint centre
     hip_to_ankle_pairs = [['RAnkle', 'RKnee'], ['LAnkle', 'LKnee'], ['RKnee', 'RHip'], ['LKnee', 'LHip']]
