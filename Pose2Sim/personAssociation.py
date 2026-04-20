@@ -191,6 +191,7 @@ def best_persons_and_cameras_combination(config_dict, json_files_framef, persons
     best_comb = None
     best_Q = None
 
+    all_json_data = [read_json(json_files_framef[c]) for c in range(n_cams)]
     while error_min > error_threshold_tracking and n_cams - (nb_cams_missing + nb_cams_off_extra) >= min_cameras_for_triangulation:
         # Try all persons combinations
         for combination in personsIDs_combinations:
@@ -198,8 +199,8 @@ def best_persons_and_cameras_combination(config_dict, json_files_framef, persons
             coords = []
             for index_cam, person_nb in enumerate(combination):
                 try:
-                    js = read_json(json_files_framef[index_cam])
-                    coords.append(js[int(person_nb)][tracked_keypoint_id*3:tracked_keypoint_id*3+3])
+                    coords.append(all_json_data[index_cam][int(person_nb)]
+                                  [tracked_keypoint_id*3:tracked_keypoint_id*3+3])
                 except:
                     coords.append([np.nan, np.nan, np.nan])
             coords = np.array(coords)

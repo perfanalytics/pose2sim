@@ -197,7 +197,8 @@
 #                                   Increase if you have many cameras and want to be more robust to occlusions
 
 # # gap filling
-# max_distance_m = 1.0 # m # max_distance a person can jump from its previous position before being considered as a new one
+# max_distance_m = 1.0 # m # max distance a person can jump from their previous position before being considered as a new one
+# max_unseen_frames = 100 # max number of frames that a person can be unseen before the next person passing by is given a new ID
 # interp_if_gap_smaller_than = 20 # do not interpolate larger gaps
 # interpolation = 'linear' # linear, slinear, quadratic, cubic, or none # 'none' if you don't want to interpolate missing points
 

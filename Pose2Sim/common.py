@@ -1182,16 +1182,8 @@ def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, slowest_f
 
     return leg_length
 
-    
 
-
-    # BEFORE ALL THAT: IN SORT, CONFIDENCE DECAY: REMOVE WHEN NOT SEEN FOR > 5*interp_gap_smaller_than?
-    # TEST POSTERS + OTHER CHALLENGING VIDS
-    # TEST POSE2SIM TRIG
-    # CHECK WHY RUGBY CUT OFF
-
-
-def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
+def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None, max_unseen_frames=None, frames_since_last_seen=None):
     '''
     Associate persons across frames (Sports2D method)
     Persons' indices are sometimes swapped when changing frame
@@ -1207,28 +1199,42 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
     - score: (K, L) array of confidence scores for K persons, L keypoints (optional) 
     - max_dist: maximum distance threshold for association. If None, no threshold applied.
                 If distance > max_dist, person is treated as new (no association)
+    - max_unseen_frames: int or None. If a person has not been seen for more than this many frames, they will be considered stale
+                        and their ID won't be confused with any other person passing by.
+                        If None, staleness tracking is disabled (original behavior).
+    - frames_since_last_seen: array of shape (K,) tracking how many frames since each previous person
+                              was last seen. Required when max_unseen_frames is not None. Updated and returned.
     
     OUTPUTS:
     - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
     - sorted_keypoints: array with reordered persons
-    - sorted_scores: array with reordered scores
-    - sorted_ids: array with indices of associated persons in current frame
+    - sorted_scores: array with reordered scores (if scores provided, else sorted_ids)
+    - frames_since_last_seen: updated staleness counter array (only returned when max_unseen_frames is not None)
     '''
+
+    use_staleness = max_unseen_frames is not None
 
     # Handle empty frames
     n_prev = len(keyptpre)
     n_curr = len(keypt)
     if n_prev == 0 and n_curr == 0:
-            if scores is not None:
-                return np.array([]), np.array([]), np.array([])
-            else:
-                return np.array([]), np.array([])
-    if n_prev == 0:
         if scores is not None:
-            return np.array([]), keypt, scores
+            ret = (np.array([]), np.array([]), np.array([]))
         else:
-            return np.array([]), keypt
+            ret = (np.array([]), np.array([]), np.array([], dtype=int))
+        return ret + (np.array([], dtype=int),) if use_staleness else ret
+    if n_prev == 0:
+        new_fsls = np.zeros(n_curr, dtype=int)
+        if scores is not None:
+            ret = (np.array([]), keypt, scores)
+        else:
+            ret = (np.array([]), keypt, np.arange(n_curr))
+        return ret + (new_fsls,) if use_staleness else ret
     
+    # Initialize frames_since_last_seen if staleness tracking is enabled but not yet started
+    if use_staleness and frames_since_last_seen is None:
+        frames_since_last_seen = np.zeros(n_prev, dtype=int)
+
     # Broadcasts the computation of distance matrix for all possible associations instead of using euclidean_distance in a loop
     keyptpre_expanded = keyptpre[:, np.newaxis, :, :]
     keypt_expanded = keypt[np.newaxis, :, :, :]
@@ -1237,6 +1243,11 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
     dist_matrix = np.nanmean(distances_per_keypoint, axis=2)
     dist_matrix = np.nan_to_num(dist_matrix, nan=1e10, posinf=1e10) # Replace inf/nan with large number
     
+    # Inflate distances for stale persons so they won't attract new detections
+    if use_staleness:
+        stale_mask = frames_since_last_seen >= max_unseen_frames
+        dist_matrix[stale_mask, :] = 1e10
+
     # Hungarian algorithm instead of min_with_single_indices in previous versions (faster when many people)
     # Finds the associations with smallest distances between previous and current frame, each person associated only once
     pre_ids, curr_ids = linear_sum_assignment(dist_matrix)
@@ -1253,8 +1264,8 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
     # Track non associated people in current frame (new people)
     associated_curr_ids = set([curr_id for _, curr_id in valid_associations])
     unassociated_curr_ids = [i for i in range(n_curr) if i not in associated_curr_ids]
-    
-    # Create sorted_keypoints filled with nans
+
+    # Create sorted_keypoints filled with nans (existing slots + truly new persons)
     n_total = n_prev + len(unassociated_curr_ids)
     sorted_keypoints = np.full((n_total,) + keypt.shape[1:], np.nan)
     if scores is not None:
@@ -1287,10 +1298,24 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
         keyptpre_padded, 
         sorted_keypoints)
     
-    if scores is not None:
-        return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+    # Update frames_since_last_seen
+    if use_staleness:
+        updated_fsls = np.full(n_total, 0, dtype=int)
+        updated_fsls[:n_prev] = frames_since_last_seen + 1  # increment for all existing
+        for prev_idx, _ in valid_associations:
+            updated_fsls[prev_idx] = 0  # reset for matched (including recycled stale slots)
+        # New persons (beyond n_prev) already initialized at 0
+    
+    if use_staleness:
+        if scores is not None:
+            return sorted_prev_keypoints, sorted_keypoints, sorted_scores, updated_fsls
+        else:
+            return sorted_prev_keypoints, sorted_keypoints, sorted_ids, updated_fsls
     else:
-        return sorted_prev_keypoints, sorted_keypoints, sorted_ids
+        if scores is not None:
+            return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+        else:
+            return sorted_prev_keypoints, sorted_keypoints, sorted_ids
 
 
 def sort_people_rtmlib(pose_tracker, keypoints, scores):
