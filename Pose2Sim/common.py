@@ -525,14 +525,18 @@ def euclidean_distance(q1, q2):
     q1 = np.array(q1)
     q2 = np.array(q2)
     dist = q2 - q1
-    if np.isnan(dist).all():
-        dist = np.empty_like(dist)
-        dist[...] = np.inf
     
     if len(dist.shape)==1:
-        euc_dist = np.sqrt(np.nansum( [d**2 for d in dist]))
+        if np.isnan(dist).any():
+            return np.inf
+        euc_dist = np.sqrt(np.nansum(dist**2))
     else:
-        euc_dist = np.sqrt(np.nansum( [d**2 for d in dist], axis=1))
+        nan_rows = np.isnan(dist).any(axis=1)
+        dist[nan_rows] = np.nan
+        euc_dist = np.sqrt(np.nansum(dist**2, axis=1))
+        euc_dist[nan_rows] = np.nan
+        if np.all(np.isnan(euc_dist)):
+            return np.inf
     
     return euc_dist
 
@@ -582,9 +586,9 @@ def trimmed_mean(arr, trimmed_extrema_percent=0.5):
     
     # Return the mean of the remaining values
     if len(trimmed_arr) == 0:
-        trimmed_mean_arr = np.mean(arr)
+        trimmed_mean_arr = np.nanmean(arr)
     else:
-        trimmed_mean_arr = np.mean(trimmed_arr)
+        trimmed_mean_arr = np.nanmean(trimmed_arr)
     
     return trimmed_mean_arr
 
@@ -1010,18 +1014,14 @@ def add_neck_hip_coords(kpt_name, p_X, p_Y, p_scores, kpt_ids, kpt_names):
     return p_X, p_Y, p_scores
 
 
-def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, slowest_frames_to_remove_percent=0.2, large_hip_knee_angles=45):
+def best_coords_for_measurements(Q_coords, large_hip_knee_angles=45):
     '''
-    Compute the best coordinates for measurements, after removing:
-    - 20% fastest frames (may be outliers)
-    - 20% slowest frames (may be outliers)
-    - frames when hip and knee angle below 45° (imprecise coordinates when person is crouching)
+    Compute the best coordinates for measurements, after removing the
+    frames where hip and knee angle are below 45° 
+    (coordinates are imprecise when the person is crouching)
     
     INPUTS:
     - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
-    - keypoints_names: list. The list of marker names
-    - fastest_frames_to_remove_percent: float
-    - slowest_frames_to_remove_percent: float
     - large_hip_knee_angles: int
     - trimmed_extrema_percent: float
 
@@ -1031,65 +1031,31 @@ def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_re
 
     # Remove nans
     Q_coords = Q_coords.dropna(how='all')
-
-    # Add MidShoulder column
-    if 'MidShoulder' not in Q_coords.columns:
-        df_MidShoulder = pd.DataFrame((Q_coords['RShoulder'].values + Q_coords['LShoulder'].values) /2)
-        df_MidShoulder.columns = ['MidShoulder']*3
-        Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_MidShoulder), axis=1)
-
-    # Add Hip column if not present
-    n_markers_init = len(keypoints_names)
-    if 'Hip' not in keypoints_names:
-        df_Hip = pd.DataFrame((Q_coords['RHip'].values + Q_coords['LHip'].values) /2)
-        df_Hip.columns = ['Hip']*3
-        Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_Hip), axis=1)
-    n_markers = len(keypoints_names)
-
-    # Excluding 20% slowest and fastest frames
-    sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords[kpt].diff(), axis=1) for kpt in keypoints_names], axis=0))
-    try:
-        n_frames = len(sum_speeds)
-        sorted_speed_indices = sum_speeds.abs().sort_values().index
-        reasonable_speed_indices = sorted_speed_indices[int(n_frames * slowest_frames_to_remove_percent) :
-                                                        n_frames - int(n_frames * fastest_frames_to_remove_percent)]
-        Q_coords_low_speeds = Q_coords.iloc[reasonable_speed_indices].reset_index(drop=True)
-        if len(Q_coords_low_speeds) == 0:
-            logging.warning(f'No frames left after excluding the {slowest_frames_to_remove_percent:.0%} slowest and {fastest_frames_to_remove_percent:.0%} fastest frames. Make sure the person is moving and correctly detected, or change slowest_frames_to_remove_percent and fastest_frames_to_remove_percent. Not excluding any frames as a fallback.')
-            raise ValueError(f'No frames left after excluding the {slowest_frames_to_remove_percent:.0%} slowest and {fastest_frames_to_remove_percent:.0%} fastest frames. Make sure the person is moving and correctly detected, or change slowest_frames_to_remove_percent and fastest_frames_to_remove_percent. Not excluding any frames as a fallback.')
-    except:
-        Q_coords_low_speeds = Q_coords
     
     # Only keep frames with hip and knee flexion angles below 45% 
     # (if more than 50 of them, else take 50 smallest values)
     try:
-        ang_mean = mean_angles(Q_coords_low_speeds, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
-        Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
+        ang_mean = mean_angles(Q_coords, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
+        Q_coords_low_speeds_low_angles = Q_coords[ang_mean < large_hip_knee_angles]
         if len(Q_coords_low_speeds_low_angles) < 50:
-            Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
+            Q_coords_low_speeds_low_angles = Q_coords.iloc[pd.Series(ang_mean).nsmallest(50).index]
     except:
-        Q_coords_low_speeds_low_angles = Q_coords_low_speeds
+        Q_coords_low_speeds_low_angles = Q_coords
         logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}° as a fallback.")
 
     if Q_coords_low_speeds_low_angles.empty:
         logging.warning('The selected person might not move, or is crouching for the whole sequence, or is not well detected. Taking all available data instead of filtering them as a fallback.')
         Q_coords_low_speeds_low_angles = Q_coords.copy()
     
-    if n_markers_init < n_markers:
-        Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
-
     return Q_coords_low_speeds_low_angles
 
 
-def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, slowest_frames_to_remove_percent=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_height(Q_coords, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Compute the height of the person from the trc data.
 
     INPUTS:
     - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
-    - keypoints_names: list. The list of marker names
-    - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
-    - slowest_frames_to_remove_percent: float. Frames with low speed are considered as outliers
     - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
     - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
     
@@ -1098,13 +1064,24 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     '''
     
     # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
-    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, keypoints_names, 
-                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, slowest_frames_to_remove_percent=slowest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles)
+    Q_coords = best_coords_for_measurements(Q_coords, large_hip_knee_angles=large_hip_knee_angles)
+    
+    # Add MidShoulder column
+    if 'MidShoulder' not in Q_coords.columns:
+        df_MidShoulder = pd.DataFrame((Q_coords['RShoulder'].values + Q_coords['LShoulder'].values) /2)
+        df_MidShoulder.columns = ['MidShoulder']*3
+        Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_MidShoulder), axis=1)
+
+    # Add Hip column if not present
+    if 'Hip' not in Q_coords.columns:
+        df_Hip = pd.DataFrame((Q_coords['RHip'].values + Q_coords['LHip'].values) /2)
+        df_Hip.columns = ['Hip']*3
+        Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_Hip), axis=1)
 
     # Automatically compute the height of the person
     feet_pairs = [['RHeel', 'RAnkle'], ['LHeel', 'LAnkle']]
     try:
-        rfoot, lfoot = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in feet_pairs]
+        rfoot, lfoot = [euclidean_distance(Q_coords[pair[0]], Q_coords[pair[1]]) for pair in feet_pairs]
     except:
         rfoot, lfoot = 0.10, 0.10
         logging.warning('The Heel marker is missing from your model. Considering Foot to Heel size as 10 cm.')
@@ -1112,7 +1089,7 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     ankle_to_shoulder_pairs =  [['RAnkle', 'RKnee'], ['RKnee', 'RHip'], ['RHip', 'RShoulder'],
                                 ['LAnkle', 'LKnee'], ['LKnee', 'LHip'], ['LHip', 'LShoulder']]
     try:
-        rshank, rfemur, rback, lshank, lfemur, lback = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in ankle_to_shoulder_pairs]
+        rshank, rfemur, rback, lshank, lfemur, lback = [euclidean_distance(Q_coords[pair[0]], Q_coords[pair[1]]) for pair in ankle_to_shoulder_pairs]
     except:
         logging.error('At least one of the following markers is missing for computing the height of the person:\
                             RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder.\n\
@@ -1123,11 +1100,11 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
 
     try:
         head_pair = [['MidShoulder', 'Head']]
-        head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]\
+        head = [euclidean_distance(Q_coords[pair[0]], Q_coords[pair[1]]) for pair in head_pair][0]\
                 *1.008
     except:
         head_pair = [['MidShoulder', 'Nose']]
-        head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]\
+        head = [euclidean_distance(Q_coords[pair[0]], Q_coords[pair[1]]) for pair in head_pair][0]\
                 *1.5
         logging.warning('The Head marker is missing from your model. Considering Neck to Head size as 1.33 times Neck to MidShoulder size.')
     
@@ -1139,14 +1116,12 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     return height
 
 
-def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, slowest_frames_to_remove_percent=0.2, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_leg_length(trc_path, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Compute the leg length of the person from the trc data.
 
     INPUTS:
     - Q_coords: path to the trc file (can be in m or px)
-    - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
-    - slowest_frames_to_remove_percent: float. Frames with low speed are considered as outliers
     - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
     - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
 
@@ -1157,10 +1132,7 @@ def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, slowest_f
     Q_coords, frames_col, time_col, markers, header = read_trc(trc_path)
 
     # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
-    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers,
-                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
-                                                                  slowest_frames_to_remove_percent=slowest_frames_to_remove_percent,
-                                                                  large_hip_knee_angles=large_hip_knee_angles)
+    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers, large_hip_knee_angles=large_hip_knee_angles)
 
     # leg length will be considered as the distance from the hip joint centre to the ankle joint centre
     hip_to_ankle_pairs = [['RAnkle', 'RKnee'], ['LAnkle', 'LKnee'], ['RKnee', 'RHip'], ['LKnee', 'LHip']]

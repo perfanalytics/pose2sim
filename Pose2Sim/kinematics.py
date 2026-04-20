@@ -382,7 +382,7 @@ def update_scale_values(scaling_root, segment_ratio_dict):
 
 def perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir, 
                     use_simple_model=False, right_left_symmetry=True, subject_height=1.75, subject_mass=70, 
-                    remove_scaling_setup=True, fastest_frames_to_remove_percent=0.1, slowest_frames_to_remove_percent=0.1, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+                    remove_scaling_setup=True, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
     '''
     Perform model scaling based on the (not necessarily static) TRC file:
     - Remove 10% fastest frames (potential outliers)
@@ -400,7 +400,6 @@ def perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir,
     - subject_height (float): The height of the subject.
     - subject_mass (float): The mass of the subject.
     - remove_scaling_setup (bool): Whether to remove the scaling setup file after scaling.
-    - fastest_frames_to_remove_percent (float): Fasters frames may be outliers
     - large_hip_knee_angles (float): Imprecise coordinates when person is crouching
     - trimmed_extrema_percent (float): Proportion of the most extreme segment values to remove before calculating their mean
     
@@ -430,17 +429,17 @@ def perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir,
         scaling_root = scaling_tree.getroot()
         scaling_path_temp = str(kinematics_dir / (trc_file.stem + '_scaling_setup.xml'))
         
-        # Remove fastest frames, frames with null speed, and frames with large hip and knee angles
+        # Remove frames with large hip and knee angles
         Q_coords, _, _, markers, _ = read_trc(trc_file)
-        Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, slowest_frames_to_remove_percent=slowest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles)
+        Q_coords_low_angles = best_coords_for_measurements(Q_coords, markers, large_hip_knee_angles=large_hip_knee_angles)
 
-        if Q_coords_low_speeds_low_angles.size == 0:
-            logging.warning(f"\nNo frames left after removing fastest frames, frames with null speed, and frames with large hip and knee angles for {trc_file}. The person may be static, or crouched, or incorrectly detected.")
-            logging.warning(f"Running with fastest_frames_to_remove_percent=0, slowest_frames_to_remove_percent=0, large_hip_knee_angles=0, trimmed_extrema_percent=0. You can edit these parameters in your Config.toml file.\n")
-            Q_coords_low_speeds_low_angles = Q_coords
+        if Q_coords_low_angles.size == 0:
+            logging.warning(f"\nNo frames left after removing frames with large hip and knee angles for {trc_file}. The person may be crouched, or incorrectly detected.")
+            logging.warning(f"Running with large_hip_knee_angles=0, trimmed_extrema_percent=0. You can edit these parameters in your Config.toml file.\n")
+            Q_coords_low_angles = Q_coords
 
         # Get manual scale values (mean from remaining frames after trimming the 20% most extreme values)
-        segment_ratio_dict = dict_segment_ratio(scaling_root, unscaled_model, Q_coords_low_speeds_low_angles, markers, 
+        segment_ratio_dict = dict_segment_ratio(scaling_root, unscaled_model, Q_coords_low_angles, markers, 
                                                 trimmed_extrema_percent=trimmed_extrema_percent, right_left_symmetry=right_left_symmetry)
 
         # Update scaling setup file
@@ -583,8 +582,6 @@ def kinematics_all(config_dict):
     subject_height = config_dict.get('project', {}).get('participant_height', 'auto')
     subject_mass = config_dict.get('project', {}).get('participant_mass', 70.0)
 
-    fastest_frames_to_remove_percent = config_dict.get('kinematics', {}).get('fastest_frames_to_remove_percent', 0.1)
-    slowest_frames_to_remove_percent = config_dict.get('kinematics', {}).get('slowest_frames_to_remove_percent', 0.1)
     large_hip_knee_angles = config_dict.get('kinematics', {}).get('large_hip_knee_angles', 45)
     trimmed_extrema_percent = config_dict.get('kinematics', {}).get('trimmed_extrema_percent', 0.5)
     default_height = config_dict.get('kinematics', {}).get('default_height', 1.7)
@@ -645,8 +642,6 @@ def kinematics_all(config_dict):
                 height = compute_height(
                     trc_data,
                     markers,
-                    fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
-                    slowest_frames_to_remove_percent=slowest_frames_to_remove_percent,
                     large_hip_knee_angles=large_hip_knee_angles,
                     trimmed_extrema_percent=trimmed_extrema_percent
                 )
@@ -654,11 +649,11 @@ def kinematics_all(config_dict):
                     logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m")
                 else:
                     logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
-                    logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, slowest_frames_to_remove_percent, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
+                    logging.warning(f"The person may be crouched or incorrectly detected. You may edit large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
                     height = default_height
             except Exception as e:
                 logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
-                logging.warning(f"The person may be static, or crouched, or incorrectly detected. You may edit fastest_frames_to_remove_percent, slowest_frames_to_remove_percent, large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
+                logging.warning(f"The person may be crouched, or incorrectly detected. You may edit large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
                 height = default_height
             subject_height.append(height)
     elif not type(subject_height) == list: # int or float
@@ -682,7 +677,7 @@ def kinematics_all(config_dict):
         logging.info(f"Subject mass: {round(subject_mass[p],2)} kg")
         logging.info(f"\nScaling TRC file: {trc_file.resolve()}...")
         perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir, use_simple_model, right_left_symmetry=right_left_symmetry, subject_height=subject_height[p], subject_mass=subject_mass[p], 
-                        remove_scaling_setup=remove_scaling_setup, fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, slowest_frames_to_remove_percent=slowest_frames_to_remove_percent, large_hip_knee_angles=large_hip_knee_angles, trimmed_extrema_percent=trimmed_extrema_percent)
+                        remove_scaling_setup=remove_scaling_setup, large_hip_knee_angles=large_hip_knee_angles, trimmed_extrema_percent=trimmed_extrema_percent)
         logging.info(f"\tDone. Scaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
 
     # Inverse Kinematics
