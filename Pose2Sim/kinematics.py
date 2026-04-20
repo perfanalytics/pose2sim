@@ -431,7 +431,7 @@ def perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir,
         
         # Remove frames with large hip and knee angles
         Q_coords, _, _, markers, _ = read_trc(trc_file)
-        Q_coords_low_angles = best_coords_for_measurements(Q_coords, markers, large_hip_knee_angles=large_hip_knee_angles)
+        Q_coords_low_angles = best_coords_for_measurements(Q_coords, large_hip_knee_angles=large_hip_knee_angles)
 
         if Q_coords_low_angles.size == 0:
             logging.warning(f"\nNo frames left after removing frames with large hip and knee angles for {trc_file}. The person may be crouched, or incorrectly detected.")
