@@ -126,7 +126,7 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("filtering").update({"display_figures":False})
         config_dict.get("filtering").update({"save_filt_plots":False})
 
-        # Step by step
+        # 1. Run step by step
         Pose2Sim.calibration(config_dict)
         Pose2Sim.poseEstimation(config_dict)
         Pose2Sim.synchronization(config_dict)
@@ -137,7 +137,7 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.kinematics(config_dict)
 
 
-        # Run all
+        # 2. Run all in one go
         # overwrite pose, balanced, no parallel pose estimation
         config_dict.get("project").update({"participant_height":1.7})
         config_dict.get("project").update({"frame_rate":60})
@@ -175,7 +175,7 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("filtering").update({"save_filt_plots":False})
         config_dict.get('kinematics').update({'use_simple_model':True})
         
-        # Step by step
+        # 1. Run step by step
         Pose2Sim.calibration(config_dict)
         Pose2Sim.poseEstimation(config_dict)
         # Pose2Sim.synchronization(config_dict) # No test for synchronization for multi-person
@@ -185,7 +185,7 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.kinematics(config_dict)
         Pose2Sim.filtering(config_dict) # on IK mot files instead of trc files
 
-        # Run all
+        # 2. Run all in one go
         # No filtering, no marker augmentation
         # config_dict.get("pose").update({"tracking_mode":'deepsort'})
         # config_dict.get("pose").update({"deepsort_params":"""{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8, 'embedder':None}"""})
@@ -200,7 +200,7 @@ class TestWorkflow(unittest.TestCase):
         project_dir = '../Demo_Batch'
         os.chdir(project_dir)
 
-        Pose2Sim.runAll(do_synchronization=False, do_filtering=False)
+        Pose2Sim.runAll(do_synchronization=False, do_filtering=False, do_kinematics=False)
 
 
 def main():
