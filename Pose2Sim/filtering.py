@@ -248,14 +248,20 @@ def gcv_spline_filter_1d(config_dict, frame_rate, col):
     1D GCV Spline filter.
     
     If cutoff is a number, it is used as the cut-off frequency in Hz and behaves like a butterworth filter.
-    If cutoff is 'auto', it automatically evaluates the best trade-off between smoothness and fidelity to data.
-    If smoothing_factor is different to 1, it biases results towards smoothing if > 1, and towards fidelity to input data if <1.
-    smoothing_factor is ignored if cutoff is not 'auto'.
-    
+    If cutoff is 'auto', GCV finds the best trade-off between smoothness and fidelity to data (optimal lambda),
+    and falls back to a biomechanically sensible frequency if GCV returns an unreliable result.
+    Smoothing_factor biases results towards smoothing if > 1, and towards fidelity to input data if <1. Ignored if cutoff is not 'auto'.
+
+    NOTE: In specific cases of a triangular wave + drift (eg pelvis Y coordinates of a subject walking uphill), 
+    the filter may occasionally overfilter the trajectory.
+    Known issue posted at: https://github.com/scipy/scipy/issues/23472
+
     INPUT:
-    - cutoff: 'auto' or int, cut-off frequency in Hz
-    - smoothing_factor: float, >=0. >1 to prioritize smoothing, <1 for fidelity to input data.
-    - col: Pandas dataframe column
+    - config_dict: configuration dictionary:
+        - filtering.gcv_spline.cut_off_frequency: 'auto' (default) or float (Hz)
+        - filtering.gcv_spline.smoothing_factor: float >= 0, default 1.0. >1 to prioritize smoothing, <1 for fidelity to input data
+    - frame_rate: float, frames per second
+    - col: Pandas Series
 
     OUTPUT:
     - col_filtered: Filtered pandas dataframe column
@@ -264,51 +270,59 @@ def gcv_spline_filter_1d(config_dict, frame_rate, col):
     cutoff = config_dict.get('filtering', {}).get('gcv_spline', {}).get('cut_off_frequency', 'auto')
     smoothing_factor = float(config_dict.get('filtering', {}).get('gcv_spline', {}).get('smoothing_factor', 1.0))
 
+    # If the automatically computed lambda corresponds to a frequency above max_cutoff (eg short sequence),
+    # it falls back to a lambda corresponding to max_cutoff. Likewise if frequency is too low (eg noisy short sequence)
+    max_cutoff = 30.0
+    min_cutoff = 1.0
+    lam_min = (frame_rate / (2.0 * np.pi * max_cutoff)) ** 4 # lam from cutoff
+    lam_max = (frame_rate / (2.0 * np.pi * min_cutoff)) ** 4
+
     # Split into sequences of not nans
     # print('\n', col.name)
     col_filtered = col.copy()
-    mask = np.isnan(col_filtered)  | col_filtered.eq(0)
+    mask = np.isnan(col_filtered) | col_filtered.eq(0)
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 2]
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 5] # Minimum length for 4th order smoothing spline
     
     # Filter each of the selected sequences
     for seq_f in idx_sequences_to_filter:
-        x = np.arange(len(col_filtered[seq_f]))
+        x = np.arange(len(seq_f), dtype=float)
+        y_raw = col_filtered.iloc[seq_f].to_numpy(dtype=float)
 
-        # Automatically determine optimal lambda value when cutoff is 'auto'
-        if cutoff == 'auto': 
-            # Normalize col around 1, because zero mean leads to unstabilities
-            median_col = np.median(col_filtered[seq_f]) # median of time series
-            mad_col = np.median(np.abs(col_filtered[seq_f] - median_col)) # median absolute deviation from median
-            mad_col = mad_col if mad_col > 0 else 1.0
-            col_norm = 1 + (col_filtered[seq_f] - median_col) / (1.4826 * mad_col) # 1.4826*mad_col equivalent to dividing by std (for col_norm to have a std of 1)
+        # Normalize y_raw around 1, because zero mean leads to unstabilities
+        median_y = np.median(y_raw) # median of time series
+        mad_y = np.median(np.abs(y_raw - median_y)) # median absolute deviation from median
+        scale = 1.4826 * mad_y if mad_y > 0 else 1.0 # 1.4826*mad_y equivalent to dividing by std (for y_norm to have a std of 1)
+        y_norm = 1.0 + (y_raw - median_y) / scale
 
+        if cutoff == 'auto':
             # Compute optimal lam 
             # See https://stackoverflow.com/a/79740481/12196632
-            lam =  _compute_optimal_gcv_parameter_numstable(x, col_norm)
-            
+            lam = _compute_optimal_gcv_parameter_numstable(x, y_norm)
+
             # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
             lam *= smoothing_factor
 
-            # Compute spline
-            spline = make_smoothing_spline(x, col_norm, w=None, lam=lam)
-            col_filtered_norm = spline(x)
-                            
-            # Denormalize data
-            col_filtered[seq_f] = (col_filtered_norm - 1) * (1.4826 * mad_col) + median_col
+            # Bounds if lam is not coherent (short, near-constant sequences, triangular wave+drift...)
+            if lam < lam_min or lam > lam_max:
+                old_lam = lam
+                lam = np.clip(lam, lam_min, lam_max)
+                logging.warning(f'{col.name}: Automatically computed lambda is equivalent to a cut-off frequency of {frame_rate / (2.0 * np.pi * old_lam**0.25):.2f} Hz, which is outside of the expected range [{min_cutoff}, {max_cutoff}] Hz. Falling back to a lambda value corresponding to a cut-off frequency of {frame_rate / (2.0 * np.pi * lam**0.25):.2f} Hz. Your sequence might be too short, noisy, or near-constant for cutoff=\'auto\' to work effectively.')
 
         else:
             # Estimate lam from cutoff frequency
-            lam = ((frame_rate / (2 * np.pi * float(cutoff))) ** 4)
-            
+            lam = (frame_rate / (2.0 * np.pi * float(cutoff))) ** 4
+
             # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
             lam *= smoothing_factor
 
-            # Compute spline
-            spline = make_smoothing_spline(x, col_filtered[seq_f], w=None, lam=lam)
-            col_filtered[seq_f] = spline(x)
+        spline = make_smoothing_spline(x, y_norm, w=None, lam=lam)
+        y_filtered_norm = spline(x)
+
+        # Denormalize
+        col_filtered.iloc[seq_f] = (y_filtered_norm - 1.0) * scale + median_y
 
     return col_filtered
 
@@ -791,7 +805,7 @@ def filter_all(config_dict):
     do_filter = config_dict.get('filtering', {}).get('filter', True)
     reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
     filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
-    filter_ik = config_dict.get('filtering', {}).get('filter_ik', False)
+    filter_ik = config_dict.get('kinematics', {}).get('filter_ik', True)
     make_c3d = config_dict.get('filtering', {}).get('make_c3d', True)
     if save_plots and not os.path.exists(plots_output_dir):
         os.makedirs(plots_output_dir)

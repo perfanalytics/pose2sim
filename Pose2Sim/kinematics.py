@@ -46,6 +46,7 @@ import opensim
 
 from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean, read_trc, \
                             best_coords_for_measurements, compute_height, get_max_workers
+from Pose2Sim.filtering import filter_all
 from Pose2Sim.skeletons import *
 
 import locale 
@@ -576,6 +577,7 @@ def kinematics_all(config_dict):
 
     use_augmentation = config_dict.get('kinematics', {}).get('use_augmentation', True)
     use_simple_model = config_dict.get('kinematics', {}).get('use_simple_model', False)
+    filter_ik = config_dict.get('kinematics', {}).get('filter_ik', True)
     multi_person = config_dict.get('project', {}).get('multi_person', False)
     parallel_workers = config_dict.get('kinematics', {}).get('parallel_workers_kinematics', 'auto')
     right_left_symmetry = config_dict.get('kinematics', {}).get('right_left_symmetry', True)
@@ -702,3 +704,15 @@ def kinematics_all(config_dict):
             logging.info(f"\tDone. Joint angle data saved to {str((kinematics_dir / (trc_file.stem + '.mot')).resolve())}\n")
 
     logging.info(f"OpenSim logs saved to {opensim_logs_file.resolve()}.")
+    
+    # Run filtering pipeline on IK results at twice the cut-off frequencies specified in the config file
+    if filter_ik:
+        # double cut-off frequencies
+        config_dict['filtering']['butterworth']['cut_off_frequency'] *= 2
+        config_dict['filtering']['kalman']['trust_ratio'] *= 2
+        config_dict['filtering']['one_euro']['cut_off_frequency'] *= 2
+        config_gcv_cut = config_dict['filtering']['gcv_spline']['cut_off_frequency']
+        config_gcv_cut = config_gcv_cut * 2 if isinstance(config_gcv_cut, (int, float)) else config_gcv_cut
+        config_dict['filtering']['butterworth_on_speed']['cut_off_frequency'] *= 2
+        
+        filter_all(config_dict)

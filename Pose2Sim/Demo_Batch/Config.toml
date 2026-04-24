@@ -217,7 +217,6 @@ make_c3d = true # save triangulated data in c3d format in addition to trc
 [filtering]
 reject_outliers = true      # Hampel filter for outlier rejection before other filtering methods. Can be slow. Rejects outliers that are outside of a 95% confidence interal from the median in a sliding window of size 7.
 filter = true               # Proceed to further filtering after outlier rejection.
-filter_ik = false           # If true, will attempt to filter IK .mot files instead of triangulated .trc files
 type = 'butterworth' # butterworth, kalman, one_euro, gvc_spline, gaussian, LOESS, median, butterworth_on_speed
 
 display_figures = true # true or false (lowercase) 
@@ -226,7 +225,7 @@ make_c3d = true # also save triangulated data in c3d format
 
    # Most intuitive and standard filter in biomechanics
    [filtering.butterworth]
-   cut_off_frequency = 6 # Hz # Will be divided by slowmo_factor to be equivalent to non slowed-down video
+   cut_off_frequency = 6 # Hz 
    order = 4 
 
    # Used in countless applications, especially real-time. This one is a simplified Kalman filter 
@@ -235,15 +234,15 @@ make_c3d = true # also save triangulated data in c3d format
    trust_ratio = 500 # = measurement_trust/process_trust ~= process_noise/measurement_noise
    smooth = true # should be true, unless you need real-time filtering
 
-   # Simpler and even faster alternative to Kalman filter for real-time but tends to blunt RoM. Similar to a 1st order Butterworth but with adaptive cut-off frequency. This one is zero-phase
+   # Simpler and even faster alternative to Kalman filter for real-time, but tends to blunt RoM. Similar to a 1st order Butterworth but with adaptive cut-off frequency. This one is zero-phase
    [filtering.one_euro]
-   cut_off_frequency = 4.0 # Hz # cutoff frequency, similar to Butterworth but adapts to velocity (with beta)
+   cut_off_frequency = 4 # Hz # cutoff frequency, similar to Butterworth but adapts to velocity (with beta)
    beta = 1.5 # cutoff adaptation to velocity: cut_off_frequency = cut_off_frequency + beta*velocity
    d_cut_off_frequency = 1.0 # Hz # cutoff frequency for derivative (1.0 is usually good)
 
    # Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips).
    [filtering.gcv_spline]
-   cut_off_frequency = 'auto' # 'auto' or int # If int, behaves like a Butterworth filter. 'auto' is usually better, unless the signal is too short (noise can then be considered as signal -> trajectories not filtered)
+   cut_off_frequency = 'auto' # 'auto' or int # If int, behaves like a Butterworth filter. 'auto' is usually better, unless the signal is too short or you got a triangular wave + drift (eg pelvis Y coordinates of a subject walking uphill)
    smoothing_factor = 1.0 # >=0, ignored if cut_off_frequency != 'auto'. Biases results towards more smoothing (>1) or more fidelity to data (<1) 
 
    [filtering.loess]
@@ -253,8 +252,8 @@ make_c3d = true # also save triangulated data in c3d format
    [filtering.median]
    kernel_size = 3
    [filtering.butterworth_on_speed]
-   order = 4 
    cut_off_frequency = 10 # Hz
+   order = 4 
 
 
 [markerAugmentation] 
@@ -266,12 +265,14 @@ make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
 [kinematics]
-parallel_workers_kinematics = 'auto' # 'auto', int, or false # One worker per person, uses CPU. Only available in multi-person mode.
 use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
 use_simple_model = false # true or false # >10 times faster IK if true. No muscles, no constraints (eg stiff spine and shoulders, no patella)
-right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)
+filter_ik = true # true or false # at TWICE the cut-off frequency defined in the [filtering] section. Useful for force estimations if results are noisy 
 
+right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)
 default_height = 1.7 # meters # If automatic height calculation did not work, this value is used to scale the model
+parallel_workers_kinematics = 'auto' # 'auto', int, or false # One worker per person, uses CPU. Only available in multi-person mode
+
 remove_individual_scaling_setup = true # true or false (lowercase) # If true, the individual scaling setup files are removed to avoid cluttering
 remove_individual_ik_setup = true # true or false (lowercase) # If true, the individual IK setup files are removed to avoid cluttering
 large_hip_knee_angles = 135 # Hip and knee angles beyond this value are considered as imprecise
