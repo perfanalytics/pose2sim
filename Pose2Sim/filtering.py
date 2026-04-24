@@ -805,7 +805,7 @@ def filter_all(config_dict):
     do_filter = config_dict.get('filtering', {}).get('filter', True)
     reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
     filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
-    filter_ik = config_dict.get('kinematics', {}).get('filter_ik', True)
+    filter_ik = config_dict.get('temp_filter_ik', False) # only applied when run from Pose2Sim.kinematics()
     make_c3d = config_dict.get('filtering', {}).get('make_c3d', True)
     if save_plots and not os.path.exists(plots_output_dir):
         os.makedirs(plots_output_dir)

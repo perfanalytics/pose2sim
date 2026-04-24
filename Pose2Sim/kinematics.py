@@ -715,4 +715,5 @@ def kinematics_all(config_dict):
         config_gcv_cut = config_gcv_cut * 2 if isinstance(config_gcv_cut, (int, float)) else config_gcv_cut
         config_dict['filtering']['butterworth_on_speed']['cut_off_frequency'] *= 2
         
+        config_dict['temp_filter_ik'] = True
         filter_all(config_dict)
