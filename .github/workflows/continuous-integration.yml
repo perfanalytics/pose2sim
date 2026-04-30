@@ -19,8 +19,6 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
-    env:
-      UV_SYSTEM_PYTHON: 1
 
     strategy:
       fail-fast: false
@@ -84,7 +82,7 @@ jobs:
           )
           for cmd in "${entry_points[@]}"; do
             echo "Testing: $cmd --help"
-            if ! "$cmd" --help >/dev/null 2>&1; then
+            if ! uv run "$cmd" --help >/dev/null 2>&1; then
               echo "❌ Failed to run: $cmd"
               exit 1
             fi
