@@ -61,10 +61,9 @@ jobs:
       - name: Smoke test CLI entry points
         shell: bash
         run: |
-          # Blazepose_runsave # requires pip install mediapipe
-          # json_display_with_img # requires cmapy
           entry_points=(
             AlphaPose_to_OpenPose
+            # Blazepose_runsave # requires pip install mediapipe
             bodykin_from_mot_osim
             c3d_to_trc
             calib_easymocap_to_toml
@@ -74,7 +73,8 @@ jobs:
             calib_toml_to_opencap
             calib_toml_to_qca
             DLC_to_OpenPose
-            face_blurring
+            # face_blurring
+            # json_display_with_img # requires cmapy
             json_display_without_img
             MMPose_to_OpenPose
             reproj_from_trc_calib
