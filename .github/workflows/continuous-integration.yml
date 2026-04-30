@@ -32,10 +32,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
 
-      - name: Install uv and Python
+      - name: "Set up Python"
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
         uses: astral-sh/setup-uv@v8.1.0
         with:
-          python-version: ${{ matrix.python-version }}
           enable-cache: true
 
       - name: Install dependencies
@@ -52,7 +56,7 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Smoke test CLI entry points
-        shell: bash -l {0}
+        shell: bash
         run: |
           entry_points=(
             AlphaPose_to_OpenPose
