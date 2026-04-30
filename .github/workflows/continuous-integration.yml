@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest] #, macos-13] # opensim not supported on macos Intel AMD x64 beyond python 3.11
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
         include:
           - os: ubuntu-latest
             cache-path: ~/.cache/pip
