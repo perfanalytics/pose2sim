@@ -39,9 +39,9 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install --system flake8 pytest
-          uv pip install --system opensim
-          uv pip install --system git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
+          uv pip install flake8 pytest
+          uv pip install opensim
+          uv pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
 
       - name: Lint with flake8
         run: |
