@@ -107,7 +107,7 @@ jobs:
             reproj_from_trc_calib
             trc_combine
             trc_desample
-            trc_filter
+            trc_mot_filter
             trc_from_easymocap
             trc_from_mot_osim
             trc_gaitevents
