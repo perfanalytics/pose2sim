@@ -19,8 +19,6 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
-    env:
-      UV_SYSTEM_PYTHON: 1
 
     strategy:
       fail-fast: false
