@@ -50,14 +50,6 @@ jobs:
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           uv run flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=.venv
 
-      - name: Debug numpy compatibility
-        shell: bash
-        run: |
-          uv run python -c "import numpy; print(numpy.__version__)"
-          uv run python -c "import cv2; print(cv2.__version__)"
-          uv run python -c "import filterpy; print('filterpy ok')"
-          uv run python -c "from rtmlib import Body; b = Body.__new__(Body); print('Body ok')"
-
       - name: Smoke test CLI entry points
         shell: bash
         run: |
