@@ -427,7 +427,6 @@ def apply_face_obscuration(frame: np.ndarray, face_keypoints: np.ndarray, blur_t
 # --- Argument Parser and Main Function --- 
 
 def main():
-    from rtmlib import Body
     parser = argparse.ArgumentParser(description='Detect and blur faces in a video.')
     parser.add_argument('-i', '--input_vid', required=False, help='Path to the input video file if single video edit (string).')
     parser.add_argument('-d', '--input_dir', required=False, help='Path to the input video directory if multiple video edit (string).')
