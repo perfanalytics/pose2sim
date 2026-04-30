@@ -19,6 +19,8 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    env:
+      UV_SYSTEM_PYTHON: 1
 
     strategy:
       fail-fast: false
@@ -30,14 +32,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
 
-      - name: "Set up Python"
-        uses: actions/setup-python@v6.2.0
-        with:
-          python-version-file: ".python-version"
-
-      - name: Install uv
+      - name: Install uv and Python
         uses: astral-sh/setup-uv@v8.1.0
         with:
+          python-version: ${{ matrix.python-version }}
           enable-cache: true
 
       - name: Install dependencies
