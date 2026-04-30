@@ -27,7 +27,6 @@ import itertools as it
 import logging
 from anytree import PreOrderIter
 
-import tkinter as tk
 import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="c3d")
@@ -1559,6 +1558,7 @@ def get_screen_size():
     - tuple of int: (screen_width, screen_height)
     '''
 
+    import tkinter as tk
     root = tk.Tk()
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()

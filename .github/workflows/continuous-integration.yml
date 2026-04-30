@@ -73,7 +73,7 @@ jobs:
             calib_toml_to_opencap
             calib_toml_to_qca
             DLC_to_OpenPose
-            # face_blurring
+            face_blurring
             # json_display_with_img # requires cmapy
             json_display_without_img
             MMPose_to_OpenPose
@@ -90,7 +90,7 @@ jobs:
           )
           for cmd in "${entry_points[@]}"; do
             echo "Testing: $cmd --help"
-            if ! uv run "$cmd" --help >/dev/null 2>&1; then
+            if ! uv run "$cmd" --help; then
               echo "❌ Failed to run: $cmd"
               exit 1
             fi
