@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint on several OS with a several versions of Python
 # See: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Build on Win-MacOS-Ubuntu with Python 3.10-3.12
+name: Build on Win-MacOS-Ubuntu with Python 3.10-3.13
 
 on:
   push:
@@ -14,6 +14,9 @@ on:
 
 permissions:
   contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
@@ -37,17 +40,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Cache conda environment
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.conda
           key: ${{ runner.os }}-conda-${{ matrix.python-version }}-${{ hashFiles('**/environment.yml') }}
           restore-keys: ${{ runner.os }}-conda-${{ matrix.python-version }}-
 
       - name: Install Miniconda
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
@@ -60,7 +63,7 @@ jobs:
           conda install -n pose2sim opensim-org::opensim -y
 
       - name: Cache pip dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ matrix.cache-path }}
           key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt') }}
