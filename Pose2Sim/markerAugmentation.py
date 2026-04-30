@@ -118,8 +118,8 @@ def augment_markers_all(config_dict):
     subject_height = config_dict.get('project', {}).get('participant_height', 'auto')
     subject_mass = config_dict.get('project', {}).get('participant_mass', 70.0)
     
-    large_hip_knee_angles = config_dict.get('kinematics', {}).get('large_hip_knee_angles', 135)
-    trimmed_extrema_percent = config_dict.get('kinematics', {}).get('trimmed_extrema_percent', 0.5)
+    large_hip_knee_angles = config_dict.get('kinematics', {}).get('large_hip_knee_angles', 90)
+    trimmed_extrema_percent = config_dict.get('kinematics', {}).get('trimmed_extrema_percent', 50)
     default_height = config_dict.get('kinematics', {}).get('default_height', 1.7)
 
     augmenterDir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'MarkerAugmenter')

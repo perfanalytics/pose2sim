@@ -36,10 +36,12 @@ import platform
 
 from scipy import signal
 from scipy.interpolate import make_smoothing_spline
-
 from scipy.interpolate._bsplines import _coeff_of_divided_diff, _compute_optimal_gcv_parameter
 from scipy.interpolate import BSpline
 from scipy.ndimage import gaussian_filter1d
+from scipy import sparse
+from scipy.sparse.linalg import spsolve
+
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
@@ -323,6 +325,68 @@ def gcv_spline_filter_1d(config_dict, frame_rate, col):
 
         # Denormalize
         col_filtered.iloc[seq_f] = (y_filtered_norm - 1.0) * scale + median_y
+
+    return col_filtered
+
+
+def acc_minimizing_filter_1d(config_dict, frame_rate, col):
+    '''
+    1D Whittaker-Henderson filter (acceleration-minimizing).
+    Inspired by AddBiomechanics: https://github.com/keenon/AddBiomechanics/blob/main/server/engine/src/dynamics_pass/acceleration_minimizing_pass.py
+
+    INPUT:
+    - config_dict: configuration dictionary:
+        - filtering.acc_minimizing.cut_off_frequency: float (Hz)
+    - frame_rate: float, frames per second
+    - col: Pandas Series
+
+    OUTPUT:
+    - col_filtered: filtered Pandas Series (same index as input)
+    '''
+
+    cutoff = float(config_dict.get('filtering', {}).get('acc_minimizing', {}).get('cut_off_frequency', 6.0))
+    pad = 10
+
+    # conversion from cutoff to lambda
+    lam = (frame_rate / (2.0 * np.pi * cutoff)) ** 4
+
+    # Split into sequences of not nans
+    col_filtered = col.copy()
+    mask = np.isnan(col_filtered) | col_filtered.eq(0)
+    falsemask_indices = np.where(~mask)[0]
+    gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1
+    idx_sequences = np.split(falsemask_indices, gaps)
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 3] # Minimum length for accelerations (2nd order differences)
+
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        y = col_filtered.iloc[seq_f].to_numpy(dtype=float)
+
+        # Pad at start and end of the sequence to minimize edge effects
+        effective_pad = min(pad, len(y))
+        y_padded = np.concatenate([
+            np.repeat(y[0],  effective_pad),
+            y,
+            np.repeat(y[-1], effective_pad),
+        ])
+
+        # Sparse second-difference operator: D[i] = y[i] - 2*y[i+1] + y[i+2]
+        d = np.ones(len(y_padded) - 2)
+        D = sparse.diags(
+            [d, -2.0 * d, d],
+            offsets=[0, 1, 2],
+            shape=(len(y_padded) - 2, len(y_padded)),
+            format='csc'
+        )
+
+        # Solve (I + lambda * D^T D) y_smooth = y_padded
+        # Equivalent to minimizing ||y_smooth - y_padded||^2 + lambda * ||D y_smooth||^2
+        #                            fidelity term            acceleration smoothness term
+        A = sparse.eye(len(y_padded), format='csc') + lam * (D.T @ D)
+        y_smooth_padded = spsolve(A, y_padded)
+
+        # Remove padding
+        col_filtered.iloc[seq_f] = y_smooth_padded[effective_pad:effective_pad + len(y)]
 
     return col_filtered
 
@@ -704,6 +768,7 @@ def filter1d(col, config_dict, filter_type, frame_rate):
     # Choose filter
     filter_mapping = {
         'butterworth': butterworth_filter_1d, 
+        'acc_minimizing': acc_minimizing_filter_1d,
         'one_euro': one_euro_filter_1d,
         'gcv_spline': gcv_spline_filter_1d,
         'kalman': kalman_filter_1d,
@@ -731,12 +796,13 @@ def recap_filter3d(config_dict, output_path):
     # Read Config
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
+    kinematics_dir = os.path.realpath(os.path.join(project_dir, 'kinematics'))
     save_plots = config_dict.get('filtering', {}).get('save_filt_plots', True)
-    plots_output_dir = os.path.join(pose3d_dir, 'filtering_plots')
     do_filter = config_dict.get('filtering', {}).get('filter', True)
     reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
     filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
     filter_ik = config_dict.get('filtering', {}).get('filter_ik', False)
+    plots_output_dir = os.path.join(kinematics_dir, 'filtering_plots') if filter_ik else os.path.join(pose3d_dir, 'filtering_plots_ik')
     kalman_filter_trustratio = int(config_dict.get('filtering', {}).get('kalman', {}).get('trust_ratio', 500))
     kalman_filter_smooth = int(config_dict.get('filtering', {}).get('kalman', {}).get('smooth', True))
     kalman_filter_smooth_str = 'smoother' if kalman_filter_smooth else 'filter'
@@ -764,6 +830,7 @@ def recap_filter3d(config_dict, output_path):
     if do_filter:
         filter_mapping_recap = {
             'butterworth': f'--> Filter type: Butterworth {butterworth_filter_type}-pass. Order {butterworth_filter_order}, Cut-off frequency {butterworth_filter_cutoff} Hz.', 
+            'acc_minimizing': f'--> Filter type: Acceleration-minimizing. Cut-off frequency {config_dict.get("filtering", {}).get("acc_minimizing", {}).get("cut_off_frequency", 6.0)} Hz.',
             'one_euro': f'--> Filter type: OneEuro (zero-phase). Min cutoff frequency: {one_euro_filter_1d_min_cutoff} Hz, Beta: {one_euro_filter_1d_beta}, Derivative cutoff frequency: {one_euro_filter_1d_d_cutoff} Hz.',
             'gcv_spline': f'--> Filter type: Generalized Cross-Validation Spline. {f"Optimal parameters automatically estimated with smoothing factor {gcv_filter_smoothing_factor}" if gcv_filter_cutoff == "auto" else "Cut-off frequency {gcv_filter_cutoff} Hz"}.',
             'kalman': f'--> Filter type: Kalman {kalman_filter_smooth_str}. Measurements trusted {kalman_filter_trustratio} times as much as previous data, assuming a constant acceleration process.', 
@@ -801,12 +868,14 @@ def filter_all(config_dict):
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
     display_figures = config_dict.get('filtering', {}).get('display_figures', True)
     save_plots = config_dict.get('filtering', {}).get('save_filt_plots', True)
-    plots_output_dir = os.path.join(pose3d_dir, 'filtering_plots')
     do_filter = config_dict.get('filtering', {}).get('filter', True)
     reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
     filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
-    filter_ik = config_dict.get('temp_filter_ik', False) # only applied when run from Pose2Sim.kinematics()
     make_c3d = config_dict.get('filtering', {}).get('make_c3d', True)
+    
+    filter_ik = config_dict.get('temp_filter_ik', False) # only applied when run from Pose2Sim.kinematics()
+    kinematics_dir = os.path.realpath(os.path.join(project_dir, 'kinematics'))
+    plots_output_dir = os.path.join(kinematics_dir, 'filtering_plots') if filter_ik else os.path.join(pose3d_dir, 'filtering_plots_ik')
     if save_plots and not os.path.exists(plots_output_dir):
         os.makedirs(plots_output_dir)
 

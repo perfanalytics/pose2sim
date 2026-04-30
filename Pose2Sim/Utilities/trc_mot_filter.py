@@ -14,29 +14,30 @@
 
     Usage examples: 
     Butterworth filter, low-pass, 4th order, cut off frequency 6 Hz:
-        from Pose2Sim.Utilities import trc_filter; trc_filter.trc_filter_func(input_file = 'input.trc', output_file = 'output.trc', 
+        from Pose2Sim.Utilities import trc_mot_filter; trc_mot_filter.trc_filter_func(input_file = 'input.trc', output_file = 'output.trc', 
             display=True, type='butterworth', pass_type='low', order=4, cut_off_frequency=6)
-        OR trc_filter -i input.trc -o output.trc -d True -t butterworth -p low -n 4 -f 6
-        OR trc_filter -i input.trc -t butterworth -p low -n 4 -f 6
+        OR trc_mot_filter -i input.trc -o output.trc -d True -t butterworth -p low -n 4 -f 6
+        OR trc_mot_filter -i input.trc -t butterworth -p low -n 4 -f 6
+        OR trc_mot_filter -i input.mot -t butterworth -p low -n 4 -f 6
     Butterworth filter on speed, low-pass, 4th order, cut off frequency 6 Hz:
-        trc_filter -i input.trc -t butterworth_on_speed -p low -n 4 -f 6
+        trc_mot_filter -i input.trc -t butterworth_on_speed -p low -n 4 -f 6
     Gaussian filter, kernel 5:
-        trc_filter -i input.trc -t gaussian -k 5
+        trc_mot_filter -i input.trc -t gaussian -k 5
     LOESS filter, kernel 5: NB: frac = kernel * frames_number
-        trc_filter -i input.trc -t loess -k 5
+        trc_mot_filter -i input.trc -t loess -k 5
     Median filter, kernel 5:
-        trc_filter -i input.trc -t median -k 5
+        trc_mot_filter -i input.trc -t median -k 5
     Kalman filter, trust ratio 500:
-        trc_filter -i input.trc -t kalman --trust_ratio 500
-    GCV Spline filter, automatic cutoff:
-        trc_filter -i input.trc -t gcv_spline --gcv_cutoff auto
+        trc_mot_filter -i input.trc -t kalman --trust_ratio 500
+    GCV Spline filter, automatic cut-off:
+        trc_mot_filter -i input.trc -t gcv_spline -f auto
     One Euro filter:
-        trc_filter -i input.trc -t one_euro --min_cutoff 2.5 --beta 0.9
+        trc_mot_filter -i input.trc -t one_euro -f 2.5 --beta 0.9
     With Hampel outlier rejection:
-        trc_filter -i input.trc -t butterworth -p low -n 4 -f 6 --reject_outliers
+        trc_mot_filter -i input.trc -t butterworth -p low -n 4 -f 6 --reject_outliers
     
     Also works on .mot files:
-        trc_filter -i input.mot -t butterworth -p low -n 4 -f 6
+        trc_mot_filter -i input.mot -t butterworth -p low -n 4 -f 6
 '''
 
 
@@ -55,6 +56,9 @@ if os_name == 'Windows':
     mpl.use('qtagg')
 mpl.rc('figure', max_open_warning=0)
 from scipy import signal
+from scipy import sparse
+from scipy import sparse
+from scipy.sparse.linalg import spsolve
 from scipy.interpolate import make_smoothing_spline
 from scipy.interpolate._bsplines import _coeff_of_divided_diff, _compute_optimal_gcv_parameter
 from scipy.interpolate import BSpline
@@ -82,15 +86,17 @@ def main():
     parser = argparse.ArgumentParser(description='Filter TRC or MOT files. File type is auto-detected from extension.')
     parser.add_argument('-i', '--input_file', required=True, help='trc or mot input file')
     parser.add_argument('-t', '--type', required=True, help='type of filter: "butterworth", '
-        '"butterworth_on_speed", "loess"/"lowess", "gaussian", "median", "kalman", "gcv_spline", "one_euro"')
+        '"butterworth_on_speed", "loess"/"lowess", "gaussian", "median", "kalman", "gcv_spline", "one_euro", "acc_minimizing"')
     parser.add_argument('-d', '--display', required=False, default=True, help='display plots (True/False)')
     parser.add_argument('-o', '--output_file', required=False, help='filtered output file')
     
-    # Butterworth / Butterworth on speed
+    # Butterworth, Butterworth on speed, GCV Spline, One Euro, Acceleration minimizing
+    parser.add_argument('-f', '--cut_off_frequency', required=False, type=float, default=6, help='cut-off frequency in Hz (default: 6)')
+
+    # Butterworth, Butterworth on speed
     parser.add_argument('-p', '--pass_type', required=False, default='low', help='"low" or "high" pass filter (default: low)')
     parser.add_argument('-n', '--order', required=False, type=int, default=4, help='filter order (default: 4)')
-    parser.add_argument('-f', '--cut_off_frequency', required=False, type=float, default=6, help='cut-off frequency in Hz (default: 6)')
-    
+
     # Gaussian, Median, LOESS
     parser.add_argument('-k', '--kernel', required=False, type=int, default=5, help='kernel of the median, gaussian, or loess filter (default: 5)')
 
@@ -99,13 +105,10 @@ def main():
     parser.add_argument('--smooth', required=False, type=bool, default=True, help='Kalman smoother double pass (default: True)')
 
     # GCV Spline
-    parser.add_argument('--gcv_cutoff', required=False, default='auto', help='GCV spline cutoff: "auto" or frequency in Hz (default: auto)')
     parser.add_argument('--smoothing_factor', required=False, type=float, default=1.0, help='GCV spline smoothing factor (default: 1.0)')
 
     # One Euro
-    parser.add_argument('--min_cutoff', required=False, type=float, default=2.5, help='One Euro min cutoff frequency (default: 2.5)')
     parser.add_argument('--beta', required=False, type=float, default=0.9, help='One Euro beta (default: 0.9)')
-    parser.add_argument('--d_cutoff', required=False, type=float, default=1.0, help='One Euro derivative cutoff frequency (default: 1.0)')
 
     # Hampel outlier rejection
     parser.add_argument('--reject_outliers', action='store_true', help='Apply Hampel filter for outlier rejection before filtering')
@@ -239,7 +242,7 @@ def butterworth_filter_1d(col, **args):
     butterworth_filter_type = args.get('pass_type', 'low')
     butterworth_filter_order = int(args.get('order', 4))
     butterworth_filter_cutoff = float(args.get('cut_off_frequency', 6))
-    frame_rate = float(args.get('frame_rate'))
+    frame_rate = float(args.get('frame_rate', 30))
 
     b, a = signal.butter(butterworth_filter_order/2, butterworth_filter_cutoff/(frame_rate/2), butterworth_filter_type, analog=False)
     padlen = 3 * max(len(a), len(b))
@@ -278,7 +281,7 @@ def butterworth_on_speed_filter_1d(col, **args):
     butter_speed_filter_type = args.get('pass_type', 'low')
     butter_speed_filter_order = int(args.get('order', 4))
     butter_speed_filter_cutoff = float(args.get('cut_off_frequency', 10))
-    frame_rate = float(args.get('frame_rate'))
+    frame_rate = float(args.get('frame_rate', 30))
 
     b, a = signal.butter(butter_speed_filter_order/2, butter_speed_filter_cutoff/(frame_rate/2), butter_speed_filter_type, analog=False)
     padlen = 3 * max(len(a), len(b))
@@ -452,7 +455,7 @@ def kalman_filter_1d(col, **args):
 
     trustratio = int(args.get('trust_ratio', 500))
     smooth = args.get('smooth', True)
-    frame_rate = float(args.get('frame_rate'))
+    frame_rate = float(args.get('frame_rate', 30))
     measurement_noise = 20
     process_noise = measurement_noise * trustratio
 
@@ -553,59 +556,143 @@ def _get_smoothing_spline_intermediate_arrays(x, y, w=None):
 
 def gcv_spline_filter_1d(col, **args):
     '''
-    1D GCV Spline filter.
-    Handles NaN values by splitting into contiguous sequences.
-    
-    If gcv_cutoff is a number, it is used as the cut-off frequency in Hz.
-    If gcv_cutoff is 'auto', it automatically evaluates the best trade-off 
-    between smoothness and fidelity to data.
-    smoothing_factor biases results towards smoothing if > 1, towards fidelity if < 1.
+    If cutoff is a number, it is used as the cut-off frequency in Hz and behaves like a butterworth filter.
+    If cutoff is 'auto', GCV finds the best trade-off between smoothness and fidelity to data (optimal lambda),
+    and falls back to a biomechanically sensible frequency if GCV returns an unreliable result.
+    Smoothing_factor biases results towards smoothing if > 1, and towards fidelity to input data if <1. Ignored if cutoff is not 'auto'.
+
+    NOTE: In specific cases of a triangular wave + drift (eg pelvis Y coordinates of a subject walking uphill), 
+    the filter may occasionally overfilter the trajectory.
+    Known issue posted at: https://github.com/scipy/scipy/issues/23472
+
 
     INPUT:
     - col: Pandas dataframe column
-    - args: dictionary with gcv_cutoff, smoothing_factor, frame_rate
+    - args: dictionary with cut_off_frequency, smoothing_factor, frame_rate
 
     OUTPUT:
     - col_filtered: Filtered pandas dataframe column
     '''
 
-    cutoff = args.get('gcv_cutoff', 'auto')
+    cutoff = args.get('cut_off_frequency', 'auto')
     smoothing_factor = float(args.get('smoothing_factor', 1.0))
-    frame_rate = float(args.get('frame_rate'))
+    frame_rate = float(args.get('frame_rate', 30))
 
+    # If the automatically computed lambda corresponds to a frequency above max_cutoff (eg short sequence),
+    # it falls back to a lambda corresponding to max_cutoff. Likewise if frequency is too low (eg noisy short sequence)
+    max_cutoff = 30.0
+    min_cutoff = 1.0
+    lam_min = (frame_rate / (2.0 * np.pi * max_cutoff)) ** 4 # lam from cutoff
+    lam_max = (frame_rate / (2.0 * np.pi * min_cutoff)) ** 4
+
+    # Split into sequences of not nans
+    # print('\n', col.name)
     col_filtered = col.copy()
     mask = np.isnan(col_filtered) | col_filtered.eq(0)
     falsemask_indices = np.where(~mask)[0]
-    
-    if len(falsemask_indices) == 0:
-        return col_filtered
-    
-    gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1
+    gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 5]
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 5] # Minimum length for 4th order smoothing spline
     
+    # Filter each of the selected sequences
     for seq_f in idx_sequences_to_filter:
-        x = np.arange(len(col_filtered.iloc[seq_f]))
+        x = np.arange(len(seq_f), dtype=float)
+        y_raw = col_filtered.iloc[seq_f].to_numpy(dtype=float)
+
+        # Normalize y_raw around 1, because zero mean leads to unstabilities
+        median_y = np.median(y_raw) # median of time series
+        mad_y = np.median(np.abs(y_raw - median_y)) # median absolute deviation from median
+        scale = 1.4826 * mad_y if mad_y > 0 else 1.0 # 1.4826*mad_y equivalent to dividing by std (for y_norm to have a std of 1)
+        y_norm = 1.0 + (y_raw - median_y) / scale
 
         if cutoff == 'auto':
-            median_col = np.median(col_filtered.iloc[seq_f])
-            mad_col = np.median(np.abs(col_filtered.iloc[seq_f] - median_col))
-            mad_col = mad_col if mad_col > 0 else 1.0
-            col_norm = 1 + (col_filtered.iloc[seq_f] - median_col) / (1.4826 * mad_col)
+            # Compute optimal lam 
+            # See https://stackoverflow.com/a/79740481/12196632
+            lam = _compute_optimal_gcv_parameter_numstable(x, y_norm)
 
-            lam = _compute_optimal_gcv_parameter_numstable(x, col_norm.values)
+            # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
             lam *= smoothing_factor
 
-            spline = make_smoothing_spline(x, col_norm.values, w=None, lam=lam)
-            col_filtered_norm = spline(x)
-            
-            col_filtered.iloc[seq_f] = (col_filtered_norm - 1) * (1.4826 * mad_col) + median_col
+            # Bounds if lam is not coherent (short, near-constant sequences, triangular wave+drift...)
+            if lam < lam_min or lam > lam_max:
+                old_lam = lam
+                lam = np.clip(lam, lam_min, lam_max)
+                print(f'{col.name}: Automatically computed lambda is equivalent to a cut-off frequency of {frame_rate / (2.0 * np.pi * old_lam**0.25):.2f} Hz, which is outside of the expected range [{min_cutoff}, {max_cutoff}] Hz. Falling back to a lambda value corresponding to a cut-off frequency of {frame_rate / (2.0 * np.pi * lam**0.25):.2f} Hz. Your sequence might be too short, noisy, or near-constant for cutoff=\'auto\' to work effectively.')
+
         else:
-            lam = ((frame_rate / (2 * np.pi * float(cutoff))) ** 4)
+            # Estimate lam from cutoff frequency
+            lam = (frame_rate / (2.0 * np.pi * float(cutoff))) ** 4
+
+            # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
             lam *= smoothing_factor
 
-            spline = make_smoothing_spline(x, col_filtered.iloc[seq_f].values, w=None, lam=lam)
-            col_filtered.iloc[seq_f] = spline(x)
+        spline = make_smoothing_spline(x, y_norm, w=None, lam=lam)
+        y_filtered_norm = spline(x)
+
+        # Denormalize
+        col_filtered.iloc[seq_f] = (y_filtered_norm - 1.0) * scale + median_y
+
+    return col_filtered
+
+
+def acc_minimizing_filter_1d(col, **args):
+    '''
+    1D Whittaker-Henderson filter (acceleration-minimizing).
+    Inspired by AddBiomechanics: https://github.com/keenon/AddBiomechanics/blob/main/server/engine/src/dynamics_pass/acceleration_minimizing_pass.py
+
+    INPUT:
+    - args: dictionary with 'cut_off_frequency' (Hz)
+    - frame_rate: float, frames per second
+    - col: Pandas Series
+
+    OUTPUT:
+    - col_filtered: filtered Pandas Series (same index as input)
+    '''
+    
+    cutoff = args.get('cut_off_frequency', 6)
+    frame_rate = float(args.get('frame_rate', 30))
+    pad = 10
+
+    # conversion from cutoff to lambda
+    lam = (frame_rate / (2.0 * np.pi * cutoff)) ** 4
+
+    # Split into sequences of not nans
+    col_filtered = col.copy()
+    mask = np.isnan(col_filtered) | col_filtered.eq(0)
+    falsemask_indices = np.where(~mask)[0]
+    gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1
+    idx_sequences = np.split(falsemask_indices, gaps)
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 3] # Minimum length for accelerations (2nd order differences)
+
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        y = col_filtered.iloc[seq_f].to_numpy(dtype=float)
+
+        # Pad at start and end of the sequence to minimize edge effects
+        effective_pad = min(pad, len(y))
+        y_padded = np.concatenate([
+            np.repeat(y[0],  effective_pad),
+            y,
+            np.repeat(y[-1], effective_pad),
+        ])
+
+        # Sparse second-difference operator: D[i] = y[i] - 2*y[i+1] + y[i+2]
+        d = np.ones(len(y_padded) - 2)
+        D = sparse.diags(
+            [d, -2.0 * d, d],
+            offsets=[0, 1, 2],
+            shape=(len(y_padded) - 2, len(y_padded)),
+            format='csc'
+        )
+
+        # Solve (I + lambda * D^T D) y_smooth = y_padded
+        # Equivalent to minimizing ||y_smooth - y_padded||^2 + lambda * ||D y_smooth||^2
+        #                            fidelity term            acceleration smoothness term
+        A = sparse.eye(len(y_padded), format='csc') + lam * (D.T @ D)
+        y_smooth_padded = spsolve(A, y_padded)
+
+        # Remove padding
+        col_filtered.iloc[seq_f] = y_smooth_padded[effective_pad:effective_pad + len(y)]
 
     return col_filtered
 
@@ -616,16 +703,16 @@ def one_euro_filter_1d(col, **args):
     
     INPUT:
     - col: Pandas Series
-    - args: dictionary with min_cutoff, beta, d_cutoff, frame_rate
+    - args: dictionary with cut_off_frequency, beta, d_cutoff, frame_rate
 
     OUTPUT:
     - col_filtered: Filtered pandas Series
     '''
     
-    min_cutoff = float(args.get('min_cutoff', 2.5))
+    min_cutoff = float(args.get('cut_off_frequency', 2.5))
     beta = float(args.get('beta', 0.9))
     d_cutoff = float(args.get('d_cutoff', 1.0))
-    frame_rate = float(args.get('frame_rate'))
+    frame_rate = float(args.get('frame_rate', 30))
     dt = 1.0 / frame_rate
     
     def smoothing_factor(dt, cutoff):
@@ -779,6 +866,7 @@ def filter1d(col, **args):
         'median': median_filter_1d,
         'kalman': kalman_filter_1d,
         'gcv_spline': gcv_spline_filter_1d,
+        'acc_minimizing': acc_minimizing_filter_1d,
         'one_euro': one_euro_filter_1d,
         }
     
@@ -913,7 +1001,7 @@ def trc_filter_func(**args):
     Q_filt = Q_coords.apply(filter1d, axis=0, **args)
 
     # --- Display figures ---
-    display = args.get('display')
+    display = args.get('display', True)
     if display == True or display == 'True' or display == 'true':
         if is_mot:
             col_names = Q_coords.columns.to_numpy()
@@ -948,8 +1036,9 @@ def trc_filter_func(**args):
         'lowess': f"LOESS, kernel {args.get('kernel', 5)}",
         'median': f"Median, kernel {args.get('kernel', 5)}",
         'kalman': f"Kalman {'smoother' if args.get('smooth', True) else 'filter'}, trust ratio {args.get('trust_ratio', 500)}",
-        'gcv_spline': f"GCV Spline, cutoff {'auto' if args.get('gcv_cutoff', 'auto') == 'auto' else str(args.get('gcv_cutoff')) + ' Hz'}, smoothing factor {args.get('smoothing_factor', 1.0)}",
-        'one_euro': f"One Euro, min cutoff {args.get('min_cutoff', 2.5)} Hz, beta {args.get('beta', 0.9)}, d_cutoff {args.get('d_cutoff', 1.0)} Hz",
+        'gcv_spline': f"GCV Spline, cutoff {'auto' if args.get('cut_off_frequency', 'auto') == 'auto' else str(args.get('cut_off_frequency')) + ' Hz'}, smoothing factor {args.get('smoothing_factor', 1.0)}",
+        'one_euro': f"One Euro, min cutoff {args.get('cut_off_frequency', 2.5)} Hz, beta {args.get('beta', 0.9)}, d_cutoff {args.get('d_cutoff', 1.0)} Hz",
+        'acc_minimizing': f"Acceleration-minimizing (Whittaker-Henderson), cutoff {args.get('cut_off_frequency', 6)} Hz",
     }
     
     file_type = "mot" if is_mot else "trc"

@@ -562,7 +562,7 @@ def pad_shape(arr, target_len, fill_value=np.nan):
     return arr
 
 
-def trimmed_mean(arr, trimmed_extrema_percent=0.5):
+def trimmed_mean(arr, trimmed_extrema_percent=50):
     '''
     Trimmed mean calculation for an array.
 
@@ -578,6 +578,7 @@ def trimmed_mean(arr, trimmed_extrema_percent=0.5):
     sorted_arr = np.sort(arr)
     
     # Determine the indices for the 25th and 75th percentiles (if trimmed_percent = 0.5)
+    trimmed_extrema_percent /= 100
     lower_idx = int(len(sorted_arr) * (trimmed_extrema_percent/2))
     upper_idx = int(len(sorted_arr) * (1 - trimmed_extrema_percent/2))
     
@@ -951,8 +952,6 @@ def mean_angles(Q_coords, ang_to_consider = ['right knee', 'left knee', 'right h
     - ang_mean: The mean angle time series.
     '''
 
-    ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']
-
     angs = []
     for ang_name in ang_to_consider:
         ang_params = angle_dict[ang_name]
@@ -1014,7 +1013,7 @@ def add_neck_hip_coords(kpt_name, p_X, p_Y, p_scores, kpt_ids, kpt_names):
     return p_X, p_Y, p_scores
 
 
-def best_coords_for_measurements(Q_coords, large_hip_knee_angles=135):
+def best_coords_for_measurements(Q_coords, large_hip_knee_angles=90):
     '''
     Compute the best coordinates for measurements, after removing the
     frames where hip and knee angle are below 45° 
@@ -1023,7 +1022,6 @@ def best_coords_for_measurements(Q_coords, large_hip_knee_angles=135):
     INPUTS:
     - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
     - large_hip_knee_angles: int
-    - trimmed_extrema_percent: float
 
     OUTPUT:
     - Q_coords_low_angles: pd.DataFrame. The best coordinates for measurements
@@ -1050,7 +1048,7 @@ def best_coords_for_measurements(Q_coords, large_hip_knee_angles=135):
     return Q_coords_low_angles
 
 
-def compute_height(Q_coords, large_hip_knee_angles=135, trimmed_extrema_percent=0.5):
+def compute_height(Q_coords, large_hip_knee_angles=90, trimmed_extrema_percent=50):
     '''
     Compute the height of the person from the trc data.
 
@@ -1116,7 +1114,7 @@ def compute_height(Q_coords, large_hip_knee_angles=135, trimmed_extrema_percent=
     return height
 
 
-def compute_leg_length(trc_path, large_hip_knee_angles=135, trimmed_extrema_percent=0.5):
+def compute_leg_length(trc_path, large_hip_knee_angles=90, trimmed_extrema_percent=50):
     '''
     Compute the leg length of the person from the trc data.
 

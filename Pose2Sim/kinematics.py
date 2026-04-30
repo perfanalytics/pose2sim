@@ -276,7 +276,7 @@ def dict_segment_marker_pairs(scaling_root, right_left_symmetry=True):
     return segment_markers_dict
 
 
-def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, trimmed_extrema_percent=0.5, right_left_symmetry=True):
+def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, trimmed_extrema_percent=50, right_left_symmetry=True):
     '''
     Calculate the ratios between the size of the actual segment and the size of the model segment.
     X, Y, and Z ratios are calculated separately if the original scaling setup file asks for it.
@@ -383,7 +383,7 @@ def update_scale_values(scaling_root, segment_ratio_dict):
 
 def perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir, 
                     use_simple_model=False, right_left_symmetry=True, subject_height=1.75, subject_mass=70, 
-                    remove_scaling_setup=True, large_hip_knee_angles=135, trimmed_extrema_percent=0.5):
+                    remove_scaling_setup=True, large_hip_knee_angles=90, trimmed_extrema_percent=50):
     '''
     Perform model scaling based on the (not necessarily static) TRC file:
     - Remove 10% fastest frames (potential outliers)
@@ -402,7 +402,7 @@ def perform_scaling(trc_file, pose_model, kinematics_dir, osim_setup_dir,
     - subject_mass (float): The mass of the subject.
     - remove_scaling_setup (bool): Whether to remove the scaling setup file after scaling.
     - large_hip_knee_angles (float): Imprecise coordinates when person is crouching
-    - trimmed_extrema_percent (float): Proportion of the most extreme segment values to remove before calculating their mean
+    - trimmed_extrema_percent (float): Percentage of the most extreme segment values to remove before calculating their mean
     
     OUTPUTS:
     - A scaled OpenSim model file.
@@ -577,15 +577,15 @@ def kinematics_all(config_dict):
 
     use_augmentation = config_dict.get('kinematics', {}).get('use_augmentation', True)
     use_simple_model = config_dict.get('kinematics', {}).get('use_simple_model', False)
-    filter_ik = config_dict.get('kinematics', {}).get('filter_ik', True)
+    filter_ik = config_dict.get('kinematics', {}).get('filter_ik', False)
     multi_person = config_dict.get('project', {}).get('multi_person', False)
     parallel_workers = config_dict.get('kinematics', {}).get('parallel_workers_kinematics', 'auto')
     right_left_symmetry = config_dict.get('kinematics', {}).get('right_left_symmetry', True)
     subject_height = config_dict.get('project', {}).get('participant_height', 'auto')
     subject_mass = config_dict.get('project', {}).get('participant_mass', 70.0)
 
-    large_hip_knee_angles = config_dict.get('kinematics', {}).get('large_hip_knee_angles', 135)
-    trimmed_extrema_percent = config_dict.get('kinematics', {}).get('trimmed_extrema_percent', 0.5)
+    large_hip_knee_angles = config_dict.get('kinematics', {}).get('large_hip_knee_angles', 90)
+    trimmed_extrema_percent = config_dict.get('kinematics', {}).get('trimmed_extrema_percent', 50)
     default_height = config_dict.get('kinematics', {}).get('default_height', 1.7)
 
     remove_scaling_setup = config_dict.get('kinematics', {}).get('remove_individual_scaling_setup', True)
@@ -707,13 +707,15 @@ def kinematics_all(config_dict):
     
     # Run filtering pipeline on IK results at twice the cut-off frequencies specified in the config file
     if filter_ik:
-        # double cut-off frequencies
-        config_dict['filtering']['butterworth']['cut_off_frequency'] *= 2
-        config_dict['filtering']['kalman']['trust_ratio'] *= 2
-        config_dict['filtering']['one_euro']['cut_off_frequency'] *= 2
-        config_gcv_cut = config_dict['filtering']['gcv_spline']['cut_off_frequency']
-        config_gcv_cut = config_gcv_cut * 2 if isinstance(config_gcv_cut, (int, float)) else config_gcv_cut
-        config_dict['filtering']['butterworth_on_speed']['cut_off_frequency'] *= 2
-        
         config_dict['temp_filter_ik'] = True
+        config_dict['filtering']['type'] = config_dict.get('kinematics', {}).get('ik_filter_type', 'acc_minimizing')
+
+        # # double cut-off frequencies
+        # config_dict['filtering']['butterworth']['cut_off_frequency'] *= 2
+        # config_dict['filtering']['kalman']['trust_ratio'] *= 2
+        # config_dict['filtering']['one_euro']['cut_off_frequency'] *= 2
+        # config_gcv_cut = config_dict['filtering']['gcv_spline']['cut_off_frequency']
+        # config_gcv_cut = config_gcv_cut * 2 if isinstance(config_gcv_cut, (int, float)) else config_gcv_cut
+        # config_dict['filtering']['butterworth_on_speed']['cut_off_frequency'] *= 2
+        
         filter_all(config_dict)
