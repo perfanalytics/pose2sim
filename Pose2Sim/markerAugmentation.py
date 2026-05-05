@@ -31,7 +31,7 @@ import glob
 import logging
 
 from Pose2Sim.common import convert_to_c3d, natural_sort_key, read_trc, write_trc,  \
-                            compute_height, add_shoulder_data
+                            compute_height, add_shoulder_data, add_neck_hip_data
 
 
 ## AUTHORSHIP INFORMATION
@@ -47,37 +47,6 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def add_neck_hip_data(trc_data, markers, header):
-    '''
-    Add neck and midhip data to trc_data if not present.
-    Also update header and markers.
-    '''
-
-    midpoints = {
-        'Neck': ['RShoulder', 'LShoulder'],
-        'Hip': ['RHip', 'LHip']}
-
-    for mk_name, r_l_markers in midpoints.items():
-        if mk_name not in markers:
-            try:
-                # Add marker name
-                markers.append(mk_name)
-
-                # Update header
-                header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
-                header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{mk_name}\t\t\t\n')
-                header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
-
-                # update trc_data
-                r_l_data = [trc_data[marker] for marker in r_l_markers]
-                mid_data = pd.DataFrame(sum([data.values for data in r_l_data])/2, columns=[mk_name]*3)
-                trc_data = pd.concat([trc_data, mid_data], axis=1)
-            except Exception as e:
-                logging.warning(f"Failed to add {mk_name} marker. Error: {e}")
-
-    return trc_data, markers, header
-
-
 def getOpenPoseMarkers_lowerExtremity2():
     feature_markers = [
         "Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",

@@ -57,7 +57,6 @@ if os_name == 'Windows':
 mpl.rc('figure', max_open_warning=0)
 from scipy import signal
 from scipy import sparse
-from scipy import sparse
 from scipy.sparse.linalg import spsolve
 from scipy.interpolate import make_smoothing_spline
 from scipy.interpolate._bsplines import _coeff_of_divided_diff, _compute_optimal_gcv_parameter

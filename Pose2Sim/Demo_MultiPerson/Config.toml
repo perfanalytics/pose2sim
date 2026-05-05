@@ -99,7 +99,7 @@ undistort_points = false # Not implemented yet. Better if distorted image (paral
 
 
 [synchronization]
-synchronization_gui = true # true or false. If true, a player will popup and let the user determine synchronization parameters. If false, it will be done automatically based on the parameters below
+synchronization_gui = true # true or false. If true, a player will pop up and let the user determine synchronization parameters. If false, it will be done automatically based on the parameters below
 display_sync_plots = true # true or false (lowercase)
 save_sync_plots = true # true or false (lowercase) # save synchronization plots
 keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, for example if the participant did not perform any particicular sharp movement. In this case, the capture needs to be 5-10 seconds long at least

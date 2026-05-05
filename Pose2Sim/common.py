@@ -388,6 +388,103 @@ def add_shoulder_data(trc_data, markers, header):
     return trc_data, markers, header
 
 
+def add_neck_hip_data(trc_data, markers, header):
+    '''
+    Add neck and midhip data to trc_data if not present.
+    Also update header and markers.
+    '''
+
+    midpoints = {
+        'Neck': ['RShoulder', 'LShoulder'],
+        'Hip': ['RHip', 'LHip']}
+
+    for mk_name, r_l_markers in midpoints.items():
+        if mk_name not in markers:
+            try:
+                # Add marker name
+                markers.append(mk_name)
+
+                # Update header
+                header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
+                header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{mk_name}\t\t\t\n')
+                header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
+
+                # update trc_data
+                r_l_data = [trc_data[marker] for marker in r_l_markers]
+                mid_data = pd.DataFrame(sum([data.values for data in r_l_data])/2, columns=[mk_name]*3)
+                trc_data = pd.concat([trc_data, mid_data], axis=1)
+            except Exception as e:
+                logging.warning(f"Failed to add {mk_name} marker. Error: {e}")
+
+    return trc_data, markers, header
+
+
+def add_shoulder_neck_hip_coords(kpt_name, p_X, p_Y, p_scores, kpt_ids, kpt_names):
+    '''
+    Adding kpt_name if missing from kpt_names:
+    - shoulder: hip + dist(knee,hip) in -Y direction
+    - neck: midshoulder
+    - hip: midhip
+    
+    INPUTS:
+    - kpt_name: name of the keypoint to add (neck, hip)
+    - p_X: list of x coordinates after flipping if needed
+    - p_Y: list of y coordinates
+    - p_scores: list of confidence scores
+    - kpt_ids: list of keypoint ids (see skeletons.py)
+    - kpt_names: list of keypoint names (see skeletons.py)
+    
+    OUTPUTS:
+    - p_X: list of x coordinates with added missing coordinate
+    - p_Y: list of y coordinates with added missing coordinate
+    - p_scores: list of confidence scores with added missing score
+    '''
+
+    names, ids = kpt_names.copy(), kpt_ids.copy()
+    names.append(kpt_name)
+    ids.append(len(p_X))
+
+    if kpt_name in ['RShoulder', 'LShoulder']:
+        rknee_coords = (p_X[ids[names.index('RKnee')]], p_Y[ids[names.index('RKnee')]])
+        rhip_coords = (p_X[ids[names.index('RHip')]], p_Y[ids[names.index('RHip')]])
+        lhip_coords = (p_X[ids[names.index('LHip')]], p_Y[ids[names.index('LHip')]])
+        lknee_coords = (p_X[ids[names.index('LKnee')]], p_Y[ids[names.index('LKnee')]])
+        knee_hip_dist = np.mean([euclidean_distance(rknee_coords, rhip_coords), euclidean_distance(lknee_coords, lhip_coords)])
+        if kpt_name == 'LShoulder':
+            lshoulder_X = lhip_coords[0]
+            lshoulder_Y = lhip_coords[1] - 1.4 * knee_hip_dist
+            lshoulder_score = (p_scores[ids[names.index('LKnee')]] + p_scores[ids[names.index('LHip')]])/2
+            new_p_X = np.append(p_X, lshoulder_X)
+            new_p_Y = np.append(p_Y, lshoulder_Y)
+            new_p_score = np.append(p_scores, lshoulder_score)
+        elif kpt_name == 'RShoulder':
+            rshoulder_X = rhip_coords[0]
+            rshoulder_Y = rhip_coords[1] - 1.4 * knee_hip_dist
+            rshoulder_score = (p_scores[ids[names.index('RKnee')]] + p_scores[ids[names.index('LHip')]])/2
+            new_p_X = np.append(p_X, rshoulder_X)
+            new_p_Y = np.append(p_Y, rshoulder_Y)
+            new_p_score = np.append(p_scores, rshoulder_score)
+
+    elif kpt_name == 'Neck':
+        new_p_X = (np.abs(p_X[ids[names.index('LShoulder')]]) + np.abs(p_X[ids[names.index('RShoulder')]])) /2
+        new_p_Y = (p_Y[ids[names.index('LShoulder')]] + p_Y[ids[names.index('RShoulder')]])/2
+        new_p_score = (p_scores[ids[names.index('LShoulder')]] + p_scores[ids[names.index('RShoulder')]])/2
+
+    elif kpt_name == 'Hip':
+        new_p_X = (np.abs(p_X[ids[names.index('LHip')]]) + np.abs(p_X[ids[names.index('RHip')]]) ) /2
+        new_p_Y = (p_Y[ids[names.index('LHip')]] + p_Y[ids[names.index('RHip')]])/2
+        new_p_score = (p_scores[ids[names.index('LHip')]] + p_scores[ids[names.index('RHip')]])/2
+    
+    else:
+        raise ValueError("kpt_name must be 'Neck' or 'Hip'")
+    
+    p_X = np.append(p_X, new_p_X)
+    p_Y = np.append(p_Y, new_p_Y)
+    p_scores = np.append(p_scores, new_p_score)
+
+    return p_X, p_Y, p_scores
+
+
 def common_items_in_list(list1, list2):
     '''
     Do two lists have any items in common at the same index?
@@ -1030,44 +1127,6 @@ def mean_angles(Q_coords, ang_to_consider = ['right knee', 'left knee', 'right h
     return ang_mean
 
 
-def add_neck_hip_coords(kpt_name, p_X, p_Y, p_scores, kpt_ids, kpt_names):
-    '''
-    Add neck (midshoulder) and hip (midhip) coordinates if neck and hip are not available
-    
-    INPUTS:
-    - kpt_name: name of the keypoint to add (neck, hip)
-    - p_X: list of x coordinates after flipping if needed
-    - p_Y: list of y coordinates
-    - p_scores: list of confidence scores
-    - kpt_ids: list of keypoint ids (see skeletons.py)
-    - kpt_names: list of keypoint names (see skeletons.py)
-    
-    OUTPUTS:
-    - p_X: list of x coordinates with added missing coordinate
-    - p_Y: list of y coordinates with added missing coordinate
-    - p_scores: list of confidence scores with added missing score
-    '''
-
-    names, ids = kpt_names.copy(), kpt_ids.copy()
-    names.append(kpt_name)
-    ids.append(len(p_X))
-    if kpt_name == 'Neck':
-        mid_X = (np.abs(p_X[ids[names.index('LShoulder')]]) + np.abs(p_X[ids[names.index('RShoulder')]])) /2
-        mid_Y = (p_Y[ids[names.index('LShoulder')]] + p_Y[ids[names.index('RShoulder')]])/2
-        mid_score = (p_scores[ids[names.index('LShoulder')]] + p_scores[ids[names.index('RShoulder')]])/2
-    elif kpt_name == 'Hip':
-        mid_X = (np.abs(p_X[ids[names.index('LHip')]]) + np.abs(p_X[ids[names.index('RHip')]]) ) /2
-        mid_Y = (p_Y[ids[names.index('LHip')]] + p_Y[ids[names.index('RHip')]])/2
-        mid_score = (p_scores[ids[names.index('LHip')]] + p_scores[ids[names.index('RHip')]])/2
-    else:
-        raise ValueError("kpt_name must be 'Neck' or 'Hip'")
-    p_X = np.append(p_X, mid_X)
-    p_Y = np.append(p_Y, mid_Y)
-    p_scores = np.append(p_scores, mid_score)
-
-    return p_X, p_Y, p_scores
-
-
 def best_coords_for_measurements(Q_coords, large_hip_knee_angles=90):
     '''
     Compute the best coordinates for measurements, after removing the
@@ -1152,16 +1211,22 @@ def compute_height(Q_coords, large_hip_knee_angles=90, trimmed_extrema_percent=5
                          Make sure that the person is entirely visible, or use a calibration file instead, or set "to_meters=false".')
 
     try:
-        head_pair = [['MidShoulder', 'Head']]
-        head = [euclidean_distance(Q_coords[pair[0]], Q_coords[pair[1]]) for pair in head_pair][0]\
-                *1.008
-    except:
-        head_pair = [['MidShoulder', 'Nose']]
-        head = [euclidean_distance(Q_coords[pair[0]], Q_coords[pair[1]]) for pair in head_pair][0]\
-                *1.5
-        logging.warning('The Head marker is missing from your model. Considering Neck to Head size as 1.33 times Neck to MidShoulder size.')
+        try:
+            head_pair = [['MidShoulder', 'Head']]
+            head = [euclidean_distance(Q_coords[pair[0]], Q_coords[pair[1]]) for pair in head_pair][0]\
+                    *1.008
+        except:
+            head_pair = [['MidShoulder', 'Nose']]
+            head = [euclidean_distance(Q_coords[pair[0]], Q_coords[pair[1]]) for pair in head_pair][0]\
+                    *1.5
+            logging.warning('The Head marker is missing from your model. Considering Neck to Head size as 1.33 times Neck to MidShoulder size.')
+        
+        heights = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2 + (rback + lback)/2 + head
     
-    heights = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2 + (rback + lback)/2 + head
+    except:
+        logging.warning('Head and Nose markers are missing. Approximating height as leg_length/0.53 (Winter, 2009).')
+        leg_lengths = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2
+        heights = leg_lengths / 0.53
     
     # Remove the 20% most extreme values
     height = trimmed_mean(heights, trimmed_extrema_percent=trimmed_extrema_percent)
@@ -1530,7 +1595,7 @@ def draw_bounding_box(img, X, Y, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)],
     return img
 
 
-def draw_skel(img, X, Y, model):
+def draw_skel(img, X, Y, skeleton_model):
     '''
     Draws keypoints and skeleton for each person.
     Skeletons have a different color for each person.
@@ -1539,7 +1604,7 @@ def draw_skel(img, X, Y, model):
     - img: opencv image
     - X: list of list of x coordinates
     - Y: list of list of y coordinates
-    - model: skeleton model (from skeletons.py)
+    - skeleton_model: Anytree node. Skeleton model (from skeletons.py)
     - colors: list of colors to cycle through
     
     OUTPUT:
@@ -1548,7 +1613,7 @@ def draw_skel(img, X, Y, model):
     
     # Get (unique) pairs between which to draw a line
     id_pairs, name_pairs = [], []
-    for data_i in PreOrderIter(model.root, filter_=lambda node: node.is_leaf):
+    for data_i in PreOrderIter(skeleton_model.root, filter_=lambda node: node.is_leaf):
         node_branch_ids = [node_i.id for node_i in data_i.path]
         node_branch_names = [node_i.name for node_i in data_i.path]
         id_pairs += [[node_branch_ids[i],node_branch_ids[i+1]] for i in range(len(node_branch_ids)-1)]

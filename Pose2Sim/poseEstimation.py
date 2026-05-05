@@ -115,38 +115,43 @@ def setup_model_class_mode(pose_model, mode, config_dict={}):
 
     if pose_model.upper() in ('HALPE_26', 'BODY_WITH_FEET', 'LOWER_BODY'):
         model_name = 'HALPE_26'
+        skeleton_name = 'HALPE_26_LOWER' if pose_model.upper()=='LOWER_BODY' else 'HALPE_26'
         ModelClass = BodyWithFeet # 26 keypoints(halpe26)
-        logging.info(f"Using HALPE_26 model (body and feet) for pose estimation in {mode} mode.")
     elif pose_model.upper() in ('COCO_133', 'WHOLE_BODY', 'WHOLE_BODY_WRIST'):
         model_name = 'COCO_133'
+        skeleton_name = 'COCO_133_WRIST' if pose_model.upper()=='WHOLE_BODY_WRIST' else 'COCO_133'
         ModelClass = Wholebody
-        logging.info(f"Using COCO_133 model (body, feet, hands, and face) for pose estimation in {mode} mode.")
     elif pose_model.upper() in ('COCO_17', 'BODY'):
         model_name = 'COCO_17'
+        skeleton_name = 'COCO_17'
         ModelClass = Body
-        logging.info(f"Using COCO_17 model (body) for pose estimation in {mode} mode.")
     elif pose_model.upper() =='HAND':
         model_name = 'HAND_21'
+        skeleton_name = 'HAND_21'
         ModelClass = Hand
-        logging.info(f"Using HAND_21 model for pose estimation in {mode} mode.")
     elif pose_model.upper() =='FACE':
         model_name = 'FACE_106'
-        logging.info(f"Using FACE_106 model for pose estimation in {mode} mode.")
+        skeleton_name = 'FACE_106'
+        ModelClass = Face
     elif pose_model.upper() =='ANIMAL':
         model_name = 'ANIMAL2D_17'
-        logging.info(f"Using ANIMAL2D_17 model for pose estimation in {mode} mode.")
+        skeleton_name = 'ANIMAL2D_17'
+        ModelClass = Animal
     else:
         model_name = pose_model.upper()
-        logging.info(f"Using model {model_name} for pose estimation in {mode} mode.")
+        skeleton_name = pose_model.upper()
+    logging.info(f"Using model {model_name} for {pose_model} pose estimation in {mode} mode.")
+
+    # Read from skeletons.py or from Config.toml
     try:
-        pose_model = eval(model_name)
+        skeleton_model = eval(skeleton_name)
     except:
         try: # from Config.toml
             from anytree.importer import DictImporter
             model_name = pose_model.upper()
-            pose_model = DictImporter().import_(config_dict.get('pose').get(pose_model)[0])
-            if pose_model.id == 'None':
-                pose_model.id = None
+            skeleton_model = DictImporter().import_(config_dict.get('pose').get(pose_model)[0])
+            if skeleton_model.id == 'None':
+                skeleton_model.id = None
             logging.info(f"Using model {model_name} for pose estimation.")
         except:
             raise NameError(f'{pose_model} not found in skeletons.py nor in Config.toml')
@@ -165,7 +170,7 @@ def setup_model_class_mode(pose_model, mode, config_dict={}):
             det = mode.get('det_model')
             det_input_size = mode.get('det_input_size')
             pose_class = mode.get('pose_class')
-            pose = mode.get('pose_model')
+            pose = mode.get('skeleton_model')
             pose_input_size = mode.get('pose_input_size')
 
             ModelClass = partial(Custom,
@@ -174,15 +179,15 @@ def setup_model_class_mode(pose_model, mode, config_dict={}):
             logging.info(f"Using model {model_name} with the following custom parameters: {mode}.")
 
             if pose_class == 'RTMO' and model_name != 'COCO_17':
-                logging.warning("RTMO currently only supports 'Body' pose_model. Switching to 'Body'.")
-                pose_model = eval('COCO_17')
+                logging.warning("RTMO currently only supports 'Body' pose model. Switching to 'Body'.")
+                skeleton_model = eval('COCO_17')
             
         except (json.JSONDecodeError, TypeError):
             logging.warning("Invalid mode. Must be 'lightweight', 'balanced', 'performance', or '''{dictionary}''' of parameters within triple quotes. Make sure input_sizes are within square brackets.")
             logging.warning('Using the default "balanced" mode.')
             mode = 'balanced'
 
-    return pose_model, ModelClass, mode
+    return skeleton_model, ModelClass, mode
 
 
 def setup_backend_device(backend='auto', device='auto'):
@@ -281,14 +286,14 @@ def save_to_openpose(json_file_path, keypoints, scores):
         json.dump(json_output, json_file)
 
 
-def process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, max_distance_px, deepsort_tracker, cancel_event=None):
+def process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, max_distance_px, deepsort_tracker, cancel_event=None):
     '''
     Estimate pose from a video file
     
     INPUTS:
     - video_path: str. Path to the input video file
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
-    - pose_model: str. The pose model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
+    - skeleton_model: Anytree node. The skeleton model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
     - frame_range: list. Range of frames to process
     - average_likelihood_threshold_pose: float. If the average confidence score of the detected keypoints for a person is below this threshold, the person will be dropped (default: 0.5)
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
@@ -339,7 +344,7 @@ def process_video(video_path, pose_tracker, pose_model, frame_range, average_lik
     frame_idx = f_range[0]
 
     # Retrieve keypoint names from model
-    keypoints_ids = [node.id for _, _, node in RenderTree(pose_model) if node.id!=None]
+    keypoints_ids = [node.id for _, _, node in RenderTree(skeleton_model) if node.id!=None]
     kpt_id_max = max(keypoints_ids)+1
 
     with tqdm(iterable=range(*f_range), desc=f'Processing {os.path.basename(video_path)}') as pbar:
@@ -411,7 +416,7 @@ def process_video(video_path, pose_tracker, pose_model, frame_range, average_lik
                         img_show = frame.copy()
                         img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                         img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
-                        img_show = draw_skel(img_show, valid_X, valid_Y, pose_model)
+                        img_show = draw_skel(img_show, valid_X, valid_Y, skeleton_model)
                 
                 if display_detection:
                     cv2.imshow(f"Pose Estimation {os.path.basename(video_path)}", img_show)
@@ -442,7 +447,7 @@ def process_video(video_path, pose_tracker, pose_model, frame_range, average_lik
 
 
 def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
-                         pose_model, frame_range, average_likelihood_threshold_pose,
+                         skeleton_model, frame_range, average_likelihood_threshold_pose,
                          output_format, save_video, save_images, display_detection, tracking_mode,
                          max_distance_px, deepsort_params, init_lock, cancel_event):
     '''
@@ -455,22 +460,22 @@ def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, d
     else:
         pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
     deepsort_tracker = None
-    if tracking_mode == 'deepsort' and multi_person:
+    if tracking_mode == 'deepsort':
         from deep_sort_realtime.deepsort_tracker import DeepSort
         deepsort_tracker = DeepSort(**deepsort_params)
-    process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, 
+    process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, 
                   output_format, save_video, save_images, display_detection,
                   tracking_mode, max_distance_px, deepsort_tracker, cancel_event=cancel_event)
 
 
-def process_images(image_folder_path, pose_tracker, pose_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker):
+def process_images(image_folder_path, pose_tracker, skeleton_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, max_distance_px, deepsort_tracker):
     '''
     Estimate pose estimation from a folder of images
     
     INPUTS:
     - image_folder_path: str. Path to the input image folder
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
-    - pose_model: str. The pose model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
+    - skeleton_model: Anytree node. The skeleton model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
@@ -511,7 +516,7 @@ def process_images(image_folder_path, pose_tracker, pose_model, output_format, f
         cv2.resizeWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", display_width, display_height)
     
     # Retrieve keypoint names from model
-    keypoints_ids = [node.id for _, _, node in RenderTree(pose_model) if node.id!=None]
+    keypoints_ids = [node.id for _, _, node in RenderTree(skeleton_model) if node.id!=None]
     kpt_id_max = max(keypoints_ids)+1
     
     f_range = [[0,len(image_files)] if frame_range in ('all', 'auto', []) else frame_range][0]
@@ -559,7 +564,7 @@ def process_images(image_folder_path, pose_tracker, pose_model, output_format, f
                     img_show = frame.copy()
                     img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                     img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
-                    img_show = draw_skel(img_show, valid_X, valid_Y, pose_model)
+                    img_show = draw_skel(img_show, valid_X, valid_Y, skeleton_model)
 
             if display_detection:
                 cv2.imshow(f"Pose Estimation {os.path.basename(image_folder_path)}", img_show)
@@ -663,7 +668,7 @@ def estimate_pose_all(config_dict):
     # Select the appropriate model based on the model_type
     logging.info('Estimating pose...\n')
     pose_model_name = pose_model
-    pose_model, ModelClass, mode = setup_model_class_mode(pose_model, mode, config_dict)
+    skeleton_model, ModelClass, mode = setup_model_class_mode(pose_model, mode, config_dict)
 
     # Estimate pose
     try:
@@ -676,10 +681,6 @@ def estimate_pose_all(config_dict):
             raise
             
     except:
-        # Set up model and mode
-        logging.info(f'\nPose tracking set up for "{pose_model_name}" model.')
-        logging.info(f'Mode: {mode}.')
-        
         # Set up detection frequency
         low_likelihood_message = f'Detections are dropped if their average keypoint likelihood is below {average_likelihood_threshold_pose}.'
         if det_frequency>1:
@@ -734,7 +735,7 @@ def estimate_pose_all(config_dict):
                         executor.submit(
                             process_video_worker, video_path,
                             ModelClass, det_frequency, mode, backend, device,
-                            pose_model, frame_range, average_likelihood_threshold_pose,
+                            skeleton_model, frame_range, average_likelihood_threshold_pose,
                             output_format, save_video, save_images, display_detection, tracking_mode,
                             max_distance_px, deepsort_params, init_lock, cancel_event
                         ): video_path for video_path in video_files
@@ -771,7 +772,7 @@ def estimate_pose_all(config_dict):
                     pose_tracker.reset()
                     if tracking_mode == 'deepsort':
                         deepsort_tracker.tracker.delete_all_tracks()
-                    process_video(video_path, pose_tracker, pose_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, max_distance_px, deepsort_tracker)
+                    process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, max_distance_px, deepsort_tracker)
 
         else:
             # Process image folders
