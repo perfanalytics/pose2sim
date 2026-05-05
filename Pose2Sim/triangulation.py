@@ -706,6 +706,7 @@ def triangulate_all(config_dict):
     # Retrieve keypoints from model
     try: # from skeletons.py
         if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'LOWER_BODY': pose_model = 'HALPE_26_LOWER'
         elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
         elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
         elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'

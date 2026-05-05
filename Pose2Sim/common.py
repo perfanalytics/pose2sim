@@ -222,7 +222,7 @@ def get_max_workers(device='cpu'):
 
 def read_mot(mot_path):
     '''
-    Read an OpenSim .mot file
+    Read a .mot file (OpenSim motion file).
     
     INPUT:
     - mot_path: path to the .mot file
@@ -256,29 +256,29 @@ def read_mot(mot_path):
     return data_cols, time_col, header_lines
 
 
-def write_mot(mot_path, data, time_col, header_lines):
+def write_mot(mot_path, mot_data, time_col, header):
     '''
     Write a .mot file (OpenSim motion file).
     
     INPUT:
     - mot_path: path to the output .mot file
-    - data: pandas DataFrame of filtered data columns
+    - mot_data: pandas DataFrame of filtered data columns
     - time_col: pandas Series of time values
-    - header_lines: list of header lines
+    - header: list of header lines
     '''
     
     with open(mot_path, 'w') as f:
-        for line in header_lines:
+        for line in header:
             f.write(line)
         # Combine time and data
-        output = data.copy()
+        output = mot_data.copy()
         output.insert(0, time_col.name if time_col.name else 'time', time_col)
         output.to_csv(f, sep='\t', index=False, lineterminator='\n')
 
 
 def read_trc(trc_path):
     '''
-    Read an OpenSim .trc file and extract its contents.
+    Read a .trc file (OpenSim marker trajectory file).
 
     INPUTS:
     - trc_path (str): The path to the TRC file.
@@ -299,15 +299,40 @@ def read_trc(trc_path):
        
         trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4, encoding='utf-8')
         frames_col, time_col = trc_df.iloc[:, 0], trc_df.iloc[:, 1]
-        Q_coords = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
-        Q_coords = Q_coords.loc[:, ~Q_coords.columns.str.startswith('Unnamed')] # remove unnamed columns
-        Q_coords.columns = np.array([[m,m,m] for m in markers]).ravel().tolist()
+        trc_data = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
+        trc_data = trc_data.loc[:, ~trc_data.columns.str.startswith('Unnamed')] # remove unnamed columns
+        trc_data.columns = np.array([[m,m,m] for m in markers]).ravel().tolist()
 
-        return Q_coords, frames_col, time_col, markers, header
+        return trc_data, frames_col, time_col, markers, header
     
     except Exception as e:
         raise ValueError(f"Error reading TRC file at {trc_path}: {e}")
     
+
+def write_trc(trc_path, trc_data, frames_col, time_col, header):
+    '''
+    Write a .trc file (OpenSim marker trajectory file).
+    
+    INPUTS:
+    - trc_path: path to the output .trc file
+    - trc_data: pandas DataFrame of filtered data columns
+    - frames_col: pandas Series of frame numbers
+    - time_col: pandas Series of time values
+    - header: list of header lines
+    '''
+
+    try:
+        with open(trc_path, 'w') as trc_o:
+            for line in header:
+                trc_o.write(line)
+            trc_data.insert(0, 'Frame#', frames_col)
+            trc_data.insert(1, 'Time', time_col)
+            # trc_data = trc_data.fillna(' ')
+            trc_data.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+    
+    except Exception as e:
+        raise ValueError(f"Error writing TRC file at {trc_path}: {e}")
+
 
 def extract_trc_data(trc_path):
     '''
@@ -331,6 +356,36 @@ def extract_trc_data(trc_path):
     trc_data_np = np.genfromtxt(trc_path, skip_header=5, delimiter = '\t')[:,1:] 
 
     return marker_names, trc_data_np
+
+
+def add_shoulder_data(trc_data, markers, header):
+    '''
+    Add shoulder data to trc_data if not present. 
+    Defined as the Hip point + 0.53 m in the Y direction + 0.1 m in the Hip to Hip direction.
+    Also update header and markers.
+    '''
+
+    shoulder_offset = 0.53
+    if 'RShoulder' not in markers and 'LShoulder' not in markers:
+        markers.append('RShoulder')
+        markers.append('LShoulder')
+
+        # Update header
+        header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
+        header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{'RShoulder'}\t\t\t{'LShoulder'}\t\t\t\n')
+        header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
+
+        # update trc_data
+        rhip_data = trc_data['RHip']
+        lhip_data = trc_data['LHip']
+        rlhip_direction = rhip_data.values - lhip_data.values
+        rlhip_direction = rlhip_direction / np.linalg.norm(rlhip_direction, axis=1)[:,None]
+
+        rshoulder_data = pd.DataFrame(rhip_data.values + np.array([0,shoulder_offset,0] + rlhip_direction * 0.1), columns=['RShoulder']*3)
+        lshoulder_data = pd.DataFrame(lhip_data.values + np.array([0,shoulder_offset,0] - rlhip_direction * 0.1), columns=['LShoulder']*3)
+        trc_data = pd.concat([trc_data, rshoulder_data, lshoulder_data], axis=1)
+    
+    return trc_data, markers, header
 
 
 def common_items_in_list(list1, list2):

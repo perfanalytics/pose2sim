@@ -33,6 +33,7 @@ classifiers = [
 ]
 urls = {Homepage = "https://github.com/perfanalytics/pose2sim", "Bug Tracker" = "https://github.com/perfanalytics/pose2sim/issues"}
 dependencies = [
+    # "opensim",
     "toml",
     "numpy",
     "lxml",

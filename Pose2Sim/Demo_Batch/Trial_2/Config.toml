@@ -38,6 +38,7 @@ participant_mass = [70.0, 63.5]     # float (eg 70.0), or list of floats (eg [70
 #                          # - Body_with_feet (default HALPE_26 model), 
 #                          # - Whole_body_wrist (COCO_133_WRIST: body + feet + 2 hand_points), 
 #                          # - Whole_body (COCO_133: body + feet + hands), 
+#                          # - Lower_body (Effectively runs HALPE_26. Later Pose2Sim stages ignore upper-body keypoints, recreate shoulder points: Hip + 0.53 m (Y direction) + 0.1 m (Hip-to-Hip direction)
 #                          # - Body (COCO_17). Marker augmentation won't work, Kinematic analysis will work, 
 #                          # - Hand (HAND_21, only lightweight mode. Potentially better results with Whole_body), 
 #                          # - Face (FACE_106), 

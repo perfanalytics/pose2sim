@@ -30,7 +30,8 @@ import onnxruntime as ort
 import glob
 import logging
 
-from Pose2Sim.common import convert_to_c3d, natural_sort_key, read_trc, compute_height
+from Pose2Sim.common import convert_to_c3d, natural_sort_key, read_trc, write_trc,  \
+                            compute_height, add_shoulder_data
 
 
 ## AUTHORSHIP INFORMATION
@@ -58,18 +59,21 @@ def add_neck_hip_data(trc_data, markers, header):
 
     for mk_name, r_l_markers in midpoints.items():
         if mk_name not in markers:
-            # Add marker name
-            markers.append(mk_name)
+            try:
+                # Add marker name
+                markers.append(mk_name)
 
-            # Update header
-            header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
-            header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{mk_name}\t\t\t\n')
-            header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
+                # Update header
+                header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
+                header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{mk_name}\t\t\t\n')
+                header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
 
-            # update trc_data
-            r_l_data = [trc_data[marker] for marker in r_l_markers]
-            mid_data = pd.DataFrame(sum([data.values for data in r_l_data])/2, columns=[mk_name]*3)
-            trc_data = pd.concat([trc_data, mid_data], axis=1)
+                # update trc_data
+                r_l_data = [trc_data[marker] for marker in r_l_markers]
+                mid_data = pd.DataFrame(sum([data.values for data in r_l_data])/2, columns=[mk_name]*3)
+                trc_data = pd.concat([trc_data, mid_data], axis=1)
+            except Exception as e:
+                logging.warning(f"Failed to add {mk_name} marker. Error: {e}")
 
     return trc_data, markers, header
 
@@ -208,6 +212,9 @@ def augment_markers_all(config_dict):
         # Import TRC file
         trc_data, frames_col, time_col, markers, header = read_trc(trc_file)
 
+        # add shoulder data if not in file
+        trc_data, markers, header = add_shoulder_data(trc_data, markers, header)
+
         # add neck and midhip data if not in file
         trc_data, markers, header = add_neck_hip_data(trc_data, markers, header)
 
@@ -225,12 +232,6 @@ def augment_markers_all(config_dict):
         header[2] = '\t'.join(part if i != 2 else str(frame_nb) for i, part in enumerate(header[2].split('\t')))
         header[2] = '\t'.join(part if i != 7 else str(frame_nb)+'\n' for i, part in enumerate(header[2].split('\t')))
 
-        # Verify that all feature markers are present in the TRC file.
-        feature_markers_joined = set(feature_markers_all[0]+feature_markers_all[1])
-        missing_markers = list(feature_markers_joined - set(markers))
-        if len(missing_markers) > 0:
-            raise ValueError(f'Marker augmentation requires {missing_markers} markers and they are not present in the TRC file.')
-
         # Loop over augmenter types to handle separate augmenters for lower and
         # upper bodies.
         outputs_all = {}
@@ -238,7 +239,13 @@ def augment_markers_all(config_dict):
             outputs_all[idx_augm] = {}
             feature_markers = feature_markers_all[idx_augm]
             response_markers = response_markers_all[idx_augm]
-            
+
+            # Verify that all feature markers are present in the TRC file
+            missing_markers = list(set(feature_markers) - set(markers))
+            if len(missing_markers) > 0:
+                logging.warning(f'Marker augmentation requires {missing_markers} markers and they are not present in the TRC file. Skipping augmentation for {augmenterModelType} markers.')
+                continue
+           
             augmenterModelDir = os.path.join(augmenterDir, augmenterModelName, 
                                              augmenterModelType)
             
@@ -301,19 +308,14 @@ def augment_markers_all(config_dict):
             
         # %% Extract minimum y-position across response markers. This is used
         # to align feet and floor when visualizing.
-        response_markers_conc = [m for resp in response_markers_all for m in resp]
-        min_y_pos = trc_data[response_markers_conc].iloc[:,1::3].min().min()
+        min_y_pos = trc_data[markers].iloc[:,1::3].min().min()
             
         # %% If offset
         if feet_on_floor:
             trc_data.iloc[:,1::3] = trc_data.iloc[:,1::3] - (min_y_pos-0.01)
             
         # %% Return augmented .trc file   
-        with open(trc_path_out, 'w') as trc_o:
-            [trc_o.write(line) for line in header]
-            trc_data.insert(0, 'Frame#', frames_col)
-            trc_data.insert(1, 'Time', time_col)
-            trc_data.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+        write_trc(trc_path_out, trc_data, frames_col, time_col, header)
         logging.info(f'Augmented marker coordinates are stored at {trc_path_out}.')
 
         # Save c3d

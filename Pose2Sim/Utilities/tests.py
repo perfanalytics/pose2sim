@@ -142,6 +142,7 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("project").update({"participant_height":1.7})
         config_dict.get("project").update({"frame_rate":60})
         config_dict.get("pose").update({"det_frequency":10})
+        config_dict.get("pose").update({"pose_model":'lower_body'})
         config_dict.get("pose").update({"mode":'balanced'})
         config_dict.get("pose").update({"parallel_workers_pose":2})
         config_dict.get("pose").update({"overwrite_pose":True})

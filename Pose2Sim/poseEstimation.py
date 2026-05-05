@@ -113,7 +113,7 @@ def setup_model_class_mode(pose_model, mode, config_dict={}):
     Set up the pose model class and mode for the pose tracker.
     '''
 
-    if pose_model.upper() in ('HALPE_26', 'BODY_WITH_FEET'):
+    if pose_model.upper() in ('HALPE_26', 'BODY_WITH_FEET', 'LOWER_BODY'):
         model_name = 'HALPE_26'
         ModelClass = BodyWithFeet # 26 keypoints(halpe26)
         logging.info(f"Using HALPE_26 model (body and feet) for pose estimation in {mode} mode.")

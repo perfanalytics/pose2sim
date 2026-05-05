@@ -47,7 +47,7 @@ from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
 from Pose2Sim.common import plotWindow
-from Pose2Sim.common import convert_to_c3d, read_trc, read_mot, write_mot, is_video_file
+from Pose2Sim.common import convert_to_c3d, read_trc, write_trc, read_mot, write_mot, is_video_file
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -961,12 +961,7 @@ def filter_all(config_dict):
             if filter_ik:
                 write_mot(file_path_out, Q_filt, time_col, header)
             else:
-                with open(file_path_out, 'w') as trc_o:
-                    [trc_o.write(line) for line in header]
-                    Q_filt.insert(0, 'Frame#', frames_col)
-                    Q_filt.insert(1, 'Time', time_col)
-                    # Q_filt = Q_filt.fillna(' ')
-                    Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+                write_trc(file_path_out, Q_filt, frames_col, time_col, header)
                 if make_c3d:
                     convert_to_c3d(file_path_out)
 

@@ -44,8 +44,9 @@ from anytree import PreOrderIter
 
 import opensim
 
-from Pose2Sim.common import natural_sort_key, euclidean_distance, trimmed_mean, read_trc, \
-                            best_coords_for_measurements, compute_height, get_max_workers
+from Pose2Sim.common import natural_sort_key, euclidean_distance, read_trc, write_trc, \
+                            add_shoulder_data, best_coords_for_measurements, \
+                            trimmed_mean, compute_height, get_max_workers
 from Pose2Sim.filtering import filter_all
 from Pose2Sim.skeletons import *
 
@@ -116,7 +117,9 @@ def get_markers_path(pose_model, osim_setup_dir):
     '''
 
     pose_model = ''.join(pose_model.split('_')).lower()
-    if pose_model == 'halpe68' or pose_model == 'halpe136':
+    if pose_model == 'halpe26lower':
+        marker_file = 'Markers_Halpe26.xml'.lower()
+    elif pose_model == 'halpe68' or pose_model == 'halpe136':
         marker_file = 'Markers_Halpe68_136.xml'.lower()
     elif pose_model == 'coco133' or pose_model == 'coco133wrist':
         marker_file = 'Markers_Coco133.xml'.lower()
@@ -147,7 +150,10 @@ def get_scaling_setup(pose_model, osim_setup_dir):
     '''
 
     pose_model = ''.join(pose_model.split('_')).lower()
-    if pose_model == 'halpe68' or pose_model == 'halpe136':
+    
+    if pose_model == 'halpe26lower':
+        scaling_setup_file = 'Scaling_Setup_Pose2Sim_Halpe26.xml'.lower()
+    elif pose_model == 'halpe68' or pose_model == 'halpe136':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Halpe68_136.xml'.lower()
     elif pose_model == 'coco133' or pose_model == 'coco133wrist':
         scaling_setup_file = 'Scaling_Setup_Pose2Sim_Coco133.xml'.lower()
@@ -178,7 +184,9 @@ def get_IK_Setup(pose_model, osim_setup_dir):
     '''
     
     pose_model = ''.join(pose_model.split('_')).lower()
-    if pose_model == 'halpe68' or pose_model == 'halpe136':
+    if pose_model == 'halpe26lower':
+        ik_setup_file = 'IK_Setup_Pose2Sim_Halpe26.xml'.lower()
+    elif pose_model == 'halpe68' or pose_model == 'halpe136':
         ik_setup_file = 'IK_Setup_Pose2Sim_Halpe68_136.xml'.lower()
     elif pose_model == 'coco133' or pose_model == 'coco133wrist':
         ik_setup_file = 'IK_Setup_Pose2Sim_Coco133.xml'.lower()
@@ -297,9 +305,14 @@ def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, 
     segment_pairs = get_kpt_pairs_from_scaling(scaling_root)
 
     # Get median segment lengths from Q_coords_scaling. Trimmed mean works better than mean or median
-    trc_segment_lengths = np.array([euclidean_distance(Q_coords_scaling.iloc[:,markers.index(pt1)*3:markers.index(pt1)*3+3], 
-                        Q_coords_scaling.iloc[:,markers.index(pt2)*3:markers.index(pt2)*3+3]) 
-                        for (pt1,pt2) in segment_pairs])
+    trc_segment_lengths = np.array([
+                            euclidean_distance(
+                                Q_coords_scaling.iloc[:,markers.index(pt1)*3:markers.index(pt1)*3+3], 
+                                Q_coords_scaling.iloc[:,markers.index(pt2)*3:markers.index(pt2)*3+3]) 
+                            if pt1 in markers and pt2 in markers 
+                            else [1]*Q_coords_scaling.shape[0]
+                            for (pt1,pt2) in segment_pairs
+                            ])
     # trc_segment_lengths = np.median(trc_segment_lengths, axis=1)
     # trc_segment_lengths = np.mean(trc_segment_lengths, axis=1)
     trc_segment_lengths = np.array([trimmed_mean(arr, trimmed_extrema_percent=trimmed_extrema_percent) for arr in trc_segment_lengths])
@@ -307,9 +320,13 @@ def dict_segment_ratio(scaling_root, unscaled_model, Q_coords_scaling, markers, 
     # Get model segment lengths
     model_markers = [marker for marker in markers if marker in [m.getName() for m in unscaled_model.getMarkerSet()]]
     model_markers_locs = [unscaled_model.getMarkerSet().get(marker).getLocationInGround(unscaled_model.getWorkingState()).to_numpy() for marker in model_markers]
-    model_segment_lengths = np.array([euclidean_distance(model_markers_locs[model_markers.index(pt1)], 
-                                                model_markers_locs[model_markers.index(pt2)]) 
-                                                for (pt1,pt2) in segment_pairs])
+    model_segment_lengths = np.array([euclidean_distance(
+                                        model_markers_locs[model_markers.index(pt1)], 
+                                        model_markers_locs[model_markers.index(pt2)]) 
+                                      if pt1 in markers and pt2 in markers 
+                                      else 1
+                                      for (pt1,pt2) in segment_pairs
+                                      ])
     
     # Calculate ratio for each segment
     segment_ratios = trc_segment_lengths / model_segment_lengths
@@ -503,7 +520,27 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_s
         ik_root.find('.//time_range').text = f'{start_time} {end_time}'
         ik_root.find('.//output_motion_file').text = str(output_motion_file)
         ik_root.find('.//marker_file').text = str(trc_file.resolve())
-        ik_tree.write(ik_path_temp)
+
+        if 'LOWER' in pose_model.upper():
+            # Smaller weight for the shoulders
+            task_markers = ['RShoulder', 'LShoulder']
+            for marker in task_markers:
+                marker_task = ik_root.find(f".//IKMarkerTask[@name='{marker}']")
+                marker_task.find('weight').text = '0.1'
+
+            # # Constrain the pelvis to be upright
+            # constrained_coords = ['pelvis_tilt', 'pelvis_list']
+            # for coord in constrained_coords:
+            #     ik_task = etree.Element("IKCoordinateTask", name=coord)
+            #     etree.SubElement(ik_task, "apply").text = "true"
+            #     etree.SubElement(ik_task, "weight").text = "10"
+            #     etree.SubElement(ik_task, "value_type").text = "default_value"
+            #     etree.SubElement(ik_task, "value").text = "0"
+            #     ik_task_set = ik_root.find(".//IKTaskSet")
+            #     objects = ik_task_set.find("objects")
+            #     objects.append(ik_task)
+
+        ik_tree.write(ik_path_temp, pretty_print=True, xml_declaration=True, encoding='utf-8')
 
         # Run IK
         opensim.InverseKinematicsTool(str(ik_path_temp)).run()
@@ -623,6 +660,7 @@ def kinematics_all(config_dict):
     else: 
         pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet').upper()
         if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'LOWER_BODY': pose_model = 'HALPE_26_LOWER'
         elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
         elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
         elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
@@ -631,7 +669,14 @@ def kinematics_all(config_dict):
         elif pose_model.upper() == 'ANIMAL': pose_model = 'ANIMAL2D_17'
         # else:
         #     raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
-
+    
+    # Add shoulder data if not in file and overwrite the file
+    for trc_file in trc_files:
+        trc_data, frames_col, time_col, markers, header = read_trc(trc_file)
+        if 'RShoulder' not in trc_data.columns or 'LShoulder' not in trc_data.columns:
+            trc_data, markers, header = add_shoulder_data(trc_data, markers, header)
+            write_trc(trc_file, trc_data, frames_col, time_col, header)
+    
     # Calculate subject heights
     if subject_height is None or subject_height == 0:
         subject_height = [1.75] * len(trc_files)

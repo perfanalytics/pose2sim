@@ -695,6 +695,7 @@ def associate_all(config_dict):
     # selection of tracked keypoint id
     try: # from skeletons.py
         if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'LOWER_BODY': pose_model = 'HALPE_26_LOWER'
         elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
         elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
         elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
@@ -749,9 +750,13 @@ def associate_all(config_dict):
             tracked_keypoint_id = [node.id for _, _, node in RenderTree(model) if node.name==tracked_keypoint][0]
             assert tracked_keypoint_id # Fails if tracked_keypoint_id is None
         except:
-            tracked_keypoint_id = 0
-            tracked_keypoint_name = next((node for node in PreOrderIter(model) if getattr(node, 'id', None) == 0), None).name
-            logging.warning(f'{tracked_keypoint} not found in {pose_model}, consider editing tracked_keypoint in Config.toml. Tracking {tracked_keypoint_name} instead.')
+            try:
+                tracked_keypoint_id = 0
+                tracked_keypoint_name = next((node for node in PreOrderIter(model) if getattr(node, 'id', None) == 0), None).name
+                logging.warning(f'{tracked_keypoint} not found in {pose_model}, consider editing tracked_keypoint in Config.toml. Tracking {tracked_keypoint_name} instead.')
+            except:
+                tracked_keypoint_id = [node.id for _, _, node in RenderTree(model) if node.name=='Hip'][0]
+                logging.warning(f'{tracked_keypoint} and id 0 not found in {pose_model}, using "Hip" instead.')
     else:
         logging.info('\nMulti-person analysis selected.')
 
