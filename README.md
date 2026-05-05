@@ -185,16 +185,14 @@ Pose2Sim.markerAugmentation()
 Pose2Sim.kinematics()
 ```
 
-When the Synchronization GUI is provided, Select the RWrist
-
 **3D marker locations** are stored as .trc files in each trial folder in the `pose-3d` directory.\
 **3D joint angles** are stored as .mot files in the `kinematics` directory. Scaled models are also stored in the same directory.
 
 </br>
 
-**Note:** 
-- Default parameters have been provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) but can be edited.\
-All of them are clearly documented: feel free to play with them!
+***Note:***\
+**Default parameters have been provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) but can be edited.**\
+**All of them are clearly documented: feel free to play with them!**
 - You can run all stages at once: 
   ``` python
   from Pose2Sim import Pose2Sim

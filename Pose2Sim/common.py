@@ -372,7 +372,7 @@ def add_shoulder_data(trc_data, markers, header):
 
         # Update header
         header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
-        header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{'RShoulder'}\t\t\t{'LShoulder'}\t\t\t\n')
+        header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{"RShoulder"}\t\t\t{"LShoulder"}\t\t\t\n')
         header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
 
         # update trc_data
