@@ -44,7 +44,7 @@ import numpy as np
 import cv2
 import threading
 
-from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, draw_skeleton
+from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, Animal, draw_skeleton
 from rtmlib.tools.object_detection.post_processings import nms
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort,\
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel, bbox_xyxy_compute, \
@@ -170,7 +170,7 @@ def setup_model_class_mode(pose_model, mode, config_dict={}):
             det = mode.get('det_model')
             det_input_size = mode.get('det_input_size')
             pose_class = mode.get('pose_class')
-            pose = mode.get('skeleton_model')
+            pose = mode.get('pose_model')
             pose_input_size = mode.get('pose_input_size')
 
             ModelClass = partial(Custom,
