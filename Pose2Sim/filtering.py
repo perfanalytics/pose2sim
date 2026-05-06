@@ -806,6 +806,7 @@ def recap_filter3d(config_dict, output_path):
     kalman_filter_trustratio = int(config_dict.get('filtering', {}).get('kalman', {}).get('trust_ratio', 500))
     kalman_filter_smooth = int(config_dict.get('filtering', {}).get('kalman', {}).get('smooth', True))
     kalman_filter_smooth_str = 'smoother' if kalman_filter_smooth else 'filter'
+    accminimizing_filter_cutoff = float(config_dict.get("filtering", {}).get("acc_minimizing", {}).get("cut_off_frequency", 6.0))
     butterworth_filter_type = 'low' # config_dict.get('filtering', {}).get('butterworth', {}).get('type')
     butterworth_filter_order = int(config_dict.get('filtering', {}).get('butterworth', {}).get('order', 4))
     butterworth_filter_cutoff = int(config_dict.get('filtering', {}).get('butterworth', {}).get('cut_off_frequency', 6))
@@ -830,7 +831,7 @@ def recap_filter3d(config_dict, output_path):
     if do_filter:
         filter_mapping_recap = {
             'butterworth': f'--> Filter type: Butterworth {butterworth_filter_type}-pass. Order {butterworth_filter_order}, Cut-off frequency {butterworth_filter_cutoff} Hz.', 
-            'acc_minimizing': f'--> Filter type: Acceleration-minimizing. Cut-off frequency {config_dict.get("filtering", {}).get("acc_minimizing", {}).get("cut_off_frequency", 6.0)} Hz.',
+            'acc_minimizing': f'--> Filter type: Acceleration-minimizing. Cut-off frequency: {accminimizing_filter_cutoff} Hz.',
             'one_euro': f'--> Filter type: OneEuro (zero-phase). Min cutoff frequency: {one_euro_filter_1d_min_cutoff} Hz, Beta: {one_euro_filter_1d_beta}, Derivative cutoff frequency: {one_euro_filter_1d_d_cutoff} Hz.',
             'gcv_spline': f'--> Filter type: Generalized Cross-Validation Spline. {f"Optimal parameters automatically estimated with smoothing factor {gcv_filter_smoothing_factor}" if gcv_filter_cutoff == "auto" else "Cut-off frequency {gcv_filter_cutoff} Hz"}.',
             'kalman': f'--> Filter type: Kalman {kalman_filter_smooth_str}. Measurements trusted {kalman_filter_trustratio} times as much as previous data, assuming a constant acceleration process.', 
@@ -866,6 +867,7 @@ def filter_all(config_dict):
     # Read config_dict
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
+    frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
     display_figures = config_dict.get('filtering', {}).get('display_figures', True)
     save_plots = config_dict.get('filtering', {}).get('save_filt_plots', True)
     do_filter = config_dict.get('filtering', {}).get('filter', True)
@@ -878,22 +880,6 @@ def filter_all(config_dict):
     plots_output_dir = os.path.join(kinematics_dir, 'filtering_plots') if filter_ik else os.path.join(pose3d_dir, 'filtering_plots_ik')
     if save_plots and not os.path.exists(plots_output_dir):
         os.makedirs(plots_output_dir)
-
-    # Get frame_rate
-    video_dir = os.path.join(project_dir, 'videos')
-    frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
-    video_files = sorted([f for f in glob.glob(os.path.join(video_dir, '*')) if is_video_file(f)])
-    frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
-    if frame_rate == 'auto': 
-        try:
-            cap = cv2.VideoCapture(video_files[0])
-            cap.read()
-            if cap.read()[0] == False:
-                raise
-            frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
-        except:
-            logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
-            frame_rate = 30  
     
     # Find input files
     if filter_ik:
@@ -915,13 +901,9 @@ def filter_all(config_dict):
         # Read file
         if filter_ik:
             Q_coords, time_col, header = read_mot(file_path_in)
-        else:
-            Q_coords, frames_col, time_col, markers, header = read_trc(file_path_in)
-
-        # Frame range selection
-        if filter_ik:
             file_path_out = file_path_in.replace('.mot', f'_filt_{filter_type}.mot')
         else:
+            Q_coords, frames_col, time_col, markers, header = read_trc(file_path_in)
             f_range = [[frames_col.iloc[0], frames_col.iloc[-1]]
                        if (frame_range in ('all', 'auto', []) or frames_col.iloc[0]>frame_range[0] or frames_col.iloc[1]<frame_range[1]) 
                        else frame_range][0]
@@ -932,6 +914,7 @@ def filter_all(config_dict):
             file_path_out = file_path_in.replace(file_path_in.split('_')[-1], f'{f_range[0]}-{f_range[1]}_filt_{filter_type}.trc')
             file_out = os.path.basename(file_path_out)
             header[0] = header[0].replace(os.path.basename(file_path_in), file_out)
+        frame_rate = (1/time_col.diff().mean()).round()
 
         # Filter coordinates
         if reject_outliers:
@@ -941,7 +924,7 @@ def filter_all(config_dict):
             Q_filt = Q_coords.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
 
         if not do_filter and not reject_outliers:
-            logging.warning(f'reject_outliers and filter have been set to false. No further processing done on {file_path_in}.\n')
+            logging.warning(f'Reject_outliers and filter have been set to false. No further processing done on {file_path_in}.\n')
         
         else:
             # Display figures

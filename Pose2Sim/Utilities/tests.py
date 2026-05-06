@@ -125,6 +125,11 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("synchronization").update({"save_sync_plots":False})
         config_dict.get("filtering").update({"display_figures":False})
         config_dict.get("filtering").update({"save_filt_plots":False})
+        config_dict.get("filtering").get('butterworth').update({"cut_off_frequency":10})
+        config_dict.get('kinematics').update({'filter_ik':True})
+        config_dict.get('kinematics').update({'ik_filter_type':'acc_minimizing'})
+        config_dict.get("filtering").get('acc_minimizing').update({"cut_off_frequency":5})
+        
 
         # 1. Run step by step
         Pose2Sim.calibration(config_dict)
