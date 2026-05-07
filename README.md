@@ -158,7 +158,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
    *For faster inference, you can run on the GPU.* \
    Be aware that GPU support takes almost 5 GB more on disk.
    
-   Run `nvidia-smi` in a terminal. If this results in an error, your GPU is probably not compatible with CUDA. If not, note the "CUDA version": it is the latest version your driver is compatible with (more information [on this post](https://stackoverflow.com/questions/60987997/why-torch-cuda-is-available-returns-false-even-after-installing-pytorch-with)).
+   Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `nvidia-smi`. If this results in an error, your GPU is probably not compatible with CUDA. If not, note the "CUDA version": it is the latest version your driver is compatible with (more information [on this post](https://stackoverflow.com/questions/60987997/why-torch-cuda-is-available-returns-false-even-after-installing-pytorch-with)).
 
    Then go to the [ONNXruntime requirement page](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), note the latest compatible CUDA and cuDNN requirements. Next, go to the [pyTorch website](https://pytorch.org/get-started/previous-versions/) and install the latest version that satisfies these requirements (beware that torch 2.4 ships with cuDNN 9, while torch 2.3 installs cuDNN 8). For example:
    ``` cmd
@@ -181,7 +181,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
   <!-- print(f'torch version: {torch.__version__}, cuda version: {torch.version.cuda}, cudnn version: {torch.backends.cudnn.version()}, onnxruntime version: {ort.__version__}') -->
 
 > **Note on storage use:**\
-     A full installation takes up to 14 GB of storage space. However, GPU and GUI supports are not mandatory and take about 5 GB. The cache can be cleared to save space if you are okay with the next installation not to be instantaneous. \
+     A full installation takes up to 14 GB of storage space. However, GPU and GUI supports are not mandatory and take about 5 GB. The cache can be cleared to save space if you are don't care for future installations to be instantaneous. \
      A minimal installation with carefully chosen pose models and without GPU support **would take less than 2 GB**.\
     <img src="Content/Storage.png" width="760">
 
@@ -192,7 +192,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 - Open a terminal (*conda, powershell, bash, or zsh*) and activate your environment (see [here](#1-set-up-a-uv-environment)).
 - Find the Demo folder under `<pose2sim_path>\Pose2Sim\Demo_SinglePerson`:
   ``` powershell
-  uv pip show pose2sim # find <pose2sim_path>
+  uv pip show pose2sim # to find <pose2sim_path>
   ``` 
 - Copy-paste the Demo folder wherever you like, and rename it as you wish (manually or using the `cp` command).\
   Go to the Demo_SinglePerson folder and start python:
@@ -259,7 +259,7 @@ Similarly to [Part-1](#demonstration-part-1-end-to-end-video-to-3d-joint-angle-c
   from Pose2Sim import Pose2Sim
   Pose2Sim.runAll()
   ```
-  <img src="Content/Demo_Multi.png" width="380">
+  <img src="Content/Demo_multi.png" width="380">
 
 
 - **Batch processing**: *Run numerous analyses with different parameters and minimal friction!*\
@@ -380,6 +380,8 @@ Pose2Sim.poseEstimation()
 <img src="Content/P2S_poseestimation.png" width="760">
 
 </br>
+
+***N.B.:* See the [Too slow for you?](#too-slow-for-you) section to make it faster** by deactivating real-time display, using your GPU, and using a lighter model.
 
 ***N.B.:* To analyse wrist motion:**\
 'Whole_body_wrist' or 'Whole_body' `pose_model` is required in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml). Note that these are slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints. 
