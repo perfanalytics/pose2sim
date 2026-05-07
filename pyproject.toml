@@ -13,7 +13,7 @@ maintainers = [
 ]
 description = "Markerless kinematics with any cameras — From 2D Pose estimation to 3D OpenSim motion"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 keywords = ["markerless", "kinematics", "OpenPose", "OpenSim", "3D human pose", "biomechanics", "mocap", "blender", "motion capture"]
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
@@ -33,7 +33,7 @@ classifiers = [
 ]
 urls = {Homepage = "https://github.com/perfanalytics/pose2sim", "Bug Tracker" = "https://github.com/perfanalytics/pose2sim/issues"}
 dependencies = [
-    "opensim", # NB: enforceContraints -> enforceConstraints from 4.6.1 onwards (the first on pypi anyway)
+    "opensim", 
     "toml",
     "numpy",
     "lxml",
