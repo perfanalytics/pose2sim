@@ -110,28 +110,25 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
   Download and install [Miniconda](https://docs.conda.io/en/latest/miniconda.html).\
    Open an Anaconda prompt and create a virtual environment:
    ```
-   conda create -n Pose2Sim python=3.12 -y 
+   conda create -n Pose2Sim python=3.13 -y # or 3.11, or 3.12
    conda activate Pose2Sim
+   conda init powershell # On Windows. `conda init bash` on Linux, `conda init zsh` on MacOS.
    ```
 
-2. **Install OpenSim**:\
-Install the OpenSim Python API (if you do not want to install via conda, refer [to this page](https://opensimconfluence.atlassian.net/wiki/spaces/OpenSim/pages/53085346/Scripting+in+Python#ScriptinginPython-SettingupyourPythonscriptingenvironment(ifnotusingconda))):
-   ```
-   conda install -c opensim-org opensim -y
-   ```
-   
-3. **Install Pose2Sim**:
-   - OPTION 1: **Quick install:** Open a terminal. 
+2. **Install Pose2Sim**:
+
+   Open a terminal (conda, powershell, bash, or zsh).
+
+   - OPTION 1: **Simplest:** 
        ``` cmd
        pip install pose2sim
        ```
-     
-   - OPTION 2: **Build from source and test the last changes:**
-     Open a terminal in the directory of your choice and Clone the Pose2Sim repository.
+
+   - OPTION 2: **For developers who want to test and edit the bleeding edge version:**
        ``` cmd
        git clone --depth 1 https://github.com/perfanalytics/pose2sim.git
        cd pose2sim
-       pip install .
+       pip install -e .
        ```
 
 4. ***Optional:***\

@@ -33,7 +33,7 @@ classifiers = [
 ]
 urls = {Homepage = "https://github.com/perfanalytics/pose2sim", "Bug Tracker" = "https://github.com/perfanalytics/pose2sim/issues"}
 dependencies = [
-    # "opensim",
+    "opensim", # NB: enforceContraints -> enforceConstraints from 4.6.1 onwards (the first on pypi anyway)
     "toml",
     "numpy",
     "lxml",
