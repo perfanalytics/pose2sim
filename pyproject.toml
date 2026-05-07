@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools-scm"] # PEP 508 specs
+requires = ["setuptools>=45", "setuptools-scm"] # PEP 508 specs
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -39,7 +39,7 @@ dependencies = [
     "lxml",
     "matplotlib",
     "mpl_interactions",
-    "PySide6",
+    "PySide6-essentials",
     "tqdm",
     "anytree",
     "pandas>=1.5",
@@ -52,12 +52,14 @@ dependencies = [
     "openvino",
     "onnxruntime",
     "opencv-python != 4.11.*",  # avoid 4.11 due to displaymatrix ignored (rotation metadata)
-    # "deep-sort-realtime",     # likely not required anymore
     "customtkinter",
     "requests"
 ]
 
-[tool.setuptools_scm]
+[project.optional-dependencies]
+gui = ["PySide6"] # install with pip install -e .[gui] or pip install pose2sim[gui]
+
+[tool.setuptools_scm] # automatically generate version from git tags
 
 [tool.setuptools]
 packages = {find = {}}

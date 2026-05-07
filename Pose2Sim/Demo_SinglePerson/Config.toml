@@ -34,7 +34,7 @@ exclude_from_batch = [] # List of trials to be excluded from batch analysis, ['<
 
 
 [pose]
-pose_model = 'Body_with_feet'  #With RTMLib: 
+pose_model = 'Lower_body'  #With RTMLib: 
                          # - Body_with_feet (default HALPE_26 model), 
                          # - Whole_body_wrist (COCO_133_WRIST: body + feet + 2 hand_points), 
                          # - Whole_body (COCO_133: body + feet + hands), 
@@ -81,7 +81,7 @@ backend = 'auto' # 'auto', 'openvino', 'onnxruntime', 'opencv'
 parallel_workers_pose = 'auto' # 'auto', int, or false # One worker per video, using GPU if available
                                # Requires display_detection = false, otherwise falls back to sequential (ie parallel_workers_pose = 1/false).
 display_detection = true # Real-time display of the videos with pose estimation. Set to false for parallel processing.
-overwrite_pose = false # Set to false if you don't want to recalculate pose estimation when it has already been done
+overwrite_pose = true # Set to false if you don't want to recalculate pose estimation when it has already been done
 save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
 output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
@@ -90,7 +90,7 @@ tracking_mode = 'sports2d' # 'none', 'sports2d' or 'deepsort'. 'deepsort' is slo
 max_distance_px = 100  # px # If a person is detected further than max_distance from its position on the previous frame, it will be considered as a new one
 deepsort_params = """{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8}""" # """{dictionary between 3 double quotes}"""
                   # More robust in crowded scenes but Can be tricky to parametrize. More information there: https://github.com/levan92/deep_sort_realtime/blob/master/deep_sort_realtime/deepsort_tracker.py#L51
-                  # Note: For faster and more robust tracking, use {'embedder_gpu': True, embedder':'torchreid'}, which uses the GPU and runs osnet_ain_x1_0 by default. requires `pip install torch torchvision torchreid gdown tensorboard`
+                  # Note: For faster and more robust tracking, use {'embedder_gpu': True, embedder':'torchreid'}, which uses the GPU and runs osnet_ain_x1_0 by default. requires `uv pip install torch torchvision torchreid gdown tensorboard`
 handle_LR_swap = false # Not implemented yet. Might be useful if cameras film from the sagittal plane and the right and left sides are hard to differenciate to your eye.
 undistort_points = false # Not implemented yet. Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
 
@@ -247,7 +247,7 @@ make_c3d = true # also save triangulated data in c3d format
    # Produces smooth velocities and accelerations, which is important for force estimations but blunts the peaks. Whittaker-Henderson filter (acceleration-minimizing), inspired by AddBiomechanics
    # Recommended use: on IK rather than on triangulated data
    [filtering.acc_minimizing]
-   cut_off_frequency = 6 # Hz
+   cut_off_frequency = 2 # Hz
 
    [filtering.loess]
    nb_values_used = 5 # = fraction of data used * nb frames
@@ -271,7 +271,7 @@ make_c3d = true # save triangulated data in c3d format in addition to trc
 [kinematics]
 use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
 use_simple_model = false # true or false # >10 times faster IK if true. No muscles, no constraints (eg stiff spine and shoulders, no patella)
-filter_ik = false # true or false # Useful for force estimations if results are noisy 
+filter_ik = true # true or false # Useful for force estimations if results are noisy 
 ik_filter_type = 'acc_minimizing' # butterworth, acc_minimizing, kalman, one_euro, gcv_spline, gaussian, LOESS, median, butterworth_on_speed
                                # see and edit the filtering parameters in the [filtering] section
 

@@ -70,8 +70,8 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
    1. [Installation](#installation)
    2. [Demonstration Part-1: End to end video to 3D joint angle computation](#demonstration-part-1-end-to-end-video-to-3d-joint-angle-computation)
    3. [Demonstration Part-2: Visualize your results with OpenSim or Blender](#demonstration-part-2-visualize-your-results-with-opensim-or-blender)
-   4. [Demonstration Part-3: Try multi-person analysis](#demonstration-part-3-try-multi-person-analysis)
-   5. [Demonstration Part-4: Try batch processing](#demonstration-part-4-try-batch-processing)
+  4. [Demonstration Part-3: Try multi-person and batch analyses](#demonstration-part-3-try-multi-person-and-batch-analyses)
+  5. [Demonstration Part-4: Go further](#demonstration-part-4-go-further)
    6. [Too slow for you?](#too-slow-for-you)
 2. [Use on your own data](#use-on-your-own-data)
    1. [Setting up your project](#setting-up-your-project)
@@ -82,19 +82,19 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
       4. [With OpenPose (legacy)](#with-openpose-legacy)
       5. [With Mediapipe BlazePose (legacy)](#with-mediapipe-blazepose-legacy)
       6. [With AlphaPose (legacy)](#with-alphapose-legacy)
-   4. [Camera calibration](#camera-calibration)
+  3. [Camera calibration](#camera-calibration)
       1. [Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-caliscope-anipose-freemocap-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
-   5. [Synchronizing, Associating, Triangulating, Filtering](#synchronizing-associating-triangulating-filtering)
+  4. [Synchronizing, Associating, Triangulating, Filtering](#synchronizing-associating-triangulating-filtering)
       1. [Synchronization](#synchronization)
       2. [Associate persons across cameras](#associate-persons-across-cameras)
       3. [Triangulating keypoints](#triangulating-keypoints)
       4. [Filtering 3D coordinates](#filtering-3d-coordinates)
       5. [Marker augmentation](#marker-augmentation)
-   6. [OpenSim kinematics](#opensim-kinematics)
+  5. [OpenSim kinematics](#opensim-kinematics)
       1. [Within Pose2Sim](#within-pose2sim)
       2. [Within OpenSim GUI](#within-opensim-gui)
-      3. [Command Line](#command-line)
+      3. [Command line](#command-line)
 3. [Utilities](#utilities)
 4. [How to cite and how to contribute](#how-to-cite-and-how-to-contribute)
    1. [How to cite](#how-to-cite)
@@ -106,46 +106,69 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 
 ## Installation
 
-1. **Create a conda environment:**\
-  Download and install [Miniconda](https://docs.conda.io/en/latest/miniconda.html).\
-   Open an Anaconda prompt and create a virtual environment:
-   ```
-   conda create -n Pose2Sim python=3.13 -y # or 3.11, or 3.12
-   conda activate Pose2Sim
-   conda init powershell # On Windows. `conda init bash` on Linux, `conda init zsh` on MacOS.
-   ```
+> N.B.: If you'd rather use conda, you can still use the old [installation procedure](https://github.com/perfanalytics/pose2sim/tree/b1a8b84a59759946b321f8f243d19dcc31f7b5d6#installation). Still works fine but not recommended, since uv is faster, lighter, better at handling dependencies, and generally more modern. 
 
-2. **Install Pose2Sim**:
+<br>
 
-   Open a terminal (conda, powershell, bash, or zsh).
+#### 1. Set up a uv environment:
 
-   - OPTION 1: **Simplest:** 
+  Open a terminal (conda, powershell, bash, or zsh).
+
+  *On Windows:*
+  ``` powershell
+    # Install uv
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+    # Create uv environment
+    uv venv "$env:USERPROFILE\.venv\pose2sim" --python 3.13 # or 3.11, or 3.13 
+    # Activate the uv environment
+    & "$env:USERPROFILE\.venv\pose2sim\Scripts\Activate.ps1"
+  ```
+
+  *On Linux or MacOS:*
+  ``` bash
+    # Install uv
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    # Create uv environment
+    uv venv ~/.venv/pose2sim --python 3.13 # or 3.11, or 3.13 
+    # Activate the uv environment
+    source ~/.venv/pose2sim/bin/activate
+  ```
+
+***Pro Tip:*** Remembering the command for activating the uv environment can be a pain. Just type **Ctrl+R** in your terminal and start typing `venv` to find it.
+
+<br>
+
+#### 2. Install Pose2Sim:
+
+   Open a terminal (*conda, powershell, bash, or zsh*).\
+   Activate your environment (see [here](#1-set-up-a-uv-environment)).
+
+   - OPTION 1: **Stable version:** 
        ``` cmd
-       pip install pose2sim
+       uv pip install pose2sim --upgrade
        ```
-
    - OPTION 2: **For developers who want to test and edit the bleeding edge version:**
        ``` cmd
        git clone --depth 1 https://github.com/perfanalytics/pose2sim.git
        cd pose2sim
-       pip install -e .
+       uv pip install -e .
        ```
 
-4. ***Optional:***\
-   *For faster inference, you can run on the GPU. Install pyTorch with CUDA and cuDNN support, and ONNX Runtime with GPU support (not available on MacOS).*\
-   Be aware that GPU support takes an additional 6 GB on disk. The full installation is then 10.75 GB instead of 4.75 GB.
+#### 3. *Optional:*
+   *For faster inference, you can run on the GPU.* \
+   Be aware that GPU support takes almost 5 GB more on disk.
    
    Run `nvidia-smi` in a terminal. If this results in an error, your GPU is probably not compatible with CUDA. If not, note the "CUDA version": it is the latest version your driver is compatible with (more information [on this post](https://stackoverflow.com/questions/60987997/why-torch-cuda-is-available-returns-false-even-after-installing-pytorch-with)).
 
    Then go to the [ONNXruntime requirement page](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), note the latest compatible CUDA and cuDNN requirements. Next, go to the [pyTorch website](https://pytorch.org/get-started/previous-versions/) and install the latest version that satisfies these requirements (beware that torch 2.4 ships with cuDNN 9, while torch 2.3 installs cuDNN 8). For example:
    ``` cmd
-   pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+   uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
    ```
 
    Finally, install ONNX Runtime with GPU support:
    ```
-   pip uninstall onnxruntime
-   pip install onnxruntime-gpu
+   uv pip uninstall onnxruntime
+   uv pip install onnxruntime-gpu
    ```
 
    Check that everything went well within Python with these commands:
@@ -158,18 +181,26 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
   <!-- print(f'torch version: {torch.__version__}, cuda version: {torch.version.cuda}, cudnn version: {torch.backends.cudnn.version()}, onnxruntime version: {ort.__version__}') -->
 
 > **Note on storage use:**\
-     A full installation takes up to 10 GB of storage space. However, GPU support is not mandatory and takes about 6 GB. A minimal installation with carefully chosen pose models and without GPU support **would take less than 3 GB**.\
+     A full installation takes up to 14 GB of storage space. However, GPU and GUI supports are not mandatory and take about 5 GB. The cache can be cleared to save space if you are okay with the next installation not to be instantaneous. \
+     A minimal installation with carefully chosen pose models and without GPU support **would take less than 2 GB**.\
     <img src="Content/Storage.png" width="760">
-
 
 </br>
 
 ## Demonstration Part-1: End to end video to 3D joint angle computation
-> _**This demonstration provides an example experiment of a person balancing on a beam, filmed with 4 cameras.**_ 
 
-Open a terminal, enter `pip show pose2sim`, report package location. \
-Copy this path and go to the Single participant Demo folder: `cd <path>\Pose2Sim\Demo_SinglePerson`. \
-Type `ipython`, and try the following code:
+- Open a terminal (*conda, powershell, bash, or zsh*) and activate your environment (see [here](#1-set-up-a-uv-environment)).
+- Find the Demo folder under `<pose2sim_path>\Pose2Sim\Demo_SinglePerson`:
+  ``` powershell
+  uv pip show pose2sim # find <pose2sim_path>
+  ``` 
+- Copy-paste the Demo folder wherever you like, and rename it as you wish (manually or using the `cp` command).\
+  Go to the Demo_SinglePerson folder and start python:
+  ``` powershell
+  cd <Demo_SinglePerson_path>
+  ipython
+  ```
+- Try the following code:
 ``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.calibration()
@@ -187,19 +218,6 @@ Pose2Sim.kinematics()
 
 </br>
 
-***Note:***\
-**Default parameters have been provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) but can be edited.**\
-**All of them are clearly documented: feel free to play with them!**
-- You can run all stages at once: 
-  ``` python
-  from Pose2Sim import Pose2Sim
-  Pose2Sim.runAll()
-  # or: Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_kinematics=True)
-  ```
-- Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
-- Note that **Pose2Sim.markerAugmentation()** does not necessarily improve results--*in fact, results are worse half of the time.* You can choose to not run this command, and save an additional 1.3 GB by uninstalling tensorflow: `pip uninstall tensorflow`.
-
-</br>
 
 ## Demonstration Part-2: Visualize your results with OpenSim or Blender
 > _**Visualize your results and look in detail for potential areas of improvement.**_ 
@@ -218,7 +236,7 @@ Pose2Sim.kinematics()
 
 <br>
 
-### Further check with the Pose2Sim Blender add-on
+### Further investigation with the Pose2Sim Blender add-on
 
 - **Install the add-on:**\
   Follow instructions on the [Pose2Sim_Blender](https://github.com/davidpagnon/Pose2Sim_Blender) add-on page.
@@ -229,87 +247,70 @@ Pose2Sim.kinematics()
 
   https://github.com/davidpagnon/Pose2Sim_Blender/assets/54667644/a2cfb75d-a2d4-471a-b6f8-8f1ee999a619
   
-  **N.B.:** Full install only required to import the skeleton. See instructions [there](https://github.com/davidpagnon/Pose2Sim_Blender?tab=readme-ov-file#full-install).
+<br/>
+
+## Demonstration Part-3: Try multi-person and batch analyses
+- Open a terminal (*conda, powershell, bash, or zsh*) and activate your environment (see [here](#1-set-up-a-uv-environment)).
+- **Multi person analysis:** *Discover another person, hidden all along!*\
+Similarly to [Part-1](#demonstration-part-1-end-to-end-video-to-3d-joint-angle-computation), find the Multi-Person Demo folder under `<pose2sim_path>\Pose2Sim\Demo_MultiPerson`, and move it and rename it if you like. Make sure you set `multi_person = true` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_MultiPerson/Config.toml) file. Go to the <Demo_MultiPerson> folder and start python:
+  ``` python
+  cd <Demo_MultiPerson_path>
+  ipython
+  from Pose2Sim import Pose2Sim
+  Pose2Sim.runAll()
+  ```
+  <img src="Content/Demo_Multi.png" width="380">
+
+
+- **Batch processing**: *Run numerous analyses with different parameters and minimal friction!*\
+Find the Batch Demo folder under `<pose2sim_path>\Pose2Sim\Demo_Batch`, and move it and rename it if you like. Go to the <Demo_Batch> folder and start python:
+  ``` python
+  cd <Demo_Batch_path>
+  ipython
+  from Pose2Sim import Pose2Sim
+  Pose2Sim.runAll()
+  ```
+
+  ***Pro Tips:***\
+  The batch processing structure requires a root `Config.toml` file, as well as one in each of the trial directories. Global parameters are given in the root one. They can be altered for each individual trial by uncommenting keys and their values in the trial-specific `Config.toml` files.\
+  For example, try uncommenting `[project]` and set `frame_range = [10,99]` in the root `Config.toml`, and uncomment `[pose]` and set `mode = 'lightweight'` in the `Trial_2` one.
+
+  Run Pose2Sim from the <Demo_Batch_path> folder if you want to batch process the whole session, or from a subfolder if you only want to process a specific trial. 
+
+  | SingleTrial     | BatchSession       |
+  |-----------------|--------------------|
+  | <pre><b>SingleTrial</b>                    <br>├── <b>calibration</b><br>├── <b>videos</b><br>└── <i><b>Config.toml</i></b></pre> |  <pre><b>BatchSession</b>                     <br>├── <b>calibration</b> <br>├── Trial_1   <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b><br>├── Trial_2 <br>│   ├── <b>videos</b> <br>│     └── <i><b>Config.toml</i></b><br>└── <i><b>Config.toml</i></b></pre>  | 
 
 <br/>
 
-## Demonstration Part-3: Try multi-person analysis
-> _**Another person, hidden all along, will appear when multi-person analysis is activated!**_
+## Demonstration Part-4: Go further
 
-Go to the Multi-participant Demo folder: `cd <path>\Pose2Sim\Demo_MultiPerson`. \
-Make sure that `multi_person = true` is set in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_MultiPerson/Config.toml) file.\
-Type `ipython`, and try the following code:
+- **Default parameters are provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) but can be edited.**\
+All of them are clearly documented: feel free to play with them!
+- **Try the calibration tool:**\
+ Set `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
+  ``` python
+  Pose2Sim.calibration()
+  ```
+- **Pass an updated config dictionary** instead of editing Config.toml, and test whole_body pose estimation:
+  ``` python
+  import toml
+  config_dict = toml.load("<Demo_SinglePerson_path>/Config.toml")
+  config_dict.get("pose").update({"pose_mode": "whole_body"})
 
-``` python
-from Pose2Sim import Pose2Sim
-Pose2Sim.calibration()
-Pose2Sim.poseEstimation()
-Pose2Sim.synchronization()
-Pose2Sim.personAssociation()
-Pose2Sim.triangulation()
-Pose2Sim.filtering()
-Pose2Sim.markerAugmentation()
-Pose2Sim.kinematics()
-```
+  Pose2Sim.calibration(config_dict)
+  ```
+- **Run all stages at once:** 
+  ``` python
+  from Pose2Sim import Pose2Sim
+  Pose2Sim.runAll()
+  # or: Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_kinematics=True)
+  ```
 
-or equivalently:
-
-``` python
-from Pose2Sim import Pose2Sim
-Pose2Sim.runAll() 
-```
-
-One .trc file per participant will be generated and stored in the `pose-3d` directory.\
-Similarly, one scaled .osim model and one joint angle .mot file per participant will be stored in the `kinematics`folder.
-
-You can visualize your results with Blender as explained in [Demonstration Part-2](#demonstration-part-2-visualize-your-results-with-opensim-or-blender).
-
-<br>
-
-***N.B.:***
-- Make sure that the order of `markerAugmentation` > `participant_height` and `participant_mass` matches the person's IDs.
-
-<br/>
-
-## Demonstration Part-4: Try batch processing
-> _**Run numerous analysis with different parameters and minimal friction.**_
-
-Go to the Batch Demo folder: `cd <path>\Pose2Sim\Demo_Batch`. \
-Type `ipython`, and try the following code:
-
-``` python
-from Pose2Sim import Pose2Sim
-Pose2Sim.calibration()
-Pose2Sim.poseEstimation()
-Pose2Sim.synchronization()
-Pose2Sim.personAssociation()
-Pose2Sim.triangulation()
-Pose2Sim.filtering()
-Pose2Sim.markerAugmentation()
-Pose2Sim.kinematics()
-```
-
-or equivalently:
-
-``` python
-from Pose2Sim import Pose2Sim
-Pose2Sim.runAll()
-```
-
-The batch processing structure requires a `Config.toml` file in each of the trial directories. Global parameters are given in the `Config.toml` file of the `BatchSession` folder. They can be altered for specific Trials by uncommenting keys and their values in their respective `Config.toml` files.
-
-Run Pose2Sim from the `BatchSession` folder if you want to batch process the whole session, or from a `Trial` folder if you want to process only a specific trial. 
+</br>
 
 
-| SingleTrial     | BatchSession       |
-|-----------------|--------------------|
-| <pre><b>SingleTrial</b>                    <br>├── <b>calibration</b><br>├── <b>videos</b><br>└── <i><b>Config.toml</i></b></pre> |  <pre><b>BatchSession</b>                     <br>├── <b>calibration</b> <br>├── Trial_1 <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b><br>├── Trial_2 <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b><br>└── <i><b>Config.toml</i></b></pre>  | 
 
-
-For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or uncomment `[pose]` and set `mode = 'lightweight'` in the `Config.toml` file of `Trial_2`.
-
-
-<br/>
 
 ## Too slow for you?
 
@@ -356,7 +357,7 @@ First of all, set `multi_person = True` in your `Config.toml`file, and remove al
 ## Setting up your project
   > _**Get yourself comfy!**_
   
-  1. Open a terminal, enter `pip show pose2sim`, report package location. \
+  1. Open a terminal, enter `uv pip show pose2sim`, report package location. \
      Copy this path and do `cd <path>\pose2sim`.
   2. Copy-paste the *Demo_SinglePerson*, *Demo_MultiPerson*, or *Demo_Batch* folder wherever you like, and rename it as you wish. 
   3. The rest of the tutorial will explain to you how to populate the `Calibration` and `videos` folders, edit the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) files, and run each Pose2Sim step.
@@ -369,8 +370,7 @@ First of all, set `multi_person = True` in your `Config.toml`file, and remove al
 ### With RTMPose *(default)*:
 > [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose) is a state-of-the-art pose estimation solution that is faster and more accurate than OpenPose. It is now included in Pose2Sim for straightforward end-to-end analysis.
 
-Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
-Type `ipython`.
+Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -491,9 +491,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 > _**Calculate camera intrinsic properties and extrinsic locations and positions.\
 > Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_
 
-Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
-Type `ipython`.
-
+Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -605,9 +603,7 @@ For each camera, the algorithm computes mean vertical speed for the chosen keypo
 
 >***N.B.:** Skip this step if your cameras are natively synchronized.*
 
-Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
-Type `ipython`.
-
+Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 ``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.synchronization()
@@ -640,8 +636,7 @@ You can choose the keypoints to synchronize on, the reference person, and the ti
 
 > ***N.B.:** Skip this step if only one person is in the field of view.*
 
-Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
-Type `ipython`.
+Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 ``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.personAssociation()
@@ -660,8 +655,7 @@ Check printed output. If results are not satisfying, try and release the constra
 > The triangulation is weighted by the likelihood of each detected 2D keypoint, provided that they this likelihood is above a threshold.\
   If the reprojection error is above another threshold, right and left sides are swapped; if it is still above, cameras are removed until the threshold is met. If more cameras are removed than a predefined number, triangulation is skipped for this point and this frame. In the end, missing values are interpolated.
 
-Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
-Type `ipython`.
+Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -678,12 +672,11 @@ If your triangulation is not satisfying, try and release the constraints in the 
 </br>
 
 ### Filtering 3D coordinates
-> _**Filter your 3D coordinates.**_\
-> - Butterworth, Kalman, OneEuro, GCV spline, LOESS, Gaussian, Median, Butterworth on speed filters are available and can be tuned accordingly
+> _**Filter your 3D coordinates.**_
+> - Butterworth, Acceleration minimizing, Kalman, OneEuro, GCV spline, LOESS, Gaussian, Median, Butterworth on speed filters are available and can be tuned accordingly
 > - Instead of filtering triangulated trc coordinates, you can also filter angle .mot files after inverse kinematics by setting `filter_ik = true` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
-Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
-Type `ipython`.
+Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -710,15 +703,13 @@ _**Note that inverse kinematic results are not necessarily better after marker a
 **Make sure that `participant_height` is correct in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.** `participant_mass` is mostly optional for IK.\
 Only works with models estimating at least the following keypoints (e.g., not COCO):
 ``` python
- ["RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
- "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
- "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
+ ["RHip", "LHip", "RKnee", "LKnee", "RAnkle", "LAnkle", 
+ "RHeel", "LHeel", "RSmallToe", "LSmallToe", "RBigToe", "LBigToe"]
 ```
 Will not work properly if missing values are not interpolated (i.e., if there are Nan value in the .trc file).
 
 
-Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
-Type `ipython`.
+Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -744,11 +735,10 @@ This can be either done fully automatically within Pose2Sim, or manually within 
 
 In your Config.toml file, set `use_augmentation = false` is you don't want to use the results with augmented marker (this is sometimes better).\
 Set `use_simple_model = true` if you want IK to run 10-40 times faster. No muscles, no constraints (eg stiff spine and shoulders, no patella).\
-Set `filter_ik = true` if you want to filter angle results after IK at **TWICE** the cut-off frequency defined in the [filtering] section. Useful for force estimations if results are noisy .\
+Set `filter_ik = true` if you want to filter angle results after IK with the parameters defined in the [filtering] section. Useful for force estimations if results are noisy .\
 Set `right_left_symmetry = false` if you have good reasons to think the participant is not symmetrical (e.g. if they wear a prosthetic limb).
 
-Open an Anaconda prompt or a terminal in a `Session` or `Trial` folder.\
-Type `ipython`.
+Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -827,6 +817,7 @@ Alternatively, you can use command-line tools:
 # Utilities
 A list of standalone tools (see [Utilities](https://github.com/perfanalytics/pose2sim/tree/main/Pose2Sim/Utilities)), which can be either run as scripts, or imported as functions. Check usage in the docstring of each Python file. The figure below shows how some of these tools can be used to further extend Pose2Sim usage.
 
+Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and any of these. Type in `name_of_script.py -h` for more instructions on how to use them.
 
 <details>
    <summary><b>Video editing</b> (CLICK TO SHOW)</summary>
@@ -920,8 +911,8 @@ Rotate trc coordinates by 90° around an axis. You can either choose an axis to 
 [trc_Zup_to_Yup.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_Zup_to_Yup.py)
 Changes Z-up system coordinates to Y-up system coordinates.
 
-[trc_filter.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_filter.py)
-Filters trc files. Available filters: Butterworth, Kalman, Butterworth on speed, Gaussian, LOESS, Median.
+[trc_mot_filter.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_filter.py)
+Filters trc or mot files. Available filters: Butterworth, Kalman, Butterworth on speed, Gaussian, LOESS, Median.
 
 [trc_gaitevents.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_gaitevents.py)
 Detects gait events from point coordinates according to [Zeni et al. (2008)](https://www.sciencedirect.com/science/article/abs/pii/S0966636207001804?via%3Dihub).
@@ -981,7 +972,7 @@ If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org
 ### How to contribute and to-do list
 
 I would happily welcome any proposal for new features, code improvement, and more!\
-If you want to contribute to Pose2Sim, please see [this issue](https://github.com/perfanalytics/pose2sim/issues/40).\
+If you want to contribute to Pose2Sim, please see [this issue](https://github.com/perfanalytics/pose2sim/issues/40) or join the Discord community [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt).\
 You will be proposed a to-do list, but please feel absolutely free to propose your own ideas and improvements.
 
 </br>
@@ -989,7 +980,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 **Main to-do list**
 - Graphical User Interface
 - Self-calibration based on keypoint detection + Bundle adjustment + Calibration of moving cameras
-- Integrate [Sports2D](https://github.com/davidpagnon/Sports2D/)
+- Get rid of the brute-force single-person mode, and instead automatically or manually select the persons of interest in multi-person mode.
 
 </br>
 

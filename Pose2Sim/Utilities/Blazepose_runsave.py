@@ -11,8 +11,8 @@
     Saves coordinates to OpenPose format (json files) or DeepLabCut format (csv or h5 table)
     Optionally displays and saves images with keypoints overlayed
 
-    N.B.: First install mediapipe: `pip install mediapipe`
-    You may also need to install tables: `pip install tables`
+    N.B.: First install mediapipe: `uv pip install mediapipe`
+    You may also need to install tables: `uv pip install tables`
         
     Usage: 
     Blazepose_runsave -i input_file --display --save_images --save_video --to_csv --to_h5 --to_json --model_complexity 2 -o output_folder
@@ -146,8 +146,8 @@ def blazepose_detec_func(**args):
     Saves coordinates to OpenPose format (json files) or DeepLabCut format (csv or h5 table)
     Optionally displays and saves images with keypoints overlayed
 
-    N.B.: First install mediapipe: `pip install mediapipe`
-    You may also need to install tables: `pip install tables`
+    N.B.: First install mediapipe: `uv pip install mediapipe`
+    You may also need to install tables: `uv pip install tables`
         
     Usage: 
     Blazepose_runsave -i input_file --display --save_images --save_video --to_csv --to_h5 --to_json --model_complexity 2 -o output_folder

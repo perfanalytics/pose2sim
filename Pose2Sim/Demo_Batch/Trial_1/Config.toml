@@ -92,7 +92,7 @@
 # max_distance_px = 100  # px # If a person is detected further than max_distance from its position on the previous frame, it will be considered as a new one
 # deepsort_params = """{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8}""" # """{dictionary between 3 double quotes}"""
 #                   # More robust in crowded scenes but Can be tricky to parametrize. More information there: https://github.com/levan92/deep_sort_realtime/blob/master/deep_sort_realtime/deepsort_tracker.py#L51
-#                   # Note: For faster and more robust tracking, use {'embedder_gpu': True, embedder':'torchreid'}, which uses the GPU and runs osnet_ain_x1_0 by default. requires `pip install torch torchvision torchreid gdown tensorboard`
+#                   # Note: For faster and more robust tracking, use {'embedder_gpu': True, embedder':'torchreid'}, which uses the GPU and runs osnet_ain_x1_0 by default. requires `uv pip install torch torchvision torchreid gdown tensorboard`
 # handle_LR_swap = false # Not implemented yet. Might be useful if cameras film from the sagittal plane and the right and left sides are hard to differenciate to your eye.
 # undistort_points = false # Not implemented yet. Better if distorted image (parallel lines curvy on the edge or at least one param > 10^-2), but unnecessary (and slightly slower) if distortions are low
 

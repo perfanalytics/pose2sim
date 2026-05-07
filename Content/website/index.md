@@ -21,7 +21,7 @@
 > **Other recently added features**: Pose estimation, Automatic camera synchronization, Multi-person analysis, Blender visualization, Marker augmentation, Batch processing.
 <!-- Incidentally, right/left limb swapping is now handled, which is useful if few cameras are used;\
 and lens distortions are better taken into account.\ -->
-> To upgrade, type `pip install pose2sim --upgrade`
+> To upgrade, type `uv pip install pose2sim --upgrade`
 
 <br>
 
@@ -159,7 +159,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
   <!-- print(f'torch version: {torch.__version__}, cuda version: {torch.version.cuda}, cudnn version: {torch.backends.cudnn.version()}, onnxruntime version: {ort.__version__}') -->
 
 > **Note on storage use:**\
-     A full installation takes up to 11 GB of storage spate. However, GPU support is not mandatory and takes about 6 GB. Moreover, [marker augmentation](#marker-augmentation) requires Tensorflow and does not necessarily yield better results. You can save an additional 1.3 GB by uninstalling it: `pip uninstall tensorflow`.\
+     A full installation takes up to 11 GB of storage spate. However, GPU support is not mandatory and takes about 6 GB. Moreover, [marker augmentation](#marker-augmentation) requires Tensorflow and does not necessarily yield better results. You can save an additional 1.3 GB by uninstalling it: `uv pip uninstall tensorflow`.\
      A minimal installation with carefully chosen pose models and without GPU support, Tensorflow, PyQt5 **would take less than 3 GB**.\
     <img src="../Storage.png" width="760">
 
@@ -169,7 +169,7 @@ If you don't use Anaconda, type `python -V` in terminal to make sure python>=3.9
 ## Demonstration Part-1: End to end video to 3D joint angle computation
 > _**This demonstration provides an example experiment of a person balancing on a beam, filmed with 4 cameras.**_ 
 
-Open a terminal, enter `pip show pose2sim`, report package location. \
+Open a terminal, enter `uv pip show pose2sim`, report package location. \
 Copy this path and go to the Single participant Demo folder: `cd <path>\Pose2Sim\Demo_SinglePerson`. \
 Type `ipython`, and try the following code:
 ``` python
@@ -198,7 +198,7 @@ All of them are clearly documented: feel free to play with them!
   # or simply: Pose2Sim.runAll()
   ```
 - Try the calibration tool by changing `calibration_type` to `calculate` instead of `convert` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
-- Note that **Pose2Sim.markerAugmentation()** does not necessarily improve results--*in fact, results are worse half of the time.* You can choose to not run this command, and save an additional 1.3 GB by uninstalling tensorflow: `pip uninstall tensorflow`.
+- Note that **Pose2Sim.markerAugmentation()** does not necessarily improve results--*in fact, results are worse half of the time.* You can choose to not run this command, and save an additional 1.3 GB by uninstalling tensorflow: `uv pip uninstall tensorflow`.
 
 </br>
 
@@ -319,7 +319,7 @@ For example, try uncommenting `[project]` and set `frame_range = [10,99]`, or un
 ## Setting up your project
   > _**Get yourself comfy!**_
   
-  1. Open a terminal, enter `pip show pose2sim`, report package location. \
+  1. Open a terminal, enter `uv pip show pose2sim`, report package location. \
      Copy this path and do `cd <path>\pose2sim`.
   2. Copy-paste the *Demo_SinglePerson*, *Demo_MultiPerson*, or *Demo_Batch* folder wherever you like, and rename it as you wish. 
   3. The rest of the tutorial will explain to you how to populate the `Calibration` and `videos` folders, edit the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) files, and run each Pose2Sim step.

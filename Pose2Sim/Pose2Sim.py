@@ -23,11 +23,7 @@ It offers tools for:
 It has been tested on Windows, Linux and MacOS, and works for any Python version >= 3.9
 
 Installation:
-# Open Anaconda prompt. Type:
-# - conda create -n Pose2Sim python=3.9
-# - conda activate Pose2Sim
-# - conda install -c opensim-org opensim -y
-# - pip install Pose2Sim
+pip install Pose2Sim
 
 Usage:
 # First run Pose estimation and organize your directories (see Readme.md)
