@@ -688,7 +688,6 @@ def kinematics_all(config_dict):
                 trc_data, _, _, markers, _ = read_trc(trc_file)
                 height = compute_height(
                     trc_data,
-                    markers,
                     large_hip_knee_angles=large_hip_knee_angles,
                     trimmed_extrema_percent=trimmed_extrema_percent
                 )

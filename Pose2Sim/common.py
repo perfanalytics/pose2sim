@@ -1165,6 +1165,8 @@ def best_coords_for_measurements(Q_coords, large_hip_knee_angles=90):
 def compute_height(Q_coords, large_hip_knee_angles=90, trimmed_extrema_percent=50):
     '''
     Compute the height of the person from the trc data.
+    Adds MidShoulder and Hip columns if not present. 
+    If the head or nose markers are missing, approximates height as leg_length/0.485 (Winter, 2009).
 
     INPUTS:
     - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
@@ -1224,9 +1226,9 @@ def compute_height(Q_coords, large_hip_knee_angles=90, trimmed_extrema_percent=5
         heights = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2 + (rback + lback)/2 + head
     
     except:
-        logging.warning('Head and Nose markers are missing. Approximating height as leg_length/0.53 (Winter, 2009).')
+        logging.warning('Head and Nose markers are missing. Approximating height as leg_length/0.485 (Winter, 2009).')
         leg_lengths = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2
-        heights = leg_lengths / 0.53
+        heights = leg_lengths / 0.485
     
     # Remove the 20% most extreme values
     height = trimmed_mean(heights, trimmed_extrema_percent=trimmed_extrema_percent)

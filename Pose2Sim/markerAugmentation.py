@@ -119,11 +119,21 @@ def augment_markers_all(config_dict):
         logging.warning(f"No subject height found in Config.toml. Using default height of {default_height}m.")
     elif isinstance(subject_height, str) and subject_height.lower() == 'auto':
         subject_height = []
+        
         for trc_file in trc_files:
-            try:
-                # Import TRC file
-                trc_data, frames_col, time_col, markers, header = read_trc(trc_file)
+            # Import TRC file
+            trc_data, frames_col, time_col, markers, header = read_trc(trc_file)
+            
+            # Create missing markers if needed
+            if not all(col in trc_data.columns for col in ['RShoulder', 'LShoulder', 'Neck', 'Hip']):
+                # add shoulder data if not in file
+                trc_data, markers, header = add_shoulder_data(trc_data, markers, header)
+                # add neck and midhip data if not in file
+                trc_data, markers, header = add_neck_hip_data(trc_data, markers, header)
+                # Overwrite TRC file
+                write_trc(trc_file, trc_data, frames_col, time_col, header)
 
+            try:
                 # frame range selection
                 f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if (frame_range in ('all', 'auto', []) or frames_col.iloc[0]>frame_range[0] or frames_col.iloc[1]<frame_range[1]) else frame_range][0]
                 f_index = [frames_col[frames_col==f_range[0]].index[0], frames_col[frames_col==f_range[1]-1].index[0]+1]
@@ -131,7 +141,6 @@ def augment_markers_all(config_dict):
 
                 height = compute_height(
                     trc_data,
-                    markers,
                     large_hip_knee_angles=large_hip_knee_angles,
                     trimmed_extrema_percent=trimmed_extrema_percent
                 )
@@ -181,12 +190,6 @@ def augment_markers_all(config_dict):
         # Import TRC file
         trc_data, frames_col, time_col, markers, header = read_trc(trc_file)
 
-        # add shoulder data if not in file
-        trc_data, markers, header = add_shoulder_data(trc_data, markers, header)
-
-        # add neck and midhip data if not in file
-        trc_data, markers, header = add_neck_hip_data(trc_data, markers, header)
-
         # frame range selection
         f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if (frame_range in ('all', 'auto', []) or frames_col.iloc[0]>frame_range[0] or frames_col.iloc[1]<frame_range[1]) else frame_range][0]
         frame_nb = f_range[1] - f_range[0]
@@ -212,7 +215,7 @@ def augment_markers_all(config_dict):
             # Verify that all feature markers are present in the TRC file
             missing_markers = list(set(feature_markers) - set(markers))
             if len(missing_markers) > 0:
-                logging.warning(f'Marker augmentation requires {missing_markers} markers and they are not present in the TRC file. Skipping augmentation for {augmenterModelType} markers.')
+                logging.warning(f'{augmenterModelType} marker augmentation requires {missing_markers} markers and they are not present in the TRC file. Skipping.')
                 continue
            
             augmenterModelDir = os.path.join(augmenterDir, augmenterModelName, 
