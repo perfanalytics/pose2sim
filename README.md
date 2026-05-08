@@ -43,7 +43,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 
 </br>
 
-**Pose2Sim releases:**
+**Pose2Sim releases (details [here](https://github.com/perfanalytics/pose2sim/releases))**:
 - [x] **v0.1** *(08/2021)*: Published paper
 - [x] **v0.2** *(01/2022)*: Published code
 - [x] **v0.3** *(01/2023)*: Supported other pose estimation algorithms
@@ -54,13 +54,12 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
 - [x] **v0.8** *(04/2024)*: New synchronization tool
 - [x] **v0.9** *(07/2024)*: Integration of pose estimation in the pipeline
 - [x] **v0.10 *(09/2024)*: Integration of OpenSim in the pipeline**
-- [ ] v0.11: Integration of Sports2D, monocular 3D pose estimation, and documentation on new website
-- [ ] v0.12: Graphical User Interface
-- [ ] v0.13: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions
-- [ ] v1.0: First full release
+- [ ] v0.11: Graphical User Interface, Integration of Sports2D, Website with documentation
+- [ ] v0.12: Monocular 3D pose estimation
+- [ ] v0.13: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions, smarter single-person mode
+- [ ] v1.0: First full release with , code refactoring for performance and clarity
 
-***N.B.:*** As always, I am more than happy to welcome contributors (see [How to contribute](#how-to-contribute)).\
-***N.B:*** Please set `undistort_points` and `handle_LR_swap` to false for now since it currently leads to inaccuracies. I'll try to fix it soon.
+***N.B.:*** If you want to contribute to Sports2D or Pose2Sim, please see [How to contribute](#how-to-contribute-and-to-do-list) or join the Discord community! [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
 
 
 </br>
@@ -143,7 +142,7 @@ Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inpu
    Open a terminal (*conda, powershell, bash, or zsh*).\
    Activate your environment (see [here](#1-set-up-a-uv-environment)).
 
-   - OPTION 1: **Stable version:** 
+   - OPTION 1: **Latest stable version:** 
        ``` cmd
        uv pip install pose2sim --upgrade
        ```
@@ -296,15 +295,21 @@ All of them are clearly documented: feel free to play with them!
   ``` python
   import toml
   config_dict = toml.load("<Demo_SinglePerson_path>/Config.toml")
-  config_dict.get("pose").update({"pose_mode": "whole_body"})
+  config_dict.get("project").update({"project_dir":"<Demo_SinglePerson_path>"})
+  config_dict.get("pose").update({"pose_model": "whole_body","overwrite_pose": True})
+  Pose2Sim.poseEstimation(config_dict)
 
-  Pose2Sim.calibration(config_dict)
+  # Or even simpler, just pass the updated parameters
+  config_dict = {"project": {"project_dir": "<Demo_SinglePerson_path>"}, 
+                 "pose": {"pose_model": "whole_body", "overwrite_pose": True}}
+  Pose2Sim.poseEstimation(config_dict)
   ```
 - **Run all stages at once:** 
   ``` python
   from Pose2Sim import Pose2Sim
   Pose2Sim.runAll()
-  # or: Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_kinematics=True)
+  # or: 
+  # Pose2Sim.runAll(do_calibration=True, do_poseEstimation=True, do_synchronization=True, do_personAssociation=True, do_triangulation=True, do_filtering=True, do_markerAugmentation=True, do_kinematics=True)
   ```
 
 </br>
@@ -974,7 +979,7 @@ If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org
 ### How to contribute and to-do list
 
 I would happily welcome any proposal for new features, code improvement, and more!\
-If you want to contribute to Pose2Sim, please see [this issue](https://github.com/perfanalytics/pose2sim/issues/40) or join the Discord community [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt).\
+If you want to contribute to Pose2Sim, please see [this issue](https://github.com/perfanalytics/pose2sim/issues/40) or join the Discord community! [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)\
 You will be proposed a to-do list, but please feel absolutely free to propose your own ideas and improvements.
 
 </br>

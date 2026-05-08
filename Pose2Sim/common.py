@@ -270,10 +270,12 @@ def write_mot(mot_path, mot_data, time_col, header):
     with open(mot_path, 'w') as f:
         for line in header:
             f.write(line)
-        # Combine time and data
-        output = mot_data.copy()
-        output.insert(0, time_col.name if time_col.name else 'time', time_col)
-        output.to_csv(f, sep='\t', index=False, lineterminator='\n')
+        
+        all_mot_data = pd.concat(
+            [pd.Series(time_col, name='time').reset_index(drop=True),
+             mot_data.reset_index(drop=True)
+            ], axis=1)
+        all_mot_data.to_csv(f, sep='\t', index=False, header=None, lineterminator='\n') 
 
 
 def read_trc(trc_path):
@@ -325,11 +327,14 @@ def write_trc(trc_path, trc_data, frames_col, time_col, header):
         with open(trc_path, 'w') as trc_o:
             for line in header:
                 trc_o.write(line)
-            trc_data.insert(0, 'Frame#', frames_col)
-            trc_data.insert(1, 'Time', time_col)
-            # trc_data = trc_data.fillna(' ')
-            trc_data.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
-    
+
+            all_trc_data = pd.concat(
+                [pd.Series(frames_col, name='Frame#').reset_index(drop=True),
+                 pd.Series(time_col, name='Time').reset_index(drop=True),
+                 trc_data.reset_index(drop=True)
+                ], axis=1)
+            all_trc_data.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+
     except Exception as e:
         raise ValueError(f"Error writing TRC file at {trc_path}: {e}")
 

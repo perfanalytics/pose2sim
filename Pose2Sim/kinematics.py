@@ -753,13 +753,5 @@ def kinematics_all(config_dict):
     if filter_ik:
         config_dict['temp_filter_ik'] = True
         config_dict['filtering']['type'] = config_dict.get('kinematics', {}).get('ik_filter_type', 'acc_minimizing')
-
-        # # double cut-off frequencies
-        # config_dict['filtering']['butterworth']['cut_off_frequency'] *= 2
-        # config_dict['filtering']['kalman']['trust_ratio'] *= 2
-        # config_dict['filtering']['one_euro']['cut_off_frequency'] *= 2
-        # config_gcv_cut = config_dict['filtering']['gcv_spline']['cut_off_frequency']
-        # config_gcv_cut = config_gcv_cut * 2 if isinstance(config_gcv_cut, (int, float)) else config_gcv_cut
-        # config_dict['filtering']['butterworth_on_speed']['cut_off_frequency'] *= 2
         
         filter_all(config_dict)

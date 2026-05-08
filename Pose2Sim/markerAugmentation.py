@@ -184,7 +184,7 @@ def augment_markers_all(config_dict):
         augmenterModelType_all = [augmenterModelType_lower, augmenterModelType_upper]
         feature_markers_all = [feature_markers_lower, feature_markers_upper]
         response_markers_all = [response_markers_lower, response_markers_upper]
-        logging.info(f'Using Stanford {augmenterModelName} {augmenter_model} augmenter model. Feet are {"" if feet_on_floor else "not "}vertically offset to be at floor level.\n')
+        logging.info(f'\nUsing Stanford {augmenterModelName} {augmenter_model} augmenter model. Feet are {"" if feet_on_floor else "NOT "}vertically offset to be at floor level.')
         
         # %% Process data.
         # Import TRC file
@@ -217,7 +217,8 @@ def augment_markers_all(config_dict):
             if len(missing_markers) > 0:
                 logging.warning(f'{augmenterModelType} marker augmentation requires {missing_markers} markers and they are not present in the TRC file. Skipping.')
                 continue
-           
+            else:
+                logging.info(f'Running {augmenterModelType} marker augmentation.')
             augmenterModelDir = os.path.join(augmenterDir, augmenterModelName, 
                                              augmenterModelType)
             
