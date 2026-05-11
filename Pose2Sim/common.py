@@ -1666,11 +1666,14 @@ def draw_keypts(img, X, Y, scores, cmap_str='RdYlGn'):
     scores = np.where(scores<0, 0, scores)
     
     cmap = plt.get_cmap(cmap_str)
-    for (x,y,s) in zip(X,Y,scores):
-        c_k = np.array(cmap(s))[:,:-1]*255
-        [cv2.circle(img, (int(x[i]), int(y[i])), thickness+4, c_k[i][::-1], -1)
-            for i in range(len(x))
-            if not (np.isnan(x[i]) or np.isnan(y[i]))]
+    try:
+        for (x,y,s) in zip(X,Y,scores):
+            c_k = np.array(cmap(s))[:,:-1]*255
+            [cv2.circle(img, (int(x[i]), int(y[i])), thickness+4, c_k[i][::-1], -1)
+                for i in range(len(x))
+                if not (np.isnan(x[i]) or np.isnan(y[i]))]
+    except:
+        pass
 
     return img
 

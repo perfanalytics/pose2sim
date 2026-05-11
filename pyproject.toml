@@ -35,25 +35,20 @@ urls = {Homepage = "https://github.com/perfanalytics/pose2sim", "Bug Tracker" = 
 dependencies = [
     "opensim", 
     "toml",
-    "numpy",
     "lxml",
-    "matplotlib",
     "mpl_interactions",
     "PySide6-essentials",
     "tqdm",
     "anytree",
-    "pandas>=1.5",
+    "pandas>=1.5", # pulls in numpy and matplotlib
     "scipy",
     "statsmodels",
     "filterpy",
     "ipython",
     "c3d",
-    "rtmlib",
+    "rtmlib", # pulls in onnxruntime and opencv-python
     "openvino",
-    "onnxruntime",
-    "opencv-python != 4.11.*",  # avoid 4.11 due to displaymatrix ignored (rotation metadata)
     "customtkinter",
-    "requests"
 ]
 
 [project.optional-dependencies]
