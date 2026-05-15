@@ -92,7 +92,7 @@ def get_marker_positions(motion_data, model, in_degrees=True, marker_list=[]):
                 value = motion_data_pd.loc[n,coord]*np.pi/180
             else:
                 value = motion_data_pd.loc[n,coord]
-            model.getCoordinateSet().get(coord).setValue(state,value, enforceContraints=False)
+            model.getCoordinateSet().get(coord).setValue(state,value, enforceConstraints=False)
         # model.assemble(state)
         model.realizePosition(state) # much faster (IK already done, no need to compute it again)
         # get marker positions

@@ -36,16 +36,18 @@ import platform
 
 from scipy import signal
 from scipy.interpolate import make_smoothing_spline
-
 from scipy.interpolate._bsplines import _coeff_of_divided_diff, _compute_optimal_gcv_parameter
 from scipy.interpolate import BSpline
 from scipy.ndimage import gaussian_filter1d
+from scipy import sparse
+from scipy.sparse.linalg import spsolve
+
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
 from Pose2Sim.common import plotWindow
-from Pose2Sim.common import convert_to_c3d, read_trc, read_mot, write_mot, is_video_file
+from Pose2Sim.common import convert_to_c3d, read_trc, write_trc, read_mot, write_mot, is_video_file
 
 ## AUTHORSHIP INFORMATION
 __author__ = "David Pagnon"
@@ -248,14 +250,20 @@ def gcv_spline_filter_1d(config_dict, frame_rate, col):
     1D GCV Spline filter.
     
     If cutoff is a number, it is used as the cut-off frequency in Hz and behaves like a butterworth filter.
-    If cutoff is 'auto', it automatically evaluates the best trade-off between smoothness and fidelity to data.
-    If smoothing_factor is different to 1, it biases results towards smoothing if > 1, and towards fidelity to input data if <1.
-    smoothing_factor is ignored if cutoff is not 'auto'.
-    
+    If cutoff is 'auto', GCV finds the best trade-off between smoothness and fidelity to data (optimal lambda),
+    and falls back to a biomechanically sensible frequency if GCV returns an unreliable result.
+    Smoothing_factor biases results towards smoothing if > 1, and towards fidelity to input data if <1. Ignored if cutoff is not 'auto'.
+
+    NOTE: In specific cases of a triangular wave + drift (eg pelvis Y coordinates of a subject walking uphill), 
+    the filter may occasionally overfilter the trajectory.
+    Known issue posted at: https://github.com/scipy/scipy/issues/23472
+
     INPUT:
-    - cutoff: 'auto' or int, cut-off frequency in Hz
-    - smoothing_factor: float, >=0. >1 to prioritize smoothing, <1 for fidelity to input data.
-    - col: Pandas dataframe column
+    - config_dict: configuration dictionary:
+        - filtering.gcv_spline.cut_off_frequency: 'auto' (default) or float (Hz)
+        - filtering.gcv_spline.smoothing_factor: float >= 0, default 1.0. >1 to prioritize smoothing, <1 for fidelity to input data
+    - frame_rate: float, frames per second
+    - col: Pandas Series
 
     OUTPUT:
     - col_filtered: Filtered pandas dataframe column
@@ -264,51 +272,121 @@ def gcv_spline_filter_1d(config_dict, frame_rate, col):
     cutoff = config_dict.get('filtering', {}).get('gcv_spline', {}).get('cut_off_frequency', 'auto')
     smoothing_factor = float(config_dict.get('filtering', {}).get('gcv_spline', {}).get('smoothing_factor', 1.0))
 
+    # If the automatically computed lambda corresponds to a frequency above max_cutoff (eg short sequence),
+    # it falls back to a lambda corresponding to max_cutoff. Likewise if frequency is too low (eg noisy short sequence)
+    max_cutoff = 30.0
+    min_cutoff = 1.0
+    lam_min = (frame_rate / (2.0 * np.pi * max_cutoff)) ** 4 # lam from cutoff
+    lam_max = (frame_rate / (2.0 * np.pi * min_cutoff)) ** 4
+
     # Split into sequences of not nans
     # print('\n', col.name)
     col_filtered = col.copy()
-    mask = np.isnan(col_filtered)  | col_filtered.eq(0)
+    mask = np.isnan(col_filtered) | col_filtered.eq(0)
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 2]
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 5] # Minimum length for 4th order smoothing spline
     
     # Filter each of the selected sequences
     for seq_f in idx_sequences_to_filter:
-        x = np.arange(len(col_filtered[seq_f]))
+        x = np.arange(len(seq_f), dtype=float)
+        y_raw = col_filtered.iloc[seq_f].to_numpy(dtype=float)
 
-        # Automatically determine optimal lambda value when cutoff is 'auto'
-        if cutoff == 'auto': 
-            # Normalize col around 1, because zero mean leads to unstabilities
-            median_col = np.median(col_filtered[seq_f]) # median of time series
-            mad_col = np.median(np.abs(col_filtered[seq_f] - median_col)) # median absolute deviation from median
-            mad_col = mad_col if mad_col > 0 else 1.0
-            col_norm = 1 + (col_filtered[seq_f] - median_col) / (1.4826 * mad_col) # 1.4826*mad_col equivalent to dividing by std (for col_norm to have a std of 1)
+        # Normalize y_raw around 1, because zero mean leads to unstabilities
+        median_y = np.median(y_raw) # median of time series
+        mad_y = np.median(np.abs(y_raw - median_y)) # median absolute deviation from median
+        scale = 1.4826 * mad_y if mad_y > 0 else 1.0 # 1.4826*mad_y equivalent to dividing by std (for y_norm to have a std of 1)
+        y_norm = 1.0 + (y_raw - median_y) / scale
 
+        if cutoff == 'auto':
             # Compute optimal lam 
             # See https://stackoverflow.com/a/79740481/12196632
-            lam =  _compute_optimal_gcv_parameter_numstable(x, col_norm)
-            
+            lam = _compute_optimal_gcv_parameter_numstable(x, y_norm)
+
             # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
             lam *= smoothing_factor
 
-            # Compute spline
-            spline = make_smoothing_spline(x, col_norm, w=None, lam=lam)
-            col_filtered_norm = spline(x)
-                            
-            # Denormalize data
-            col_filtered[seq_f] = (col_filtered_norm - 1) * (1.4826 * mad_col) + median_col
+            # Bounds if lam is not coherent (short, near-constant sequences, triangular wave+drift...)
+            if lam < lam_min or lam > lam_max:
+                old_lam = lam
+                lam = np.clip(lam, lam_min, lam_max)
+                logging.warning(f'{col.name}: Automatically computed lambda is equivalent to a cut-off frequency of {frame_rate / (2.0 * np.pi * old_lam**0.25):.2f} Hz, which is outside of the expected range [{min_cutoff}, {max_cutoff}] Hz. Falling back to a lambda value corresponding to a cut-off frequency of {frame_rate / (2.0 * np.pi * lam**0.25):.2f} Hz. Your sequence might be too short, noisy, or near-constant for cutoff=\'auto\' to work effectively.')
 
         else:
             # Estimate lam from cutoff frequency
-            lam = ((frame_rate / (2 * np.pi * float(cutoff))) ** 4)
-            
+            lam = (frame_rate / (2.0 * np.pi * float(cutoff))) ** 4
+
             # More smoothing if smoothing_factor > 1, more fidelity to data if < 1
             lam *= smoothing_factor
 
-            # Compute spline
-            spline = make_smoothing_spline(x, col_filtered[seq_f], w=None, lam=lam)
-            col_filtered[seq_f] = spline(x)
+        spline = make_smoothing_spline(x, y_norm, w=None, lam=lam)
+        y_filtered_norm = spline(x)
+
+        # Denormalize
+        col_filtered.iloc[seq_f] = (y_filtered_norm - 1.0) * scale + median_y
+
+    return col_filtered
+
+
+def acc_minimizing_filter_1d(config_dict, frame_rate, col):
+    '''
+    1D Whittaker-Henderson filter (acceleration-minimizing).
+    Inspired by AddBiomechanics: https://github.com/keenon/AddBiomechanics/blob/main/server/engine/src/dynamics_pass/acceleration_minimizing_pass.py
+
+    INPUT:
+    - config_dict: configuration dictionary:
+        - filtering.acc_minimizing.cut_off_frequency: float (Hz)
+    - frame_rate: float, frames per second
+    - col: Pandas Series
+
+    OUTPUT:
+    - col_filtered: filtered Pandas Series (same index as input)
+    '''
+
+    cutoff = float(config_dict.get('filtering', {}).get('acc_minimizing', {}).get('cut_off_frequency', 6.0))
+    pad = 10
+
+    # conversion from cutoff to lambda
+    lam = (frame_rate / (2.0 * np.pi * cutoff)) ** 4
+
+    # Split into sequences of not nans
+    col_filtered = col.copy()
+    mask = np.isnan(col_filtered) | col_filtered.eq(0)
+    falsemask_indices = np.where(~mask)[0]
+    gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1
+    idx_sequences = np.split(falsemask_indices, gaps)
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 3] # Minimum length for accelerations (2nd order differences)
+
+    # Filter each of the selected sequences
+    for seq_f in idx_sequences_to_filter:
+        y = col_filtered.iloc[seq_f].to_numpy(dtype=float)
+
+        # Pad at start and end of the sequence to minimize edge effects
+        effective_pad = min(pad, len(y))
+        y_padded = np.concatenate([
+            np.repeat(y[0],  effective_pad),
+            y,
+            np.repeat(y[-1], effective_pad),
+        ])
+
+        # Sparse second-difference operator: D[i] = y[i] - 2*y[i+1] + y[i+2]
+        d = np.ones(len(y_padded) - 2)
+        D = sparse.diags(
+            [d, -2.0 * d, d],
+            offsets=[0, 1, 2],
+            shape=(len(y_padded) - 2, len(y_padded)),
+            format='csc'
+        )
+
+        # Solve (I + lambda * D^T D) y_smooth = y_padded
+        # Equivalent to minimizing ||y_smooth - y_padded||^2 + lambda * ||D y_smooth||^2
+        #                            fidelity term            acceleration smoothness term
+        A = sparse.eye(len(y_padded), format='csc') + lam * (D.T @ D)
+        y_smooth_padded = spsolve(A, y_padded)
+
+        # Remove padding
+        col_filtered.iloc[seq_f] = y_smooth_padded[effective_pad:effective_pad + len(y)]
 
     return col_filtered
 
@@ -690,6 +768,7 @@ def filter1d(col, config_dict, filter_type, frame_rate):
     # Choose filter
     filter_mapping = {
         'butterworth': butterworth_filter_1d, 
+        'acc_minimizing': acc_minimizing_filter_1d,
         'one_euro': one_euro_filter_1d,
         'gcv_spline': gcv_spline_filter_1d,
         'kalman': kalman_filter_1d,
@@ -717,15 +796,17 @@ def recap_filter3d(config_dict, output_path):
     # Read Config
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
+    kinematics_dir = os.path.realpath(os.path.join(project_dir, 'kinematics'))
     save_plots = config_dict.get('filtering', {}).get('save_filt_plots', True)
-    plots_output_dir = os.path.join(pose3d_dir, 'filtering_plots')
     do_filter = config_dict.get('filtering', {}).get('filter', True)
     reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
     filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
     filter_ik = config_dict.get('filtering', {}).get('filter_ik', False)
+    plots_output_dir = os.path.join(kinematics_dir, 'filtering_plots') if filter_ik else os.path.join(pose3d_dir, 'filtering_plots_ik')
     kalman_filter_trustratio = int(config_dict.get('filtering', {}).get('kalman', {}).get('trust_ratio', 500))
     kalman_filter_smooth = int(config_dict.get('filtering', {}).get('kalman', {}).get('smooth', True))
     kalman_filter_smooth_str = 'smoother' if kalman_filter_smooth else 'filter'
+    accminimizing_filter_cutoff = float(config_dict.get("filtering", {}).get("acc_minimizing", {}).get("cut_off_frequency", 6.0))
     butterworth_filter_type = 'low' # config_dict.get('filtering', {}).get('butterworth', {}).get('type')
     butterworth_filter_order = int(config_dict.get('filtering', {}).get('butterworth', {}).get('order', 4))
     butterworth_filter_cutoff = int(config_dict.get('filtering', {}).get('butterworth', {}).get('cut_off_frequency', 6))
@@ -750,6 +831,7 @@ def recap_filter3d(config_dict, output_path):
     if do_filter:
         filter_mapping_recap = {
             'butterworth': f'--> Filter type: Butterworth {butterworth_filter_type}-pass. Order {butterworth_filter_order}, Cut-off frequency {butterworth_filter_cutoff} Hz.', 
+            'acc_minimizing': f'--> Filter type: Acceleration-minimizing. Cut-off frequency: {accminimizing_filter_cutoff} Hz.',
             'one_euro': f'--> Filter type: OneEuro (zero-phase). Min cutoff frequency: {one_euro_filter_1d_min_cutoff} Hz, Beta: {one_euro_filter_1d_beta}, Derivative cutoff frequency: {one_euro_filter_1d_d_cutoff} Hz.',
             'gcv_spline': f'--> Filter type: Generalized Cross-Validation Spline. {f"Optimal parameters automatically estimated with smoothing factor {gcv_filter_smoothing_factor}" if gcv_filter_cutoff == "auto" else "Cut-off frequency {gcv_filter_cutoff} Hz"}.',
             'kalman': f'--> Filter type: Kalman {kalman_filter_smooth_str}. Measurements trusted {kalman_filter_trustratio} times as much as previous data, assuming a constant acceleration process.', 
@@ -785,32 +867,19 @@ def filter_all(config_dict):
     # Read config_dict
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
     pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
+    frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
     display_figures = config_dict.get('filtering', {}).get('display_figures', True)
     save_plots = config_dict.get('filtering', {}).get('save_filt_plots', True)
-    plots_output_dir = os.path.join(pose3d_dir, 'filtering_plots')
     do_filter = config_dict.get('filtering', {}).get('filter', True)
     reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
     filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
-    filter_ik = config_dict.get('filtering', {}).get('filter_ik', False)
     make_c3d = config_dict.get('filtering', {}).get('make_c3d', True)
+    
+    filter_ik = config_dict.get('temp_filter_ik', False) # only applied when run from Pose2Sim.kinematics()
+    kinematics_dir = os.path.realpath(os.path.join(project_dir, 'kinematics'))
+    plots_output_dir = os.path.join(kinematics_dir, 'filtering_plots') if filter_ik else os.path.join(pose3d_dir, 'filtering_plots_ik')
     if save_plots and not os.path.exists(plots_output_dir):
         os.makedirs(plots_output_dir)
-
-    # Get frame_rate
-    video_dir = os.path.join(project_dir, 'videos')
-    frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
-    video_files = sorted([f for f in glob.glob(os.path.join(video_dir, '*')) if is_video_file(f)])
-    frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
-    if frame_rate == 'auto': 
-        try:
-            cap = cv2.VideoCapture(video_files[0])
-            cap.read()
-            if cap.read()[0] == False:
-                raise
-            frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
-        except:
-            logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
-            frame_rate = 30  
     
     # Find input files
     if filter_ik:
@@ -832,13 +901,9 @@ def filter_all(config_dict):
         # Read file
         if filter_ik:
             Q_coords, time_col, header = read_mot(file_path_in)
-        else:
-            Q_coords, frames_col, time_col, markers, header = read_trc(file_path_in)
-
-        # Frame range selection
-        if filter_ik:
             file_path_out = file_path_in.replace('.mot', f'_filt_{filter_type}.mot')
         else:
+            Q_coords, frames_col, time_col, markers, header = read_trc(file_path_in)
             f_range = [[frames_col.iloc[0], frames_col.iloc[-1]]
                        if (frame_range in ('all', 'auto', []) or frames_col.iloc[0]>frame_range[0] or frames_col.iloc[1]<frame_range[1]) 
                        else frame_range][0]
@@ -849,6 +914,7 @@ def filter_all(config_dict):
             file_path_out = file_path_in.replace(file_path_in.split('_')[-1], f'{f_range[0]}-{f_range[1]}_filt_{filter_type}.trc')
             file_out = os.path.basename(file_path_out)
             header[0] = header[0].replace(os.path.basename(file_path_in), file_out)
+        frame_rate = (1/time_col.diff().mean()).round()
 
         # Filter coordinates
         if reject_outliers:
@@ -858,7 +924,7 @@ def filter_all(config_dict):
             Q_filt = Q_coords.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
 
         if not do_filter and not reject_outliers:
-            logging.warning(f'reject_outliers and filter have been set to false. No further processing done on {file_path_in}.\n')
+            logging.warning(f'Reject_outliers and filter have been set to false. No further processing done on {file_path_in}.\n')
         
         else:
             # Display figures
@@ -878,12 +944,7 @@ def filter_all(config_dict):
             if filter_ik:
                 write_mot(file_path_out, Q_filt, time_col, header)
             else:
-                with open(file_path_out, 'w') as trc_o:
-                    [trc_o.write(line) for line in header]
-                    Q_filt.insert(0, 'Frame#', frames_col)
-                    Q_filt.insert(1, 'Time', time_col)
-                    # Q_filt = Q_filt.fillna(' ')
-                    Q_filt.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+                write_trc(file_path_out, Q_filt, frames_col, time_col, header)
                 if make_c3d:
                     convert_to_c3d(file_path_out)
 

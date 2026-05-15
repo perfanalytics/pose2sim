@@ -23,11 +23,7 @@ It offers tools for:
 It has been tested on Windows, Linux and MacOS, and works for any Python version >= 3.9
 
 Installation:
-# Open Anaconda prompt. Type:
-# - conda create -n Pose2Sim python=3.9
-# - conda activate Pose2Sim
-# - conda install -c opensim-org opensim -y
-# - pip install Pose2Sim
+pip install Pose2Sim
 
 Usage:
 # First run Pose estimation and organize your directories (see Readme.md)
@@ -122,8 +118,8 @@ def read_config_files(config):
         config_dicts = [config]
         if config_dicts[0].get('project', {}).get('project_dir') == None:
             config_dicts[0].get('project', {}).get('project_dir') == '.'
-            logging.warning('Project directory not specified in config dictionary: using current directory.')
-
+            logging.warning('Project directory not specified in config dictionary: using current directory.' \
+            'Set it to a custom directory with config_dict = {"project": {"project_dir": "<Custom_directory>"}}.')
             # raise ValueError('Please specify the project directory in config_dict:\n \
             #                  config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
     else:

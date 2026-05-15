@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools-scm"] # PEP 508 specs
+requires = ["setuptools>=45", "setuptools-scm"] # PEP 508 specs
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -13,7 +13,7 @@ maintainers = [
 ]
 description = "Markerless kinematics with any cameras — From 2D Pose estimation to 3D OpenSim motion"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 keywords = ["markerless", "kinematics", "OpenPose", "OpenSim", "3D human pose", "biomechanics", "mocap", "blender", "motion capture"]
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
@@ -33,31 +33,28 @@ classifiers = [
 ]
 urls = {Homepage = "https://github.com/perfanalytics/pose2sim", "Bug Tracker" = "https://github.com/perfanalytics/pose2sim/issues"}
 dependencies = [
+    "opensim", 
     "toml",
-    "numpy<2.0; python_version<'3.12'",
-    "numpy>=2.0,<2.3; python_version>='3.12'",
     "lxml",
-    "matplotlib",
     "mpl_interactions",
-    "PySide6",
+    "PySide6-essentials",
     "tqdm",
     "anytree",
-    "pandas>=1.5",
+    "pandas>=1.5", # pulls in numpy and matplotlib
     "scipy",
     "statsmodels",
     "filterpy",
     "ipython",
     "c3d",
-    "rtmlib",
+    "rtmlib", # pulls in onnxruntime and opencv-python
     "openvino",
-    "onnxruntime",
-    "opencv-python != 4.11.*",  # avoid 4.11 due to displaymatrix ignored (rotation metadata)
-    # "deep-sort-realtime",     # likely not required anymore
     "customtkinter",
-    "requests"
 ]
 
-[tool.setuptools_scm]
+[project.optional-dependencies]
+gui = ["PySide6"] # install with pip install -e .[gui] or pip install pose2sim[gui]
+
+[tool.setuptools_scm] # automatically generate version from git tags
 
 [tool.setuptools]
 packages = {find = {}}
@@ -84,7 +81,7 @@ MMPose_to_OpenPose = "Pose2Sim.Utilities.MMPose_to_OpenPose:main"
 reproj_from_trc_calib = "Pose2Sim.Utilities.reproj_from_trc_calib:main"
 trc_combine = "Pose2Sim.Utilities.trc_combine:main"
 trc_desample = "Pose2Sim.Utilities.trc_desample:main"
-trc_filter = "Pose2Sim.Utilities.trc_filter:main"
+trc_mot_filter = "Pose2Sim.Utilities.trc_mot_filter:main"
 trc_from_easymocap = "Pose2Sim.Utilities.trc_from_easymocap:main"
 trc_from_mot_osim = "Pose2Sim.Utilities.trc_from_mot_osim:main"
 trc_gaitevents = "Pose2Sim.Utilities.trc_gaitevents:main"

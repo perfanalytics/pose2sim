@@ -74,22 +74,6 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def count_persons_in_json(file_path):
-    '''
-    Count the number of persons in a json file.
-
-    INPUT:
-    - file_path: path to the json file
-
-    OUTPUT:
-    - int: number of persons in the json file
-    '''
-
-    with open(file_path, 'r') as file:
-        data = json.load(file)
-        return len(data.get('people', []))
-    
-
 def indices_of_first_last_non_nan_chunks(series, min_chunk_size=10, chunk_choice_method='largest', trim_output_chunk=True):
     '''
     Find indices of the chunks of at least min_chunk_size consecutive non-NaN values.
@@ -272,7 +256,7 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     # if batch
     session_dir = os.path.realpath(os.path.join(project_dir, '..'))
     # if single trial
-    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else os.getcwd()
+    session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else project_dir if 'Config.toml' in os.listdir(project_dir) else os.getcwd()
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
     calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
     calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
@@ -603,7 +587,7 @@ def triangulation_from_best_cameras(config_dict, coords_2D_kpt, coords_2D_kpt_sw
     return Q, error_min, nb_cams_excluded, id_excluded_cams
 
 
-def extract_files_frame_f(json_tracked_files_f, keypoints_ids, nb_persons_to_detect):
+def extract_files_frame_f(json_tracked_files_f, keypoints_ids, nb_persons_to_detect=None):
     '''
     Extract data from json files for frame f, 
     in the order of the body model hierarchy.
@@ -619,6 +603,18 @@ def extract_files_frame_f(json_tracked_files_f, keypoints_ids, nb_persons_to_det
 
     n_cams = len(json_tracked_files_f)
     
+    # Read all json files for frame f
+    all_json_data = []
+    for cam_nb in range(n_cams):
+        try:
+            with open(json_tracked_files_f[cam_nb], 'r') as json_f:
+                all_json_data.append(json.load(json_f))
+        except:
+            all_json_data.append(None)
+    
+    if nb_persons_to_detect is None or nb_persons_to_detect == 0:
+        nb_persons_to_detect = max(len(js.get('people', [])) if js else 0 for js in all_json_data)
+
     x_files = [[] for n in range(nb_persons_to_detect)]
     y_files = [[] for n in range(nb_persons_to_detect)]
     likelihood_files = [[] for n in range(nb_persons_to_detect)]
@@ -626,17 +622,16 @@ def extract_files_frame_f(json_tracked_files_f, keypoints_ids, nb_persons_to_det
         for cam_nb in range(n_cams):
             x_files_cam, y_files_cam, likelihood_files_cam = [], [], []
             try:
-                with open(json_tracked_files_f[cam_nb], 'r') as json_f:
-                    js = json.load(json_f)
-                    for keypoint_id in keypoints_ids:
-                        try:
-                            x_files_cam.append( js['people'][n]['pose_keypoints_2d'][keypoint_id*3] )
-                            y_files_cam.append( js['people'][n]['pose_keypoints_2d'][keypoint_id*3+1] )
-                            likelihood_files_cam.append( js['people'][n]['pose_keypoints_2d'][keypoint_id*3+2] )
-                        except:
-                            x_files_cam.append( np.nan )
-                            y_files_cam.append( np.nan )
-                            likelihood_files_cam.append( np.nan )
+                js = all_json_data[cam_nb]
+                for keypoint_id in keypoints_ids:
+                    try:
+                        x_files_cam.append(js['people'][n]['pose_keypoints_2d'][keypoint_id*3])
+                        y_files_cam.append(js['people'][n]['pose_keypoints_2d'][keypoint_id*3+1])
+                        likelihood_files_cam.append(js['people'][n]['pose_keypoints_2d'][keypoint_id*3+2])
+                    except:
+                        x_files_cam.append(np.nan)
+                        y_files_cam.append(np.nan)
+                        likelihood_files_cam.append(np.nan)
             except:
                 x_files_cam = [np.nan] * len(keypoints_ids)
                 y_files_cam = [np.nan] * len(keypoints_ids)
@@ -644,12 +639,8 @@ def extract_files_frame_f(json_tracked_files_f, keypoints_ids, nb_persons_to_det
             x_files[n].append(x_files_cam)
             y_files[n].append(y_files_cam)
             likelihood_files[n].append(likelihood_files_cam)
-        
-    x_files = np.array(x_files)
-    y_files = np.array(y_files)
-    likelihood_files = np.array(likelihood_files)
 
-    return x_files, y_files, likelihood_files
+    return np.array(x_files), np.array(y_files), np.array(likelihood_files)
 
 
 def triangulate_all(config_dict):
@@ -686,6 +677,7 @@ def triangulate_all(config_dict):
     interpolation_kind = config_dict.get('triangulation', {}).get('interpolation', 'linear')
     interp_gap_smaller_than = config_dict.get('triangulation', {}).get('interp_if_gap_smaller_than', 20)
     max_distance_m = config_dict.get('triangulation', {}).get('max_distance_m', 1.0)
+    max_unseen_frames = config_dict.get('triangulation', {}).get('max_unseen_frames', 100)
     remove_incomplete_frames = config_dict.get('triangulation', {}).get('remove_incomplete_frames', False)
     sections_to_keep = config_dict.get('triangulation', {}).get('sections_to_keep', 'all')
     min_chunk_size = config_dict.get('triangulation', {}).get('min_chunk_size', 10)
@@ -714,6 +706,7 @@ def triangulate_all(config_dict):
     # Retrieve keypoints from model
     try: # from skeletons.py
         if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'LOWER_BODY': pose_model = 'HALPE_26_LOWER'
         elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
         elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
         elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
@@ -779,12 +772,8 @@ def triangulate_all(config_dict):
         raise Exception(f'Error: The number of cameras is not consistent: Found {len(P)} cameras in the calibration file, and {n_cams} cameras based on the number of pose folders.')
     
     # Triangulation
-    if multi_person:
-        logging.info('Counting the number of persons... This can take a while if you use numerous cameras or recorded for a long time.')
-        nb_persons_to_detect = max(max(count_persons_in_json(os.path.join(pose_dir, json_dirs_names[c], json_fname)) for json_fname in json_files_names[c]) for c in range(n_cams))
-        logging.info(f'{nb_persons_to_detect} person(s) detected. Triangulating now...')
-    else:
-        nb_persons_to_detect = 1
+    logging.info(f'Triangulating in {"multi-person" if multi_person else "single-person"} mode.')
+    nb_persons_to_detect = 0 if multi_person else 1
 
     Q = [[[np.nan]*3]*keypoints_nb for n in range(nb_persons_to_detect)]
     Q_old = [[[np.nan]*3]*keypoints_nb for n in range(nb_persons_to_detect)]
@@ -794,6 +783,7 @@ def triangulate_all(config_dict):
     Q_tot, error_tot, nb_cams_excluded_tot, cam_excluded_count, id_excluded_cams_tot = [], [], [], [], []
     interp_frames, non_interp_frames, f_range_trimmed = [], [], []
     trc_paths, c3d_paths = [], []
+    frames_since_last_seen = None
     for f in tqdm(range(*f_range)):
         # print(f'\nFrame {f}:')        
         # Get x,y,likelihood values from files
@@ -801,7 +791,13 @@ def triangulate_all(config_dict):
         json_files_names_f = [j for j_list in json_files_names_f for j in (j_list or ['none'])]
         json_files_f = [os.path.join(pose_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
 
-        x_files, y_files, likelihood_files = extract_files_frame_f(json_files_f, keypoints_ids, nb_persons_to_detect)
+        x_files, y_files, likelihood_files = extract_files_frame_f(json_files_f, keypoints_ids, nb_persons_to_detect=nb_persons_to_detect)
+        if multi_person:
+            nb_persons_in_frame = len(x_files)
+            if nb_persons_in_frame > nb_persons_to_detect:
+                for n in range(nb_persons_in_frame - nb_persons_to_detect):
+                    Q_old = np.concatenate([Q_old, [[[np.nan]*3]*keypoints_nb]], axis=0) if len(Q_old) > 0 else np.array([[[np.nan]*3]*keypoints_nb])
+                nb_persons_to_detect = nb_persons_in_frame
         # [[[list of coordinates] * n_cams ] * nb_persons_to_detect]
         # vs. [[list of coordinates] * n_cams ] 
         
@@ -821,9 +817,24 @@ def triangulate_all(config_dict):
                 y_files[n][likelihood_files[n] < likelihood_threshold] = np.nan
                 likelihood_files[n][likelihood_files[n] < likelihood_threshold] = np.nan
         
+        # Harmonize shapes of Q and Q_old
+        Q, Q_old = np.array(Q), np.array(Q_old)
+        if Q.ndim < 3:
+            Q = Q.reshape(0, keypoints_nb, 3) if Q.size == 0 else Q
+        if Q_old.ndim < 3:
+            Q_old = Q_old.reshape(0, keypoints_nb, 3) if Q_old.size == 0 else Q_old
+        if len(Q) > len(Q_old):
+            padding = np.full((len(Q) - len(Q_old), keypoints_nb, 3), np.nan)
+            Q_old = np.concatenate([Q_old, padding], axis=0)
+        elif len(Q_old) > len(Q):
+            padding = np.full((len(Q_old) - len(Q), keypoints_nb, 3), np.nan)
+            Q = np.concatenate([Q, padding], axis=0)
+
         # Q_old = Q except when it has nan, otherwise it takes the Q_old value
-        nan_mask = np.isnan(Q)
-        Q_old = np.where(nan_mask, Q_old, Q)
+        if Q.size > 0:
+            nan_mask = np.isnan(Q)
+            Q_old = np.where(nan_mask, Q_old, Q)
+
         Q = [[] for n in range(nb_persons_to_detect)]
         error = [[] for n in range(nb_persons_to_detect)]
         nb_cams_excluded = [[] for n in range(nb_persons_to_detect)]
@@ -848,9 +859,14 @@ def triangulate_all(config_dict):
         if multi_person:
             # reID persons across frames by checking the distance from one frame to another
             # print('Q before ordering ', np.array(Q)[:,:2])
-            if f !=0:
+            if f != f_range[0]:
                 Q = np.array(Q)
-                Q_old, Q, sorted_ids = sort_people_sports2d(Q_old, np.array(Q), max_dist=max_distance_m)
+                Q_old, Q, sorted_ids, frames_since_last_seen = sort_people_sports2d(Q_old, np.array(Q), max_dist=max_distance_m,
+                    max_unseen_frames=max_unseen_frames, frames_since_last_seen=frames_since_last_seen)
+                
+                # Update nb_persons_to_detect if new persons were added
+                if len(Q) > nb_persons_to_detect:
+                    nb_persons_to_detect = len(Q)
                 
                 error_sorted, nb_cams_excluded_sorted, id_excluded_cams_sorted = [], [], []
                 for n in range(nb_persons_to_detect):

@@ -45,7 +45,7 @@ import json
 import re
 from lxml import etree
 import warnings
-import tkinter as tk
+import customtkinter as ctk
 from tkinter import messagebox
 import matplotlib.pyplot as plt
 from mpl_interactions import zoom_factory, panhandler
@@ -747,7 +747,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
                         objp = np.array(objp).reshape(-1, 3)
                         saved_img_path = create_image_labels(img_path, imgp, calib_dir, 'int', reprojected_points=None, show=True, save=save_debug_images)
                         # Are you satisfied? If so, add to imgpoints and continue; else, redo detection
-                        root = tk.Tk()
+                        root = ctk.CTk()
                         root.withdraw()
                         satisfied = messagebox.askyesno("Loaded previous labels", f"Are you satisfied with the previous labels for {cam_name}?")
                         root.destroy()
@@ -906,7 +906,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
                     saved_img_path = create_image_labels(img_vid_file, imgp, calib_dir, 'ext', reprojected_points=proj_obj_all, show=show_reprojection_error, save=save_debug_images)
 
                     # Are you satisfied? If so, add to imgpoints and continue; else, redo detection
-                    root = tk.Tk()
+                    root = ctk.CTk()
                     root.withdraw()
                     satisfied = messagebox.askyesno("Loaded previous labels", f"Are you satisfied with the previous labels for {cam_name}?")
                     root.destroy()
@@ -1171,7 +1171,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     fig_3d.canvas.draw()
 
                     # Ask for confirmation
-                    root = tk.Tk()
+                    root = ctk.CTk()
                     root.withdraw()
                     response = messagebox.askyesno("Confirm labeling", f"Are you satisfied with your labeling for {os.path.basename(img_path)}?")
 
@@ -1242,7 +1242,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     ax_3d.scatter(*objp[count], marker='o', color='g')
                     fig_3d.canvas.draw()
                     # Ask for confirmation
-                    root = tk.Tk()
+                    root = ctk.CTk()
                     root.withdraw()
                     response = messagebox.askyesno("Confirm labeling", f"Are you satisfied with your labeling for {os.path.basename(img_path)}?")
                     # Disable event picking

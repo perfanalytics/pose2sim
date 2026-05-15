@@ -191,6 +191,7 @@ def best_persons_and_cameras_combination(config_dict, json_files_framef, persons
     best_comb = None
     best_Q = None
 
+    all_json_data = [read_json(json_files_framef[c]) for c in range(n_cams)]
     while error_min > error_threshold_tracking and n_cams - (nb_cams_missing + nb_cams_off_extra) >= min_cameras_for_triangulation:
         # Try all persons combinations
         for combination in personsIDs_combinations:
@@ -198,8 +199,8 @@ def best_persons_and_cameras_combination(config_dict, json_files_framef, persons
             coords = []
             for index_cam, person_nb in enumerate(combination):
                 try:
-                    js = read_json(json_files_framef[index_cam])
-                    coords.append(js[int(person_nb)][tracked_keypoint_id*3:tracked_keypoint_id*3+3])
+                    coords.append(all_json_data[index_cam][int(person_nb)]
+                                  [tracked_keypoint_id*3:tracked_keypoint_id*3+3])
                 except:
                     coords.append([np.nan, np.nan, np.nan])
             coords = np.array(coords)
@@ -694,6 +695,7 @@ def associate_all(config_dict):
     # selection of tracked keypoint id
     try: # from skeletons.py
         if pose_model.upper() == 'BODY_WITH_FEET': pose_model = 'HALPE_26'
+        elif pose_model.upper() == 'LOWER_BODY': pose_model = 'HALPE_26_LOWER'
         elif pose_model.upper() == 'WHOLE_BODY_WRIST': pose_model = 'COCO_133_WRIST'
         elif pose_model.upper() == 'WHOLE_BODY': pose_model = 'COCO_133'
         elif pose_model.upper() == 'BODY': pose_model = 'COCO_17'
@@ -748,9 +750,13 @@ def associate_all(config_dict):
             tracked_keypoint_id = [node.id for _, _, node in RenderTree(model) if node.name==tracked_keypoint][0]
             assert tracked_keypoint_id # Fails if tracked_keypoint_id is None
         except:
-            tracked_keypoint_id = 0
-            tracked_keypoint_name = next((node for node in PreOrderIter(model) if getattr(node, 'id', None) == 0), None).name
-            logging.warning(f'{tracked_keypoint} not found in {pose_model}, consider editing tracked_keypoint in Config.toml. Tracking {tracked_keypoint_name} instead.')
+            try:
+                tracked_keypoint_id = 0
+                tracked_keypoint_name = next((node for node in PreOrderIter(model) if getattr(node, 'id', None) == 0), None).name
+                logging.warning(f'{tracked_keypoint} not found in {pose_model}, consider editing tracked_keypoint in Config.toml. Tracking {tracked_keypoint_name} instead.')
+            except:
+                tracked_keypoint_id = [node.id for _, _, node in RenderTree(model) if node.name=='Hip'][0]
+                logging.warning(f'{tracked_keypoint} and id 0 not found in {pose_model}, using "Hip" instead.')
     else:
         logging.info('\nMulti-person analysis selected.')
 

@@ -86,6 +86,33 @@ HALPE_26 = Node("Hip", id=19, children=[
 ])
 
 
+'''HALPE_26_LOWER (full-body without hands, from AlphaPose, MMPose, etc.)
+https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md
+https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose'''
+HALPE_26_LOWER = Node("Hip", id=19, children=[
+    Node("RHip", id=12, children=[
+        Node("RKnee", id=14, children=[
+            Node("RAnkle", id=16, children=[
+                Node("RBigToe", id=21, children=[
+                    Node("RSmallToe", id=23),
+                ]),
+                Node("RHeel", id=25),
+            ]),
+        ]),
+    ]),
+    Node("LHip", id=11, children=[
+        Node("LKnee", id=13, children=[
+            Node("LAnkle", id=15, children=[
+                Node("LBigToe", id=20, children=[
+                    Node("LSmallToe", id=22),
+                ]),
+                Node("LHeel", id=24),
+            ]),
+        ]),
+    ])
+])
+
+
 '''COCO_133_WRIST (full-body with hands and face, from AlphaPose, MMPose, etc.)
 https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md
 https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose'''
