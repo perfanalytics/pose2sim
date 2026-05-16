@@ -41,10 +41,10 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: |
+        run: |  # uv pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
           uv venv
           uv pip install flake8 pytest
-          uv pip install git+https://github.com/${{ github.repository }}.git@${{ github.sha }}
+          uv pip install . 
 
       - name: Lint with flake8
         run: |
