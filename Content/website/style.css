@@ -675,6 +675,11 @@ a:hover {
     border-color: var(--secondary-color);
 }
 
+#nextBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* Footer */
 .footer {
     margin-top: 60px;

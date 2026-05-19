@@ -21,14 +21,14 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 
 **Pose2Sim** is free and open-source, requiring low-cost hardware but with research-grade accuracy and production-grade robustness. It gives maximum control over clearly explained parameters. Any combination of phones, webcams, or GoPros can be used with fully clothed subjects, so it is particularly adapted to the sports field, the doctor's office, or for outdoor 3D animation capture.
 
-> [!TIP]
-> For real-time analysis with a single camera, please consider **[Sports2D](https://github.com/davidpagnon/Sports2D)** (note that the motion must lie in the sagittal or frontal plane). 
-
 <br>
 
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
 
 <br>
+
+> [!TIP]
+> For real-time analysis with a single camera, please consider **[Sports2D](https://github.com/davidpagnon/Sports2D)** (note that the motion must lie in the sagittal or frontal plane). 
 
 > [!NOTE]
 > **Features:**
@@ -296,12 +296,12 @@ Similarly to [Part-1](#demonstration-part-1-end-to-end-video-to-3d-joint-angle-c
 
 Find the Batch Demo folder under `<pose2sim_path>\Pose2Sim\Demo_Batch`, and move it and rename it if you like. Go to the <Demo_Batch> folder and start python:
 
-  ``` python
-  cd <Demo_Batch_path>
-  ipython
-  from Pose2Sim import Pose2Sim
-  Pose2Sim.runAll()
-  ```
+``` python
+cd <Demo_Batch_path>
+ipython
+from Pose2Sim import Pose2Sim
+Pose2Sim.runAll()
+```
 
 > [!NOTE]
 > This lets you run entire sessions with consistent calibration and global settings across trials.\
@@ -771,16 +771,17 @@ You can choose the keypoints to synchronize on, the reference person, and the ti
 
 > [!TIP]
 > Works best when:
+> 
 > - the participant does not move towards or away from the cameras
 > - they perform a clear vertical movement
 > - the capture lasts at least 5 seconds, so that there is enough data to synchronize on
 > - the capture lasts a few minutes maximum, so that cameras are less likely to [drift with time](https://github.com/mprib/caliscope/discussions/496)
 
-> [!TIP]
-> GoPro cameras can also be synchronized [with a timecode](https://community.gopro.com/s/article/HERO12-Black-Timecode-Sync?language=en_US) or [by GPS](https://gopro.github.io/labs/control/gpssync/) (outdoors).
-
 > [!NOTE]
 > Alternatively, synchronize cameras using a flashlight, a clap, or a clear visual or audio event. The speed of sound being lesser than the speed of light, visual events should be preferred.
+
+> [!TIP]
+> GoPro cameras can also be synchronized [with a timecode](https://community.gopro.com/s/article/HERO12-Black-Timecode-Sync?language=en_US) or [by GPS](https://gopro.github.io/labs/control/gpssync/) (outdoors).
 
 </br>
 
@@ -805,7 +806,7 @@ Pose2Sim.personAssociation()
 
 > [!TIP]
 > **If persons are frequently lost**, raise `reconstruction_error_threshold`, lower `min_affinity`, or lower `min_cameras_for_triangulation` ([triangulation] section) in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.\
-**If persons are wrongly associated**, change the same parameters in the opposite direction.
+> **If persons are wrongly associated**, change the same parameters in the opposite direction.
 
 > [!NOTE]
 > Pose2Sim is robust to the losses of persons in some camera views (e.g., due to occlusions or to the person entering/leaving the scene). 

@@ -133,8 +133,8 @@ function updateNavButtons() {
     }
 
     prevBtn.style.display = currentIdx === 0 ? 'none' : 'inline-flex';
-    nextBtn.querySelector('span').textContent =
-        currentIdx === sections.length - 1 ? 'Finish ✓' : 'Next →';
+    nextBtn.querySelector('span').textContent = 'Next →';
+    nextBtn.disabled = currentIdx === sections.length - 1;
 }
 
 function updateActiveNav(activeSectionId) {

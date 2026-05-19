@@ -84,6 +84,14 @@ def preprocess(text: str) -> str:
     # 0b. Backslash line-breaks (GitHub extension: \<newline>) → <br>
     text = re.sub(r'\\\n', '<br>\n', text)
 
+    # 0c. Normalize code block language tags for highlight.js
+    lang_remaps = {'cmd': 'bash', 'powershell': 'bash', 'zsh': 'bash', 'sh': 'bash', 'shell': 'bash'}
+    def remap_lang(m):
+        lang = m.group(1).strip().lower()
+        lang = lang_remaps.get(lang, lang)
+        return f'```{lang}'
+    text = re.sub(r'```(\w+)', remap_lang, text)
+    
     # 1. Fix relative image paths → raw GitHub URLs
     text = re.sub(
         r'(<img\b[^>]*\bsrc=")Content/',
