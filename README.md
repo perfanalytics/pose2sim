@@ -115,7 +115,7 @@ Open a terminal (conda, powershell, bash, or zsh).
 
 *On Windows:*
 
-``` powershell
+```powershell
   # Install uv
   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
   # Create uv environment
@@ -126,7 +126,7 @@ Open a terminal (conda, powershell, bash, or zsh).
 
 *On Linux or MacOS:*
 
-``` bash
+```bash
   # Install uv
   curl -LsSf https://astral.sh/uv/install.sh | sh
   # Create uv environment
@@ -147,7 +147,7 @@ Activate your environment (see [here](#1-set-up-a-uv-environment)).
 
 - OPTION 1: **Latest stable version:** 
 
-  ``` cmd
+  ```cmd
     uv pip install pose2sim --upgrade
   ```
 
@@ -169,20 +169,20 @@ Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environmen
 
 Then go to the [ONNXruntime requirement page](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), note the latest compatible CUDA and cuDNN requirements. Next, go to the [pyTorch website](https://pytorch.org/get-started/previous-versions/) and install the latest version that satisfies these requirements (beware that torch 2.4 ships with cuDNN 9, while torch 2.3 installs cuDNN 8). For example:
 
-``` cmd
+```cmd
   uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 ```
 
 Finally, install ONNX Runtime with GPU support:
 
-``` cmd
+```cmd
   uv pip uninstall onnxruntime
   uv pip install onnxruntime-gpu
 ```
 
 Check that everything went well within Python with these commands:
 
-``` python
+```python
   import torch; import onnxruntime as ort
   print(torch.cuda.is_available(), ort.get_available_providers())
   # Should print "True ['CUDAExecutionProvider', ...]"
@@ -203,21 +203,21 @@ Check that everything went well within Python with these commands:
 - Open a terminal (*conda, powershell, bash, or zsh*) and activate your environment (see [here](#1-set-up-a-uv-environment)).
 - Find the Demo folder under `<pose2sim_path>\Pose2Sim\Demo_SinglePerson`:
 
-  ``` powershell
+  ```powershell
   uv pip show pose2sim # to find <pose2sim_path>
   ``` 
 
 - Copy-paste the Demo folder wherever you like, and rename it as you wish (manually or using the `cp` command).\
   Go to the Demo_SinglePerson folder and start python:
 
-  ``` powershell
+  ```powershell
   cd <Demo_SinglePerson_path>
   ipython
   ```
 
 - Try the following code:
 
-  ``` python
+  ```python
     from Pose2Sim import Pose2Sim
     Pose2Sim.calibration()
     Pose2Sim.poseEstimation()
@@ -277,7 +277,7 @@ Open a terminal (*conda, powershell, bash, or zsh*) and activate your environmen
 
 Similarly to [Part-1](#demonstration-part-1-end-to-end-video-to-3d-joint-angle-computation), find the Multi-Person Demo folder under `<pose2sim_path>\Pose2Sim\Demo_MultiPerson`, and move it and rename it if you like. Make sure you set `multi_person = true` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_MultiPerson/Config.toml) file. Go to the <Demo_MultiPerson> folder and start python:
 
-``` python
+```python
   cd <Demo_MultiPerson_path>
   ipython
   from Pose2Sim import Pose2Sim
@@ -300,7 +300,7 @@ Similarly to [Part-1](#demonstration-part-1-end-to-end-video-to-3d-joint-angle-c
 
 Find the Batch Demo folder under `<pose2sim_path>\Pose2Sim\Demo_Batch`, and move it and rename it if you like. Go to the <Demo_Batch> folder and start python:
 
-``` python
+```python
 cd <Demo_Batch_path>
 ipython
 from Pose2Sim import Pose2Sim
@@ -334,7 +334,7 @@ All of them are clearly documented: feel free to play with them!
 - **Try the calibration tool:**\
  Set `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
 
-  ``` python
+  ```python
   Pose2Sim.calibration()
   ```
 
@@ -342,7 +342,7 @@ All of them are clearly documented: feel free to play with them!
 
 - **Pass an updated config dictionary** instead of editing Config.toml, and test whole_body pose estimation:
 
-  ``` python
+  ```python
   import toml
   config_dict = toml.load("<Demo_SinglePerson_path>/Config.toml")
   config_dict.get("project").update({"project_dir":"<Demo_SinglePerson_path>"})
@@ -359,7 +359,7 @@ All of them are clearly documented: feel free to play with them!
 
 - **Run all stages at once:** 
 
-  ``` python
+  ```python
   from Pose2Sim import Pose2Sim
   Pose2Sim.runAll()
   # or: 
@@ -461,7 +461,7 @@ Initial project structure:
 
 Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
-``` python
+```python
 from Pose2Sim import Pose2Sim
 Pose2Sim.poseEstimation()
 ```
@@ -530,7 +530,6 @@ This will run pose estimation on your videos and save the results in the `pose` 
 
 1. Train your DeepLabCut model and run it on your images or videos (more instruction on their repository)
 2. Translate the h5 2D coordinates to json files (with `DLC_to_OpenPose.py` script, see [Utilities](#utilities)). Note that the names of your camera folders must follow the same order as in the calibration file, and end with '_json': 
-
 ``` cmd
 DLC_to_OpenPose -i input_h5_file
 ```
@@ -538,7 +537,7 @@ DLC_to_OpenPose -i input_h5_file
 3. Edit `pose.CUSTOM` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), and edit the node IDs so that they correspond to the column numbers of the 2D pose file, starting from zero. Make sure you also changed the `pose_model` and the `tracked_keypoint`.\
   You can visualize your skeleton's hierarchy by changing pose_model to CUSTOM and writing these lines: 
 
-  ``` python
+  ```python
   config_path = r'path_to_Config.toml'
   import toml, anytree
   config = toml.load(config_path)
@@ -564,7 +563,7 @@ The accuracy and robustness of Pose2Sim have been thoroughly assessed only with 
 * Open a command prompt in your **OpenPose** directory. \
   Launch OpenPose for each `videos` folder: 
 
-  ``` cmd
+  ```cmd
   bin\OpenPoseDemo.exe --model_pose BODY_25B --video <PATH_TO_TRIAL_DIR>\videos\cam01.mp4 --write_json <PATH_TO_TRIAL_DIR>\pose\pose_cam01_json
   ```
 
@@ -584,7 +583,7 @@ Make sure you modify the [Config.toml](https://github.com/perfanalytics/pose2sim
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 
 * Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
-  ``` cmd
+  ```cmd
   Blazepose_runsave -i input_file -dJs
   ```
   Type in `Blazepose_runsave -h` for explanation on parameters.
@@ -602,7 +601,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 
 * Install and run AlphaPose on your videos (more instruction on their repository)
 * Translate the AlphaPose single json file to OpenPose frame-by-frame files (with `AlphaPose_to_OpenPose.py` script, see [Utilities](#utilities)): 
-   ``` cmd
+   ```cmd
    AlphaPose_to_OpenPose -i input_alphapose_json_file
    ```
 * Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
@@ -615,7 +614,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 
 Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
-``` python
+```python
 from Pose2Sim import Pose2Sim
 Pose2Sim.calibration()
 ```
@@ -758,7 +757,7 @@ For each camera, the algorithm computes mean vertical speed for the chosen keypo
 
 Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
-``` python
+```python
 from Pose2Sim import Pose2Sim
 Pose2Sim.synchronization()
 ```
@@ -799,7 +798,7 @@ You can choose the keypoints to synchronize on, the reference person, and the ti
 
 Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
-``` python
+```python
 from Pose2Sim import Pose2Sim
 Pose2Sim.personAssociation()
 ```
@@ -828,7 +827,7 @@ Pose2Sim.personAssociation()
 
 Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
-``` python
+```python
 from Pose2Sim import Pose2Sim
 Pose2Sim.triangulation()
 ```
@@ -873,7 +872,7 @@ The logs provide detailed statistics:
 
 Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
-``` python
+```python
 from Pose2Sim import Pose2Sim
 Pose2Sim.filtering()
 ```
@@ -903,7 +902,7 @@ Output:\
 
 Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
-``` python
+```python
 from Pose2Sim import Pose2Sim
 Pose2Sim.markerAugmentation()
 ```
@@ -937,7 +936,7 @@ This can be either done fully automatically within Pose2Sim, or manually within 
 
 Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
-``` python
+```python
 from Pose2Sim import Pose2Sim
 Pose2Sim.kinematics()
 ```
@@ -1006,12 +1005,12 @@ Alternatively, you can use command-line tools:
 
 See [there](https://simtk-confluence.stanford.edu:8443/display/OpenSim/Scripting+in+Python) for installation instructions (conda install may take a while).
 Make sure to replace `py38np120` with your Python version (3.8 in this case) and with your numpy version (1.20 here).
-``` cmd
+```cmd
 conda install -c opensim-org opensim-moco=4.4=py38np120 -y
 ```
 If you run into a DLL error while importing opensim, open the file `<Pose2Sim-env>\Lib\opensim\__init__.py` and replace `conda`by `conda-meta` line 4. `<Pose2Sim-env>` location can be found with `conda env list`.\ -->
 
-``` python
+```python
 import opensim
 opensim.ScaleTool("<PATH TO YOUR SCALING OR IK SETUP FILE>.xml").run()
 opensim.InverseKinematicsTool("<PATH TO YOUR SCALING OR IK SETUP FILE>.xml").run()
@@ -1023,12 +1022,12 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 
 <!--
 - Open an Anaconda terminal in your OpenSim/bin directory, typically `C:\OpenSim <Version>\bin`.\
-  ``` cmd
+  ```cmd
   opensim-cmd run-tool <PATH TO YOUR SCALING OR IK SETUP FILE>.xml
   ```
 
 - You can also run OpenSim directly in Python:
-  ``` python
+  ```python
   import subprocess
   subprocess.call(["opensim-cmd", "run-tool", r"<PATH TO YOUR SCALING OR IK SETUP FILE>.xml"])
   ```
