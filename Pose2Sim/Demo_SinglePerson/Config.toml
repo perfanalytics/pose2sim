@@ -18,7 +18,8 @@
 
 
 [project]
-multi_person = false # true for trials with multiple participants. If false, only the person with lowest reprojection error is analyzed.
+project_dir = '.' # '.' if Config.toml is in the root of the project, path to the project root otherwise
+multi_person = false # true for trials with multiple participants. If false, only the person with lowest reprojection error is analyzed
 participant_height = 'auto' # 'auto', float (eg 1.72), or list of floats (eg [1.72, 1.40])  # meters  # Only used for marker augmentation 
 participant_mass = 70.0             # float (eg 70.0), or list of floats (eg [70.0, 63.5])  # kg      # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces
 
@@ -172,10 +173,8 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 
 
 [personAssociation]
-   likelihood_threshold_association = 0.3 # should be in single_person section
-
    [personAssociation.single_person]
-   likelihood_threshold_association = 0.3
+   likelihood_threshold_association = 0.3 
    reproj_error_threshold_association = 20 # px
    tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
                # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' or 'RShoulder')
@@ -204,7 +203,7 @@ interpolation = 'linear' # linear, slinear, quadratic, cubic, or none # 'none' i
 # cleaning up
 remove_incomplete_frames = false # true or false (lowercase) # If true, frame is kept only if all keypoints have been correctly triangulated
 sections_to_keep = 'all' # 'all', 'largest', 'first', 'last'
-                        # keep 'all' correctly triangulated sections, or the 'largest' valid section, or the 'first' one, or the 'last' one
+                         # keep 'all' correctly triangulated sections, or the 'largest' valid section, or the 'first' one, or the 'last' one
 min_chunk_size = 10 # Minimum number of consecutive valid frames to make it a section to keep
 fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
 

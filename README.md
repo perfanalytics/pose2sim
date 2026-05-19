@@ -24,45 +24,37 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 > [!TIP]
 > For real-time analysis with a single camera, please consider **[Sports2D](https://github.com/davidpagnon/Sports2D)** (note that the motion must lie in the sagittal or frontal plane). 
 
-> [!NOTE]
-> *Fun fact:* Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inputs (2D keypoints coordinates) and led to an OpenSim result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose), and custom models (from [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut), for example) can also be used.
-
-
 <br>
 
 <img src="Content/Pose2Sim_workflow.jpg" width="760">
 
+<br>
 
+> [!NOTE]
+> - **Features:**
+>   - 📹 Any Cameras (phones, webcams, GoPros...)
+>   - 🎯 Research-Grade Accuracy (validated by peer-reviewed studies)
+>   - 👥 Multi-Person Support  (track multiple people simultaneously)
+>   - 🤸 Full 3D kinematics (complete OpenSim skeletal analysis with joint angles)
+> - **Use cases:**
+>   - 🏀 Sports Analysis (field-based 3D motion capture)
+>   - 🏥 Clinical Assessment (gait analysis in doctor's office)
+>   - 🎭 Animation (outdoor 3D capture with fully clothed subjects)
+>   - 🔬 Research (biomechanics studies with multiple participants)
+
+> [!NOTE]
+> *Fun fact:* Pose2Sim stands for "OpenPose to OpenSim", as it originally used *OpenPose* inputs (2D keypoints coordinates) and led to an OpenSim result (full-body 3D joint angles). Pose estimation is now performed with more recent models from [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose), and custom models (from [DeepLabCut](https://www.mackenziemathislab.org/deeplabcut), for example) can also be used.
+
+<br>
+
+> [!IMPORTANT]
+> If you want to contribute to Sports2D or Pose2Sim, please see [How to contribute](#how-to-contribute-and-to-do-list) or join the Discord community! [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
 
 <!-- GitHub Star Button -->
 <!-- 
 <a class="github-button" href="https://github.com/perfanalytics/pose2sim" data-color-scheme="no-preference: light; light: light; dark: dark;" data-icon="octicon-star" data-show-count="true" aria-label="Star perfanalytics/pose2sim on GitHub">Star</a>
 <script async defer src="https://buttons.github.io/buttons.js"></script>
 -->
-
-
-
-</br>
-
-**Pose2Sim releases (details [here](https://github.com/perfanalytics/pose2sim/releases))**:
-- [x] **v0.1** *(08/2021)*: Published paper
-- [x] **v0.2** *(01/2022)*: Published code
-- [x] **v0.3** *(01/2023)*: Supported other pose estimation algorithms
-- [x] **v0.4** *(07/2023)*: New calibration tool based on scene measurements
-- [x] **v0.5** *(12/2023)*: Automatic batch processing
-- [x] **v0.6** *(02/2024)*: Marker augmentation, Blender visualizer
-- [x] **v0.7** *(03/2024)*: Multi-person analysis
-- [x] **v0.8** *(04/2024)*: New synchronization tool
-- [x] **v0.9** *(07/2024)*: Integration of pose estimation in the pipeline
-- [x] **v0.10 *(09/2024)*: Integration of OpenSim in the pipeline**
-- [ ] v0.11: Graphical User Interface, Integration of Sports2D, Website with documentation
-- [ ] v0.12: Monocular 3D pose estimation
-- [ ] v0.13: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions, smarter single-person mode
-- [ ] v1.0: First full release with , code refactoring for performance and clarity
-
-> [!TIP]
-> If you want to contribute to Sports2D or Pose2Sim, please see [How to contribute](#how-to-contribute-and-to-do-list) or join the Discord community! [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
-
 
 </br>
 
@@ -73,7 +65,7 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
    3. [Demonstration Part-2: Visualize your results with OpenSim or Blender](#demonstration-part-2-visualize-your-results-with-opensim-or-blender)
   4. [Demonstration Part-3: Try multi-person and batch analyses](#demonstration-part-3-try-multi-person-and-batch-analyses)
   5. [Demonstration Part-4: Go further](#demonstration-part-4-go-further)
-   6. [Too slow for you?](#too-slow-for-you)
+  6. [Too slow for you?](#too-slow-for-you)
 2. [Use on your own data](#use-on-your-own-data)
    1. [Setting up your project](#setting-up-your-project)
    2. [2D pose estimation](#2d-pose-estimation)
@@ -216,8 +208,10 @@ Pose2Sim.markerAugmentation()
 Pose2Sim.kinematics()
 ```
 
-**3D marker locations** are stored as .trc files in each trial folder in the `pose-3d` directory.\
-**3D joint angles** are stored as .mot files in the `kinematics` directory. Scaled models are also stored in the same directory.
+> [!NOTE]
+> **3D marker trajectories** are stored as .trc files in each trial folder in the `pose-3d` directory.\
+> **3D joint angles** are stored as .mot files in the `kinematics` directory. Scaled models are also stored in the same directory.\
+> **Processing details and statistics** are stored in `logs.txt`.
 
 </br>
 
@@ -248,13 +242,18 @@ Pose2Sim.kinematics()
   Just play with the buttons!\
   Visualize camera positions, videos, triangulated keypoints, OpenSim skeleton, video overlay your results on videos, ... or let your creativity flow and create your own animations!
 
-  https://github.com/davidpagnon/Pose2Sim_Blender/assets/54667644/a2cfb75d-a2d4-471a-b6f8-8f1ee999a619
+  https://github.com/user-attachments/assets/2d1875b4-abe6-452a-b21a-e1ca5a2d1e55
   
 <br/>
 
+
 ## Demonstration Part-3: Try multi-person and batch analyses
-- Open a terminal (*conda, powershell, bash, or zsh*) and activate your environment (see [here](#1-set-up-a-uv-environment)).
-- **Multi person analysis:** *Discover another person, hidden all along!*\
+Open a terminal (*conda, powershell, bash, or zsh*) and activate your environment (see [here](#1-set-up-a-uv-environment)).
+
+### Multi person analysis
+
+> Discover another person, hidden all along!
+
 Similarly to [Part-1](#demonstration-part-1-end-to-end-video-to-3d-joint-angle-computation), find the Multi-Person Demo folder under `<pose2sim_path>\Pose2Sim\Demo_MultiPerson`, and move it and rename it if you like. Make sure you set `multi_person = true` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_MultiPerson/Config.toml) file. Go to the <Demo_MultiPerson> folder and start python:
   ``` python
   cd <Demo_MultiPerson_path>
@@ -264,8 +263,16 @@ Similarly to [Part-1](#demonstration-part-1-end-to-end-video-to-3d-joint-angle-c
   ```
   <img src="Content/Demo_multi.png" width="380">
 
+> [!NOTE]
+> Pose2Sim uses sophisticated algorithms to Match people across views, Track IDs over time, Handle occlusions.
 
-- **Batch processing**: *Run numerous analyses with different parameters and minimal friction!*\
+<br>
+
+### Batch processing
+
+> Scale from research studies to production pipelines!\
+> Run numerous analyses with different parameters and minimal friction.
+
 Find the Batch Demo folder under `<pose2sim_path>\Pose2Sim\Demo_Batch`, and move it and rename it if you like. Go to the <Demo_Batch> folder and start python:
   ``` python
   cd <Demo_Batch_path>
@@ -274,15 +281,20 @@ Find the Batch Demo folder under `<pose2sim_path>\Pose2Sim\Demo_Batch`, and move
   Pose2Sim.runAll()
   ```
 
+> [!NOTE]
+> This lets you run entire sessions with consistent calibration and global settings across trials.\
+> Trial-specific customization is possible when needed
+
 > [!TIP]
-> The batch processing structure requires a root `Config.toml` file, as well as one in each of the trial directories. Global parameters are given in the root one. They can be altered for each individual trial by uncommenting keys and their values in the trial-specific `Config.toml` files.\
+> The batch processing structure requires a root `Config.toml` file, as well as one in each of the trial directories. Global parameters are given in the root one. Any trial can override specific parameters by uncommenting keys and their values in the trial-specific `Config.toml` files.
+> 
 > For example, try uncommenting `[project]` and set `frame_range = [10,99]` in the root `Config.toml`, and uncomment `[pose]` and set `mode = 'lightweight'` in the `Trial_2` one.
 > 
 > Run Pose2Sim from the <Demo_Batch_path> folder if you want to batch process the whole session, or from a subfolder if you only want to process a specific trial. 
 > 
 > | SingleTrial     | BatchSession       |
 > |-----------------|--------------------|
-> | <pre><b>SingleTrial</b>                    <br>├── <b>calibration</b><br>├── <b>videos</b><br>└── <i><b>Config.toml</i></b></pre> |  <pre><b>BatchSession</b>                     <br>├── <b>calibration</b> <br>├── Trial_1   <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b><br>├── Trial_2 <br>│   ├── <b>videos</b> <br>│     └── <i><b>Config.toml</i></b><br>└── <i><b>Config.toml</i></b></pre>  | 
+> | <pre><b>SingleTrial</b>                    <br>├── <b>calibration</b><br>├── <b>videos</b><br>└── <i><b>Config.toml</i></b></pre> |  <pre><b>BatchSession</b>                     <br>├── <b>calibration</b> <br>├── Trial_1   <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b> # Trial specific parameters<br>├── Trial_2 <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b> # Different trial parameters<br>└── <i><b>Config.toml</i></b> # Global parameters</pre>  | 
 
 <br/>
 
@@ -324,6 +336,7 @@ All of them are clearly documented: feel free to play with them!
 ## Too slow for you?
 
 - Set `multi_person = True` in your `Config.toml` file, and remove all the detections other than the ones of interest. It works as well as the single person mode, and is much faster. In the future, I plan to add a person selection feature (like on Sports2D) and to remove the old single person mode.
+- Limit `frame_range` in `Config.toml` file, and only process a subset of frames.
 - `Pose2Sim.calibration()`:\
   Run it only when your cameras are moved or changed. If they are not, just copy a previous calibration.toml file into your new calibration folder.
 - `Pose2Sim.poseEstimation()`:
@@ -364,12 +377,28 @@ All of them are clearly documented: feel free to play with them!
 > If any of the following steps is not relevant for your use case (synchronization, person association, marker augmentation...), you can just skip it.
 
 ## Setting up your project
-  > _**Get yourself comfy!**_
-  
-  1. Open a terminal, enter `uv pip show pose2sim`, report package location. \
-     Copy this path and do `cd <path>\pose2sim`.
-  2. Copy-paste the *Demo_SinglePerson*, *Demo_MultiPerson*, or *Demo_Batch* folder wherever you like, and rename it as you wish. 
-  3. The rest of the tutorial will explain to you how to populate the `Calibration` and `videos` folders, edit the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) files, and run each Pose2Sim step.
+> _**Get yourself comfy!**_
+
+1. Open a terminal, enter `uv pip show pose2sim`, report package location. \
+    Copy this path and do `cd <path>\pose2sim`.
+2. Copy the appropriate Demo folder as your project template (*Demo_SinglePerson*, *Demo_MultiPerson*, or *Demo_Batch*). \
+Paste it to your preferred location and rename as desired. 
+3. Edit the parameters in the `[project]` section of [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), e.g. `project_dir`, `participant_height`, `participant_mass`, etc.
+4. Add your videos to the `videos` folder. We recommend renaming them for clarity.
+4. The rest of the tutorial will explain to you how to populate the `Calibration` and `videos` folders, run each Pose2Sim step, and edit the `Config.toml` file.
+
+Initial project structure:
+
+> | SingleTrial     | BatchSession       |
+> |-----------------|--------------------|
+> | <pre><b>SingleTrial</b>                    <br>├── <b>calibration</b><br>├── <b>videos</b><br>└── <i><b>Config.toml</i></b></pre> |  <pre><b>BatchSession</b>                     <br>├── <b>calibration</b> <br>├── Trial_1   <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b> # Trial specific parameters<br>├── Trial_2 <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b> # Different trial parameters<br>└── <i><b>Config.toml</i></b> # Global parameters</pre>  | 
+
+> [!NOTE]
+> Uncluttered background and good lighting conditions will help you get better results. Note that tripods may sometimes be mistaken for people. 
+
+> [!TIP]
+> Consider using the [Lab Camera Optimizer](https://github.com/flodelaplace/lab-camera-optimizer) tool to help you position your cameras in difficult settings.
+> <img src="Content/Lab_cam_optimizer.png" width="760">
 
 </br>
 
@@ -377,25 +406,30 @@ All of them are clearly documented: feel free to play with them!
 > _**Estimate 2D pose from images with RTMPose or another pose estimation solution.**_ 
 
 ### With RTMPose *(default)*:
-> [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose) is a state-of-the-art pose estimation solution that is faster and more accurate than OpenPose. It is now included in Pose2Sim for straightforward end-to-end analysis.
+> [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose) is a state-of-the-art pose estimation solution that is accurate, fast, flexible, and natively integrated in Pose2Sim.
 
-Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
 ``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.poseEstimation()
 ```
 
+This will run pose estimation on your videos and save the results in the `pose` folder. They are provided in the OpenPose format, with one .json file per frame per camera, containing keypoint coordinates and confidence scores.
+
 <img src="Content/P2S_poseestimation.png" width="760">
 
 </br>
 
 > [!TIP]
-> **See the [Too slow for you?](#too-slow-for-you) section to make it faster** by deactivating real-time display, running parallel pose estimation, using your GPU, and using a lighter model.
+> **See the [Too slow for you?](#too-slow-for-you) section to make it faster** by deactivating real-time display, running parallel pose estimation, using your GPU, increasing the detection frequency, and using a lighter model.
 
 > [!TIP]
-> **To analyse wrist motion:**\
-Use 'Whole_body_wrist' or 'Whole_body' `pose_model` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml). Note that they are slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints. 
+> **Other available models:**\
+> - **Whole body:** Use 'Whole_body' `pose_model` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) to track 133 keypoints on the body, face, and hands. Note that it is slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints.
+> - **Wrist motion:** Use 'Whole_body_wrist' `pose_model` (effectively runs the 'whole_body' model) but ignores all face and finger keypoints, except 2 per hand.
+> - **Lower body:** Use 'Lower_body' `pose_model`. Effectively runs the 'body_with_feet' model but ignores all upper body keypoints. 
+> - **Others:** You can also use the `Hand`, `Face`, `Animal`, or any other RTMlib model (see next tip).
 
 <br>
 
@@ -513,10 +547,10 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 </br>
 
 ## Camera calibration
-> _**Calculate camera intrinsic properties and extrinsic locations and positions.\
+> _**Calculate camera intrinsic properties (lens characteristics) and extrinsic parameters (positions and orientations).\
 > Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_
 
-Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -536,8 +570,10 @@ Output file:
 ### Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
 
 If you already have a calibration file, set `calibration_type` type to `convert` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
+
 > [!NOTE]
 > If the original calibration file does not provide any residual errors, they will be logged as NaN. This is not an error and can be ignored.
+
 - **From [Caliscope](https://mprib.github.io/caliscope/)** (recommended)**, [Dynamic Extrinsic Camera Calibrator](https://github.com/flodelaplace/lab-camera-dynamic-calibrator), [AniPose](https://github.com/lambdaloop/anipose) or [FreeMocap](https://github.com/freemocap/freemocap):**  
   - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
   - Calibration can be skipped since these formats are natively supported by Pose2Sim.
@@ -572,57 +608,75 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 > _**Calculate calibration parameters with a checkerboard, with measurements on the scene, or automatically with detected keypoints.**_\
 > Take heart, it is not that complicated once you get the hang of it!
 
-  > [!TIP]
-  > Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).\
-  For the sake of practicality, there are voluntarily few board images for intrinsic calibration, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm#:~:text=Angle%20results%20were,Table%203).).
-  
-  - **Calculate intrinsic parameters with a checkerboard:**
+> [!TIP]
+> Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).\
+For the sake of practicality, there are voluntarily few board images for intrinsic calibration, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm#:~:text=Angle%20results%20were,Table%203).
 
-    > [!NOTE]
-    > _Intrinsic parameters:_ camera properties (focal length, optical center, distortion), usually need to be calculated only once in their lifetime. In theory, cameras with same model and same settings will have identical intrinsic parameters.
+<br> 
 
-    > [!TIP]
-    > If you already calculated intrinsic parameters earlier, you can skip this step by setting `overwrite_intrinsics` to false.
+#### 1. Calculate intrinsic parameters with a checkerboard
 
-    - For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
-    - Create a folder for each camera in your `Calibration\intrinsics` folder and copy your images or videos in them.
-    - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
-    - Make sure that the board:
-      - is filmed from different angles, covers a large part of the video frame, and is in focus.
-      - is flat, without reflections, surrounded by a wide white border, and is not rotationally invariant (Nrows ≠ Ncols, and Nrows odd if Ncols even). Go to [calib.io](https://calib.io/pages/camera-calibration-pattern-generator) to generate a suitable checkerboard.
-    - A common error is to specify the external, instead of the internal number of corners (one less than the count from calib.io). This may be one less than you would intuitively think. 
-    - Another common error is to take photos from the scene instead of extracting frames from a video. The photo image format is often different from the video one, which skew intrinsic calibration.
-    
-    <img src="Content/Calib_int.png" width="600">
+> [!NOTE]
+> _Intrinsic parameters:_ camera properties (focal length, optical center, distortion).\
+> They are stored in a Calib.toml file: focal length in matrix[0,0] and matrix[1,1], optical center in matrix[0,2] and matrix[1,2], distortion in the distortions array. 
+
+- For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
+- Create a folder for each camera in your `Calibration\intrinsics` folder and copy your images or videos in them.
+- Adjust `intrinsics_corners_nb` and `intrinsic_square_size` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+
+<img src="Content/Calib_int.png" width="600">
+
+> [!TIP]
+> - The intrinsic parameters usually need to be calculated only once in their lifetime. In theory, cameras with the same model and settings will have identical intrinsic parameters, so they can be copied from one Calib.toml file to another. In practice, small variations can occur. 
+> - If you already calculated intrinsic parameters earlier, you can skip this step by setting `overwrite_intrinsics` to false.
+
+ > [!TIP]
+ > Checkerboard requirements:
+ > - Flat: Board must be completely flat
+ > - Asymmetric: Rows ≠ Columns (or rows odd if columns even)
+ > - Border: Wide white border around pattern
+ > - Focus: Sharp, in-focus images
+ > - Coverage: Film from multiple angles covering most of frame
+ > - No glare: Avoid reflections
+> Generate checkerboard at [calib.io](https://calib.io/pages/camera-calibration-pattern-generator)
+
+> [!IMPORTANT]
+> Common errors:
+> - Specifying the external, instead of the internal number of corners (one less than the count from calib.io). This may be one less than you would intuitively think.
+> - Taking photos from the scene instead of extracting frames from a video. The photo image format is often different from the video one, which skews intrinsic calibration.
 
 > [!IMPORTANT]
 > Intrinsic calibration error should be below 0.5 px.
-        
-- **Calculate extrinsic parameters:** 
 
-  > [!NOTE]
-  > _Extrinsic parameters:_ camera placement in space (position and orientation), need to be calculated every time a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates.
+<br>
 
-  > [!TIP]
-  > If there is no measurable item in the scene, you can temporarily bring something in (a table, for example), perform calibration, and then remove it before you start capturing motion.
+#### 2.Calculate extrinsic parameters
 
-  - 3 available methods:
-    - **With a checkerboard:**\
-      Make sure that it is seen by all cameras. \
-      Can be set horizontally (default) or vertically (set `board_position = 'vertical'` in Config.toml). \
-      It should preferably be rather large, as results will not be very accurate out of the covered zone.
-    - **With scene measurements** (more flexible and potentially more accurate if points are spread out):\
-      Manually measure the 3D coordinates of 10 or more points in the scene (tiles, lines on wall, boxes, treadmill dimensions...). These points should be as spread out as possible. Replace `object_coords_3d` by these coordinates in Config.toml.\
-      Then you will click on the corresponding image points for each view.
-    - **With keypoints:**\
-      For a more automatic calibration, pose keypoints could also be used for calibration.\
-      **COMING SOON!**
-  - Once your cameras are in place, make a quicke recording of the checkerboard laid on the floor, or the raw scene (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format). \
-    You can remove the checkerboard or the calibration object for the actual capture of your participants.
-  - Copy your files in the èxtrinsics` folder.
-  - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
+> [!NOTE]
+> _Extrinsic parameters:_ camera positions and orientations in space, need to be recalculated whenever a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates.\
+> They are stored in a Calib.toml file, in the `translation` and `rotation` arrays.
 
-  <img src="Content/Calib_ext.png" width="920">
+> [!TIP]
+> If there is no measurable item in the scene, you can temporarily bring something in (a table, for example), perform calibration, and then remove it before you start capturing motion.
+
+- 3 available methods:
+  - **With a checkerboard:**\
+    Make sure that it is seen by all cameras. \
+    Can be set horizontally (default) or vertically (set `board_position = 'vertical'` in Config.toml). \
+    It should preferably be rather large, as results will not be very accurate out of the covered zone.\
+    Adjust `extrinsics_corners_nb` and `extrinsic_square_size`.
+  - **With scene measurements** (more flexible and potentially more accurate if points are spread out):\
+    Manually measure the 3D coordinates of 10 or more points in the scene (tiles, wall lines, boxes, treadmill dimensions...). These points should be as spread out as possible. Replace `object_coords_3d` by these coordinates in Config.toml.\
+    Then you will be prompted to click on the corresponding image points for each view.
+  - **With keypoints:**\
+    For a more automatic calibration, pose keypoints could also be used for calibration.\
+    **COMING SOON!**
+- Once your cameras are in place, make a quicke recording of the checkerboard laid on the floor, or the raw scene (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format). \
+  You can remove the checkerboard or the calibration object for the actual capture of your participants.
+- Copy your files in the `extrinsics` folder.
+- Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
+
+<img src="Content/Calib_ext.png" width="920">
 
 > [!IMPORTANT]
 > Extrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.
@@ -637,10 +691,10 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 > _**2D points can be triangulated only if they represent the same body position across all cameras: therefore, views need to be synchronized. This module helps you do it.**_\
 For each camera, the algorithm computes mean vertical speed for the chosen keypoints, and synchronizes by finding the time offset for which the correlation is highest.
 
-> [!NOTE]
+> [!TIP]
 > Skip this step if your cameras are natively synchronized.
 
-Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 ``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.synchronization()
@@ -650,7 +704,7 @@ Pose2Sim.synchronization()
 
 <br> 
 
-You can choose the keypoints to synchronize on, the reference person, and the time when the vertical speed is the highest. You can either tune these parameters in the GUI (set `synchronization_gui = true`) or set them in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
+You can choose the keypoints to synchronize on, the reference person, and the time window for analysis. You can either tune these parameters in the GUI (set `synchronization_gui = true`) or set them in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
 <img src="Content/synchro_multi.jpg" width="760">
 
@@ -674,12 +728,12 @@ You can choose the keypoints to synchronize on, the reference person, and the ti
 ### Associate persons across cameras
 
 > _**If `multi_person` is set to `false`, the algorithm chooses the person for whom the reprojection error is smallest.\
-  If `multi_person` is set to `true`, it associates across views the people for whom the distances between epipolar lines are the smallest. People are then associated across frames according to their displacement speed.**_ 
+  If `multi_person` is set to `true`, it associates persons across views by measuring how closely the 3D rays from cameras to keypoints intersect. In the triangulation stage, people are then associated across frames according to their displacement speed.**_ 
 
-> [!NOTE]
-> Skip this step if only one person is in the field of view.
+> [!TIP]
+> Skip this step if only one person is visible during the capture.
 
-Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 ``` python
 from Pose2Sim import Pose2Sim
 Pose2Sim.personAssociation()
@@ -689,16 +743,24 @@ Pose2Sim.personAssociation()
    
 </br>
 
-Check printed output. If results are not satisfying, try and release the constraints in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
+> [!TIP]
+> **If persons are frequently lost**, raise `reconstruction_error_threshold`, lower `min_affinity`, or lower `min_cameras_for_triangulation` ([triangulation] section) in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.\
+**If persons are wrongly associated**, change the same parameters in the opposite direction.
+
+> [!NOTE]
+> Pose2Sim is robust to the losses of persons in some camera views (e.g., due to occlusions or to the person entering/leaving the scene). 
 
 </br>
 
 ### Triangulating keypoints
-> _**Triangulate your 2D coordinates in a robust way.**_ \
-> The triangulation is weighted by the likelihood of each detected 2D keypoint, provided that they this likelihood is above a threshold.\
-  If the reprojection error is above another threshold, right and left sides are swapped; if it is still above, cameras are removed until the threshold is met. If more cameras are removed than a predefined number, triangulation is skipped for this point and this frame. In the end, missing values are interpolated.
+> _**Robustly triangulate your 2D coordinates:**_
+> - The triangulation is **weighted** by the likelihood of each detected 2D keypoint, provided that their likelihood is above `likelihood_threshold_triangulation`.
+> - If the reprojection error is above `reproj_error_threshold_triangulation`, cameras are progressively excluded until the threshold is met. If more cameras are removed than `min_cameras_for_triangulation`, triangulation is skipped for this point and this frame.
+> - A person is given a new ID if they are not seen within `max_distance_m` m of their previous position and lost for more than `max_unseen_frames` frames.
+> - In the end, gaps smaller than `interp_if_gap_smaller_than` frames are interpolated.
+> See Config.toml file for more triangulation parameters.
 
-Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -709,8 +771,16 @@ Pose2Sim.triangulation()
 
 </br>
 
-Check printed output, and visualize your trc in OpenSim: `File -> Preview experimental data`.\
-If your triangulation is not satisfying, try and release the constraints in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
+The logs provide detailed statistics:
+- For each keypoint, their mean reprojection error (mm and px), the average number of cameras excluded, and the interpolated frames.
+- For the full keypoint set, the grand mean reprojection error (mm and px), the grand mean number of cameras excluded, and the percentage of exclusion for each camera.
+
+> [!TIP]
+> Visualize your output trc files in the Blender add-on or in OpenSim: `File -> Preview experimental data`.\
+
+> [!TIP]
+> If results are not satisfactory, primarily increase `min_cameras_for_triangulation` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.\
+> Then try increasing `likelihood_threshold_triangulation` or decreasing `reproj_error_threshold_triangulation`.
 
 </br>
 
@@ -720,7 +790,7 @@ If your triangulation is not satisfying, try and release the constraints in the 
 > [!TIP]
 > Instead of, or in addition to filtering triangulated trc coordinates, you can also filter angle .mot files after inverse kinematics by setting `filter_ik = true` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
-Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -739,11 +809,10 @@ Output:\
 </br>
 
 ### Marker Augmentation
-> _**Use the Stanford LSTM model to estimate the position of 47 virtual markers.**_\
-_**Note that inverse kinematic results are not necessarily better after marker augmentation.**_ Skip if results are not convincing.
+> _**Use the [Stanford LSTM model](https://github.com/antoinefalisse/marker-augmentation) to estimate the position of 47 virtual markers.**_
 
-> [!NOTE]
-> Marker augmentation tends to give a more stable, but less precise output. In practice, it is mostly beneficial when using fewer than 4 cameras. 
+> [!TIP]
+> Marker augmentation tends to give a more stable, but less precise output. In practice, it is mostly beneficial when using fewer than 4 cameras. Skip if inverse kinematic results are not convincing.
 
 > [!IMPORTANT]
 > Make sure that `participant_height` is correct in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.\
@@ -756,7 +825,7 @@ _**Note that inverse kinematic results are not necessarily better after marker a
 > Will not work properly if missing values are not interpolated (i.e., if there are NaN values in the .trc file).
 
 
-Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -787,7 +856,7 @@ Set `use_simple_model = true` if you want IK to run 10-40 times faster. No muscl
 Set `filter_ik = true` if you want to filter angle results after IK with the parameters defined in the [filtering] section. Useful for force estimations if results are noisy .\
 Set `right_left_symmetry = false` if you have good reasons to think the participant is not symmetrical (e.g. if they wear a prosthetic limb).
 
-Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
 ``` python
 from Pose2Sim import Pose2Sim
@@ -1064,7 +1133,7 @@ Take heart, calibration is not that complicated once you get the hang of it!
 
 **marker Augmentation**
 
-> Requires at least: `["RHip", "LHip", "RKnee", "LKnee", "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe", "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]`
+> Requires at least: `["RHip", "LHip", "RKnee", "LKnee", "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe", "RBigToe", "LBigToe"]`
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1100,7 +1169,7 @@ Take heart, calibration is not that complicated once you get the hang of it!
 # Utilities
 A list of standalone tools (see [Utilities](https://github.com/perfanalytics/pose2sim/tree/main/Pose2Sim/Utilities)), which can be either run as scripts, or imported as functions. Check usage in the docstring of each Python file. The figure below shows how some of these tools can be used to further extend Pose2Sim usage.
 
-Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and any of these. Type in `name_of_script.py -h` for more instructions on how to use them.
+Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and any of these. Type in `name_of_script.py -h` for more instructions on how to use them.
 
 <details>
    <summary><b>Video editing</b> (CLICK TO SHOW)</summary>
@@ -1254,9 +1323,26 @@ If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org
 
 ### How to contribute and to-do list
 
-I would happily welcome any proposal for new features, code improvement, and more!\
-If you want to contribute to Pose2Sim, please see [this issue](https://github.com/perfanalytics/pose2sim/issues/40) or join the Discord community! [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)\
-You will be proposed a to-do list, but please feel absolutely free to propose your own ideas and improvements.
+> [!TIP]
+> If you want to contribute to Sports2D or Pose2Sim, please see [this issue](https://github.com/perfanalytics/pose2sim/issues/40) or join the Discord community! [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
+
+</br>
+
+**Pose2Sim releases (details [here](https://github.com/perfanalytics/pose2sim/releases))**:
+- [x] **v0.1** *(08/2021)*: Published paper
+- [x] **v0.2** *(01/2022)*: Published code
+- [x] **v0.3** *(01/2023)*: Supported other pose estimation algorithms
+- [x] **v0.4** *(07/2023)*: New calibration tool based on scene measurements
+- [x] **v0.5** *(12/2023)*: Automatic batch processing
+- [x] **v0.6** *(02/2024)*: Marker augmentation, Blender visualizer
+- [x] **v0.7** *(03/2024)*: Multi-person analysis
+- [x] **v0.8** *(04/2024)*: New synchronization tool
+- [x] **v0.9** *(07/2024)*: Integration of pose estimation in the pipeline
+- [x] **v0.10 *(09/2024)*: Integration of OpenSim in the pipeline**
+- [ ] v0.11: Graphical User Interface, Integration of Sports2D, Website with documentation
+- [ ] v0.12: Monocular 3D pose estimation
+- [ ] v0.13: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions, smarter single-person mode
+- [ ] v1.0: First full release with most important features, code refactoring for performance and clarity
 
 </br>
 
@@ -1264,6 +1350,7 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 - Graphical User Interface
 - Self-calibration based on keypoint detection + Bundle adjustment + Calibration of moving cameras
 - Get rid of the brute-force single-person mode, and instead automatically or manually select the persons of interest in multi-person mode.
+- Real-time processing 3D kinematics
 
 </br>
 
@@ -1352,11 +1439,11 @@ You will be proposed a to-do list, but please feel absolutely free to propose yo
 &#10004; **Pip package**
 &#10004; **Batch processing** (also enable non-batch processing)
 &#10004; **Catch errors**
+&#10004;  Integrate [Sports2D](https://github.com/davidpagnon/Sports2D/) for OpenSim analysis from a single camera
 &#9634; **Conda package** 
 &#9634; **Docker image**
-&#9634;  Integrate [Sports2D](https://github.com/davidpagnon/Sports2D/) for OpenSim analysis from a single camera
-&#9634; Real-time: Run Pose estimation, Person association, Triangulation, Kalman filter, IK frame by frame (instead of running each step for all frames)
-&#9634; Config parameter for non batch peocessing
+&#9634; **Real-time: Run Pose estimation, Person association, Triangulation, Kalman filter, IK frame by frame (instead of running each step for all frames)**
+&#9634; Config parameter for non batch processing
 
 &#9634; **Run from command line via click or typer**
 &#9634; **Utilities**: Export other data from c3d files into .mot or .sto files (angles, powers, forces, moments, GRF, EMG...)
