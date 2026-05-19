@@ -360,7 +360,7 @@ HTML_TEMPLATE = """\
         <footer class="footer">
             <div class="footer-content">
                 <p>Pose2Sim Documentation &bull;
-                   <a href="https://github.com/perfanalytics/pose2sim" target="_blank">GitHub</a> &bull;
+                   <a href="https://github.com/perfanalytics/pose2sim" target="_blank">GitHub</a> (⭐please leave a star!⭐) &bull;
                    <a href="#how-to-cite">Cite</a>
                 </p>
                 <p>Open-source markerless motion capture &bull; BSD-3-Clause License</p>
