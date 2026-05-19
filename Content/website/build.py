@@ -324,7 +324,7 @@ HTML_TEMPLATE = """\
         <div class="logo">
             <h2>Documentation</h2>
             <div class="docs-switcher">
-                <a href="#" class="docs-switch active" title="Pose2Sim documentation">Pose2Sim</a>
+                <a href="#pose2sim" class="docs-switch active" title="Pose2Sim documentation">Pose2Sim</a>
                 <span class="docs-switch-sep">|</span>
                 <a href="https://github.com/davidpagnon/Sports2D/blob/main/README.md"
                    class="docs-switch" target="_blank" rel="noopener" title="Sports2D documentation">Sports2D</a>
