@@ -462,6 +462,9 @@ This will run pose estimation on your videos and save the results in the `pose` 
 >   # Same approach for hand or face pose estimation, check the RTMLib documentation for more information.
 >   ```
 
+> [!WARNING]
+> Note that it does not currently work well for acrobatic movements where the person is upside down. We are working on a solution but in the meantime, you can try MediaPipe BlazePose (see [here](#with-mediapipe-blazepose-legacy)).
+
 <img src="Content/Pose2D.png" width="760">
 
 </br>
@@ -776,7 +779,7 @@ The logs provide detailed statistics:
 - For the full keypoint set, the grand mean reprojection error (mm and px), the grand mean number of cameras excluded, and the percentage of exclusion for each camera.
 
 > [!TIP]
-> Visualize your output trc files in the Blender add-on or in OpenSim: `File -> Preview experimental data`.\
+> Visualize your output trc files in the Blender add-on or in OpenSim: `File -> Preview experimental data`.
 
 > [!TIP]
 > If results are not satisfactory, primarily increase `min_cameras_for_triangulation` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.\
@@ -785,7 +788,20 @@ The logs provide detailed statistics:
 </br>
 
 ### Filtering 3D coordinates
-> _**Filter your 3D coordinates.**_ Butterworth, Acceleration minimizing, Kalman, OneEuro, GCV spline, LOESS, Gaussian, Median, Butterworth on speed filters are available and can be tuned accordingly
+
+> _**Filter your 3D coordinates.**_ Available filters:
+> - **Butterworth**: Most intuitive and standard filter in biomechanics
+> - **Acceleration minimizing**: Whittaker-Henderson filter, produces smooth velocities and accelerations, which is important for force estimations but blunts the peaks. 
+> - **Kalman**: Used in countless applications, especially real-time. This simplified Kalman filter assumes constant acceleration with Gaussian process noise.
+> - **OneEuro**: Simpler and even faster alternative to Kalman filter for real-time, but tends to blunt RoM. Analog to a 1st order Butterworth but with adaptive cut-off frequency. Zero-phase in our case
+> - **GCV spline**: Automatically determines optimal cut-off frequency for each point, which is good when some move faster than others (eg fingers vs hips). The cut-off frequency determination can be buggy if the signal is a triangular wave + drift, for vertical hip coordinates in uphill gait for example. 
+> - **LOESS**: Local low-degree polynomial smoothing.
+> - **Gaussian**: Weighted moving average, with more weight on central points.
+> - **Median**: Removes outliers (but not as well as the Hampel filter).
+> - **Butterworth on speed**: Signal is differenciated, filtered, then integrated back. Preserves sharp movements, but can introduce an offset in the original signal.
+> They can all be tuned with the parameters in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
+
+> A **Hampel filter** can optionally be applied by setting `reject_outliers` to true. Rejects outliers that are outside of a 95% confidence interal from the median in a sliding window of size 7.
 
 > [!TIP]
 > Instead of, or in addition to filtering triangulated trc coordinates, you can also filter angle .mot files after inverse kinematics by setting `filter_ik = true` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
@@ -815,15 +831,10 @@ Output:\
 > Marker augmentation tends to give a more stable, but less precise output. In practice, it is mostly beneficial when using fewer than 4 cameras. Skip if inverse kinematic results are not convincing.
 
 > [!IMPORTANT]
-> Make sure that `participant_height` is correct in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.\
-> `participant_mass` is mostly optional for IK.\
-> Only works with models estimating at least the following keypoints (e.g., not COCO):
-> ```python
->  ["RHip", "LHip", "RKnee", "LKnee", "RAnkle", "LAnkle", 
->  "RHeel", "LHeel", "RSmallToe", "LSmallToe", "RBigToe", "LBigToe"] 
-> ```
-> Will not work properly if missing values are not interpolated (i.e., if there are NaN values in the .trc file).
-
+> - Make sure that `participant_height` is correct in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file
+> - `participant_mass` is mostly optional for IK
+> - Only works with models estimating at least the following keypoints (e.g., not COCO):`[RHip, LHip, RKnee, LKnee, RAnkle, LAnkle, RHeel, LHeel, RSmallToe, LSmallToe, RBigToe, LBigToe]`
+> - Will not work properly if missing values are not interpolated (i.e., if there are NaN values in the .trc file)
 
 Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
@@ -837,7 +848,7 @@ Pose2Sim.markerAugmentation()
 </br>
 
 ## OpenSim kinematics
-> _**Obtain a scaled model and 3D joint angles.**_
+> _**Scale an OpenSim skeletal model to your participant and compute biomechanically accurate 3D joint angles using inverse kinematics.**_
 
 > [!TIP]
 > If you are not interested in muscles or having a flexible spine, set `use_simple_model` to true. This will make inverse kinematics at least 10 times faster.
@@ -846,15 +857,17 @@ This can be either done fully automatically within Pose2Sim, or manually within 
 
 ### Within Pose2Sim
 > *Scaling and inverse kinematics are performed in a fully automatic way for each trc file.*\
-> *No need for a static trial!*\
-> _**Note that automatic scaling is not recommended when the participant is mostly crouching or sitting. In this case, scale manually on a standing trial**_ (see [next section](#within-opensim-gui)).
+> *No need for a static trial!* _
 
-> Model scaling is done according to the mean of the segment lengths, across a subset of frames. We remove the 10% fastest frames (potential outliers), the frames where the speed is 0 (person probably out of frame), the frames where the average knee and hip flexion angles are above 45° (pose estimation is not precise when the person is crouching) and the 20% most extreme segment values after the previous operations (potential outliers). All these parameters can be edited in your Config.toml file.
+> Model scaling is done according to the mean of the segment lengths, across a subset of frames. We remove the frames where the average knee and hip flexion angles are above 90° (pose estimation is not precise when the person is crouching) and the 50% most extreme segment values (potential outliers).\
+> Note: If the participant is mostly crouching or sitting, manually scale on a standing trial (see [next section](#within-opensim-gui)).
 
-In your Config.toml file, set `use_augmentation = false` is you don't want to use the results with augmented marker (this is sometimes better).\
-Set `use_simple_model = true` if you want IK to run 10-40 times faster. No muscles, no constraints (eg stiff spine and shoulders, no patella).\
-Set `filter_ik = true` if you want to filter angle results after IK with the parameters defined in the [filtering] section. Useful for force estimations if results are noisy .\
-Set `right_left_symmetry = false` if you have good reasons to think the participant is not symmetrical (e.g. if they wear a prosthetic limb).
+> [!TIP]
+> In your Config.toml file:
+> - Set `use_simple_model = true` if you want IK to run 10-40 times faster. No muscles, no constraints (eg stiff spine and shoulders, no patella).
+> - Set `filter_ik = true` if you want to filter angle results after IK with the parameters defined in the [filtering] section. Useful for force estimations if results are noisy.
+> - set `use_augmentation = false` is you don't want to use the results with augmented marker (this is sometimes better).
+> - Set `right_left_symmetry = false` if you have good reasons to think the participant is not symmetrical (e.g. if they wear a prosthetic limb).
 
 Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
 
@@ -869,7 +882,29 @@ Pose2Sim.kinematics()
 
 <img src="Content/OpenSim.JPG" width="380">
 
-Once you have the scaled model and the joint angles, you are free to go further! Inverse dynamics, muscle analysis, etc. (make sure previously add muscles from [the Pose2Sim model with muscles](Pose2Sim\OpenSim_Setup\Model_Pose2Sim_Body25b_contacts_muscles.osim)).
+> [!NOTE]
+> At that point, you should have produced the following files:
+> ```
+> Pose2Sim_Project/
+> ├── Config.toml
+> ├── videos/
+> ├── calibration/
+> │   └── Calib.toml     # Calibration file, either converted or calculated
+> ├── pose/              # 2D pose files
+> ├── pose-sync/         # Synchronized 2D pose files
+> ├── pose-3d/           # 3D marker trajectories, unfiltered and filtered (.trc files)
+> ├── kinematics/        # OpenSim results
+> │   ├── *_scaled.osim      # Scaled OpenSim model for each person
+> │   ├── *.mot              # Joint angles for each trial, unfiltered and filtered (open with Excel or│OpenSim)
+> │   └── opensim_logs.txt
+> └── logs.txt          # Detailed logs of all the steps
+>  ```
+
+> [!TIP]
+> Visualize your animated skeleton in the Blender add-on or in OpenSim: `File -> Preview experimental data`.
+
+Once you have the scaled model and the joint angles, you are free to go further!\
+Ground reaction force estimation, inverse dynamics, muscle analysis, Moco optimization, etc.
 
 <br>
 
