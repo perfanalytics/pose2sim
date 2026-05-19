@@ -18,3 +18,5 @@ dist/
 **/pose-sync/
 **/pose-associated/
 **/kinematics/
+
+Content/website/index.html

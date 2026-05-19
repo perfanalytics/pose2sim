@@ -18,7 +18,8 @@
 
 
 [project]
-multi_person = false # true for trials with multiple participants. If false, only the person with lowest reprojection error is analyzed.
+project_dir = '.' # '.' if Config.toml is in the root of the project, path to the project root otherwise
+multi_person = false # true for trials with multiple participants. If false, only the person with lowest reprojection error is analyzed
 participant_height = 'auto' # 'auto', float (eg 1.72), or list of floats (eg [1.72, 1.40])  # meters  # Only used for marker augmentation 
 participant_mass = 70.0             # float (eg 70.0), or list of floats (eg [70.0, 63.5])  # kg      # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces
 
@@ -172,10 +173,8 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 
 
 [personAssociation]
-   likelihood_threshold_association = 0.3 # should be in single_person section
-
    [personAssociation.single_person]
-   likelihood_threshold_association = 0.3
+   likelihood_threshold_association = 0.3 
    reproj_error_threshold_association = 20 # px
    tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
                # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' or 'RShoulder')
@@ -204,7 +203,7 @@ interpolation = 'linear' # linear, slinear, quadratic, cubic, or none # 'none' i
 # cleaning up
 remove_incomplete_frames = false # true or false (lowercase) # If true, frame is kept only if all keypoints have been correctly triangulated
 sections_to_keep = 'all' # 'all', 'largest', 'first', 'last'
-                        # keep 'all' correctly triangulated sections, or the 'largest' valid section, or the 'first' one, or the 'last' one
+                         # keep 'all' correctly triangulated sections, or the 'largest' valid section, or the 'first' one, or the 'last' one
 min_chunk_size = 10 # Minimum number of consecutive valid frames to make it a section to keep
 fill_large_gaps_with = 'last_value' # 'last_value', 'nan', or 'zeros' 
 
@@ -224,18 +223,18 @@ make_c3d = true # also save triangulated data in c3d format
 
    # Most intuitive and standard filter in biomechanics
    [filtering.butterworth]
-   cut_off_frequency = 6 # Hz 
+   cut_off_frequency = 6 # Hz # 3-6 Hz: Walking, slow movements; 6-15 Hz: Running, fast movements; 15+ Hz: Very fast and impulsive movements
    order = 4 
 
-   # Used in countless applications, especially real-time. This one is a simplified Kalman filter 
+   # Used in countless applications, especially real-time. This simplified Kalman filter assumes constant acceleration with Gaussian process noise
    [filtering.kalman]
    # How much more do you trust triangulation results (measurements), than the assumption of constant acceleration(process)?
    trust_ratio = 500 # = measurement_trust/process_trust ~= process_noise/measurement_noise
    smooth = true # should be true, unless you need real-time filtering
 
-   # Simpler and even faster alternative to Kalman filter for real-time, but tends to blunt RoM. Similar to a 1st order Butterworth but with adaptive cut-off frequency. This one is zero-phase
+   # Simpler and even faster alternative to Kalman filter for real-time, but tends to blunt RoM. Analog to a 1st order Butterworth but with adaptive cut-off frequency. This one is zero-phase
    [filtering.one_euro]
-   cut_off_frequency = 4 # Hz # cutoff frequency, similar to Butterworth but adapts to velocity (with beta)
+   cut_off_frequency = 4 # Hz # cutoff frequency, analog to Butterworth but adapts to velocity (with beta)
    beta = 1.5 # cutoff adaptation to velocity: cut_off_frequency = cut_off_frequency + beta*velocity
    d_cut_off_frequency = 1.0 # Hz # cutoff frequency for derivative (1.0 is usually good)
 
@@ -244,26 +243,32 @@ make_c3d = true # also save triangulated data in c3d format
    cut_off_frequency = 'auto' # 'auto' or int # If int, behaves like a Butterworth filter. 'auto' is usually better, unless the signal is too short or you got a triangular wave + drift (eg pelvis Y coordinates of a subject walking uphill)
    smoothing_factor = 1.0 # >=0, ignored if cut_off_frequency != 'auto'. Biases results towards more smoothing (>1) or more fidelity to data (<1) 
 
-   # Produces smooth velocities and accelerations, which is important for force estimations but blunts the peaks. Whittaker-Henderson filter (acceleration-minimizing), inspired by AddBiomechanics
+   # Whittaker-Henderson filter (acceleration-minimizing), produces smooth velocities and accelerations, which is important for force estimations but blunts the peaks. Inspired by AddBiomechanics
    # Recommended use: on IK rather than on triangulated data
    [filtering.acc_minimizing]
    cut_off_frequency = 6 # Hz
 
+   # Local low-degree polynomial smoothing
    [filtering.loess]
    nb_values_used = 5 # = fraction of data used * nb frames
+   
+   # Weighted moving average, with more weight on central points
    [filtering.gaussian]
    sigma_kernel = 1 #px
+
+   # Removes outliers (but not as well as the Hampel filter: see reject_outliers)
    [filtering.median]
    kernel_size = 3
+
+   # Signal is differenciated, filtered, then integrated back. Preserves sharp movements, but can introduce an offset in the original signal
    [filtering.butterworth_on_speed]
    cut_off_frequency = 10 # Hz
    order = 4 
 
 
 [markerAugmentation] 
-## Requires the following markers: ["Neck", "RShoulder", "LShoulder", "RHip", "LHip", "RKnee", "LKnee",
-##        "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe",
-##        "RBigToe", "LBigToe", "RElbow", "LElbow", "RWrist", "LWrist"]
+## Requires the following markers: ["RHip", "LHip", "RKnee", "LKnee",
+##        "RAnkle", "LAnkle", "RHeel", "LHeel", "RSmallToe", "LSmallToe", "RBigToe", "LBigToe"]
 feet_on_floor = false # true or false (lowercase) # If true, markers will be translated so that the feet are on the floor (assuming that the floor is flat). Useful if you want to estimate ground reaction forces or joint loads.
 make_c3d = true # save triangulated data in c3d format in addition to trc
 

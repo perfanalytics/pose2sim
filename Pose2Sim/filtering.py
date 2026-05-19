@@ -393,7 +393,8 @@ def acc_minimizing_filter_1d(config_dict, frame_rate, col):
 
 def kalman_filter(coords, frame_rate, measurement_noise, process_noise, nb_dimensions=3, nb_derivatives=3, smooth=True):
     '''
-    Filters coordinates with a Kalman filter or a Kalman smoother
+    Filters coordinates with a Kalman filter or a Kalman smoother.
+    Assumes a constant acceleration model with Gaussian process noise.
     
     INPUTS:
     - coords: array of shape (nframes, ndims)
@@ -433,7 +434,7 @@ def kalman_filter(coords, frame_rate, measurement_noise, process_noise, nb_dimen
     for i in range(nb_derivatives):
         for j in range(min(i+1, nb_derivatives)):
             F_per_coord[j,i] = dt**(i-j) / math.factorial(i - j)
-    f.F = np.kron(np.eye(nb_dimensions),F_per_coord) 
+    f.F = np.kron(np.eye(nb_dimensions), F_per_coord) 
     # F_per_coord= [[1, dt, dt**2/2], 
                  # [ 0, 1,  dt     ],
                  # [ 0, 0,  1      ]])
