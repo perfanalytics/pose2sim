@@ -626,6 +626,51 @@ li {
     height: auto;
 }
 
+/* Responsive images – override any remaining fixed-width attrs from README */
+.step-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    display: block;
+}
+
+/* Hamburger button (hidden on desktop) */
+.hamburger {
+    display: none;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 200;
+    background: var(--primary-color);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 11px;
+    cursor: pointer;
+    flex-direction: column;
+    gap: 5px;
+}
+.hamburger span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: #fff;
+    border-radius: 2px;
+    transition: all 0.25s;
+}
+.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Sidebar overlay */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 99;
+}
+.sidebar-overlay.visible { display: block; }
+
 /* Links */
 a {
     color: var(--primary-color);
@@ -714,6 +759,10 @@ a:hover {
 }
 
 @media (max-width: 768px) {
+    .hamburger {
+        display: flex;
+    }
+
     .sidebar {
         transform: translateX(-100%);
         transition: transform 0.3s;
@@ -727,6 +776,7 @@ a:hover {
     .content {
         margin-left: 0;
         padding: 20px;
+        padding-top: 60px; /* room for hamburger */
     }
     
     .step-header {

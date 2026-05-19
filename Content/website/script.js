@@ -165,6 +165,34 @@ function toggleViewAll() {
 }
 
 // ---------------------------------------------------------------------------
+// Mobile sidebar (hamburger)
+// ---------------------------------------------------------------------------
+function toggleSidebar() {
+    const sidebar  = document.getElementById('sidebar');
+    const btn      = document.getElementById('hamburgerBtn');
+    const overlay  = document.getElementById('sidebarOverlay');
+    const isOpen   = sidebar.classList.toggle('mobile-open');
+    btn.classList.toggle('open', isOpen);
+    overlay.classList.toggle('visible', isOpen);
+}
+
+function closeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const btn     = document.getElementById('hamburgerBtn');
+    const overlay = document.getElementById('sidebarOverlay');
+    sidebar.classList.remove('mobile-open');
+    btn.classList.remove('open');
+    overlay.classList.remove('visible');
+}
+
+// Close sidebar after a nav-item click on mobile
+document.addEventListener('click', e => {
+    if (e.target.closest('.nav-item') && window.innerWidth <= 768) {
+        closeSidebar();
+    }
+}, true);
+
+// ---------------------------------------------------------------------------
 // Keyboard navigation
 // ---------------------------------------------------------------------------
 document.addEventListener('keydown', e => {

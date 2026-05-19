@@ -97,6 +97,9 @@ def preprocess(text: str) -> str:
         r'(<img\b[^>]*\bsrc=")Content/',
         rf"\1{GITHUB_RAW}Content/", text
     )
+    # 1b. Remove fixed width/height attrs from <img> so CSS can make them responsive
+    text = re.sub(r'(<img\b[^>]*?)\s+width="\d+"', r'\1', text)
+    text = re.sub(r'(<img\b[^>]*?)\s+height="\d+"', r'\1', text)
     text = re.sub(
         r"!\[([^\]]*)\]\(Content/([^)]+)\)",
         rf"![\1]({GITHUB_RAW}Content/\2)", text
@@ -319,8 +322,15 @@ HTML_TEMPLATE = """\
         <div id="google_translate_element"></div>
     </div>
 
+    <!-- Hamburger button (mobile only) -->
+    <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Open navigation">
+        <span></span><span></span><span></span>
+    </button>
+    <!-- Sidebar overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
         <div class="logo">
             <h2>Documentation</h2>
             <div class="docs-switcher">
