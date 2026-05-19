@@ -1175,7 +1175,7 @@ def compute_height(Q_coords, large_hip_knee_angles=90, trimmed_extrema_percent=5
 
     INPUTS:
     - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
-    - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
+    - large_hip_knee_angles: float. Hip and knee angles below this value are considered as imprecise
     - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
     
     OUTPUT:
@@ -1235,7 +1235,7 @@ def compute_height(Q_coords, large_hip_knee_angles=90, trimmed_extrema_percent=5
         leg_lengths = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2
         heights = leg_lengths / 0.485
     
-    # Remove the 20% most extreme values
+    # Remove the 50% most extreme values
     height = trimmed_mean(heights, trimmed_extrema_percent=trimmed_extrema_percent)
 
     return height
@@ -1247,7 +1247,7 @@ def compute_leg_length(trc_path, large_hip_knee_angles=90, trimmed_extrema_perce
 
     INPUTS:
     - Q_coords: path to the trc file (can be in m or px)
-    - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
+    - large_hip_knee_angles: float. Hip and knee angles below this value are considered as imprecise
     - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
 
     OUTPUT:
