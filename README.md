@@ -51,6 +51,10 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 <br>
 
 > [!IMPORTANT]
+> If you like it, ⭐ please leave a star ⭐ on the [GitHub repository](https://github.com/perfanalytics/pose2sim)!\
+> This project is completely free: this is your chance to support the project and make it more visible to the community.
+
+> [!IMPORTANT]
 > If you want to contribute to Sports2D or Pose2Sim, please see [How to contribute](#how-to-contribute-and-to-do-list) or join the Discord community! [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
 
 <!-- GitHub Star Button -->
