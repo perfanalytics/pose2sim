@@ -620,6 +620,12 @@ li {
     color: var(--text-secondary);
 }
 
+/* Responsive images */
+.step-content img {
+    max-width: 100%;
+    height: auto;
+}
+
 /* Links */
 a {
     color: var(--primary-color);
