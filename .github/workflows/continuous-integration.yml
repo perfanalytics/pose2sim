@@ -9,6 +9,7 @@ on:
     paths-ignore:
       - 'README.md'
       - 'Content/**'
+      - 'GUI/**'
   pull_request:
     branches: [ "main", "experimental" ]
 

@@ -257,7 +257,7 @@ keypoints_to_consider = ['RWrist'] # 'all' if all points should be considered, f
 #    [filtering.gaussian]
 #    sigma_kernel = 1 #px
 
-#    # Removes outliers (but not as well as the Hampel filter: srr reject_outliers)
+#    # Removes outliers (but not as well as the Hampel filter: see reject_outliers)
 #    [filtering.median]
 #    kernel_size = 3
 

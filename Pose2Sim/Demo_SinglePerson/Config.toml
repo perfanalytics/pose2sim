@@ -256,7 +256,7 @@ make_c3d = true # also save triangulated data in c3d format
    [filtering.gaussian]
    sigma_kernel = 1 #px
 
-   # Removes outliers (but not as well as the Hampel filter: srr reject_outliers)
+   # Removes outliers (but not as well as the Hampel filter: see reject_outliers)
    [filtering.median]
    kernel_size = 3
 
