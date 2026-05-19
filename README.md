@@ -259,7 +259,7 @@ Check that everything went well within Python with these commands:
   Just play with the buttons!\
   Visualize camera positions, videos, triangulated keypoints, OpenSim skeleton, video overlay your results on videos, ... or let your creativity flow and create your own animations!
 
-https://github.com/user-attachments/assets/2d1875b4-abe6-452a-b21a-e1ca5a2d1e55
+https://github.com/user-attachments/assets/53bfd9e2-f542-410f-8e9f-7b70229d598b
   
 <br/>
 
