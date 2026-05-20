@@ -18,6 +18,45 @@
     --sidebar-width: 280px;
 }
 
+/* Dark mode overrides */
+[data-theme="dark"] {
+    --bg-primary: #1e2433;
+    --bg-secondary: #161b27;
+    --bg-tertiary: #252d3d;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-tertiary: #64748b;
+    --border-color: #2d3748;
+    --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5);
+}
+[data-theme="dark"] .info-box    { background: #1e2d45; border-color: #2563eb55; }
+[data-theme="dark"] .success-box { background: #14291e; border-color: #10b98155; }
+[data-theme="dark"] .warning-box { background: #2a2010; border-color: #f59e0b55; }
+[data-theme="dark"] .step-header { background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%); }
+[data-theme="dark"] .code-block  { background: #0d1117; }
+[data-theme="dark"] .feature-card { background: var(--bg-tertiary); border-color: var(--border-color); }
+[data-theme="dark"] .params-table th { background: var(--bg-tertiary); color: var(--text-primary); }
+[data-theme="dark"] .params-table td code { background: var(--bg-secondary); color: #93c5fd; }
+[data-theme="dark"] .translate-widget {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+[data-theme="dark"] .goog-te-gadget-simple {
+    background: var(--bg-secondary) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .goog-te-menu-value span,
+[data-theme="dark"] .goog-te-gadget-simple span,
+[data-theme="dark"] .goog-te-gadget-simple a {
+    color: var(--text-primary) !important;
+    filter: invert(0) !important;
+}
+[data-theme="dark"] .goog-te-gadget-icon {
+    filter: invert(1) brightness(2);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -137,6 +176,34 @@ body {
     background: var(--primary-color);
     color: white;
 }
+
+/* Theme toggle */
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+}
+.theme-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 4px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-family: inherit;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.theme-toggle-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+.theme-icon { font-size: 15px; }
 
 /* Docs switcher */
 .docs-switcher {
@@ -620,18 +687,17 @@ li {
     color: var(--text-secondary);
 }
 
-/* Responsive images */
+/* Responsive images: all imgs get fluid sizing; badges stay inline */
 .step-content img {
     max-width: 100%;
     height: auto;
 }
 
-/* Responsive images – override any remaining fixed-width attrs from README */
-.step-content img {
-    max-width: 100%;
-    height: auto;
-    border-radius: 6px;
+/* Standalone content images (e.g. diagrams, screenshots) are block */
+.step-content img.img-block {
     display: block;
+    margin: 12px auto;
+    border-radius: 6px;
 }
 
 /* Hamburger button (hidden on desktop) */

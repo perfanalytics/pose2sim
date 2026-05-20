@@ -100,6 +100,8 @@ def preprocess(text: str) -> str:
     # 1b. Remove fixed width/height attrs from <img> so CSS can make them responsive
     text = re.sub(r'(<img\b[^>]*?)\s+width="\d+"', r'\1', text)
     text = re.sub(r'(<img\b[^>]*?)\s+height="\d+"', r'\1', text)
+    # 1c. Mark explicit <img> HTML tags as block-level content images (not inline badge images)
+    text = re.sub(r'(<img\b)(?![^>]*\bclass=)', r'\1 class="img-block"', text)
     text = re.sub(
         r"!\[([^\]]*)\]\(Content/([^)]+)\)",
         rf"![\1]({GITHUB_RAW}Content/\2)", text
@@ -341,6 +343,12 @@ HTML_TEMPLATE = """\
                 <span class="docs-switch-sep">|</span>
                 <a href="https://github.com/davidpagnon/Pose2Sim_Blender/blob/main/README.md"
                    class="docs-switch" target="_blank" rel="noopener" title="Pose2Sim Blender add-on documentation">Blender</a>
+            </div>
+            <div class="theme-toggle">
+                <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
+                    <span class="theme-icon" id="themeIcon">☀️</span>
+                    <span id="themeLabel">Light mode</span>
+                </button>
             </div>
         </div>
         <nav class="nav-menu">

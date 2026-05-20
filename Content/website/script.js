@@ -165,6 +165,32 @@ function toggleViewAll() {
 }
 
 // ---------------------------------------------------------------------------
+// Dark / Light theme
+// ---------------------------------------------------------------------------
+function applyTheme(dark) {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : '');
+    const icon  = document.getElementById('themeIcon');
+    const label = document.getElementById('themeLabel');
+    if (icon)  icon.textContent  = dark ?  '☀️' : '🌙';
+    if (label) label.textContent = dark ? 'Light mode' : 'Dark mode' ;
+}
+
+function toggleTheme() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    applyTheme(!isDark);
+    try { localStorage.setItem('pose2sim-theme', !isDark ? 'dark' : 'light'); } catch(e) {}
+}
+
+// Restore saved theme on page load
+(function () {
+    try {
+        const saved = localStorage.getItem('pose2sim-theme');
+        if (saved === 'dark') applyTheme(true);
+        else if (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches) applyTheme(true);
+    } catch(e) {}
+})();
+
+// ---------------------------------------------------------------------------
 // Mobile sidebar (hamburger)
 // ---------------------------------------------------------------------------
 function toggleSidebar() {
