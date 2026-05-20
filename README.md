@@ -106,6 +106,8 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 
 ## Installation
 
+> **Install Pose2Sim**
+
 > [!NOTE]
 > If you'd rather use conda, you can still use the old [installation procedure](https://github.com/perfanalytics/pose2sim/tree/b1a8b84a59759946b321f8f243d19dcc31f7b5d6#installation). Still works fine but not recommended, since uv is faster, lighter, better at handling dependencies, and generally more modern. 
 
@@ -200,6 +202,8 @@ Check that everything went well within Python with these commands:
 
 ## Demonstration Part-1: End to end video to 3D joint angle computation
 
+> **Test the full pipeline!**
+
 - Open a terminal (*conda, powershell, bash, or zsh*) and activate your environment (see [here](#1-set-up-a-uv-environment)).
 - Find the Demo folder under `<pose2sim_path>\Pose2Sim\Demo_SinglePerson`:
 
@@ -246,9 +250,9 @@ Check that everything went well within Python with these commands:
 - Install OpenSim GUI:\
   Download the executable [there](https://simtk.org/projects/opensim).
 - Visualize results:
-  - Open the OpenSim GUI, go to File > Open Model, and select the scaled model in the `kinematics` folder.
-  - Go to File > Load Motion, and load the joint angle .mot file in the `kinematics` folder.
-  - If you want to see the 3D marker locations, go to File > Preview Experimental Data, and load the .trc file in the `pose-3d` folder.
+  - Open the OpenSim GUI, go to `File > Open Model`, and select the scaled model in the `kinematics` folder.
+  - Go to `File > Load Motion`, and load the joint angle .mot file in the `kinematics` folder.
+  - If you want to see the 3D marker locations, go to `File > Preview Experimental Data`, and load the .trc file in the `pose-3d` folder.
 
   <img src="Content/OpenSim.JPG" width="380">
 
@@ -269,6 +273,9 @@ https://github.com/user-attachments/assets/53bfd9e2-f542-410f-8e9f-7b70229d598b
 
 
 ## Demonstration Part-3: Try multi-person and batch analyses
+
+> **Try multi-person and batch analyses**
+
 Open a terminal (*conda, powershell, bash, or zsh*) and activate your environment (see [here](#1-set-up-a-uv-environment)).
 
 ### Multi person analysis
@@ -326,13 +333,15 @@ Pose2Sim.runAll()
 
 ## Demonstration Part-4: Go further
 
-- **Default parameters are provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) but can be edited.**\
-All of them are clearly documented: feel free to play with them!
+> **Playing with parameters and try different features!**
+
+> **Default parameters are provided in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) but can be edited.**\
+> All of them are clearly documented: feel free to play with them!
 
 <br>
 
 - **Try the calibration tool:**\
- Set `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) (more info [there](#calculate-from-scratch)).
+ Set `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) and follow the process (more info [there](#calculate-from-scratch)).
 
   ```python
   Pose2Sim.calibration()
@@ -372,6 +381,8 @@ All of them are clearly documented: feel free to play with them!
 
 
 ## Too slow for you?
+
+> **Pose2Sim can probably run 10 - 20 times faster with a few tweaks**
 
 **Project set up:**
 
@@ -1037,6 +1048,8 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 
 # All the parameters
 
+> **All of the Pose2Sim parameters**
+
 > [!TIP]
 > All the parameters are defined and documented in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. You can also pass a dictionary to any Pose2Sim function to override the config parameters (see [Demonstration Part-4](#demonstration-part-4-go-further)).
 
@@ -1271,6 +1284,9 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 <br>
 
 # Utilities
+
+> **A list of useful standalone tools**
+
 We provide a list of standalone tools (see [Utilities](https://github.com/perfanalytics/pose2sim/tree/main/Pose2Sim/Utilities)), which can be either run as scripts, or imported as functions. Check usage in the docstring of each Python file. The figure below shows how some of these tools can be used to further extend Pose2Sim usage.
 
 Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and try any of these. Type in `name_of_script.py -h` for more instructions on how to use them.
@@ -1458,6 +1474,8 @@ If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org
 - Self-calibration based on keypoint detection + Bundle adjustment + Calibration of moving cameras
 - Get rid of the brute-force single-person mode, and instead automatically or manually select the persons of interest in multi-person mode.
 - Real-time processing 3D kinematics
+- Support ground reaction force, joint moments, muscle activation estimation
+- 3D monocular solution
 
 </br>
 
