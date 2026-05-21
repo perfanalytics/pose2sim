@@ -106,7 +106,9 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 
 ## Installation
 
-> **Install Pose2Sim**
+> **Let's get started!**
+
+<br>
 
 > [!NOTE]
 > If you'd rather use conda, you can still use the old [installation procedure](https://github.com/perfanalytics/pose2sim/tree/b1a8b84a59759946b321f8f243d19dcc31f7b5d6#installation). Still works fine but not recommended, since uv is faster, lighter, better at handling dependencies, and generally more modern. 
@@ -125,6 +127,8 @@ Open a terminal (conda, powershell, bash, or zsh).
   # Activate the uv environment
   & "$env:USERPROFILE\.venv\pose2sim\Scripts\Activate.ps1"
 ```
+
+<br>
 
 *On Linux or MacOS:*
 
@@ -204,6 +208,8 @@ Check that everything went well within Python with these commands:
 
 > **Test the full pipeline!**
 
+<br>
+
 - Open a terminal (*conda, powershell, bash, or zsh*) and activate your environment (see [here](#1-set-up-a-uv-environment)).
 - Find the Demo folder under `<pose2sim_path>\Pose2Sim\Demo_SinglePerson`:
 
@@ -275,6 +281,8 @@ https://github.com/user-attachments/assets/53bfd9e2-f542-410f-8e9f-7b70229d598b
 ## Demonstration Part-3: Try multi-person and batch analyses
 
 > **Try multi-person and batch analyses**
+
+<br>
 
 Open a terminal (*conda, powershell, bash, or zsh*) and activate your environment (see [here](#1-set-up-a-uv-environment)).
 
@@ -382,7 +390,7 @@ Pose2Sim.runAll()
 
 ## Too slow for you?
 
-> **Pose2Sim can probably run 10 - 20 times faster with a few tweaks**
+> **Pose2Sim can probably run 10 - 20 times faster with a few tweaks!**
 
 **Project set up:**
 
@@ -647,7 +655,11 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 > [!NOTE]
 > If the original calibration file does not provide any residual errors, they will be logged as NaN. This is not an error and can be ignored.
 
-- **From [Caliscope](https://mprib.github.io/caliscope/)** (recommended)**, [Dynamic Extrinsic Camera Calibrator](https://github.com/flodelaplace/lab-camera-dynamic-calibrator), [AniPose](https://github.com/lambdaloop/anipose) or [FreeMocap](https://github.com/freemocap/freemocap):**  
+> [!TIP]
+> If you want to use a calibration method that requires synchronized cameras, you can run pose estimation and synchronization first.\
+> ***Note:*** This suggestion is only valid if there is a fast motion of a body keypoint that allows you to synchronize on. Set "create synchronized videos = true" to do so, and then run calibration. <!-- Make sure calibration runs on the synchronized videos, not the original ones -->
+
+- **From [Caliscope](https://mprib.github.io/caliscope/)** (recommended *if your cameras are synchronized*), **[Dynamic Extrinsic Camera Calibrator](https://github.com/flodelaplace/lab-camera-dynamic-calibrator)** (based on keypoints: not checkerboard! But *requires synchronized videos, does not estimate intrinsics, and not commercially available*), **[AniPose](https://github.com/lambdaloop/anipose)**, or **[FreeMocap](https://github.com/freemocap/freemocap):**  
   - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
   - Calibration can be skipped since these formats are natively supported by Pose2Sim.
   - **Note:** It seems like the FreeMoCap calibration is in millimeters rather than in meters. Just open your calibration.toml file and multiply all the translation values by 1000.
@@ -728,30 +740,35 @@ For the sake of practicality, there are voluntarily few board images for intrins
 #### 2.Calculate extrinsic parameters
 
 > [!NOTE]
-> _Extrinsic parameters:_ camera positions and orientations in space, need to be recalculated whenever a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates.\
+> _Extrinsic parameters:_ camera positions and orientations in space, need to be recalculated whenever a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates (**not just their dimensions!**).\
 > They are stored in a Calib.toml file, in the `translation` and `rotation` arrays.
 
-> [!TIP]
-> If there is no measurable item in the scene, you can temporarily bring something in (a table, for example), perform calibration, and then remove it before you start capturing motion.
-
 - 3 available methods:
-  - **With a checkerboard:**\
-    Make sure that it is seen by all cameras. \
-    Can be set horizontally (default) or vertically (set `board_position = 'vertical'` in Config.toml). \
+  - **With scene coordinates**  (`extrinsics_method = 'scene'`):\
+    Manually measure the 3D coordinates of 10 or more points in the scene (tiles, wall lines, boxes, treadmill dimensions...). These points should be as spread out as possible. Replace `object_coords_3d` by your coordinates.\
+    Then you will be prompted to click on the corresponding image points for each view.
+  - **With a checkerboard** (`extrinsics_method = 'static_board'`):\
+    Make sure that it is seen by all cameras so that it can be automatically detected. \
+    Can be set horizontally (default) or vertically (`board_position = 'vertical'`).\
     It should preferably be rather large, as results will not be very accurate out of the covered zone.\
     Adjust `extrinsics_corners_nb` and `extrinsic_square_size`.
-  - **With scene measurements** (more flexible and potentially more accurate if points are spread out):\
-    Manually measure the 3D coordinates of 10 or more points in the scene (tiles, wall lines, boxes, treadmill dimensions...). These points should be as spread out as possible. Replace `object_coords_3d` by these coordinates in Config.toml.\
-    Then you will be prompted to click on the corresponding image points for each view.
-  - **With keypoints:**\
-    For a more automatic calibration, pose keypoints could also be used for calibration.\
+  - **With keypoints** (`extrinsics_method = 'keypoints'`):\
+    For a more automatic calibration, you can calibrate your cameras just by walking and waving your armsaround the scene.\
     **COMING SOON!**
-- Once your cameras are in place, make a quicke recording of the checkerboard laid on the floor, or the raw scene (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format). \
+- Once your cameras are in place, make a quick recording of the checkerboard laid on the floor or of the raw scene (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format). \
   You can remove the checkerboard or the calibration object for the actual capture of your participants.
 - Copy your files in the `extrinsics` folder.
 - Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
 <img src="Content/Calib_ext.png" width="920">
+
+> [!TIP]
+> `extrinsics_method = 'scene'` is recommended.
+> 
+> - Works even on unsynchronized cameras
+> - Very accurate if the landmark coordinates are sufficiently spread out
+> - If there is no measurable item in the scene, you can temporarily bring something in (a table, for example), perform calibration, and then remove it before starting to capture motion
+> - Providing that scene coordinates can be retrieved later on, it can be used on old, forgotten video files
 
 > [!IMPORTANT]
 > Extrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.
