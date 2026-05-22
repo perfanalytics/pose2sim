@@ -23,11 +23,8 @@ import matplotlib as mpl
 import platform
 os_name = platform.system()
 if os_name == 'Windows':
-    mpl.use('qt5agg') # windows
+    mpl.use('qtagg') # windows
 mpl.rc('figure', max_open_warning=0)
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
 from scipy import signal
 from scipy.ndimage import gaussian_filter1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
@@ -63,9 +60,23 @@ class plotWindow():
     '''
 
     def __init__(self, parent=None):
-        self.app = QApplication(sys.argv)
+        # Lazy imports: PySide6 requires a display server and crashes on headless
+        # environments (e.g. CI runners) if imported at module level. Since
+        # common.py is imported by nearly every module, we defer Qt imports to
+        # here so only code that actually creates a plotWindow needs a display.
+        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+        from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+        from PySide6.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
+
+        self.FigureCanvas = FigureCanvas
+        self.NavigationToolbar = NavigationToolbar
+        self.QWidget = QWidget
+        self.QVBoxLayout = QVBoxLayout
+
+        self.app = QApplication.instance()
+        if not self.app:
+            self.app = QApplication(sys.argv)
         self.MainWindow = QMainWindow()
-        self.MainWindow.__init__()
         self.MainWindow.setWindowTitle("Multitabs figure")
         self.canvases = []
         self.figure_handles = []
@@ -78,13 +89,13 @@ class plotWindow():
         self.MainWindow.show()
 
     def addPlot(self, title, figure):
-        new_tab = QWidget()
-        layout = QVBoxLayout()
+        new_tab = self.QWidget()
+        layout = self.QVBoxLayout()
         new_tab.setLayout(layout)
 
         figure.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.91, wspace=0.2, hspace=0.2)
-        new_canvas = FigureCanvas(figure)
-        new_toolbar = NavigationToolbar(new_canvas, new_tab)
+        new_canvas = self.FigureCanvas(figure)
+        new_toolbar = self.NavigationToolbar(new_canvas, new_tab)
 
         layout.addWidget(new_canvas)
         layout.addWidget(new_toolbar)
@@ -96,7 +107,7 @@ class plotWindow():
         self.tab_handles.append(new_tab)
 
     def show(self):
-        self.app.exec_() 
+        self.app.exec()
 
 
 ## FUNCTIONS
@@ -165,7 +176,7 @@ def trc_plot_func(*args):
     Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
 
     # Display figures
-    keypoints_names = pd.read_csv(trc_path, sep="\t", skiprows=3, nrows=0).columns[2::3].tolist()
+    keypoints_names = pd.read_csv(trc_path, sep="\t", skiprows=3, nrows=0).columns[2::3][:-1].to_numpy()
     display_figures_fun(Q_coord, time_col, keypoints_names)
 
 

@@ -11,6 +11,7 @@ Functions shared between modules, and other utilities
 '''
 
 ## INIT
+import os
 import toml
 import json
 import numpy as np
@@ -26,11 +27,8 @@ import itertools as it
 import logging
 from anytree import PreOrderIter
 
-import tkinter as tk
+import customtkinter as ctk
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="c3d")
 
@@ -48,6 +46,9 @@ __status__ = "Development"
 
 
 ## CONSTANTS
+# 4 points joint angle: between knee and ankle, and toe and heel. Add 90° offset and multiply by -1
+# 3 points joint angle: between ankle, knee, hip. -180° offset, multiply by -1
+# 2 points segment angle: between horizontal and ankle and knee, 0° offset, multiply by 1 (except trunk and head: -1)
 angle_dict = { # lowercase!
     # joint angles
     'right ankle': [['RKnee', 'RAnkle', 'RBigToe', 'RHeel'], 'dorsiflexion', 90, 1],
@@ -108,6 +109,19 @@ class plotWindow():
     '''
 
     def __init__(self, parent=None):
+        # Lazy imports: PySide6 requires a display server and crashes on headless
+        # environments (e.g. CI runners) if imported at module level. Since
+        # common.py is imported by nearly every module, we defer Qt imports to
+        # here so only code that actually creates a plotWindow needs a display.
+        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+        from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+        from PySide6.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
+
+        self.FigureCanvas = FigureCanvas
+        self.NavigationToolbar = NavigationToolbar
+        self.QWidget = QWidget
+        self.QVBoxLayout = QVBoxLayout
+
         self.app = QApplication.instance()
         if not self.app:
             self.app = QApplication(sys.argv)
@@ -124,13 +138,13 @@ class plotWindow():
         self.MainWindow.show()
 
     def addPlot(self, title, figure):
-        new_tab = QWidget()
-        layout = QVBoxLayout()
+        new_tab = self.QWidget()
+        layout = self.QVBoxLayout()
         new_tab.setLayout(layout)
 
         figure.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.91, wspace=0.2, hspace=0.2)
-        new_canvas = FigureCanvas(figure)
-        new_toolbar = NavigationToolbar(new_canvas, new_tab)
+        new_canvas = self.FigureCanvas(figure)
+        new_toolbar = self.NavigationToolbar(new_canvas, new_tab)
 
         layout.addWidget(new_canvas)
         layout.addWidget(new_toolbar)
@@ -142,19 +156,141 @@ class plotWindow():
         self.tab_handles.append(new_tab)
 
     def show(self):
-        self.app.exec_() 
+        self.app.exec()
 
 
 ## FUNCTIONS
+def is_video_file(path):
+    '''
+    Check if the given path is a video file based on its extension.
+    
+    INPUTS:
+    - path (str): The file path to check.
+
+    OUTPUTS:
+    - bool: True if the path is a video file, False otherwise.
+    '''
+
+    video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.mpeg', '.mpg'}
+    return os.path.isfile(path) and os.path.splitext(path)[1].lower() in video_extensions
+
+
+def is_image_file(path):
+    '''
+    Check if the given path is an image file based on its extension.
+    
+    INPUTS:
+    - path (str): The file path to check.
+
+    OUTPUTS:
+    - bool: True if the path is an image file, False otherwise.
+    '''
+
+    image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.webp'}
+    return os.path.isfile(path) and os.path.splitext(path)[1].lower() in image_extensions
+
+
+def get_max_workers(device='cpu'):
+    '''
+    Determine the number of parallel workers for pose estimation.
+    
+    INPUTS:
+        device: 'cpu', 'cuda', 'mps', 'rocm'
+    
+    OUTPUTS:
+        max_workers: Number of workers (>= 1)
+    '''
+    
+    if device == 'cpu':
+        # Half of the CPU cores
+        cpu_count = os.cpu_count() or 4
+        max_workers = max(1, cpu_count // 2)
+    
+    else:
+        # ~1 GB per worker, 20% headroom
+        try: 
+            # 'cuda' or 'rocm'
+            import torch
+            vram_gb = torch.cuda.mem_get_info(0)[0] / 1e9
+            max_workers = max(1, int(vram_gb * 0.8)) 
+        except Exception: 
+            # 'mps' or fallback
+            max_workers = 4
+
+    return max_workers
+
+
+def read_mot(mot_path):
+    '''
+    Read a .mot file (OpenSim motion file).
+    
+    INPUT:
+    - mot_path: path to the .mot file
+    
+    OUTPUT:
+    - data: pandas DataFrame with all data columns, excluding time
+    - time_col: pandas Series of time values
+    - header: list of header lines
+    '''
+    
+    header_lines = []
+    header_end_line = 0
+    with open(mot_path, 'r') as f:
+        lines = f.readlines()
+    
+    # Find the end of the header (line with "endheader")
+    for i, line in enumerate(lines):
+        if line.strip().lower() == 'endheader':
+            header_end_line = i
+            break
+        
+    header_lines = lines[:header_end_line + 1]
+    
+    # Read the data portion
+    data = pd.read_csv(mot_path, sep='\t', skiprows=header_end_line + 1)
+    
+    # Separate time column from data columns
+    time_col = data.iloc[:, 0]  # first column is time
+    data_cols = data.iloc[:, 1:]  # remaining columns are data
+    
+    return data_cols, time_col, header_lines
+
+
+def write_mot(mot_path, mot_data, time_col, header):
+    '''
+    Write a .mot file (OpenSim motion file).
+    
+    INPUT:
+    - mot_path: path to the output .mot file
+    - mot_data: pandas DataFrame of filtered data columns
+    - time_col: pandas Series of time values
+    - header: list of header lines
+    '''
+    
+    with open(mot_path, 'w') as f:
+        for line in header:
+            f.write(line)
+        
+        all_mot_data = pd.concat(
+            [pd.Series(time_col, name='time').reset_index(drop=True),
+             mot_data.reset_index(drop=True)
+            ], axis=1)
+        all_mot_data.to_csv(f, sep='\t', index=False, header=None, lineterminator='\n') 
+
+
 def read_trc(trc_path):
     '''
-    Read a TRC file and extract its contents.
+    Read a .trc file (OpenSim marker trajectory file).
 
     INPUTS:
     - trc_path (str): The path to the TRC file.
 
     OUTPUTS:
-    - tuple: A tuple containing the Q coordinates, frames column, time column, marker names, and header.
+    - Q_coords (DataFrame): A DataFrame containing the Q coordinates of the markers.
+    - frames_col (Series): A Series containing the frame numbers.
+    - time_col (Series): A Series containing the time values.
+    - markers (list): A list of marker names.
+    - header (list): A list of header lines.
     '''
 
     try:
@@ -165,15 +301,43 @@ def read_trc(trc_path):
        
         trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4, encoding='utf-8')
         frames_col, time_col = trc_df.iloc[:, 0], trc_df.iloc[:, 1]
-        Q_coords = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
-        Q_coords = Q_coords.loc[:, ~Q_coords.columns.str.startswith('Unnamed')] # remove unnamed columns
-        Q_coords.columns = np.array([[m,m,m] for m in markers]).ravel().tolist()
+        trc_data = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
+        trc_data = trc_data.loc[:, ~trc_data.columns.str.startswith('Unnamed')] # remove unnamed columns
+        trc_data.columns = np.array([[m,m,m] for m in markers]).ravel().tolist()
 
-        return Q_coords, frames_col, time_col, markers, header
+        return trc_data, frames_col, time_col, markers, header
     
     except Exception as e:
         raise ValueError(f"Error reading TRC file at {trc_path}: {e}")
     
+
+def write_trc(trc_path, trc_data, frames_col, time_col, header):
+    '''
+    Write a .trc file (OpenSim marker trajectory file).
+    
+    INPUTS:
+    - trc_path: path to the output .trc file
+    - trc_data: pandas DataFrame of filtered data columns
+    - frames_col: pandas Series of frame numbers
+    - time_col: pandas Series of time values
+    - header: list of header lines
+    '''
+
+    try:
+        with open(trc_path, 'w') as trc_o:
+            for line in header:
+                trc_o.write(line)
+
+            all_trc_data = pd.concat(
+                [pd.Series(frames_col, name='Frame#').reset_index(drop=True),
+                 pd.Series(time_col, name='Time').reset_index(drop=True),
+                 trc_data.reset_index(drop=True)
+                ], axis=1)
+            all_trc_data.to_csv(trc_o, sep='\t', index=False, header=None, lineterminator='\n')
+
+    except Exception as e:
+        raise ValueError(f"Error writing TRC file at {trc_path}: {e}")
+
 
 def extract_trc_data(trc_path):
     '''
@@ -197,6 +361,133 @@ def extract_trc_data(trc_path):
     trc_data_np = np.genfromtxt(trc_path, skip_header=5, delimiter = '\t')[:,1:] 
 
     return marker_names, trc_data_np
+
+
+def add_shoulder_data(trc_data, markers, header):
+    '''
+    Add shoulder data to trc_data if not present. 
+    Defined as the Hip point + 0.53 m in the Y direction + 0.1 m in the Hip to Hip direction.
+    Also update header and markers.
+    '''
+
+    shoulder_offset = 0.53
+    if 'RShoulder' not in markers and 'LShoulder' not in markers:
+        markers.append('RShoulder')
+        markers.append('LShoulder')
+
+        # Update header
+        header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
+        header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{"RShoulder"}\t\t\t{"LShoulder"}\t\t\t\n')
+        header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
+
+        # update trc_data
+        rhip_data = trc_data['RHip']
+        lhip_data = trc_data['LHip']
+        rlhip_direction = rhip_data.values - lhip_data.values
+        rlhip_direction = rlhip_direction / np.linalg.norm(rlhip_direction, axis=1)[:,None]
+
+        rshoulder_data = pd.DataFrame(rhip_data.values + np.array([0,shoulder_offset,0] + rlhip_direction * 0.1), columns=['RShoulder']*3)
+        lshoulder_data = pd.DataFrame(lhip_data.values + np.array([0,shoulder_offset,0] - rlhip_direction * 0.1), columns=['LShoulder']*3)
+        trc_data = pd.concat([trc_data, rshoulder_data, lshoulder_data], axis=1)
+    
+    return trc_data, markers, header
+
+
+def add_neck_hip_data(trc_data, markers, header):
+    '''
+    Add neck and midhip data to trc_data if not present.
+    Also update header and markers.
+    '''
+
+    midpoints = {
+        'Neck': ['RShoulder', 'LShoulder'],
+        'Hip': ['RHip', 'LHip']}
+
+    for mk_name, r_l_markers in midpoints.items():
+        if mk_name not in markers:
+            try:
+                # Add marker name
+                markers.append(mk_name)
+
+                # Update header
+                header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
+                header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{mk_name}\t\t\t\n')
+                header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
+
+                # update trc_data
+                r_l_data = [trc_data[marker] for marker in r_l_markers]
+                mid_data = pd.DataFrame(sum([data.values for data in r_l_data])/2, columns=[mk_name]*3)
+                trc_data = pd.concat([trc_data, mid_data], axis=1)
+            except Exception as e:
+                logging.warning(f"Failed to add {mk_name} marker. Error: {e}")
+
+    return trc_data, markers, header
+
+
+def add_shoulder_neck_hip_coords(kpt_name, p_X, p_Y, p_scores, kpt_ids, kpt_names):
+    '''
+    Adding kpt_name if missing from kpt_names:
+    - shoulder: hip + dist(knee,hip) in -Y direction
+    - neck: midshoulder
+    - hip: midhip
+    
+    INPUTS:
+    - kpt_name: name of the keypoint to add (neck, hip)
+    - p_X: list of x coordinates after flipping if needed
+    - p_Y: list of y coordinates
+    - p_scores: list of confidence scores
+    - kpt_ids: list of keypoint ids (see skeletons.py)
+    - kpt_names: list of keypoint names (see skeletons.py)
+    
+    OUTPUTS:
+    - p_X: list of x coordinates with added missing coordinate
+    - p_Y: list of y coordinates with added missing coordinate
+    - p_scores: list of confidence scores with added missing score
+    '''
+
+    names, ids = kpt_names.copy(), kpt_ids.copy()
+    names.append(kpt_name)
+    ids.append(len(p_X))
+
+    if kpt_name in ['RShoulder', 'LShoulder']:
+        rknee_coords = (p_X[ids[names.index('RKnee')]], p_Y[ids[names.index('RKnee')]])
+        rhip_coords = (p_X[ids[names.index('RHip')]], p_Y[ids[names.index('RHip')]])
+        lhip_coords = (p_X[ids[names.index('LHip')]], p_Y[ids[names.index('LHip')]])
+        lknee_coords = (p_X[ids[names.index('LKnee')]], p_Y[ids[names.index('LKnee')]])
+        knee_hip_dist = np.mean([euclidean_distance(rknee_coords, rhip_coords), euclidean_distance(lknee_coords, lhip_coords)])
+        if kpt_name == 'LShoulder':
+            lshoulder_X = lhip_coords[0]
+            lshoulder_Y = lhip_coords[1] - 1.4 * knee_hip_dist
+            lshoulder_score = (p_scores[ids[names.index('LKnee')]] + p_scores[ids[names.index('LHip')]])/2
+            new_p_X = np.append(p_X, lshoulder_X)
+            new_p_Y = np.append(p_Y, lshoulder_Y)
+            new_p_score = np.append(p_scores, lshoulder_score)
+        elif kpt_name == 'RShoulder':
+            rshoulder_X = rhip_coords[0]
+            rshoulder_Y = rhip_coords[1] - 1.4 * knee_hip_dist
+            rshoulder_score = (p_scores[ids[names.index('RKnee')]] + p_scores[ids[names.index('LHip')]])/2
+            new_p_X = np.append(p_X, rshoulder_X)
+            new_p_Y = np.append(p_Y, rshoulder_Y)
+            new_p_score = np.append(p_scores, rshoulder_score)
+
+    elif kpt_name == 'Neck':
+        new_p_X = (np.abs(p_X[ids[names.index('LShoulder')]]) + np.abs(p_X[ids[names.index('RShoulder')]])) /2
+        new_p_Y = (p_Y[ids[names.index('LShoulder')]] + p_Y[ids[names.index('RShoulder')]])/2
+        new_p_score = (p_scores[ids[names.index('LShoulder')]] + p_scores[ids[names.index('RShoulder')]])/2
+
+    elif kpt_name == 'Hip':
+        new_p_X = (np.abs(p_X[ids[names.index('LHip')]]) + np.abs(p_X[ids[names.index('RHip')]]) ) /2
+        new_p_Y = (p_Y[ids[names.index('LHip')]] + p_Y[ids[names.index('RHip')]])/2
+        new_p_score = (p_scores[ids[names.index('LHip')]] + p_scores[ids[names.index('RHip')]])/2
+    
+    else:
+        raise ValueError("kpt_name must be 'Neck' or 'Hip'")
+    
+    p_X = np.append(p_X, new_p_X)
+    p_Y = np.append(p_Y, new_p_Y)
+    p_scores = np.append(p_scores, new_p_score)
+
+    return p_X, p_Y, p_scores
 
 
 def common_items_in_list(list1, list2):
@@ -391,14 +682,18 @@ def euclidean_distance(q1, q2):
     q1 = np.array(q1)
     q2 = np.array(q2)
     dist = q2 - q1
-    if np.isnan(dist).all():
-        dist = np.empty_like(dist)
-        dist[...] = np.inf
     
     if len(dist.shape)==1:
-        euc_dist = np.sqrt(np.nansum( [d**2 for d in dist]))
+        if np.isnan(dist).any():
+            return np.inf
+        euc_dist = np.sqrt(np.nansum(dist**2))
     else:
-        euc_dist = np.sqrt(np.nansum( [d**2 for d in dist], axis=1))
+        nan_rows = np.isnan(dist).any(axis=1)
+        dist[nan_rows] = np.nan
+        euc_dist = np.sqrt(np.nansum(dist**2, axis=1))
+        euc_dist[nan_rows] = np.nan
+        if np.all(np.isnan(euc_dist)):
+            return np.inf
     
     return euc_dist
 
@@ -424,7 +719,7 @@ def pad_shape(arr, target_len, fill_value=np.nan):
     return arr
 
 
-def trimmed_mean(arr, trimmed_extrema_percent=0.5):
+def trimmed_mean(arr, trimmed_extrema_percent=50):
     '''
     Trimmed mean calculation for an array.
 
@@ -440,6 +735,7 @@ def trimmed_mean(arr, trimmed_extrema_percent=0.5):
     sorted_arr = np.sort(arr)
     
     # Determine the indices for the 25th and 75th percentiles (if trimmed_percent = 0.5)
+    trimmed_extrema_percent /= 100
     lower_idx = int(len(sorted_arr) * (trimmed_extrema_percent/2))
     upper_idx = int(len(sorted_arr) * (1 - trimmed_extrema_percent/2))
     
@@ -448,9 +744,9 @@ def trimmed_mean(arr, trimmed_extrema_percent=0.5):
     
     # Return the mean of the remaining values
     if len(trimmed_arr) == 0:
-        trimmed_mean_arr = np.mean(arr)
+        trimmed_mean_arr = np.nanmean(arr)
     else:
-        trimmed_mean_arr = np.mean(trimmed_arr)
+        trimmed_mean_arr = np.nanmean(trimmed_arr)
     
     return trimmed_mean_arr
 
@@ -697,7 +993,7 @@ def interpolate_zeros_nans(col, *args):
     if 'kind' not in locals(): # 'linear', 'slinear', 'quadratic', 'cubic'
         f_interp = interpolate.interp1d(idx_good, col[idx_good], kind="linear", bounds_error=False)
     else:
-        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, fill_value='extrapolate', bounds_error=False)
+        f_interp = interpolate.interp1d(idx_good, col[idx_good], kind=kind, bounds_error=False)
     col_interp = col.where(mask, f_interp(col.index)) #replace at false index with interpolated values
     
     # Reintroduce nans if length of sequence > N
@@ -719,8 +1015,8 @@ def points_to_angles(points_list):
     If len(points_list)==4, computes clockwise angle between vectors ab and cd (e.g. Neck Hip, RKnee RHip)
     
     Points can be 2D or 3D.
-    If parameters are float, returns a float between 0.0 and 360.0
-    If parameters are arrays, returns an array of floats between 0.0 and 360.0
+    If parameters are float, returns a float between -180.0 and 180.0
+    If parameters are arrays, returns an array of floats between -180.0 and 180.0
 
     INPUTS:
     - points_list: list of arrays of points
@@ -737,10 +1033,16 @@ def points_to_angles(points_list):
 
     if len(points_list) == 2:
         vector_u = points_array[0] - points_array[1]
-        if len(points_array.shape)==2:
-            vector_v = np.array([1, 0, 0]) # Here vector X, could be any horizontal vector
+        if dimensions == 2:
+            # Segment angle w.r.t. horizontal: atan2(dy, dx) directly
+            ang = np.arctan2(vector_u[1], vector_u[0])
+            ang_deg = np.degrees(ang)
+            return ang_deg
         else:
-            vector_v = np.array([[1, 0, 0],] * points_array.shape[1]) 
+            if len(points_array.shape)==2:
+                vector_v = np.array([1, 0, 0])
+            else:
+                vector_v = np.array([[1, 0, 0],] * points_array.shape[1])
 
     elif len(points_list) == 3:
         vector_u = points_array[0] - points_array[1]
@@ -753,24 +1055,27 @@ def points_to_angles(points_list):
     else:
         return np.nan
 
-    if dimensions == 2: 
-        vector_u = vector_u[:2]
-        vector_v = vector_v[:2]
-        ang = np.arctan2(vector_u[1], vector_u[0]) - np.arctan2(vector_v[1], vector_v[0])
+    if dimensions == 2:
+        # atan2(cross, dot) gives angle from u to v (CCW positive).
+        # Negate to get angle from v to u, matching the old atan2(u)-atan2(v) convention.
+        # Range: (-180, 180) instead of (-360, 360), eliminating discontinuities.
+        cross = vector_u[0] * vector_v[1] - vector_u[1] * vector_v[0]
+        dot = vector_u[0] * vector_v[0] + vector_u[1] * vector_v[1]
+        ang = -np.arctan2(cross, dot)
     else:
         cross_product = np.cross(vector_u, vector_v)
-        dot_product = np.einsum('ij,ij->i', vector_u, vector_v) # np.dot(vector_u, vector_v) # does not work with time series
-        ang = np.arctan2(np.linalg.norm(cross_product,axis=1), dot_product)
+        dot_product = np.einsum('ij,ij->i', vector_u, vector_v) # np.dot(vector_u, vector_v) does not work with time series
+        ang = np.arctan2(np.linalg.norm(cross_product, axis=-1), dot_product)
 
     ang_deg = np.degrees(ang)
-    # ang_deg = np.array(np.degrees(np.unwrap(ang*2)/2))
     
     return ang_deg
 
 
 def fixed_angles(points_list, ang_name):
     '''
-    Add offset and multiplying factor to angles
+    Compute angle and apply offset and scaling factor.
+    Wraps result to (-180, 180] for most angles, or (-90, 90] for pelvis/shoulders.
 
     INPUTS:
     - points_list: list of arrays of points
@@ -782,14 +1087,12 @@ def fixed_angles(points_list, ang_name):
 
     ang_params = angle_dict[ang_name]
     ang = points_to_angles(points_list)
-    ang += ang_params[2]
-    ang *= ang_params[3]
+    ang = (ang + ang_params[2]) * ang_params[3]
+    
     if ang_name in ['pelvis', 'shoulders']:
-        ang = np.where(ang>90, ang-180, ang)
-        ang = np.where(ang<-90, ang+180, ang)
+        ang = (ang + 90) % 180 - 90
     else:
-        ang = np.where(ang>180, ang-360, ang)
-        ang = np.where(ang<-180, ang+360, ang)
+        ang = (ang + 180) % 360 - 180
 
     return ang
 
@@ -805,8 +1108,6 @@ def mean_angles(Q_coords, ang_to_consider = ['right knee', 'left knee', 'right h
     OUTPUTS:
     - ang_mean: The mean angle time series.
     '''
-
-    ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip']
 
     angs = []
     for ang_name in ang_to_consider:
@@ -831,117 +1132,50 @@ def mean_angles(Q_coords, ang_to_consider = ['right knee', 'left knee', 'right h
     return ang_mean
 
 
-def add_neck_hip_coords(kpt_name, p_X, p_Y, p_scores, kpt_ids, kpt_names):
+def best_coords_for_measurements(Q_coords, large_hip_knee_angles=90):
     '''
-    Add neck (midshoulder) and hip (midhip) coordinates if neck and hip are not available
-    
-    INPUTS:
-    - kpt_name: name of the keypoint to add (neck, hip)
-    - p_X: list of x coordinates after flipping if needed
-    - p_Y: list of y coordinates
-    - p_scores: list of confidence scores
-    - kpt_ids: list of keypoint ids (see skeletons.py)
-    - kpt_names: list of keypoint names (see skeletons.py)
-    
-    OUTPUTS:
-    - p_X: list of x coordinates with added missing coordinate
-    - p_Y: list of y coordinates with added missing coordinate
-    - p_scores: list of confidence scores with added missing score
-    '''
-
-    names, ids = kpt_names.copy(), kpt_ids.copy()
-    names.append(kpt_name)
-    ids.append(len(p_X))
-    if kpt_name == 'Neck':
-        mid_X = (np.abs(p_X[ids[names.index('LShoulder')]]) + np.abs(p_X[ids[names.index('RShoulder')]])) /2
-        mid_Y = (p_Y[ids[names.index('LShoulder')]] + p_Y[ids[names.index('RShoulder')]])/2
-        mid_score = (p_scores[ids[names.index('LShoulder')]] + p_scores[ids[names.index('RShoulder')]])/2
-    elif kpt_name == 'Hip':
-        mid_X = (np.abs(p_X[ids[names.index('LHip')]]) + np.abs(p_X[ids[names.index('RHip')]]) ) /2
-        mid_Y = (p_Y[ids[names.index('LHip')]] + p_Y[ids[names.index('RHip')]])/2
-        mid_score = (p_scores[ids[names.index('LHip')]] + p_scores[ids[names.index('RHip')]])/2
-    else:
-        raise ValueError("kpt_name must be 'Neck' or 'Hip'")
-    p_X = np.append(p_X, mid_X)
-    p_Y = np.append(p_Y, mid_Y)
-    p_scores = np.append(p_scores, mid_score)
-
-    return p_X, p_Y, p_scores
-
-
-def best_coords_for_measurements(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.2, close_to_zero_speed=0.2, large_hip_knee_angles=45):
-    '''
-    Compute the best coordinates for measurements, after removing:
-    - 20% fastest frames (may be outliers)
-    - frames when speed is close to zero (person is out of frame): 0.2 m/frame, or 50 px/frame
-    - frames when hip and knee angle below 45° (imprecise coordinates when person is crouching)
+    Compute the best coordinates for measurements, after removing the
+    frames where hip and knee angle are below 45° 
+    (coordinates are imprecise when the person is crouching)
     
     INPUTS:
     - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
-    - keypoints_names: list. The list of marker names
-    - fastest_frames_to_remove_percent: float
-    - close_to_zero_speed: float (sum for all keypoints: about 50 px/frame or 0.2 m/frame)
     - large_hip_knee_angles: int
-    - trimmed_extrema_percent
 
     OUTPUT:
-    - Q_coords_low_speeds_low_angles: pd.DataFrame. The best coordinates for measurements
+    - Q_coords_low_angles: pd.DataFrame. The best coordinates for measurements
     '''
 
-    # Add MidShoulder column
-    df_MidShoulder = pd.DataFrame((Q_coords['RShoulder'].values + Q_coords['LShoulder'].values) /2)
-    df_MidShoulder.columns = ['MidShoulder']*3
-    Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_MidShoulder), axis=1)
-
-    # Add Hip column if not present
-    n_markers_init = len(keypoints_names)
-    if 'Hip' not in keypoints_names:
-        df_Hip = pd.DataFrame((Q_coords['RHip'].values + Q_coords['LHip'].values) /2)
-        df_Hip.columns = ['Hip']*3
-        Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_Hip), axis=1)
-    n_markers = len(keypoints_names)
-
-    # Using 80% slowest frames
-    sum_speeds = pd.Series(np.nansum([np.linalg.norm(Q_coords[kpt].diff(), axis=1) for kpt in keypoints_names], axis=0))
-    sum_speeds = sum_speeds[sum_speeds>close_to_zero_speed] # Removing when speeds close to zero (out of frame)
-    if len(sum_speeds)==0:
-        logging.warning('All frames have speed close to zero. Make sure the person is moving and correctly detected, or change close_to_zero_speed to a lower value. Not restricting the speeds to be above any threshold.')
-        Q_coords_low_speeds = Q_coords
-    else:
-        min_speed_indices = sum_speeds.abs().nsmallest(int(len(sum_speeds) * (1-fastest_frames_to_remove_percent))).index
-        Q_coords_low_speeds = Q_coords.iloc[min_speed_indices].reset_index(drop=True)
+    # Remove nans
+    Q_coords = Q_coords.dropna(how='all')
     
     # Only keep frames with hip and knee flexion angles below 45% 
     # (if more than 50 of them, else take 50 smallest values)
     try:
-        ang_mean = mean_angles(Q_coords_low_speeds, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
-        Q_coords_low_speeds_low_angles = Q_coords_low_speeds[ang_mean < large_hip_knee_angles]
-        if len(Q_coords_low_speeds_low_angles) < 50:
-            Q_coords_low_speeds_low_angles = Q_coords_low_speeds.iloc[pd.Series(ang_mean).nsmallest(50).index]
+        ang_mean = mean_angles(Q_coords, ang_to_consider = ['right knee', 'left knee', 'right hip', 'left hip'])
+        Q_coords_low_angles = Q_coords[ang_mean < large_hip_knee_angles]
+        if len(Q_coords_low_angles) < 50:
+            Q_coords_low_angles = Q_coords.iloc[pd.Series(ang_mean).nsmallest(50).index]
     except:
-        Q_coords_low_speeds_low_angles = Q_coords_low_speeds
-        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}°.")
+        Q_coords_low_angles = Q_coords
+        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}° as a fallback.")
 
-    if Q_coords_low_speeds_low_angles.empty:
-        logging.warning('The selected person might not move, or is crouching for the whole sequence, or is not well detected. Taking all available data instead of filtering them.')
-        Q_coords_low_speeds_low_angles = Q_coords.copy()
+    if Q_coords_low_angles.empty:
+        logging.warning('The selected person might not move, or is crouching for the whole sequence, or is not well detected. Taking all available data instead of filtering them as a fallback.')
+        Q_coords_low_angles = Q_coords.copy()
     
-    if n_markers_init < n_markers:
-        Q_coords_low_speeds_low_angles = Q_coords_low_speeds_low_angles.iloc[:,:-3]
-
-    return Q_coords_low_speeds_low_angles
+    return Q_coords_low_angles
 
 
-def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_height(Q_coords, large_hip_knee_angles=90, trimmed_extrema_percent=50):
     '''
     Compute the height of the person from the trc data.
+    Adds MidShoulder and Hip columns if not present. 
+    If the head or nose markers are missing, approximates height as leg_length/0.485 (Winter, 2009).
 
     INPUTS:
     - Q_coords: pd.DataFrame. The XYZ coordinates of each marker
-    - keypoints_names: list. The list of marker names
-    - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
-    - close_to_zero_speed: float. Sum for all keypoints: about 50 px/frame or 0.2 m/frame
-    - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
+    - large_hip_knee_angles: float. Hip and knee angles below this value are considered as imprecise
     - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
     
     OUTPUT:
@@ -949,13 +1183,24 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     '''
     
     # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
-    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, keypoints_names, 
-                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent, close_to_zero_speed=close_to_zero_speed, large_hip_knee_angles=large_hip_knee_angles)
+    Q_coords = best_coords_for_measurements(Q_coords, large_hip_knee_angles=large_hip_knee_angles)
+    
+    # Add MidShoulder column
+    if 'MidShoulder' not in Q_coords.columns:
+        df_MidShoulder = pd.DataFrame((Q_coords['RShoulder'].values + Q_coords['LShoulder'].values) /2)
+        df_MidShoulder.columns = ['MidShoulder']*3
+        Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_MidShoulder), axis=1)
+
+    # Add Hip column if not present
+    if 'Hip' not in Q_coords.columns:
+        df_Hip = pd.DataFrame((Q_coords['RHip'].values + Q_coords['LHip'].values) /2)
+        df_Hip.columns = ['Hip']*3
+        Q_coords = pd.concat((Q_coords.reset_index(drop=True), df_Hip), axis=1)
 
     # Automatically compute the height of the person
     feet_pairs = [['RHeel', 'RAnkle'], ['LHeel', 'LAnkle']]
     try:
-        rfoot, lfoot = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in feet_pairs]
+        rfoot, lfoot = [euclidean_distance(Q_coords[pair[0]], Q_coords[pair[1]]) for pair in feet_pairs]
     except:
         rfoot, lfoot = 0.10, 0.10
         logging.warning('The Heel marker is missing from your model. Considering Foot to Heel size as 10 cm.')
@@ -963,7 +1208,7 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
     ankle_to_shoulder_pairs =  [['RAnkle', 'RKnee'], ['RKnee', 'RHip'], ['RHip', 'RShoulder'],
                                 ['LAnkle', 'LKnee'], ['LKnee', 'LHip'], ['LHip', 'LShoulder']]
     try:
-        rshank, rfemur, rback, lshank, lfemur, lback = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in ankle_to_shoulder_pairs]
+        rshank, rfemur, rback, lshank, lfemur, lback = [euclidean_distance(Q_coords[pair[0]], Q_coords[pair[1]]) for pair in ankle_to_shoulder_pairs]
     except:
         logging.error('At least one of the following markers is missing for computing the height of the person:\
                             RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder.\n\
@@ -973,32 +1218,36 @@ def compute_height(Q_coords, keypoints_names, fastest_frames_to_remove_percent=0
                          Make sure that the person is entirely visible, or use a calibration file instead, or set "to_meters=false".')
 
     try:
-        head_pair = [['MidShoulder', 'Head']]
-        head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]\
-                *1.008
+        try:
+            head_pair = [['MidShoulder', 'Head']]
+            head = [euclidean_distance(Q_coords[pair[0]], Q_coords[pair[1]]) for pair in head_pair][0]\
+                    *1.008
+        except:
+            head_pair = [['MidShoulder', 'Nose']]
+            head = [euclidean_distance(Q_coords[pair[0]], Q_coords[pair[1]]) for pair in head_pair][0]\
+                    *1.5
+            logging.warning('The Head marker is missing from your model. Considering Neck to Head size as 1.33 times Neck to MidShoulder size.')
+        
+        heights = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2 + (rback + lback)/2 + head
+    
     except:
-        head_pair = [['MidShoulder', 'Nose']]
-        head = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]],Q_coords_low_speeds_low_angles[pair[1]]) for pair in head_pair][0]\
-                *1.5
-        logging.warning('The Head marker is missing from your model. Considering Neck to Head size as 1.33 times Neck to MidShoulder size.')
+        logging.warning('Head and Nose markers are missing. Approximating height as leg_length/0.485 (Winter, 2009).')
+        leg_lengths = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2
+        heights = leg_lengths / 0.485
     
-    heights = (rfoot + lfoot)/2 + (rshank + lshank)/2 + (rfemur + lfemur)/2 + (rback + lback)/2 + head
-    
-    # Remove the 20% most extreme values
+    # Remove the 50% most extreme values
     height = trimmed_mean(heights, trimmed_extrema_percent=trimmed_extrema_percent)
 
     return height
 
 
-def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, close_to_zero_speed=50, large_hip_knee_angles=45, trimmed_extrema_percent=0.5):
+def compute_leg_length(trc_path, large_hip_knee_angles=90, trimmed_extrema_percent=50):
     '''
     Compute the leg length of the person from the trc data.
 
     INPUTS:
     - Q_coords: path to the trc file (can be in m or px)
-    - fastest_frames_to_remove_percent: float. Frames with high speed are considered as outliers
-    - close_to_zero_speed: float. Sum for all keypoints: about 50 px/frame or 0.2 m/frame
-    - large_hip_knee_angles5: float. Hip and knee angles below this value are considered as imprecise
+    - large_hip_knee_angles: float. Hip and knee angles below this value are considered as imprecise
     - trimmed_extrema_percent: float. Proportion of the most extreme segment values to remove before calculating their mean)
 
     OUTPUT:
@@ -1008,17 +1257,14 @@ def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, close_to_
     Q_coords, frames_col, time_col, markers, header = read_trc(trc_path)
 
     # Retrieve most reliable coordinates, adding MidShoulder and Hip columns if not present
-    Q_coords_low_speeds_low_angles = best_coords_for_measurements(Q_coords, markers,
-                                                                  fastest_frames_to_remove_percent=fastest_frames_to_remove_percent,
-                                                                  close_to_zero_speed=close_to_zero_speed,
-                                                                  large_hip_knee_angles=large_hip_knee_angles)
+    Q_coords_low_angles = best_coords_for_measurements(Q_coords, large_hip_knee_angles=large_hip_knee_angles)
 
     # leg length will be considered as the distance from the hip joint centre to the ankle joint centre
     hip_to_ankle_pairs = [['RAnkle', 'RKnee'], ['LAnkle', 'LKnee'], ['RKnee', 'RHip'], ['LKnee', 'LHip']]
 
     # calculate the distance between each of the pairs of points
     try:
-        rshank, lshank, rthigh, lthigh = [euclidean_distance(Q_coords_low_speeds_low_angles[pair[0]], Q_coords_low_speeds_low_angles[pair[1]]) for pair in hip_to_ankle_pairs]
+        rshank, lshank, rthigh, lthigh = [euclidean_distance(Q_coords_low_angles[pair[0]], Q_coords_low_angles[pair[1]]) for pair in hip_to_ankle_pairs]
     except:
         logging.error('At least one of the following markers is missing for computing the leg length of the person:\
                                     RAnkle, RKnee, RHip, LAnkle, LKnee, LHip.')
@@ -1033,16 +1279,8 @@ def compute_leg_length(trc_path, fastest_frames_to_remove_percent=0.1, close_to_
 
     return leg_length
 
-    
 
-
-    # BEFORE ALL THAT: IN SORT, CONFIDENCE DECAY: REMOVE WHEN NOT SEEN FOR > 5*interp_gap_smaller_than?
-    # TEST POSTERS + OTHER CHALLENGING VIDS
-    # TEST POSE2SIM TRIG
-    # CHECK WHY RUGBY CUT OFF
-
-
-def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
+def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None, max_unseen_frames=None, frames_since_last_seen=None):
     '''
     Associate persons across frames (Sports2D method)
     Persons' indices are sometimes swapped when changing frame
@@ -1058,28 +1296,42 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
     - score: (K, L) array of confidence scores for K persons, L keypoints (optional) 
     - max_dist: maximum distance threshold for association. If None, no threshold applied.
                 If distance > max_dist, person is treated as new (no association)
+    - max_unseen_frames: int or None. If a person has not been seen for more than this many frames, they will be considered stale
+                        and their ID won't be confused with any other person passing by.
+                        If None, staleness tracking is disabled (original behavior).
+    - frames_since_last_seen: array of shape (K,) tracking how many frames since each previous person
+                              was last seen. Required when max_unseen_frames is not None. Updated and returned.
     
     OUTPUTS:
     - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
     - sorted_keypoints: array with reordered persons
-    - sorted_scores: array with reordered scores
-    - sorted_ids: array with indices of associated persons in current frame
+    - sorted_scores: array with reordered scores (if scores provided, else sorted_ids)
+    - frames_since_last_seen: updated staleness counter array (only returned when max_unseen_frames is not None)
     '''
+
+    use_staleness = max_unseen_frames is not None
 
     # Handle empty frames
     n_prev = len(keyptpre)
     n_curr = len(keypt)
     if n_prev == 0 and n_curr == 0:
-            if scores is not None:
-                return np.array([]), np.array([]), np.array([])
-            else:
-                return np.array([]), np.array([])
-    if n_prev == 0:
         if scores is not None:
-            return np.array([]), keypt, scores
+            ret = (np.array([]), np.array([]), np.array([]))
         else:
-            return np.array([]), keypt
+            ret = (np.array([]), np.array([]), np.array([], dtype=int))
+        return ret + (np.array([], dtype=int),) if use_staleness else ret
+    if n_prev == 0:
+        new_fsls = np.zeros(n_curr, dtype=int)
+        if scores is not None:
+            ret = (np.array([]), keypt, scores)
+        else:
+            ret = (np.array([]), keypt, np.arange(n_curr))
+        return ret + (new_fsls,) if use_staleness else ret
     
+    # Initialize frames_since_last_seen if staleness tracking is enabled but not yet started
+    if use_staleness and frames_since_last_seen is None:
+        frames_since_last_seen = np.zeros(n_prev, dtype=int)
+
     # Broadcasts the computation of distance matrix for all possible associations instead of using euclidean_distance in a loop
     keyptpre_expanded = keyptpre[:, np.newaxis, :, :]
     keypt_expanded = keypt[np.newaxis, :, :, :]
@@ -1088,6 +1340,11 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
     dist_matrix = np.nanmean(distances_per_keypoint, axis=2)
     dist_matrix = np.nan_to_num(dist_matrix, nan=1e10, posinf=1e10) # Replace inf/nan with large number
     
+    # Inflate distances for stale persons so they won't attract new detections
+    if use_staleness:
+        stale_mask = frames_since_last_seen >= max_unseen_frames
+        dist_matrix[stale_mask, :] = 1e10
+
     # Hungarian algorithm instead of min_with_single_indices in previous versions (faster when many people)
     # Finds the associations with smallest distances between previous and current frame, each person associated only once
     pre_ids, curr_ids = linear_sum_assignment(dist_matrix)
@@ -1104,8 +1361,8 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
     # Track non associated people in current frame (new people)
     associated_curr_ids = set([curr_id for _, curr_id in valid_associations])
     unassociated_curr_ids = [i for i in range(n_curr) if i not in associated_curr_ids]
-    
-    # Create sorted_keypoints filled with nans
+
+    # Create sorted_keypoints filled with nans (existing slots + truly new persons)
     n_total = n_prev + len(unassociated_curr_ids)
     sorted_keypoints = np.full((n_total,) + keypt.shape[1:], np.nan)
     if scores is not None:
@@ -1138,10 +1395,24 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None):
         keyptpre_padded, 
         sorted_keypoints)
     
-    if scores is not None:
-        return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+    # Update frames_since_last_seen
+    if use_staleness:
+        updated_fsls = np.full(n_total, 0, dtype=int)
+        updated_fsls[:n_prev] = frames_since_last_seen + 1  # increment for all existing
+        for prev_idx, _ in valid_associations:
+            updated_fsls[prev_idx] = 0  # reset for matched (including recycled stale slots)
+        # New persons (beyond n_prev) already initialized at 0
+    
+    if use_staleness:
+        if scores is not None:
+            return sorted_prev_keypoints, sorted_keypoints, sorted_scores, updated_fsls
+        else:
+            return sorted_prev_keypoints, sorted_keypoints, sorted_ids, updated_fsls
     else:
-        return sorted_prev_keypoints, sorted_keypoints, sorted_ids
+        if scores is not None:
+            return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+        else:
+            return sorted_prev_keypoints, sorted_keypoints, sorted_ids
 
 
 def sort_people_rtmlib(pose_tracker, keypoints, scores):
@@ -1331,7 +1602,7 @@ def draw_bounding_box(img, X, Y, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)],
     return img
 
 
-def draw_skel(img, X, Y, model):
+def draw_skel(img, X, Y, skeleton_model):
     '''
     Draws keypoints and skeleton for each person.
     Skeletons have a different color for each person.
@@ -1340,7 +1611,7 @@ def draw_skel(img, X, Y, model):
     - img: opencv image
     - X: list of list of x coordinates
     - Y: list of list of y coordinates
-    - model: skeleton model (from skeletons.py)
+    - skeleton_model: Anytree node. Skeleton model (from skeletons.py)
     - colors: list of colors to cycle through
     
     OUTPUT:
@@ -1349,7 +1620,7 @@ def draw_skel(img, X, Y, model):
     
     # Get (unique) pairs between which to draw a line
     id_pairs, name_pairs = [], []
-    for data_i in PreOrderIter(model.root, filter_=lambda node: node.is_leaf):
+    for data_i in PreOrderIter(skeleton_model.root, filter_=lambda node: node.is_leaf):
         node_branch_ids = [node_i.id for node_i in data_i.path]
         node_branch_names = [node_i.name for node_i in data_i.path]
         id_pairs += [[node_branch_ids[i],node_branch_ids[i+1]] for i in range(len(node_branch_ids)-1)]
@@ -1395,11 +1666,14 @@ def draw_keypts(img, X, Y, scores, cmap_str='RdYlGn'):
     scores = np.where(scores<0, 0, scores)
     
     cmap = plt.get_cmap(cmap_str)
-    for (x,y,s) in zip(X,Y,scores):
-        c_k = np.array(cmap(s))[:,:-1]*255
-        [cv2.circle(img, (int(x[i]), int(y[i])), thickness+4, c_k[i][::-1], -1)
-            for i in range(len(x))
-            if not (np.isnan(x[i]) or np.isnan(y[i]))]
+    try:
+        for (x,y,s) in zip(X,Y,scores):
+            c_k = np.array(cmap(s))[:,:-1]*255
+            [cv2.circle(img, (int(x[i]), int(y[i])), thickness+4, c_k[i][::-1], -1)
+                for i in range(len(x))
+                if not (np.isnan(x[i]) or np.isnan(y[i]))]
+    except:
+        pass
 
     return img
 
@@ -1415,7 +1689,7 @@ def get_screen_size():
     - tuple of int: (screen_width, screen_height)
     '''
 
-    root = tk.Tk()
+    root = ctk.CTk()
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     root.destroy()
@@ -1455,31 +1729,29 @@ def calculate_display_size(W, H, screen_width, screen_height, margin=100):
 def set_always_on_top(fig):
     '''
     Set a matplotlib figure window to be always on top.
-    Works with Tkinter, PyQt5, and PySide2 backends.
+    Works with Tkinter and Qt backends (PySide6, PyQt5, PySide2).
     
     INPUTS:
     - fig: matplotlib figure object
     '''
 
     try:
-        # Try Tk method first
+        # Tk backend
         fig.canvas.manager.window.wm_attributes("-topmost", True)
-        print("Set always on top using Tk method")
     except AttributeError:
+        # Qt backend
         try:
-            # Try Qt method
-            from PyQt5.QtCore import Qt
-            window = fig.canvas.manager.window
-            window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
-            window.show()
-            print("Set always on top using Qt method")
-        except (ImportError, AttributeError):
             try:
-                # Try PySide2
-                from PySide2.QtCore import Qt
-                window = fig.canvas.manager.window
-                window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
-                window.show()
-                print("Set always on top using PySide2 method")
-            except (ImportError, AttributeError):
-                print("Could not set always on top - backend not supported")
+                from PySide6.QtCore import Qt
+                hint = Qt.WindowType.WindowStaysOnTopHint
+            except ImportError:
+                try:
+                    from PyQt5.QtCore import Qt
+                except ImportError:
+                    from PySide2.QtCore import Qt
+                hint = Qt.WindowStaysOnTopHint
+            window = fig.canvas.manager.window
+            window.setWindowFlags(window.windowFlags() | hint)
+            window.show()
+        except (ImportError, AttributeError):
+            pass

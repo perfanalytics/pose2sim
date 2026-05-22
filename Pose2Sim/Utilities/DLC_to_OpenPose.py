@@ -8,7 +8,7 @@
     ########################################################
     
     Translates DeepLabCut (h5) 2D pose estimation files into OpenPose (json) files.
-    You may need to install tables: 'pip install tables' or 'conda install pytables'
+    You may need to install tables: 'uv pip install tables' or 'conda install pytables'
         
     Usage: 
     DLC_to_OpenPose -i input_h5_file -o output_json_folder

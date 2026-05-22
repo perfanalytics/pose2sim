@@ -86,6 +86,33 @@ HALPE_26 = Node("Hip", id=19, children=[
 ])
 
 
+'''HALPE_26_LOWER (full-body without hands, from AlphaPose, MMPose, etc.)
+https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md
+https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose'''
+HALPE_26_LOWER = Node("Hip", id=19, children=[
+    Node("RHip", id=12, children=[
+        Node("RKnee", id=14, children=[
+            Node("RAnkle", id=16, children=[
+                Node("RBigToe", id=21, children=[
+                    Node("RSmallToe", id=23),
+                ]),
+                Node("RHeel", id=25),
+            ]),
+        ]),
+    ]),
+    Node("LHip", id=11, children=[
+        Node("LKnee", id=13, children=[
+            Node("LAnkle", id=15, children=[
+                Node("LBigToe", id=20, children=[
+                    Node("LSmallToe", id=22),
+                ]),
+                Node("LHeel", id=24),
+            ]),
+        ]),
+    ])
+])
+
+
 '''COCO_133_WRIST (full-body with hands and face, from AlphaPose, MMPose, etc.)
 https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md
 https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose'''
@@ -807,42 +834,42 @@ BODY_135 = Node("CHip", id=None, children=[
 
 '''BLAZEPOSE (full-body with simplified hand and foot, from mediapipe)
 https://google.github.io/mediapipe/solutions/pose'''
-BLAZEPOSE = Node("root", id=None, children=[
-    Node("right_hip", id=24, children=[
-        Node("right_knee", id=26, children=[
-            Node("right_ankle", id=28, children=[
-                Node("right_heel", id=30),
-                Node("right_foot_index", id=32),
+BLAZEPOSE = Node("Hip", id=None, children=[
+    Node("RHip", id=24, children=[
+        Node("RKnee", id=26, children=[
+            Node("RAnkle", id=28, children=[
+                Node("RHeel", id=30),
+                Node("RBigToe", id=32),
             ]),
         ]),
     ]),
-    Node("left_hip", id=23, children=[
-        Node("left_knee", id=25, children=[
-            Node("left_ankle", id=27, children=[
-                Node("left_heel", id=29),
-                Node("left_foot_index", id=31),
+    Node("LHip", id=23, children=[
+        Node("Lknee", id=25, children=[
+            Node("LAnkle", id=27, children=[
+                Node("LHeel", id=29),
+                Node("LBigToe", id=31),
             ]),
         ]),
     ]),
-    Node("nose", id=0, children=[
-        Node("right_eye", id=5),
-        Node("left_eye", id=2),
+    Node("Nose", id=0, children=[
+        Node("REye", id=5),
+        Node("LEye", id=2),
     ]),
-    Node("right_shoulder", id=12, children=[
-        Node("right_elbow", id=14, children=[
-            Node("right_wrist", id=16, children=[
-                Node("right_pinky", id=18),
-                Node("right_index", id=20),
-                Node("right_thumb", id=22),
+    Node("RShoulder", id=12, children=[
+        Node("RElbow", id=14, children=[
+            Node("RWrist", id=16, children=[
+                Node("RPinky", id=18),
+                Node("RIndex", id=20),
+                Node("RThumb", id=22),
             ]),
         ]),
     ]),
-    Node("left_shoulder", id=11, children=[
-        Node("left_elbow", id=13, children=[
-            Node("left_wrist", id=15, children=[
-                Node("left_pinky", id=17),
-                Node("left_index", id=19),
-                Node("left_thumb", id=21),
+    Node("LShoulder", id=11, children=[
+        Node("LElbow", id=13, children=[
+            Node("LWrist", id=15, children=[
+                Node("LPinky", id=17),
+                Node("LIndex", id=19),
+                Node("LThumb", id=21),
             ]),
         ]),
     ]),

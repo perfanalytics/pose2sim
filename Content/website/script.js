@@ -1,164 +1,228 @@
-// Global variables
-let currentStep = 0;
-const totalSteps = 16; // FIXED: Changed from 11 to 16 (steps 0-15)
-let currentLanguage = 'en';
+﻿'use strict';
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+let sections    = [];   // Array of section IDs in DOM order
+let currentIdx  = 0;    // Index of currently visible section
 let viewAllMode = false;
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    initializeNavigation();
+// ---------------------------------------------------------------------------
+// Initialisation
+// ---------------------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+    sections = Array.from(document.querySelectorAll('.step'))
+                    .map(el => el.id)
+                    .filter(Boolean);
+
+    if (sections.length === 0) return;
+
+    const hash = location.hash.slice(1);
+    const targetSection = resolveSection(hash);
+    showSection(targetSection, false);
     updateNavButtons();
-    updateActiveNavItem();
+    updateActiveNav(targetSection);
+
+    // Intercept in-content anchor link clicks so hidden sections become visible
+    document.addEventListener('click', e => {
+        const link = e.target.closest('a[href^="#"]');
+        if (!link) return;
+        const hash = link.getAttribute('href').slice(1);
+        if (!hash) return;
+
+        // Is it a direct section ID?
+        if (sections.includes(hash)) {
+            e.preventDefault();
+            goToSection(hash, null);
+            return;
+        }
+
+        // Is the target ID inside a known section?
+        const targetEl = document.getElementById(hash);
+        if (targetEl) {
+            const parentSection = targetEl.closest('.step');
+            if (parentSection && parentSection.id) {
+                e.preventDefault();
+                goToSection(parentSection.id, hash);
+                return;
+            }
+        }
+
+        // Fall back to nav-item data-anchor lookup
+        const navItem = document.querySelector(`.nav-item[data-anchor="${hash}"]`);
+        if (navItem && navItem.dataset.section) {
+            e.preventDefault();
+            goToSection(navItem.dataset.section, hash);
+        }
+    });
 });
 
-// Navigation functions
-function goToStep(stepNumber) {
-    if (viewAllMode) {
-        toggleViewAll(); // Exit view all mode
+// Also handle direct URL hash navigation (back/forward, typed URLs)
+window.addEventListener('hashchange', () => {
+    const hash = location.hash.slice(1);
+    if (!hash) return;
+    const targetSection = resolveSection(hash);
+    showSection(targetSection, false);
+    // Scroll to sub-anchor if it's not the section itself
+    if (hash !== targetSection) {
+        const el = document.getElementById(hash);
+        if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
     }
-    
-    currentStep = stepNumber;
-    showStep(currentStep);
     updateNavButtons();
-    updateActiveNavItem();
-    scrollToTop();
+    updateActiveNav(targetSection);
+});
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function resolveSection(hash) {
+    if (!hash) return sections[0];
+    if (sections.includes(hash)) return hash;
+    const navItem = document.querySelector(`.nav-item[data-anchor="${hash}"]`);
+    if (navItem && navItem.dataset.section) return navItem.dataset.section;
+    return sections[0];
 }
 
-function nextStep() {
-    if (viewAllMode) {
-        toggleViewAll();
-        return;
-    }
-    
-    if (currentStep < totalSteps - 1) {
-        currentStep++;
-        showStep(currentStep);
-        updateNavButtons();
-        updateActiveNavItem();
-        scrollToTop();
-    }
-}
-
-function previousStep() {
-    if (viewAllMode) {
-        toggleViewAll();
-        return;
-    }
-    
-    if (currentStep > 0) {
-        currentStep--;
-        showStep(currentStep);
-        updateNavButtons();
-        updateActiveNavItem();
-        scrollToTop();
+// ---------------------------------------------------------------------------
+// Navigation
+// ---------------------------------------------------------------------------
+function goToSection(sectionId, anchor) {
+    if (viewAllMode) toggleViewAll();
+    showSection(sectionId, !anchor);
+    updateNavButtons();
+    updateActiveNav(sectionId);
+    if (anchor) {
+        const el = document.getElementById(anchor);
+        if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     }
 }
 
-function showStep(stepNumber) {
-    // Hide all steps
-    document.querySelectorAll('.step').forEach(step => {
-        step.classList.remove('active');
-    });
-    
-    // Show current step
-    const currentStepElement = document.getElementById(`step-${stepNumber}`);
-    if (currentStepElement) {
-        currentStepElement.classList.add('active');
+function showSection(sectionId, scrollTop = true) {
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    const el = document.getElementById(sectionId);
+    if (el) {
+        el.classList.add('active');
+        currentIdx = sections.indexOf(sectionId);
+        history.replaceState(null, '', `#${sectionId}`);
     }
+    if (scrollTop) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function nextSection() {
+    if (viewAllMode) { toggleViewAll(); return; }
+    if (currentIdx < sections.length - 1) goToSection(sections[currentIdx + 1], null);
+}
+
+function previousSection() {
+    if (viewAllMode) { toggleViewAll(); return; }
+    if (currentIdx > 0) goToSection(sections[currentIdx - 1], null);
+}
+
+// ---------------------------------------------------------------------------
+// UI state updates
+// ---------------------------------------------------------------------------
 function updateNavButtons() {
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
-    
+    if (!prevBtn || !nextBtn) return;
+
     if (viewAllMode) {
         prevBtn.style.display = 'none';
         nextBtn.querySelector('span').textContent = 'Exit View All';
         return;
     }
-    
-    // Show/hide previous button
-    prevBtn.style.display = currentStep === 0 ? 'none' : 'inline-flex';
-    
-    // Update next button text
-    if (currentStep === totalSteps - 1) {
-        nextBtn.querySelector('span').textContent = 'Finish ✓';
-    } else {
-        nextBtn.querySelector('span').textContent = 'Next →';
-    }
+
+    prevBtn.style.display = currentIdx === 0 ? 'none' : 'inline-flex';
+    nextBtn.querySelector('span').textContent = 'Next →';
+    nextBtn.disabled = currentIdx === sections.length - 1;
 }
 
-function updateActiveNavItem() {
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.remove('active');
-    });
-    
-    const activeItem = document.querySelector(`a[href="#step-${currentStep}"]`);
-    if (activeItem) {
-        activeItem.classList.add('active');
-    }
+function updateActiveNav(activeSectionId) {
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    document.querySelectorAll(`.nav-item[data-section="${activeSectionId}"]`)
+            .forEach(item => item.classList.add('active'));
 }
 
+// ---------------------------------------------------------------------------
+// View-all toggle
+// ---------------------------------------------------------------------------
 function toggleViewAll() {
     viewAllMode = !viewAllMode;
-    
-    const steps = document.querySelectorAll('.step');
-    const viewAllBtn = document.querySelector('.view-all-btn');
-    
+    const steps   = document.querySelectorAll('.step');
+    const btnSpan = document.querySelector('.view-all-btn span');
+
     if (viewAllMode) {
-        // Show all steps
-        steps.forEach(step => {
-            step.classList.add('view-all-mode');
-            step.classList.add('active');
-        });
-        
-        viewAllBtn.querySelector('span').textContent = 'Back to Step View';
-        
-        document.querySelector('.nav-buttons').style.display = 'flex';
+        steps.forEach(s => s.classList.add('view-all-mode', 'active'));
+        if (btnSpan) btnSpan.textContent = 'Back to Step View';
     } else {
-        // Return to single step view
-        steps.forEach(step => {
-            step.classList.remove('view-all-mode');
-            step.classList.remove('active');
-        });
-        
-        showStep(currentStep);
-        
-        viewAllBtn.querySelector('span').textContent = 'View All Steps';
+        steps.forEach(s => s.classList.remove('view-all-mode', 'active'));
+        showSection(sections[currentIdx], true);
+        if (btnSpan) btnSpan.textContent = 'View All';
     }
-    
+
     updateNavButtons();
-    scrollToTop();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function initializeNavigation() {
-    // Add click handlers to nav items
-    document.querySelectorAll('.nav-item').forEach((item, index) => {
-        item.addEventListener('click', (e) => {
-            e.preventDefault();
-            goToStep(index);
-        });
-    });
+// ---------------------------------------------------------------------------
+// Dark / Light theme
+// ---------------------------------------------------------------------------
+function applyTheme(dark) {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : '');
+    const icon  = document.getElementById('themeIcon');
+    const label = document.getElementById('themeLabel');
+    if (icon)  icon.textContent  = dark ?  '☀️' : '🌙';
+    if (label) label.textContent = dark ? 'Light mode' : 'Dark mode' ;
 }
 
-function scrollToTop() {
-    window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-    });
+function toggleTheme() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    applyTheme(!isDark);
+    try { localStorage.setItem('pose2sim-theme', !isDark ? 'dark' : 'light'); } catch(e) {}
 }
 
-// Keyboard navigation
-document.addEventListener('keydown', function(e) {
-    if (viewAllMode) return;
-    
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-        if (currentStep > 0) {
-            previousStep();
-        }
-    } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-        if (currentStep < totalSteps - 1) {
-            nextStep();
-        }
+// Restore saved theme on page load
+(function () {
+    try {
+        const saved = localStorage.getItem('pose2sim-theme');
+        if (saved === 'dark') applyTheme(true);
+        else if (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches) applyTheme(true);
+    } catch(e) {}
+})();
+
+// ---------------------------------------------------------------------------
+// Mobile sidebar (hamburger)
+// ---------------------------------------------------------------------------
+function toggleSidebar() {
+    const sidebar  = document.getElementById('sidebar');
+    const btn      = document.getElementById('hamburgerBtn');
+    const overlay  = document.getElementById('sidebarOverlay');
+    const isOpen   = sidebar.classList.toggle('mobile-open');
+    btn.classList.toggle('open', isOpen);
+    overlay.classList.toggle('visible', isOpen);
+}
+
+function closeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const btn     = document.getElementById('hamburgerBtn');
+    const overlay = document.getElementById('sidebarOverlay');
+    sidebar.classList.remove('mobile-open');
+    btn.classList.remove('open');
+    overlay.classList.remove('visible');
+}
+
+// Close sidebar after a nav-item click on mobile
+document.addEventListener('click', e => {
+    if (e.target.closest('.nav-item') && window.innerWidth <= 768) {
+        closeSidebar();
     }
+}, true);
+
+// ---------------------------------------------------------------------------
+// Keyboard navigation
+// ---------------------------------------------------------------------------
+document.addEventListener('keydown', e => {
+    if (viewAllMode) return;
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   previousSection();
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextSection();
 });

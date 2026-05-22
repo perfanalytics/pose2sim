@@ -90,6 +90,7 @@ class TestWorkflow(unittest.TestCase):
             Testing det_frequency 1 and 10.
             Testing synchronization with all markers or only ['RWrist'].
             Testing with and without marker augmentation.
+            Testing filtering trc files or IK mot files.
             
             N.B.: Calibration from scene dimensions is not tested, as it requires the 
             user to click points on the image. 
@@ -124,8 +125,13 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("synchronization").update({"save_sync_plots":False})
         config_dict.get("filtering").update({"display_figures":False})
         config_dict.get("filtering").update({"save_filt_plots":False})
+        config_dict.get("filtering").get('butterworth').update({"cut_off_frequency":10})
+        config_dict.get('kinematics').update({'filter_ik':True})
+        config_dict.get('kinematics').update({'ik_filter_type':'acc_minimizing'})
+        config_dict.get("filtering").get('acc_minimizing').update({"cut_off_frequency":5})
+        
 
-        # Step by step
+        # 1. Run step by step
         Pose2Sim.calibration(config_dict)
         Pose2Sim.poseEstimation(config_dict)
         Pose2Sim.synchronization(config_dict)
@@ -136,12 +142,14 @@ class TestWorkflow(unittest.TestCase):
         Pose2Sim.kinematics(config_dict)
 
 
-        # Run all
-        # overwrite pose, balanced
+        # 2. Run all in one go
+        # overwrite pose, balanced, no parallel pose estimation
         config_dict.get("project").update({"participant_height":1.7})
         config_dict.get("project").update({"frame_rate":60})
         config_dict.get("pose").update({"det_frequency":10})
+        config_dict.get("pose").update({"pose_model":'lower_body'})
         config_dict.get("pose").update({"mode":'balanced'})
+        config_dict.get("pose").update({"parallel_workers_pose":2})
         config_dict.get("pose").update({"overwrite_pose":True})
         config_dict.get("pose").update({"save_video":'none'})
         config_dict.get('synchronization').update({'keypoints_to_consider':['RWrist']})
@@ -168,21 +176,22 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("synchronization").update({"synchronization_gui":False})
         config_dict.get("synchronization").update({"display_sync_plots":False})
         config_dict.get("synchronization").update({"save_sync_plots":False})
+        config_dict.get("filtering").update({"filter_ik":True})
         config_dict.get("filtering").update({"display_figures":False})
         config_dict.get("filtering").update({"save_filt_plots":False})
         config_dict.get('kinematics').update({'use_simple_model':True})
         
-        # Step by step
+        # 1. Run step by step
         Pose2Sim.calibration(config_dict)
         Pose2Sim.poseEstimation(config_dict)
         # Pose2Sim.synchronization(config_dict) # No test for synchronization for multi-person
         Pose2Sim.personAssociation(config_dict)
         Pose2Sim.triangulation(config_dict)
-        Pose2Sim.filtering(config_dict)
         # Pose2Sim.markerAugmentation(config_dict) # Marker augmentation requires markers that are not provided by RTMO: ['RHeel', 'RBigToe', 'RSmallToe', 'LSmallToe', 'LHeel', 'LBigToe']
         Pose2Sim.kinematics(config_dict)
+        Pose2Sim.filtering(config_dict) # on IK mot files instead of trc files
 
-        # Run all
+        # 2. Run all in one go
         # No filtering, no marker augmentation
         # config_dict.get("pose").update({"tracking_mode":'deepsort'})
         # config_dict.get("pose").update({"deepsort_params":"""{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8, 'embedder':None}"""})
@@ -197,7 +206,7 @@ class TestWorkflow(unittest.TestCase):
         project_dir = '../Demo_Batch'
         os.chdir(project_dir)
 
-        Pose2Sim.runAll(do_synchronization=False, do_filtering=False)
+        Pose2Sim.runAll(do_synchronization=False, do_filtering=False, do_kinematics=False)
 
 
 def main():
