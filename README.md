@@ -1502,6 +1502,9 @@ Run `uv pip install pose2sim --upgrade` to get the latest version!
 - Real-time processing 3D kinematics
 - Support ground reaction force, joint moments, muscle activation estimation
 - 3D monocular solution
+- Fix leg swaps
+- Handle distortions
+- Support animal pose estimation and kinematics (requires animal-specific model and skeleton definition for the kinematics part)
 
 </br>
 
