@@ -11,6 +11,7 @@
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 \
 [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/perfanalytics/pose2sim)
 
 
 # Pose2Sim
@@ -51,7 +52,7 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 <br>
 
 > [!IMPORTANT]
-> If you like it, ⭐ please leave a star ⭐ on the [GitHub repository](https://github.com/perfanalytics/pose2sim)!\
+> If you like it, ⭐ please leave a star ⭐ on the [Pose2Sim GitHub repository](https://github.com/perfanalytics/pose2sim)!\
 > This project is completely free: this is your chance to support the project and make it more visible to the community.
 
 > [!IMPORTANT]
@@ -656,7 +657,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 > If the original calibration file does not provide any residual errors, they will be logged as NaN. This is not an error and can be ignored.
 
 > [!TIP]
-> If you want to use a calibration method that requires synchronized cameras, you can run pose estimation and synchronization first.\
+> If you want to use a calibration method that requires synchronized cameras, you can switch the steps and first run pose estimation and synchronization.\
 > ***Note:*** This suggestion is only valid if there is a fast motion of a body keypoint that allows you to synchronize on. Set "create synchronized videos = true" to do so, and then run calibration. <!-- Make sure calibration runs on the synchronized videos, not the original ones -->
 
 - **From [Caliscope](https://mprib.github.io/caliscope/)** (recommended *if your cameras are synchronized*), **[Dynamic Extrinsic Camera Calibrator](https://github.com/flodelaplace/lab-camera-dynamic-calibrator)** (based on keypoints: not checkerboard! But *requires synchronized videos, does not estimate intrinsics, and not commercially available*), **[AniPose](https://github.com/lambdaloop/anipose)**, or **[FreeMocap](https://github.com/freemocap/freemocap):**  

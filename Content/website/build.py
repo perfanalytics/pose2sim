@@ -336,13 +336,14 @@ HTML_TEMPLATE = """\
         <div class="logo">
             <h2>Documentation</h2>
             <div class="docs-switcher">
-                <a href="#pose2sim" class="docs-switch active" title="Pose2Sim documentation">Pose2Sim</a>
+                <a href="https://perfanalytics.github.io/pose2sim/#pose2sim" 
+                   class="docs-switch active" title="Pose2Sim documentation">Pose2Sim</a>
                 <span class="docs-switch-sep">|</span>
-                <a href="https://github.com/davidpagnon/Sports2D/blob/main/README.md"
-                   class="docs-switch" target="_blank" rel="noopener" title="Sports2D documentation">Sports2D</a>
+                <a href=https://davidpagnon.github.io/Sports2D/#sports2d"
+                   class="docs-switch" title="Sports2D documentation">Sports2D</a>
                 <span class="docs-switch-sep">|</span>
-                <a href="https://github.com/davidpagnon/Pose2Sim_Blender/blob/main/README.md"
-                   class="docs-switch" target="_blank" rel="noopener" title="Pose2Sim Blender add-on documentation">Blender</a>
+                <a href="https://davidpagnon.github.io/Pose2Sim_Blender/#pose2sim-blender/"
+                   class="docs-switch" title="Pose2Sim Blender add-on documentation">Blender add-on</a>
             </div>
             <div class="theme-toggle">
                 <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
@@ -378,12 +379,11 @@ HTML_TEMPLATE = """\
         <!-- Footer -->
         <footer class="footer">
             <div class="footer-content">
-                <p>Pose2Sim Documentation &bull;
-                   <a href="https://github.com/perfanalytics/pose2sim" target="_blank">GitHub</a> (⭐please leave a star!⭐) &bull;
-                   <a href="#how-to-cite">Cite</a>
+                <p<a href="https://github.com/perfanalytics/pose2sim" target="_blank">Pose2Sim GitHub</a> (⭐please leave a star!⭐) &bull;
+                   <a href="#how-to-cite">Cite Pose2Sim</a>
                 </p>
                 <p>Open-source markerless motion capture &bull; BSD-3-Clause License</p>
-                <p>Website Created by AYL & DP with ❤️ for the Markerless Community</p>
+                <p>Website Created by AYL & <a href="https://david-pagnon.com/fr/en-deux-mots/" target="_blank">DP</a> with ❤️ for the Markerless Community</p>
             </div>
         </footer>
     </main>

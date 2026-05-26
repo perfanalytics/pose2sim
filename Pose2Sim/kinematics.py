@@ -11,8 +11,7 @@
     
     Scaling:
     - No need for a static trial: scaling is done on the triangulated coordinates (trc file)
-    - Remove 10% fastest frames (potential outliers)
-    - Remove frames where coordinate speed is null (person probably out of frame)
+    - Remove frames with knee and hip angles beyong 90° (pose estimation not trusted in crouched position)
     - Remove 40% most extreme calculated segment values (potential outliers)
     - For each segment, scale on the mean of the remaining segment values
     
