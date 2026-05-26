@@ -249,17 +249,18 @@ Check that everything went well within Python with these commands:
 
 
 ## Demonstration Part-2: Visualize your results with OpenSim or Blender
+
 > _**Visualize your results and look in detail for potential areas of improvement.**_ 
 
 ### Basic visualization with the OpenSim GUI
 
 
-- Install OpenSim GUI:\
+- **Install OpenSim GUI:**\
   Download the executable [there](https://simtk.org/projects/opensim).
-- Visualize results:
-  - Open the OpenSim GUI, go to `File > Open Model`, and select the scaled model in the `kinematics` folder.
-  - Go to `File > Load Motion`, and load the joint angle .mot file in the `kinematics` folder.
-  - If you want to see the 3D marker locations, go to `File > Preview Experimental Data`, and load the .trc file in the `pose-3d` folder.
+- **Visualize results:**
+  - `File > Open Model`: Open your scaled .osim model in the `kinematics` folder.
+  - `File > Load Motion`: Open your joint angle .mot file in the `kinematics` folder.
+  - `File > Preview Experimental Data`: Open your 3D marker .trc file in the `pose-3d` folder.
 
   <img src="Content/OpenSim.JPG" width="380">
 
@@ -276,6 +277,10 @@ Check that everything went well within Python with these commands:
 
 https://github.com/user-attachments/assets/53bfd9e2-f542-410f-8e9f-7b70229d598b
   
+> [!NOTE]
+> The OpenSim skeleton is not rigged yet. **[Feel free to contribute!](https://github.com/perfanalytics/pose2sim/issues/40)** [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
+
+
 <br/>
 
 
@@ -1428,7 +1433,7 @@ Reprojects 3D coordinates of a trc file to the image planes defined by a calibra
 
 # How to cite and how to contribute
 ### How to cite
-If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org/10.21105/joss.04362), [Pagnon et al., 2022a](https://www.mdpi.com/1424-8220/22/7/2712), or [Pagnon et al., 2021](https://www.mdpi.com/1424-8220/21/19/6530).
+If you use this Pose2Sim, please cite [Pagnon et al., 2022b](https://doi.org/10.21105/joss.04362), [Pagnon et al., 2022a](https://www.mdpi.com/1424-8220/22/7/2712), or [Pagnon et al., 2021](https://www.mdpi.com/1424-8220/21/19/6530).
     
     @Article{Pagnon_2022_JOSS, 
       AUTHOR = {Pagnon, David and Domalain, Mathieu and Reveret, Lionel}, 
@@ -1483,6 +1488,9 @@ If you use this code or data, please cite [Pagnon et al., 2022b](https://doi.org
 - [ ] v0.13: Calibration based on keypoint detection, Handling left/right swaps, Correcting lens distortions, smarter single-person mode
 - [ ] v0.14: Real-time Pose estimation, Person association, Triangulation, Filtering, IK frame by frame
 - [ ] v1.0: First full release with most important features, code refactoring for performance and clarity
+
+Run `uv pip install pose2sim --upgrade` to get the latest version!
+
 
 </br>
 

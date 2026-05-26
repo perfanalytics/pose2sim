@@ -3,8 +3,8 @@
     --primary-dark: #1e40af;
     --secondary-color: #64748b;
     --success-color: #10b981;
-    --warning-color: #f59e0b;
-    --danger-color: #ef4444;
+    --important-color: #f59e0b;
+    --warning-color: #e11d48;
     --bg-primary: #ffffff;
     --bg-secondary: #f8fafc;
     --bg-tertiary: #f1f5f9;
@@ -33,7 +33,8 @@
 }
 [data-theme="dark"] .info-box    { background: #1e2d45; border-color: #2563eb55; }
 [data-theme="dark"] .success-box { background: #14291e; border-color: #10b98155; }
-[data-theme="dark"] .warning-box { background: #2a2010; border-color: #f59e0b55; }
+[data-theme="dark"] .important-box { background: #2a2010; border-color: #f59e0b55; }
+[data-theme="dark"] .warning-box { background: #2a1018; border-color: #e11d4855; }
 [data-theme="dark"] .step-header { background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%); }
 [data-theme="dark"] .code-block  { background: #0d1117; }
 [data-theme="dark"] .feature-card { background: var(--bg-tertiary); border-color: var(--border-color); }
@@ -80,6 +81,10 @@ body {
     border-radius: 8px;
     box-shadow: var(--shadow-md);
     padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
 }
 
 #google_translate_element {
@@ -178,12 +183,6 @@ body {
 }
 
 /* Theme toggle */
-.theme-toggle {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 10px;
-}
 .theme-toggle-btn {
     display: flex;
     align-items: center;
@@ -520,7 +519,7 @@ p {
 }
 
 .warning-box {
-    background: #fffbeb;
+    background: #fff1f2;
     border: 1px solid #fed7aa;
     border-left: 4px solid var(--warning-color);
     padding: 20px;
@@ -530,6 +529,20 @@ p {
 
 .warning-box h4 {
     color: var(--warning-color);
+    margin-top: 0;
+}
+
+.important-box {
+    background: #fffbeb;
+    border: 1px solid #fecdd3;
+    border-left: 4px solid var(--important-color);
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.important-box h4 {
+    color:  var(--important-color);
     margin-top: 0;
 }
 
@@ -736,6 +749,22 @@ li {
     z-index: 99;
 }
 .sidebar-overlay.visible { display: block; }
+
+/* Task lists */
+.step-content .task-list-item {
+    list-style: none;
+    margin-left: -1.2em;
+}
+.step-content .task-list-item input[type="checkbox"] {
+    margin-right: 6px;
+    accent-color: var(--primary-color);
+    width: 15px;
+    height: 15px;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+    cursor: default;
+}
 
 /* Links */
 a {

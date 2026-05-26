@@ -26,7 +26,7 @@ GITHUB_RAW  = "https://raw.githubusercontent.com/perfanalytics/pose2sim/main/"
 
 try:
     import pymdownx  # noqa: F401
-    MD_EXTENSIONS = ["tables", "pymdownx.superfences", "md_in_html", "sane_lists", "attr_list"]
+    MD_EXTENSIONS = ["tables", "pymdownx.superfences", "pymdownx.tasklist", "md_in_html", "sane_lists", "attr_list"]
 except ImportError:
     MD_EXTENSIONS = ["tables", "fenced_code", "md_in_html", "sane_lists", "attr_list"]
 
@@ -55,7 +55,7 @@ def clean_title(text: str) -> str:
 
 # Map admonition type → (CSS class, label)
 ADMON_CSS  = {"NOTE": "info-box",    "TIP": "success-box",
-              "WARNING": "warning-box", "IMPORTANT": "warning-box"}
+              "WARNING": "warning-box", "IMPORTANT": "important-box"}
 ADMON_ICON = {"NOTE": "📝 Note", "TIP": "💡 Tip",
               "WARNING": "⚠️ Warning", "IMPORTANT": "❗ Important"}
 
@@ -321,6 +321,10 @@ HTML_TEMPLATE = """\
 
     <!-- Google Translate Widget -->
     <div class="translate-widget">
+        <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
+            <span class="theme-icon" id="themeIcon">☀️</span>
+            <span id="themeLabel">Light mode</span>
+        </button>
         <div id="google_translate_element"></div>
     </div>
 
@@ -342,14 +346,8 @@ HTML_TEMPLATE = """\
                 <a href=https://davidpagnon.github.io/Sports2D/#sports2d"
                    class="docs-switch" title="Sports2D documentation">Sports2D</a>
                 <span class="docs-switch-sep">|</span>
-                <a href="https://davidpagnon.github.io/Pose2Sim_Blender/#pose2sim-blender/"
+                <a href="https://davidpagnon.github.io/Pose2Sim_Blender/#pose2sim-blender"
                    class="docs-switch" title="Pose2Sim Blender add-on documentation">Blender add-on</a>
-            </div>
-            <div class="theme-toggle">
-                <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
-                    <span class="theme-icon" id="themeIcon">☀️</span>
-                    <span id="themeLabel">Light mode</span>
-                </button>
             </div>
         </div>
         <nav class="nav-menu">
