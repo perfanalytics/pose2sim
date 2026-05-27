@@ -19,7 +19,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const hash = location.hash.slice(1);
     const targetSection = resolveSection(hash);
-    showSection(targetSection, false);
+    showSection(targetSection, hash === targetSection || !hash, hash || targetSection);
+    if (hash && hash !== targetSection) {
+        const el = document.getElementById(hash);
+        if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    }
     updateNavButtons();
     updateActiveNav(targetSection);
 
@@ -62,8 +66,7 @@ window.addEventListener('hashchange', () => {
     const hash = location.hash.slice(1);
     if (!hash) return;
     const targetSection = resolveSection(hash);
-    showSection(targetSection, false);
-    // Scroll to sub-anchor if it's not the section itself
+    showSection(targetSection, hash === targetSection, hash);
     if (hash !== targetSection) {
         const el = document.getElementById(hash);
         if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
@@ -80,6 +83,12 @@ function resolveSection(hash) {
     if (sections.includes(hash)) return hash;
     const navItem = document.querySelector(`.nav-item[data-anchor="${hash}"]`);
     if (navItem && navItem.dataset.section) return navItem.dataset.section;
+    // Sub-anchor inside a section: find its parent .step
+    const el = document.getElementById(hash);
+    if (el) {
+        const parent = el.closest('.step');
+        if (parent && parent.id) return parent.id;
+    }
     return sections[0];
 }
 
@@ -88,7 +97,7 @@ function resolveSection(hash) {
 // ---------------------------------------------------------------------------
 function goToSection(sectionId, anchor) {
     if (viewAllMode) toggleViewAll();
-    showSection(sectionId, !anchor);
+    showSection(sectionId, !anchor, anchor || sectionId);
     updateNavButtons();
     updateActiveNav(sectionId);
     if (anchor) {
@@ -97,13 +106,13 @@ function goToSection(sectionId, anchor) {
     }
 }
 
-function showSection(sectionId, scrollTop = true) {
+function showSection(sectionId, scrollTop = true, urlHash = null) {
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
     const el = document.getElementById(sectionId);
     if (el) {
         el.classList.add('active');
         currentIdx = sections.indexOf(sectionId);
-        history.replaceState(null, '', `#${sectionId}`);
+        history.replaceState(null, '', `#${urlHash || sectionId}`);
     }
     if (scrollTop) window.scrollTo({ top: 0, behavior: 'smooth' });
 }

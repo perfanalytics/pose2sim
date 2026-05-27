@@ -253,7 +253,9 @@ def section_to_html(sec: dict) -> str:
         slug   = slugify(title)
         lvl    = len(hashes)
         t      = clean_title(title)
-        return f'<h{lvl} id="{slug}">{t}</h{lvl}>'
+        return (f'<h{lvl} id="{slug}">{t}'
+                f'<a href="#{slug}" class="heading-anchor" aria-label="Link to section">#</a>'
+                f'</h{lvl}>')
 
     md = re.sub(r"^(#{3,4}) +(.+)$", add_heading_id, md, flags=re.MULTILINE)
 

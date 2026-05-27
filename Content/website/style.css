@@ -360,6 +360,35 @@ body {
     margin: 0;
 }
 
+/* Heading anchor links */
+.heading-anchor {
+    margin-left: 0.4em;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: rgba(255,255,255,0.35);
+    text-decoration: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    vertical-align: middle;
+}
+.step-header h1:hover .heading-anchor,
+.step-header h1 .heading-anchor:focus {
+    opacity: 1;
+}
+.step-content h3 .heading-anchor,
+.step-content h4 .heading-anchor {
+    color: var(--text-tertiary);
+    font-size: 0.8em;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.step-content h3:hover .heading-anchor,
+.step-content h4:hover .heading-anchor,
+.step-content h3 .heading-anchor:focus,
+.step-content h4 .heading-anchor:focus {
+    opacity: 1;
+}
+
 .step-content {
     padding: 50px;
 }
