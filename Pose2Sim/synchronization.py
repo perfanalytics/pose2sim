@@ -527,7 +527,9 @@ def update_main_time(text, fps, search_around_frames, i, ui, cap, frame_to_json,
         main_time = float(text)
         frame_num = int(round(main_time * fps))
         frame_num = max(search_around_frames[i][0], min(frame_num, search_around_frames[i][1]))
+        ui['controls']['frame_slider'].eventson = False
         ui['controls']['frame_slider'].set_val(frame_num)
+        ui['controls']['frame_slider'].eventson = True
         update_frame(frame_num, fps, ui, frame_to_json, pose_dir, json_dirs_names, i, search_around_frames, bounding_boxes_list)
     except ValueError:
         pass
@@ -658,7 +660,9 @@ def update_frame(val, fps, ui, frame_to_json, pose_dir, json_dirs_names, i, sear
 
     frame_num = int(val)
     main_time = frame_num / fps
+    ui['controls']['main_time_textbox'].eventson = False
     ui['controls']['main_time_textbox'].set_val(f"{main_time:.2f}")
+    ui['controls']['main_time_textbox'].eventson = True
     
     # Update yellow highlight position
     try:
@@ -1006,10 +1010,8 @@ def person_ui(frame_rgb, cam_name, frame_number, search_around_frames, time_rang
                              containers['bounding_boxes_list'],
                              containers['selected_idx']))
 
-    # Connect event handlers using lambda
-    frame_slider.on_changed(lambda val: on_slider_change(val, fps, controls, fig, search_around_frames, cam_index, ax_slider))
-    controls['main_time_textbox'].on_submit(lambda text: update_main_time(text, fps, search_around_frames, cam_index, ui, ui['cap'], frame_to_json, pose_dir, json_dirs_names, containers['bounding_boxes_list']))
-    controls['time_RAM_textbox'].on_submit(lambda text: update_time_RAM(text, fps, search_around_frames, cam_index, ui))
+    # NOTE: slider and textbox event handlers are intentionally NOT connected here.
+    # They are connected once in select_person to avoid duplicate/cascading callbacks.
 
     return ui
 
@@ -1093,12 +1095,28 @@ def select_person(vid_or_img_files, cam_names, json_files_names_range, search_ar
                                           ui['containers']['rects'], 
                                           ui['containers']['annotations'])
         ui['containers']['bounding_boxes_list'] = bounding_boxes_list 
-        ui['controls']['frame_slider'].on_changed(lambda val: update_frame(val, fps, ui, frame_to_json, pose_dir, json_dirs_names, i, search_around_frames, bounding_boxes_list))
-        
-        # Update main time textbox to also update slider
+        # Single consolidated slider handler - suppresses textbox on_submit to prevent cascade:
+        # slider → set_val(textbox) would re-fire on_submit → update_main_time → set_val(slider) → infinite loop
+        def make_slider_handler(ui_ref, fps_ref, frame_to_json_ref, pose_dir_ref, json_dirs_names_ref, i_ref, search_around_frames_ref):
+            def on_slider(val):
+                frame_num = int(val)
+                ui_ref['controls']['main_time_textbox'].eventson = False
+                ui_ref['controls']['main_time_textbox'].set_val(f"{frame_num / fps_ref:.2f}")
+                ui_ref['controls']['main_time_textbox'].eventson = True
+                try:
+                    time_RAM = float(ui_ref['controls']['time_RAM_textbox'].text)
+                except ValueError:
+                    time_RAM = 0
+                update_highlight(frame_num, time_RAM, fps_ref, search_around_frames_ref, i_ref, ui_ref['axes']['slider'], ui_ref['controls'])
+                update_play(ui_ref['cap'], ui_ref['ax_video'].images[0], frame_num, frame_to_json_ref,
+                            pose_dir_ref, json_dirs_names_ref[i_ref], ui_ref['containers']['rects'],
+                            ui_ref['containers']['annotations'], ui_ref['containers']['bounding_boxes_list'],
+                            ui_ref['ax_video'], ui_ref['fig'])
+            return on_slider
+        ui['controls']['frame_slider'].on_changed(make_slider_handler(ui, fps, frame_to_json, pose_dir, json_dirs_names, i, search_around_frames))
+
+        # Single textbox handlers (connected once here, not in person_ui)
         ui['controls']['main_time_textbox'].on_submit(lambda text: update_main_time(text, fps, search_around_frames, i, ui, ui['cap'], frame_to_json, pose_dir, json_dirs_names, ui['containers']['bounding_boxes_list']))
-        
-        # Update time_RAM textbox to update highlight
         ui['controls']['time_RAM_textbox'].on_submit(lambda text: update_time_RAM(text, fps, search_around_frames, i, ui))
 
         # Add click event handler
