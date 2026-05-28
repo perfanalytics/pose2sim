@@ -1,3 +1,16 @@
+# Visit the website!
+
+Please visit the website! (after leaving a **⭐star⭐**! 😇)
+
+[https://perfanalytics.github.io/pose2sim](https://perfanalytics.github.io/pose2sim/)
+
+
+<br>
+
+---
+
+<br>
+
 [![Continuous integration](https://github.com/perfanalytics/pose2sim/actions/workflows/continuous-integration.yml/badge.svg?branch=main)](https://github.com/perfanalytics/pose2sim/actions/workflows/continuous-integration.yml)
 [![PyPI version](https://badge.fury.io/py/Pose2Sim.svg)](https://badge.fury.io/py/Pose2Sim) \
 [![Downloads](https://static.pepy.tech/badge/pose2sim)](https://pepy.tech/project/pose2sim)

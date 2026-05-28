@@ -155,6 +155,11 @@ def split_sections(text: str) -> list[dict]:
     Returns list of dicts:
       level, title, slug, content (raw markdown), children (list of h3/h4 dicts)
     """
+    # Strip the "Visit the website!" preamble (everything up to and including <br>---<br>)
+    sep = re.search(r"<br>\s*\n\n---\n\n<br>", text)
+    if sep:
+        text = text[sep.end():].lstrip("\n")
+
     # Capture content before the first heading (badges etc.)
     m = re.search(r"^# ", text, flags=re.MULTILINE)
     pre_h1 = text[:m.start()].strip() if m else ""
