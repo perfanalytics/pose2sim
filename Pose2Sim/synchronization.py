@@ -631,11 +631,12 @@ def update_keypoint_selection(selected_keypoints, all_keypoints, keypoints_names
     
     # Update selected text and button label
     if selected_keypoints:
-        text_parts = ['Selected: '] + [f'$\\bf{{{kp}}}$' if i == 0 else f', $\\bf{{{kp}}}$' for i, kp in enumerate(selected_keypoints)]
-        selected_text.set_text(''.join(text_parts))
+        selected_text.set_text('Selected: ' + ', '.join(selected_keypoints))
+        selected_text.set_fontweight('bold')
         btn_all_none.label.set_text('Select None')
     else:
         selected_text.set_text('Selected: None\nClick on keypoints to select them')
+        selected_text.set_fontweight('normal')
         btn_all_none.label.set_text('Select All')
     
     plt.draw()
@@ -826,9 +827,11 @@ def keypoints_ui(keypoints_to_consider, keypoints_names):
     ax_selected.axis('off')
     ax_selected.set_facecolor('black')
     text_parts = ['Selected: '] + [f'$\\bf{{{kp}}}$' if i == 0 else f', $\\bf{{{kp}}}$' for i, kp in enumerate(selected_keypoints)]
-    selected_text = ax_selected.text(0.0, 0.5, ''.join(text_parts), 
-                                    va='center', fontsize=BUTTON_SIZE, wrap=True, color='black')
-    
+    selected_text = ax_selected.text(0.0, 0.5,
+        'Selected: ' + ', '.join(selected_keypoints) if selected_keypoints else 'Selected: None\nClick on keypoints to select them',
+        va='center', fontsize=BUTTON_SIZE, wrap=True, color='black',
+        fontweight='bold' if selected_keypoints else 'normal')
+        
     # Add buttons
     btn_all_none = plt.Button(plt.axes([CENTER_X - 1.5*BTN_WIDTH_KEYPOINTS - 0.01, BTN_Y, BTN_WIDTH_KEYPOINTS, BTN_HEIGHT]), 'Select All')
     btn_toggle = plt.Button(plt.axes([CENTER_X - BTN_WIDTH_KEYPOINTS/2, BTN_Y, BTN_WIDTH_KEYPOINTS, BTN_HEIGHT]), 'Show names')
