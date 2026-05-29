@@ -55,6 +55,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -796,14 +797,14 @@ def recap_filter3d(config_dict, output_path):
 
     # Read Config
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
-    pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
-    kinematics_dir = os.path.realpath(os.path.join(project_dir, 'kinematics'))
+    pose3d_dir = (Path(project_dir) / 'pose-3d').resolve()
+    kinematics_dir = (Path(project_dir) / 'kinematics').resolve()
     save_plots = config_dict.get('filtering', {}).get('save_filt_plots', True)
     do_filter = config_dict.get('filtering', {}).get('filter', True)
     reject_outliers = config_dict.get('filtering', {}).get('reject_outliers', False)
     filter_type = config_dict.get('filtering', {}).get('type', 'butterworth')
     filter_ik = config_dict.get('filtering', {}).get('filter_ik', False)
-    plots_output_dir = os.path.join(kinematics_dir, 'filtering_plots') if filter_ik else os.path.join(pose3d_dir, 'filtering_plots_ik')
+    plots_output_dir = Path(kinematics_dir) / 'filtering_plots' if filter_ik else Path(pose3d_dir) / 'filtering_plots_ik'
     kalman_filter_trustratio = int(config_dict.get('filtering', {}).get('kalman', {}).get('trust_ratio', 500))
     kalman_filter_smooth = int(config_dict.get('filtering', {}).get('kalman', {}).get('smooth', True))
     kalman_filter_smooth_str = 'smoother' if kalman_filter_smooth else 'filter'
@@ -867,7 +868,7 @@ def filter_all(config_dict):
 
     # Read config_dict
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
-    pose3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
+    pose3d_dir = (Path(project_dir) / 'pose-3d').resolve()
     frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
     display_figures = config_dict.get('filtering', {}).get('display_figures', True)
     save_plots = config_dict.get('filtering', {}).get('save_filt_plots', True)
@@ -877,15 +878,15 @@ def filter_all(config_dict):
     make_c3d = config_dict.get('filtering', {}).get('make_c3d', True)
     
     filter_ik = config_dict.get('temp_filter_ik', False) # only applied when run from Pose2Sim.kinematics()
-    kinematics_dir = os.path.realpath(os.path.join(project_dir, 'kinematics'))
-    plots_output_dir = os.path.join(kinematics_dir, 'filtering_plots') if filter_ik else os.path.join(pose3d_dir, 'filtering_plots_ik')
-    if save_plots and not os.path.exists(plots_output_dir):
+    kinematics_dir = (Path(project_dir) / 'kinematics').resolve()
+    plots_output_dir = Path(kinematics_dir) / 'filtering_plots' if filter_ik else Path(pose3d_dir) / 'filtering_plots_ik'
+    if save_plots and not Path(plots_output_dir).exists():
         os.makedirs(plots_output_dir)
     
     # Find input files
     if filter_ik:
-        kinematics_dir = os.path.realpath(os.path.join(project_dir, 'kinematics'))
-        files_in = [f for f in glob.glob(os.path.join(kinematics_dir, '*.mot')) if f.count('filt') <= 1]
+        kinematics_dir = (Path(project_dir) / 'kinematics').resolve()
+        files_in = [f for f in glob.glob(Path(kinematics_dir) / '*.mot') if f.count('filt') <= 1]
         if not files_in:
             logging.error(f'No .mot files found in {kinematics_dir}. '
                         f'Make sure inverse kinematics has been run before filtering mot files, '
@@ -894,7 +895,7 @@ def filter_all(config_dict):
                                     f'Make sure inverse kinematics has been run before filtering mot files, '
                                     f'or set filter_ik to false in Config.toml to filter trc files instead.')
     else:
-        files_in = [f for f in glob.glob(os.path.join(pose3d_dir, '*.trc')) if 'filt' not in f]
+        files_in = [f for f in glob.glob(Path(pose3d_dir) / '*.trc') if 'filt' not in f]
 
     for person_id, file_path_in in enumerate(files_in):
         logging.info(f'\nFiltering {"IK mot" if filter_ik else "3D trc"} data for person {person_id}...')
@@ -913,8 +914,8 @@ def filter_all(config_dict):
             frames_col = frames_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
             time_col = time_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
             file_path_out = file_path_in.replace(file_path_in.split('_')[-1], f'{f_range[0]}-{f_range[1]}_filt_{filter_type}.trc')
-            file_out = os.path.basename(file_path_out)
-            header[0] = header[0].replace(os.path.basename(file_path_in), file_out)
+            file_out = Path(file_path_out).name
+            header[0] = header[0].replace(Path(file_path_in).name, file_out)
         frame_rate = (1/time_col.diff().mean()).round()
 
         # Filter coordinates
@@ -938,7 +939,7 @@ def filter_all(config_dict):
                         dpi = pw.canvases[0].figure.dpi
                         f.set_size_inches(1280/dpi, 720/dpi)
                         title = pw.tabs.tabText(n)
-                        plot_path = os.path.join(plots_output_dir, f'person{person_id:02d}_{title.replace(" ","_").replace("/","_")}.png')
+                        plot_path = Path(plots_output_dir) / f'person{person_id:02d}_{title.replace(" " / "_".replace("/","_")}.png')
                         f.savefig(plot_path, dpi=dpi, bbox_inches='tight')
 
             # Write output file

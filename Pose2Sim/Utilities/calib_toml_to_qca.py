@@ -32,6 +32,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -61,7 +62,7 @@ def read_toml(toml_path):
     - T (extrinsic translation)
     '''
 
-    calib = rtoml.load(toml_path)
+    calib = rtoml.load(Path(toml_path))
     C, S, D, K, R, T = [], [], [], [], [], []
     for cam in list(calib.keys()):
         if cam != 'metadata':
@@ -125,7 +126,7 @@ def qca_write(qca_path, C, S, D, K, R, T, binning_factor, pixel_size):
     D = [d*binning_factor*64 for d in D]
 
     # .qca.txt construction
-    root = etree.Element('calibration', source=os.path.basename(qca_path), created='sometimes ago', qtmversion='none', type='regular', wandLength='none', maximumFrames="none", shortArmEnd="none", longArmEnd="none", longArmMiddle="none")
+    root = etree.Element('calibration', source=Path(qca_path).name, created='sometimes ago', qtmversion='none', type='regular', wandLength='none', maximumFrames="none", shortArmEnd="none", longArmEnd="none", longArmMiddle="none")
     etree.SubElement(root, 'results', stddev='0.', minmaxdiff='0.')
     cams = etree.SubElement(root, 'cameras')
     

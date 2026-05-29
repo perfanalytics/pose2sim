@@ -39,6 +39,7 @@ __copyright__ = "Copyright 2021, Maya-Mocap"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -172,7 +173,7 @@ def is_video_file(path):
     '''
 
     video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.mpeg', '.mpg'}
-    return os.path.isfile(path) and os.path.splitext(path)[1].lower() in video_extensions
+    return Path(path).is_file() and Path(path).suffix.lower() in video_extensions
 
 
 def is_image_file(path):
@@ -187,7 +188,7 @@ def is_image_file(path):
     '''
 
     image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.webp'}
-    return os.path.isfile(path) and os.path.splitext(path)[1].lower() in image_extensions
+    return Path(path).is_file() and Path(path).suffix.lower() in image_extensions
 
 
 def get_max_workers(device='cpu'):
@@ -559,7 +560,7 @@ def retrieve_calib_params(calib_file):
     - T: translation vectors as list of 3x1 arrays
     '''
     
-    calib = rtoml.load(calib_file)
+    calib = rtoml.load(Path(calib_file))
 
     cal_keys = [c for c in calib.keys() 
                 if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
@@ -591,7 +592,7 @@ def computeP(calib_file, undistort=False):
     - P: projection matrix as list of arrays
     '''
     
-    calib = rtoml.load(calib_file)
+    calib = rtoml.load(Path(calib_file))
     
     cal_keys = [c for c in calib.keys() 
                 if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 

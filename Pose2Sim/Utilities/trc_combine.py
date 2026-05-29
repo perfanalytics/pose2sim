@@ -32,6 +32,7 @@ __copyright__ = "Copyright 2022, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -149,20 +150,20 @@ def trc_combine_func(*args):
     '''
 
     try:
-        first_path = os.path.realpath(args[0].get('first_path')) # invoked with argparse
-        second_path = os.path.realpath(args[0].get('second_path'))
+        first_path = Path(args[0].get('first_path').resolve()) # invoked with argparse
+        second_path = Path(args[0].get('second_path').resolve())
         output_path = args[0].get('output_path')
         if output_path == None: 
-            output_path = os.path.join(os.path.dirname(first_path), 'combined.trc')
+            output_path = Path(first_path).parent / 'combined.trc'
         else: 
-            output_path = os.path.realpath(output_path)
+            output_path = Path(output_path).resolve()
     except:
-        first_path = os.path.realpath(args[0]) # invoked as a function
-        second_path = os.path.realpath(args[1])
+        first_path = Path(args[0]).resolve() # invoked as a function
+        second_path = Path(args[1]).resolve()
         try:
-            output_path = os.path.realpath(args[2])
+            output_path = Path(args[2]).resolve()
         except:
-            output_path = os.path.join(os.path.dirname(first_path), 'combined.trc')
+            output_path = Path(first_path).parent / 'combined.trc'
     
     Header, Data = combine_trc_headerdata (first_path, second_path)
     trc_from_header_data(Header, Data, output_path)

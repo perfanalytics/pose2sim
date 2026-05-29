@@ -1,6 +1,7 @@
 import json
 import os
 import argparse
+from pathlib import Path
 
 def load_rtmpose_json(filepath):
     with open(filepath, 'r') as f:
@@ -40,7 +41,7 @@ def convert_to_pose2sim_format(frame_data):
 
 def save_pose2sim_json(data, frame_id, output_dir):
     os.makedirs(output_dir, exist_ok=True)
-    output_filepath = os.path.join(output_dir, f"frame_{frame_id}.json")
+    output_filepath = Path(output_dir) / f"frame_{frame_id}.json"
     with open(output_filepath, 'w') as f:
         json.dump(data, f, indent=4)
 

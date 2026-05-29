@@ -57,6 +57,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -599,7 +600,7 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
     # Read config_dict
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
     # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
+    session_dir = (Path(project_dir) / '..').resolve()
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else project_dir if 'Config.toml' in os.listdir(project_dir) else os.getcwd()
     multi_person = config_dict.get('project', {}).get('multi_person', False)
@@ -609,16 +610,16 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
     reconstruction_error_threshold = config_dict.get('personAssociation', {}).get('multi_person', {}).get('reconstruction_error_threshold', 0.1)
     min_affinity = config_dict.get('personAssociation', {}).get('multi_person', {}).get('min_affinity', 0.2)
     min_cameras_for_triangulation = config_dict.get('triangulation', {}).get('min_cameras_for_triangulation', 2)
-    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
-    calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
-    calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
+    poseTracked_dir = Path(project_dir) / 'pose-associated'
+    calib_dir = [Path(session_dir) / c for c in os.listdir(session_dir) if (Path(session_dir) / c).is_dir() and 'calib' in c.lower()][0]
+    calib_files = glob.glob(str(Path(calib_dir) / '*.toml'))
+    calib_file = max(calib_files, key=lambda f: Path(f).stat().st_ctime) # lastly created calibration file
     
     if not multi_person:
         # Error
         mean_error_px = np.around(np.nanmean(error), decimals=1)
         
-        calib = rtoml.load(calib_file)
+        calib = rtoml.load(Path(calib_file))
         cal_keys = [c for c in calib.keys() 
                     if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
                     and isinstance(calib[c],dict)]
@@ -638,7 +639,7 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
         logging.info(f'\n--> A person was reconstructed if the lines from cameras to their keypoints intersected within {reconstruction_error_threshold} m and if the calculated affinity stayed above {min_affinity}. Correspondences were ignored if less than {min_cameras_for_triangulation} cameras saw the person.')
         logging.info(f'--> Beware that people were sorted across cameras, but not across frames. This will be done in the triangulation stage.')
 
-    logging.info(f'\nTracked json files are stored in {os.path.realpath(poseTracked_dir)}.')
+    logging.info(f'\nTracked json files are stored in {Path(poseTracked_dir).resolve()}.')
     
 
 def associate_all(config_dict):
@@ -664,7 +665,7 @@ def associate_all(config_dict):
     # Read config_dict
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
     # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
+    session_dir = (Path(project_dir) / '..').resolve()
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else project_dir if 'Config.toml' in os.listdir(project_dir) else os.getcwd()
     multi_person = config_dict.get('project', {}).get('multi_person', False)
@@ -677,17 +678,17 @@ def associate_all(config_dict):
     undistort_points = config_dict.get('triangulation', {}).get('undistort_points', False)
     
     try:
-        calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
+        calib_dir = [Path(session_dir) / c for c in os.listdir(session_dir) if (Path(session_dir) / c).is_dir() and 'calib' in c.lower()][0]
     except:
         raise Exception(f'No .toml calibration directory found.')
     try:
-        calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
-        calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
+        calib_files = glob.glob(str(Path(calib_dir) / '*.toml'))
+        calib_file = max(calib_files, key=lambda f: Path(f).stat().st_ctime) # lastly created calibration file
     except:
         raise Exception(f'No .toml calibration file found in the {calib_dir}.')
-    pose_dir = os.path.join(project_dir, 'pose')
-    poseSync_dir = os.path.join(project_dir, 'pose-sync')
-    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
+    pose_dir = Path(project_dir) / 'pose'
+    poseSync_dir = Path(project_dir) / 'pose-sync'
+    poseTracked_dir = Path(project_dir) / 'pose-associated'
 
     # projection matrix from toml calibration file
     P_all = computeP(calib_file, undistort=undistort_points)
@@ -717,22 +718,22 @@ def associate_all(config_dict):
     pose_listdirs_names = next(os.walk(pose_dir))[1]
     try:
         pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
-        os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
+        os.listdir(Path(pose_dir) / pose_listdirs_names[0])[0]
     except:
         raise ValueError(f'No json files found in {pose_dir} subdirectories. Make sure you run Pose2Sim.poseEstimation() first.')
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     try: 
-        json_files_names = [fnmatch.filter(os.listdir(os.path.join(poseSync_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+        json_files_names = [fnmatch.filter(os.listdir(Path(poseSync_dir) / js_dir), '*.json') for js_dir in json_dirs_names]
     except:
         try:
-            json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+            json_files_names = [fnmatch.filter(os.listdir(Path(pose_dir) / js_dir), '*.json') for js_dir in json_dirs_names]
         except:
             raise ValueError(f'No json files found in {pose_dir} nor {poseSync_dir} subdirectories. Make sure you run Pose2Sim.poseEstimation() first.')
     json_files_names = [sort_stringlist_by_last_number(j) for j in json_files_names]
     
     # 2d-pose-associated files creation
-    if not os.path.exists(poseTracked_dir): os.mkdir(poseTracked_dir)   
-    try: [os.mkdir(os.path.join(poseTracked_dir,k)) for k in json_dirs_names]
+    if not Path(poseTracked_dir).exists(): os.mkdir(poseTracked_dir)   
+    try: [os.mkdir(Path(poseTracked_dir) / k) for k in json_dirs_names]
     except: pass
     
     error_min_tot, cameras_off_tot = [], []
@@ -767,11 +768,11 @@ def associate_all(config_dict):
         json_files_names_f = [[j for j in json_files_names[c] if int(re.split(r'(\d+)',j)[-2])==f] for c in range(n_cams)]
         json_files_names_f = [j for j_list in json_files_names_f for j in (j_list or ['none'])]
         try:
-            json_files_f = [os.path.join(poseSync_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
-            with open(os.path.exist(json_files_f[0])) as json_exist_test: pass
+            json_files_f = [Path(poseSync_dir) / json_dirs_names[c] / json_files_names_f[c] for c in range(n_cams)]
+            with open(json_files_f[0]) as json_exist_test: pass
         except:
-            json_files_f = [os.path.join(pose_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
-        json_tracked_files_f = [os.path.join(poseTracked_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
+            json_files_f = [Path(pose_dir) / json_dirs_names[c] / json_files_names_f[c] for c in range(n_cams)]
+        json_tracked_files_f = [Path(poseTracked_dir) / json_dirs_names[c] / json_files_names_f[c] for c in range(n_cams)]
 
         if not multi_person:
             # all possible combinations of persons

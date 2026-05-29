@@ -178,7 +178,7 @@ def toml_write(toml_path, C, S, D, K, R, T):
     Writes calibration parameters to a .toml file.
     '''
 
-    with open(os.path.join(toml_path), 'w+') as cal_f:
+    with open(toml_path, 'w+') as cal_f:
         for c in range(len(C)):
             cam=f'[cam_{c+1}]\n'
             name = f'name = "{C[c]}"\n'

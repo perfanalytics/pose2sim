@@ -32,6 +32,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -147,7 +148,7 @@ def trc_from_mot_osim_func(**args):
     fps = str( int(1/ ((times[-1]-times[0]) / (len(times)-1))))
     nb_frames = str(len(times))
     nb_markers = str(len(marker_set_names))
-    header0_str = 'PathFileType\t4\t(X/Y/Z)\t' + os.path.basename(trc_path)
+    header0_str = 'PathFileType\t4\t(X/Y/Z)\t' + Path(trc_path).name
 
     header1 = {}
     header1['DataRate'] = fps

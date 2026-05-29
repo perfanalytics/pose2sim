@@ -82,6 +82,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -705,10 +706,10 @@ def trc_gaitevents_func(**args):
                                 = gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=forward_velocity_threshold, motion_type=motion_type, cut_off_frequency=cut_off_frequency, markers=markers, plot=plot)
 
     if save_output or save_output==None:
-        trc_dir = os.path.dirname(trc_path)
-        trc_name = os.path.basename(trc_path)
+        trc_dir = Path(trc_path).parent
+        trc_name = Path(trc_path).name
         if output_file == None: output_file = 'gaitevents.txt'
-        with open(os.path.join(trc_dir, output_file), 'a') as gaitevents:
+        with open(Path(trc_dir) / output_file, 'a') as gaitevents:
             L = trc_name + '\n'
             L += f'Method: {method}. '
             L += f'Height threshold: {height_threshold}\n' if method=='height_coordinates' else f'Forward velovity threshold: {forward_velocity_threshold}\n' if method == 'forward_velocity' else '\n'

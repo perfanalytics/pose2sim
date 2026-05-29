@@ -28,6 +28,7 @@ __copyright__ = "Copyright 2023, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -55,19 +56,19 @@ def AlphaPose_to_OpenPose_func(*args):
     '''
 
     try:
-        input_alphapose_json_file = os.path.realpath(args[0]['input_alphapose_json_file']) # invoked with argparse
+        input_alphapose_json_file = Path(args[0]['input_alphapose_json_file']).resolve() # invoked with argparse
         if args[0]['output_openpose_json_folder'] == None:
-            output_openpose_json_folder = os.path.splitext(input_alphapose_json_file)[0]
+            output_openpose_json_folder = Path(input_alphapose_json_file).stem
         else:
-            output_openpose_json_folder = os.path.realpath(args[0]['output_openpose_json_folder'])
+            output_openpose_json_folder = Path(args[0]['output_openpose_json_folder']).resolve()
     except:
-        input_alphapose_json_file = os.path.realpath(args[0]) # invoked as a function
+        input_alphapose_json_file = Path(args[0]).resolve() # invoked as a function
         try:
-            output_openpose_json_folder = os.path.realpath(args[1])
+            output_openpose_json_folder = Path(args[1]).resolve()
         except:
-            output_openpose_json_folder = os.path.splitext(input_alphapose_json_file)[0]
+            output_openpose_json_folder = Path(input_alphapose_json_file).stem
         
-    if not os.path.exists(output_openpose_json_folder):    
+    if not Path(output_openpose_json_folder).exists():    
         os.mkdir(output_openpose_json_folder)
 
     # Open AlphaPose json file
@@ -82,7 +83,7 @@ def AlphaPose_to_OpenPose_func(*args):
             if frame_next != frame_prev or i==0:
                 # Save openpose json file with all people contained in the previous frame
                 if i != 0:
-                    json_file = os.path.join(output_openpose_json_folder, os.path.splitext(os.path.basename(str(frame_prev-1).zfill(5)))[0]+'.json')
+                    json_file = Path(output_openpose_json_folder) / f'{str(frame_prev-1).zfill(5)}.json'
                     with open(json_file, 'w') as js_f:
                         js_f.write(json.dumps(json_dict))
                 # Reset json_dict
@@ -112,7 +113,7 @@ def AlphaPose_to_OpenPose_func(*args):
             frame_next = int(a.get('image_id').split('.')[0])
         
         # Save last frame
-        json_file = os.path.join(output_openpose_json_folder, os.path.splitext(os.path.basename(str(frame_prev).zfill(5)))[0]+'.json')
+        json_file = Path(output_openpose_json_folder) / f'{str(frame_prev).zfill(5)}.json'
         with open(json_file, 'w') as js_f:
             js_f.write(json.dumps(json_dict))
 

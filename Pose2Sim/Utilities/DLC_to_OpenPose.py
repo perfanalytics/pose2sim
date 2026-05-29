@@ -32,6 +32,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -59,19 +60,19 @@ def DLC_to_OpenPose_func(*args):
     '''
 
     try:
-        h5_file_path = os.path.realpath(args[0]['input']) # invoked with argparse
+        h5_file_path = Path(args[0]['input']).resolve() # invoked with argparse
         if args[0]['output'] == None:
-            json_folder_path = os.path.splitext(h5_file_path)[0]
+            json_folder_path = Path(h5_file_path).stem
         else:
-            json_folder_path = os.path.realpath(args[0]['output'])
+            json_folder_path = Path(args[0]['output']).resolve()
     except:
-        h5_file_path = os.path.realpath(args[0]) # invoked as a function
+        h5_file_path = Path(args[0]).resolve() # invoked as a function
         try:
-            json_folder_path = os.path.realpath(args[1])
+            json_folder_path = Path(args[1]).resolve()
         except:
-            json_folder_path = os.path.splitext(h5_file_path)[0]
+            json_folder_path = Path(h5_file_path).stem
         
-    if not os.path.exists(json_folder_path):    
+    if not Path(json_folder_path).exists():    
         os.mkdir(json_folder_path)
 
     # json preparation
@@ -94,7 +95,7 @@ def DLC_to_OpenPose_func(*args):
     for f, frame in enumerate(h5_file.index):
         h5_line = np.array([[h5_file.iloc[f, 3*k], h5_file.iloc[f, 3*k+1], h5_file.iloc[f, 3*k+2]] for k in range(kpt_nb)]).flatten().tolist()
         json_dict['people'][0]['pose_keypoints_2d'] = h5_line
-        json_file = os.path.join(json_folder_path, os.path.splitext(os.path.basename(str(frame).zfill(5)))[0]+'.json')
+        json_file = Path(json_folder_path) / f'{str(f).zfill(5)}.json'
         with open(json_file, 'w') as js_f:
             js_f.write(json.dumps(json_dict))
 

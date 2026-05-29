@@ -45,6 +45,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -128,7 +129,7 @@ def write_trc(Q_df, output_trc_dir, trc_root_name):
         Q.index = np.array(range(NumFrames)) + 1
         Q.insert(0, 't', Q.index / DataRate)
         
-        trc_path = os.path.realpath(os.path.join(output_trc_dir, trc_root_name+str(idx)+'.trc'))
+        trc_path = Path(Path(output_trc_dir) / trc_root_name+str(idx.resolve()+'.trc'))
         with open(trc_path, 'w') as trc_o:
             [trc_o.write(line+'\n') for line in header_trc]
             Q.to_csv(trc_o, sep='\t', index=True, header=None, lineterminator='\n')
@@ -157,10 +158,10 @@ def trc_from_easymocap_func(**kwargs):
     input_keypoint_dir = kwargs.get('input_keypoint_dir')
     output_trc_dir = kwargs.get('output_trc_dir')
 
-    input_keypoint_dir = os.path.abspath(input_keypoint_dir)
-    output_trc_dir = os.path.abspath(output_trc_dir) if output_trc_dir else os.path.dirname(input_keypoint_dir)
-    if not os.path.exists(output_trc_dir): os.makedirs(output_trc_dir)
-    trc_root_name = os.path.basename(os.path.dirname(os.path.dirname(input_keypoint_dir)))
+    input_keypoint_dir = Path(input_keypoint_dir).resolve()
+    output_trc_dir = Path(output_trc_dir).resolve() if output_trc_dir else Path(input_keypoint_dir).parent
+    if not Path(output_trc_dir).exists(): os.makedirs(output_trc_dir)
+    trc_root_name = input_keypoint_dir.parent.parent.name
 
     keypoint_files = sorted(glob.glob(input_keypoint_dir+'/*.json'))
     max_id = max_persons(keypoint_files)

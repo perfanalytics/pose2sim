@@ -36,6 +36,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -96,15 +97,15 @@ def json_display_without_img_func(**args):
     import json_display_without_img; json_display_without_img.json_display_without_img_func(json_folder=r'<json_folder>', image_width=1920, image_height = 1080, id_persons=(1,2))
     '''
 
-    json_folder = os.path.realpath(args.get('json_folder'))
-    json_fnames = [f for f in os.listdir(json_folder) if os.path.isfile(os.path.join(json_folder, f))]
+    json_folder = Path(args.get('json_folder')).resolve()
+    json_fnames = [f for f in os.listdir(json_folder) if (json_folder / f).is_file()]
     json_fnames = sort_stringlist_by_last_number(json_fnames)
     
     output_img_folder =  args.get('output_img_folder')
     if output_img_folder==None: 
-        output_img_folder = os.path.join(json_folder+'_img')
+        output_img_folder = json_folder.with_name(json_folder.name + '_img')
     else:
-        output_img_folder =  os.path.realpath(output_img_folder)
+        output_img_folder =  Path(output_img_folder).resolve()
     image_width =  args.get('image_width')
     if image_width==None: 
         image_width = 2000
@@ -124,14 +125,14 @@ def json_display_without_img_func(**args):
 
     # Save
     if save == True or save == 'True':
-        if not os.path.exists(output_img_folder):
+        if not Path(output_img_folder).exists():
             os.mkdir(output_img_folder)
 
     # Données json
     X,Y,CONF = [], [], []
     for json_fname in json_fnames:    
         xfrm, yfrm, conffrm = np.array([]), np.array([]), np.array([])    # Coordinates of all people in frame
-        with open(os.path.join(json_folder,json_fname)) as json_f:
+        with open(Path(json_folder) / json_fname) as json_f:
             json_file = json.load(json_f)
             if id_persons == 'all':
                 for ppl in range(len(json_file['people'])):  
@@ -168,7 +169,7 @@ def json_display_without_img_func(**args):
             scat.set_offsets(np.c_[X[frame], image_height-Y[frame]])
             scat.set_array(CONF[frame])
             if save == True or save=='True' or save == '1':
-                output_name = os.path.join(output_img_folder, f'{os.path.basename(output_img_folder)}_{str(frame).zfill(5)}.png')
+                output_name = Path(output_img_folder) / f'{Path(output_img_folder.name}_{str(frame).zfill(5)}.png')
                 plt.savefig(output_name)
         return scat,
     

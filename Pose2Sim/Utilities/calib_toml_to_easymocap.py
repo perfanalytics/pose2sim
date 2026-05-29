@@ -30,6 +30,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -58,7 +59,7 @@ def read_toml(toml_path):
     - T (extrinsic translation)
     '''
 
-    calib = rtoml.load(toml_path)
+    calib = rtoml.load(Path(toml_path))
     C, S, D, K, R, T = [], [], [], [], [], []
     for cam in list(calib.keys()):
         if cam != 'metadata':
@@ -133,17 +134,17 @@ def calib_toml_to_easymocap_func(*args):
     '''
     
     try:
-        toml_path = os.path.realpath(args[0].get('toml_file')) # invoked with argparse
+        toml_path = Path(args[0].get('toml_file').resolve()) # invoked with argparse
         if args[0]['intrinsic_yml_file'] == None or args[0]['extrinsic_yml_file'] == None:
-            intrinsic_yml_path = os.path.join(os.path.dirname(toml_path), 'Intrinsic.yml')
-            extrinsic_yml_path = os.path.join(os.path.dirname(toml_path), 'Extrinsic.yml')
+            intrinsic_yml_path = Path(toml_path).parent / 'Intrinsic.yml'
+            extrinsic_yml_path = Path(toml_path).parent / 'Extrinsic.yml'
         else:
-            intrinsic_yml_path = os.path.realpath(args[0]['intrinsic_yml_file'])
-            extrinsic_yml_path = os.path.realpath(args[0]['extrinsic_yml_file'])
+            intrinsic_yml_path = Path(args[0]['intrinsic_yml_file']).resolve()
+            extrinsic_yml_path = Path(args[0]['extrinsic_yml_file']).resolve()
     except:
-        toml_path = os.path.realpath(args[0]) # invoked as a function
-        intrinsic_yml_path = os.path.join(os.path.dirname(toml_path), 'Intrinsic.yml')
-        extrinsic_yml_path = os.path.join(os.path.dirname(toml_path), 'Extrinsic.yml')
+        toml_path = Path(args[0]).resolve() # invoked as a function
+        intrinsic_yml_path = Path(toml_path).parent / 'Intrinsic.yml'
+        extrinsic_yml_path = Path(toml_path).parent / 'Extrinsic.yml'
         
     C, _, D, K, R, T = read_toml(toml_path)
     write_intrinsic_yml(intrinsic_yml_path, C, D, K)

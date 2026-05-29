@@ -67,6 +67,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -149,14 +150,14 @@ def make_trc(config_dict, Q, keypoints_names, id_person=-1):
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
     multi_person = config_dict.get('project', {}).get('multi_person', False)
     if multi_person:
-        seq_name = f'{os.path.basename(os.path.realpath(project_dir))}_P{id_person}'
+        seq_name = f'{Path(project_dir).resolve().name}_P{id_person}'
     else:
-        seq_name = f'{os.path.basename(os.path.realpath(project_dir))}'
-    pose3d_dir = os.path.join(project_dir, 'pose-3d')
+        seq_name = f'{Path(project_dir).resolve().name}'
+    pose3d_dir = Path(project_dir) / 'pose-3d'
 
     # Get frame_rate
-    video_dir = os.path.join(project_dir, 'videos')
-    video_files = sorted([f for f in glob.glob(os.path.join(video_dir, '*')) if is_video_file(f)])
+    video_dir = Path(project_dir) / 'videos'
+    video_files = sorted([f for f in glob.glob(Path(video_dir) / '*') if is_video_file(f)])
     frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
     if frame_rate == 'auto': 
         try:
@@ -189,8 +190,8 @@ def make_trc(config_dict, Q, keypoints_names, id_person=-1):
     # Q = Q.fillna(' ')
 
     #Write file
-    if not os.path.exists(pose3d_dir): os.mkdir(pose3d_dir)
-    trc_path = os.path.realpath(os.path.join(pose3d_dir, trc_f))
+    if not Path(pose3d_dir).exists(): os.mkdir(pose3d_dir)
+    trc_path = (Path(pose3d_dir) / trc_f).resolve()
     with open(trc_path, 'w') as trc_o:
         [trc_o.write(line+'\n') for line in header_trc]
         Q.to_csv(trc_o, sep='\t', index=True, header=None, lineterminator='\n')
@@ -210,12 +211,12 @@ def retrieve_right_trc_order(trc_paths):
     '''
     
     logging.info('\n\nReordering trc file IDs:')
-    logging.info(f'\nPlease visualize the generated trc files in Blender or OpenSim.\nTrc files are stored in {os.path.dirname(trc_paths[0])}.\n')
+    logging.info(f'\nPlease visualize the generated trc files in Blender or OpenSim.\nTrc files are stored in {Path(trc_paths[0]).parent}.\n')
     retry = True
     while retry:
         retry = False
         logging.info('List of trc files:')
-        [logging.info(f'#{t_list}: {os.path.basename(trc_list)}') for t_list, trc_list in enumerate(trc_paths)]
+        [logging.info(f'#{t_list}: {Path(trc_list).name}') for t_list, trc_list in enumerate(trc_paths)]
         trc_id = []
         for t, trc_p in enumerate(trc_paths):
             logging.info(f'\nStatic trial #{t} corresponds to trc number:')
@@ -254,13 +255,13 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     # Read config_dict
     project_dir = config_dict.get('project').get('project_dir')
     # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
+    session_dir = (Path(project_dir) / '..').resolve()
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else project_dir if 'Config.toml' in os.listdir(project_dir) else os.getcwd()
-    calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
-    calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
-    calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
-    calib = rtoml.load(calib_file)
+    calib_dir = [Path(session_dir) / c for c in os.listdir(session_dir) if (Path(session_dir) / c).is_dir() and 'calib' in c.lower()][0]
+    calib_files = glob.glob(str(Path(calib_dir) / '*.toml'))
+    calib_file = max(calib_files, key=lambda f: Path(f).stat().st_ctime) # lastly created calibration file
+    calib = rtoml.load(Path(calib_file))
     cal_keys = [c for c in calib.keys() 
             if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
             and isinstance(calib[c],dict)]
@@ -667,7 +668,7 @@ def triangulate_all(config_dict):
     # Read config_dict
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
     # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
+    session_dir = (Path(project_dir) / '..').resolve()
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else project_dir if 'Config.toml' in os.listdir(project_dir) else os.getcwd()
     multi_person = config_dict.get('project', {}).get('multi_person', False)
@@ -687,17 +688,8 @@ def triangulate_all(config_dict):
     make_c3d = config_dict.get('triangulation', {}).get('make_c3d', True)
     
     try:
-        calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
-    except:
-        raise Exception(f'No .toml calibration directory found.')
-    try:
-        calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
-        calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
-    except:
-        raise Exception(f'No .toml calibration file found in the {calib_dir}.')
-    pose_dir = os.path.join(project_dir, 'pose')
-    poseSync_dir = os.path.join(project_dir, 'pose-sync')
-    poseTracked_dir = os.path.join(project_dir, 'pose-associated')
+        calib_dir = [Path(session_dir) / c for c in os.listdir(session_dir) if (Path(session_dir) / c).is_dir() and 'calib' in c.lower()][0]
+    poseTracked_dir = Path(project_dir) / 'pose-associated'
     
     # Projection matrix from toml calibration file
     P = computeP(calib_file, undistort=undistort_points)
@@ -743,22 +735,22 @@ def triangulate_all(config_dict):
     # 2d-pose files selection
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
-        os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
+        os.listdir(Path(pose_dir) / pose_listdirs_names[0])[0]
     except:
         raise ValueError(f'No json files found in {pose_dir} subdirectories. Make sure you run Pose2Sim.poseEstimation() first.')
     pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
     n_cams = len(json_dirs_names)
     try: 
-        json_files_names = [fnmatch.filter(os.listdir(os.path.join(poseTracked_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+        json_files_names = [fnmatch.filter(os.listdir(Path(poseTracked_dir) / js_dir), '*.json') for js_dir in json_dirs_names]
         pose_dir = poseTracked_dir
     except:
         try: 
-            json_files_names = [fnmatch.filter(os.listdir(os.path.join(poseSync_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+            json_files_names = [fnmatch.filter(os.listdir(Path(poseSync_dir) / js_dir), '*.json') for js_dir in json_dirs_names]
             pose_dir = poseSync_dir
         except:
             try:
-                json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+                json_files_names = [fnmatch.filter(os.listdir(Path(pose_dir) / js_dir), '*.json') for js_dir in json_dirs_names]
             except:
                 raise Exception(f'No json files found in {pose_dir}, {poseSync_dir}, nor {poseTracked_dir} subdirectories. Make sure you run Pose2Sim.poseEstimation() first.')
     json_files_names = [sort_stringlist_by_last_number(js) for js in json_files_names]    
@@ -789,7 +781,7 @@ def triangulate_all(config_dict):
         # Get x,y,likelihood values from files
         json_files_names_f = [[j for j in json_files_names[c] if int(re.split(r'(\d+)',j)[-2])==f] for c in range(n_cams)]
         json_files_names_f = [j for j_list in json_files_names_f for j in (j_list or ['none'])]
-        json_files_f = [os.path.join(pose_dir, json_dirs_names[c], json_files_names_f[c]) for c in range(n_cams)]
+        json_files_f = [Path(pose_dir) / json_dirs_names[c] / json_files_names_f[c] for c in range(n_cams)]
 
         x_files, y_files, likelihood_files = extract_files_frame_f(json_files_f, keypoints_ids, nb_persons_to_detect=nb_persons_to_detect)
         if multi_person:

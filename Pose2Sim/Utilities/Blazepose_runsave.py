@@ -42,6 +42,7 @@ __copyright__ = "Copyright 2023, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -77,11 +78,11 @@ def save_to_csv_or_h5(kpt_list, output_folder, video_name, to_csv, to_h5):
     df = pd.DataFrame(np.array(kpt_list).T, index=index_csv).T
 
     if to_csv:
-        csv_file = os.path.join(output_folder, video_name+'.csv')
+        csv_file = Path(output_folder) / video_name+'.csv'
         df.to_csv(csv_file, sep=',', index=True, lineterminator='\n')
 
     if to_h5:
-        h5_file = os.path.join(output_folder, video_name+'.h5')
+        h5_file = Path(output_folder) / video_name+'.h5'
         df.to_hdf(h5_file, index=True, key='blazepose_detection')
 
 
@@ -99,8 +100,8 @@ def save_to_json(kpt_list, output_folder, video_name):
     - Creation of json files in output_folder/json_folder    
     '''
 
-    json_folder = os.path.join(output_folder, 'blaze_'+video_name + '_json')
-    if not os.path.exists(json_folder):
+    json_folder = Path(output_folder) / 'blaze_'+video_name + '_json'
+    if not Path(json_folder).exists():
         os.mkdir(json_folder)
     print(json_folder)
 
@@ -119,7 +120,7 @@ def save_to_json(kpt_list, output_folder, video_name):
     # write each h5 line in json file
     for frame, kpt in enumerate(kpt_list):
         json_dict['people'][0]['pose_keypoints_2d'] = kpt
-        json_file = os.path.join(json_folder, 'blaze_'+video_name+'.'+str(frame).zfill(5)+'.json')
+        json_file = Path(json_folder) / 'blaze_'+video_name+'.'+str(frame.zfill(5)+'.json')
         with open(json_file, 'w') as js_f:
             js_f.write(json.dumps(json_dict))
 
@@ -157,9 +158,9 @@ def blazepose_detec_func(**args):
     '''
 
     # Retrieve arguments
-    video_input = os.path.realpath(args.get('input_file'))
-    video_dir = os.path.dirname(video_input)
-    video_name = os.path.splitext(os.path.basename(video_input))[0]
+    video_input = Path(args.get('input_file').resolve())
+    video_dir = Path(video_input).parent
+    video_name = Path(video_input).stem
     output_folder = args.get('output_folder')
 
     display = args.get('display')
@@ -176,8 +177,8 @@ def blazepose_detec_func(**args):
     if to_csv or to_h5 or to_json or save_images or save_video:
         if output_folder == None: 
             output_folder = video_dir
-        if not os.path.exists(os.path.realpath(output_folder)):
-            os.mkdir(os.path.realpath(output_folder))
+        if not Path(Path(output_folder).exists().resolve()):
+            os.mkdir(Path(output_folder).resolve())
     
     # Run Blazepose
     cap = cv2.VideoCapture(video_input)
@@ -208,16 +209,16 @@ def blazepose_detec_func(**args):
 
                 # Save images
                 if save_images: 
-                    images_folder = os.path.join(output_folder, 'blaze_'+video_name + '_img')
-                    if not os.path.exists(images_folder):
+                    images_folder = Path(output_folder) / 'blaze_'+video_name + '_img'
+                    if not Path(images_folder).exists():
                         os.mkdir(images_folder)
-                    cv2.imwrite(os.path.join(images_folder, 'blaze_'+video_name+'.'+str(count).zfill(5)+'.png'), frame)
+                    cv2.imwrite(Path(images_folder) / 'blaze_'+video_name+'.'+str(count.zfill(5)+'.png'), frame)
 
                 # Save video
                 if save_video:
                     if count == 0:
                         fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-                        writer = cv2.VideoWriter(os.path.join(output_folder, video_name+'_blaze.mp4'), fourcc, fps, (int(W), int(H)))
+                        writer = cv2.VideoWriter(Path(output_folder) / video_name+'_blaze.mp4', fourcc, fps, (int(W), int(H)))
                     writer.write(frame)
 
                 # Store coordinates

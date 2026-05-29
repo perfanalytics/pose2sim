@@ -38,6 +38,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -190,7 +191,7 @@ def calib_checkerboard(criteria, **args):
     for cam in cam_listdirs_names:
         # Find corners in vid
         if video:
-            video = glob.glob(os.path.join(calib_dir, cam, '*.'+ extension))[0]
+            video = glob.glob(Path(calib_dir) / cam / '*.'+ extension)[0]
             cap = cv2.VideoCapture(video)
             ret_vid, img = cap.read()
             while ret_vid:
@@ -206,7 +207,7 @@ def calib_checkerboard(criteria, **args):
             
         # Find corners in images        
         else:
-            images = glob.glob(os.path.join(calib_dir, cam, '*.'+ extension))
+            images = glob.glob(Path(calib_dir) / cam / '*.'+ extension)
             for image_f in images:
                 img = cv2.imread(image_f)
                 imgp = findCorners(img, corners_nb, criteria, show)
@@ -254,7 +255,7 @@ def toml_write(calib_path, C, S, D, K, R, T):
     - a .toml file cameras calibrations
     '''
 
-    with open(os.path.join(calib_path), 'w+') as cal_f:
+    with open(calib_path, 'w+') as cal_f:
         for c in range(len(C)):
             cam=f'[cam_{c+1}]\n'
             name = f'name = "{C[c]}"\n'
@@ -277,7 +278,7 @@ def recap_calibrate(ret, calib_path):
     - Message in console
     '''
     
-    calib = rtoml.load(calib_path)
+    calib = rtoml.load(Path(calib_path))
     
     ret_m, ret_px = [], []
     for c, cam in enumerate(calib.keys()):
@@ -306,7 +307,7 @@ def calibrate_cams_func(**args):
     
     calib_dir = args.get('calib_dir')
     output_file = 'Calib.toml' if args.get('output_file')==None else args.get('output_file')
-    calib_path = os.path.join(calib_dir, output_file)
+    calib_path = Path(calib_dir) / output_file
     
     # Calibrate
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001) # stop refining after 30 iterations or if error less than 0.001px

@@ -33,6 +33,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -113,7 +114,7 @@ def toml_write(toml_path, C, S, D, K, R, T):
     '''
     Writes calibration parameters to a .toml file.
     '''
-    with open(os.path.join(toml_path), 'w+') as cal_f:
+    with open(toml_path, 'w+') as cal_f:
         for c in range(len(C)):
             cam=f'[cam_{c+1}]\n'
             name = f'name = "{C[c]}"\n'
@@ -142,16 +143,16 @@ def calib_easymocap_to_toml_func(*args):
         OR calib_yml_to_toml -i intrinsic_yml_file -e extrinsic_yml_file -o output_toml_file
     '''
     try:
-        intrinsic_path = os.path.realpath(args[0].get('intrinsic_file')) # invoked with argparse
-        extrinsic_path = os.path.realpath(args[0].get('extrinsic_file'))
+        intrinsic_path = Path(args[0].get('intrinsic_file').resolve()) # invoked with argparse
+        extrinsic_path = Path(args[0].get('extrinsic_file').resolve())
         if args[0]['toml_file'] == None:
-            toml_path = os.path.join(os.path.dirname(intrinsic_path), 'Calib.toml')
+            toml_path = Path(intrinsic_path).parent / 'Calib.toml'
         else:
-            toml_path = os.path.realpath(args[0]['toml_file'])
+            toml_path = Path(args[0]['toml_file']).resolve()
     except:
-        intrinsic_path = os.path.realpath(args[0]) # invoked as a function
-        extrinsic_path = os.path.realpath(args[1])
-        toml_path = os.path.join(os.path.dirname(intrinsic_path), 'Calib.toml')
+        intrinsic_path = Path(args[0]).resolve() # invoked as a function
+        extrinsic_path = Path(args[1]).resolve()
+        toml_path = Path(intrinsic_path).parent / 'Calib.toml'
      
     C, S, D, K, R, T = read_calib_yml(intrinsic_path, extrinsic_path)
     toml_write(toml_path, C, S, D, K, R, T)

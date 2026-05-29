@@ -952,7 +952,7 @@ def trc_filter_func(**args):
     '''
 
     input_path = args.get('input_file')
-    _, ext = os.path.splitext(input_path)
+    ext = Path(input_path).suffix
     ext = ext.lower()
     is_mot = (ext == '.mot')
     

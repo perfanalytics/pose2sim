@@ -60,6 +60,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -395,7 +396,7 @@ def calib_biocv_fun(files_to_convert_paths, binning_factor=1):
     - T: extrinsic translation: list of arrays of floats
     '''
     
-    logging.info(f'Converting {[os.path.basename(f) for f in files_to_convert_paths]} to .toml calibration file...')
+    logging.info(f'Converting {[Path(f).name for f in files_to_convert_paths]} to .toml calibration file...')
 
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
     for i, f_path in enumerate(files_to_convert_paths):
@@ -435,7 +436,7 @@ def calib_opencap_fun(files_to_convert_paths, binning_factor=1):
     - T: extrinsic translation: list of arrays of floats
     '''
     
-    logging.info(f'Converting {[os.path.basename(f) for f in files_to_convert_paths]} to .toml calibration file...')
+    logging.info(f'Converting {[Path(f).name for f in files_to_convert_paths]} to .toml calibration file...')
     
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
     for i, f_path in enumerate(files_to_convert_paths):
@@ -489,14 +490,14 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
 
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
     try:
-        calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
-        calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
+        calib_files = glob.glob(str(Path(calib_dir) / '*.toml'))
+        calib_file = max(calib_files, key=lambda f: Path(f).stat().st_ctime) # lastly created calibration file
     except:
         pass
     if not overwrite_intrinsics and 'calib_file' in locals():
         logging.info(f'\nPreexisting calibration file found: \'{calib_file}\'.')
         logging.info(f'\nRetrieving intrinsic parameters from file. Set "overwrite_intrinsics" to true in Config.toml to recalculate them.')
-        calib_data = rtoml.load(calib_file)
+        calib_data = rtoml.load(Path(calib_file))
 
         ret, C, S, D, K, R, T = [], [], [], [], [], [], []
         for cam in calib_data:
@@ -520,7 +521,7 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
     if calculate_extrinsics:
         logging.info(f'\nCalculating extrinsic parameters...')
         # check that the number of cameras is consistent
-        nb_cams_extrinsics = [max(len(fold),len(files)) for path, fold, files in os.walk(os.path.join(calib_dir, 'extrinsics'))][0]
+        nb_cams_extrinsics = [max(len(fold),len(files)) for path, fold, files in os.walk(Path(calib_dir) / 'extrinsics')][0]
         if nb_cams_intrinsics != nb_cams_extrinsics:
             raise Exception(f'Error: The number of cameras is not consistent:\
                     Found {nb_cams_intrinsics} cameras based on the number of intrinsic folders or on calibration file data,\
@@ -544,10 +545,10 @@ def append_points_to_json(calib_dir, category, img_filename, points, object_poin
     - object_points: bool. If true, points needs to be an array of shape (N, 3)
     '''
 
-    json_path = os.path.join(calib_dir, 'Image_points.json')
+    json_path = Path(calib_dir) / 'Image_points.json'
     
     # Load existing JSON or create new structure
-    if os.path.exists(json_path):
+    if Path(json_path).exists():
         with open(json_path, 'r') as f:
             data = json.load(f)
     else:
@@ -651,18 +652,18 @@ def create_image_labels(img_path, imgpoints, calib_dir, prefix, reprojected_poin
         fig = plt.figure()
         plt.imshow(im_pil)
         plt.axis('off')
-        fig.canvas.manager.set_window_title(os.path.basename(img_path))
+        fig.canvas.manager.set_window_title(Path(img_path).name)
         fig.canvas.manager.window.showMaximized()
         plt.tight_layout()
         plt.show(block=False)
 
     # Save image
     if save:
-        original_filename = os.path.basename(img_path)
+        original_filename = Path(img_path).name
         save_filename = f'{prefix}_{original_filename}'
-        save_filename = os.path.splitext(save_filename)[0] + '.png' # if original is .mp4 or other video format
-        save_path = os.path.join(calib_dir, 'debug_images', save_filename)
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        save_filename = Path(save_filename).stem + '.png' # if original is .mp4 or other video format
+        save_path = Path(calib_dir) / 'debug_images' / save_filename
+        os.makedirs(Path(save_path).parent, exist_ok=True)
         img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         cv2.imwrite(save_path, img_bgr)
     else:
@@ -687,10 +688,10 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
     '''
 
     try:
-        intrinsics_cam_listdirs_names = sorted(next(os.walk(os.path.join(calib_dir, 'intrinsics')))[1])
+        intrinsics_cam_listdirs_names = sorted(next(os.walk(Path(calib_dir) / 'intrinsics'))[1])
     except StopIteration:
-        logging.exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
-        raise Exception(f'Error: No {os.path.join(calib_dir, "intrinsics")} folder found.')
+        logging.exception(f'Error: No {Path(calib_dir) / "intrinsics"} folder found.')
+        raise Exception(f'Error: No {Path(calib_dir) / "intrinsics"} folder found.')
     intrinsics_extension = intrinsics_config_dict.get('intrinsics_extension', 'jpg')
     extract_every_N_sec = intrinsics_config_dict.get('extract_every_N_sec', 1)
     overwrite_extraction = False
@@ -700,8 +701,8 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
 
     # Load clicked image points if exist
-    img_pts_path = os.path.join(calib_dir, f'Image_points.json')
-    if os.path.exists(img_pts_path):
+    img_pts_path = Path(calib_dir) / f'Image_points.json'
+    if Path(img_pts_path).exists():
         with open(img_pts_path, 'r') as f:
             imgp_data = json.load(f)
         image_points = imgp_data['intrinsics']
@@ -715,10 +716,10 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
         imgpoints = [] # 2d points in image plane
 
         logging.info(f'\nCamera {cam}:')
-        img_vid_files = glob.glob(os.path.join(calib_dir, 'intrinsics', cam, f'*.{intrinsics_extension}'))
+        img_vid_files = glob.glob(Path(calib_dir) / 'intrinsics' / cam / f'*.{intrinsics_extension}')
         if len(img_vid_files) == 0:
-            logging.exception(f'The folder {os.path.join(calib_dir, "intrinsics", cam)} does not exist or does not contain any files with extension .{intrinsics_extension}.')
-            raise ValueError(f'The folder {os.path.join(calib_dir, "intrinsics", cam)} does not exist or does not contain any files with extension .{intrinsics_extension}.')
+            logging.exception(f'The folder {Path(calib_dir) / "intrinsics" / cam} does not exist or does not contain any files with extension .{intrinsics_extension}.')
+            raise ValueError(f'The folder {Path(calib_dir) / "intrinsics" / cam} does not exist or does not contain any files with extension .{intrinsics_extension}.')
         img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
         
         # extract frames from video if video
@@ -728,14 +729,14 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
             if cap.read()[0] == False:
                 raise
             extract_frames(img_vid_files[0], extract_every_N_sec, overwrite_extraction)
-            img_vid_files = glob.glob(os.path.join(calib_dir, 'intrinsics', cam, f'*.png'))
+            img_vid_files = glob.glob(Path(calib_dir) / 'intrinsics' / cam / f'*.png')
             img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)])
         except:
             pass
 
         # find corners
         for img_path in img_vid_files:
-            cam_name = os.path.basename(img_path)
+            cam_name = Path(img_path).name
             if show_detection_intrinsics == True:
                 # If previously labeled points exist, check if they are satisfying
                 if 'image_points' in locals():
@@ -830,27 +831,27 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
         show_reprojection_error = extrinsics_config_dict.get('board', {}).get('show_reprojection_error', True)
 
     try:
-        img_vid_files = sorted(glob.glob(os.path.join(calib_dir, 'extrinsics', '*', f'*.{extrinsics_extension}')))
+        img_vid_files = sorted(glob.glob(Path(calib_dir) / 'extrinsics' / '*' / f'*.{extrinsics_extension}'))
         if len(img_vid_files) == 0:
-            img_vid_files = sorted(glob.glob(os.path.join(calib_dir, 'extrinsics', f'*.{extrinsics_extension}')))
+            img_vid_files = sorted(glob.glob(Path(calib_dir) / 'extrinsics' / f'*.{extrinsics_extension}'))
         if len(img_vid_files) == 0:
             raise
         img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
     except StopIteration:
-        logging.exception(f'Error: The {os.path.join(calib_dir, "extrinsics")} folder does not exist or does not contain any files with extension .{extrinsics_extension}.')
-        raise Exception(f'Error: The {os.path.join(calib_dir, "extrinsics")} folder does not exist or does not contain any files with extension .{extrinsics_extension}.')
+        logging.exception(f'Error: The {Path(calib_dir) / "extrinsics"} folder does not exist or does not contain any files with extension .{extrinsics_extension}.')
+        raise Exception(f'Error: The {Path(calib_dir) / "extrinsics"} folder does not exist or does not contain any files with extension .{extrinsics_extension}.')
 
     # Load clicked image points if exist
-    img_pts_path = os.path.join(calib_dir, f'Image_points.json')
-    if os.path.exists(img_pts_path):
+    img_pts_path = Path(calib_dir) / f'Image_points.json'
+    if Path(img_pts_path).exists():
         with open(img_pts_path, 'r') as f:
             imgp_data = json.load(f)
         image_points = imgp_data.get('extrinsics', [])
 
     ret, R, T = [], [], []
-    if extrinsics_method in {'board', 'scene'}:
+    if extrinsics_method in {'board', 'static_board', 'scene'}:
         # Define 3D object points
-        if extrinsics_method == 'board':
+        if extrinsics_method in ('board', 'static_board'):
             if not board_position:
                 logging.warning('board_position not defined in Config.toml. Defaulting to "vertical".')
                 board_position = 'vertical'
@@ -866,12 +867,12 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
                 raise ValueError('board_position should be "horizontal" or "vertical".')
                 
         # Save reference 3D coordinates as trc
-        obj_pts_path = os.path.join(calib_dir, f'Object_points.trc')
+        obj_pts_path = Path(calib_dir) / f'Object_points.trc'
         trc_write(object_coords_3d, obj_pts_path)
 
         # Create or update clicked image points file
         for i, img_vid_file in enumerate(img_vid_files):
-            cam_name = os.path.basename(img_vid_file)
+            cam_name = Path(img_vid_file).name
             logging.info(f'\nCamera {cam_name}:')
            
             # extract frames from image, or from video if imread is None
@@ -922,7 +923,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
                         plt.close('all')
 
             # if len(imgp) == 0 or not satisfied:
-            if extrinsics_method == 'board':
+            if extrinsics_method in ('board', 'static_board'):
                 imgp, objp = findCorners(img_vid_file, extrinsics_corners_nb, objp=object_coords_3d, show=show_reprojection_error)
                 if len(imgp) == 0:
                     logging.exception('No corners found. Set "show_detection_extrinsics" to true to click corners by hand, or change extrinsic_board_type to "scene"')
@@ -1012,7 +1013,7 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
     # If corners are found, refine corners
     if ret == True: 
         imgp = cv2.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
-        logging.info(f'{os.path.basename(img_path)}: Corners found.')
+        logging.info(f'{Path(img_path).name}: Corners found.')
         
         if show:
             # Draw corners
@@ -1037,10 +1038,10 @@ def findCorners(img_path, corner_nb, objp=[], show=True):
     else:
         if show:
             # Visualizer and key press event handler
-            logging.info(f'{os.path.basename(img_path)}: Corners not found: please label them by hand.')
+            logging.info(f'{Path(img_path).name}: Corners not found: please label them by hand.')
             imgp_objp_confirmed = imgp_objp_visualizer_clicker(img, imgp=[], objp=objp, img_path=img_path)
         else:
-            logging.info(f'{os.path.basename(img_path)}: Corners not found. To label them by hand, set "show_detection_intrinsics" to true in the Config.toml file.')
+            logging.info(f'{Path(img_path).name}: Corners not found. To label them by hand, set "show_detection_intrinsics" to true in the Config.toml file.')
             imgp_objp_confirmed = []
 
     return imgp_objp_confirmed
@@ -1171,7 +1172,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     # Ask for confirmation
                     root = ctk.CTk()
                     root.withdraw()
-                    response = messagebox.askyesno("Confirm labeling", f"Are you satisfied with your labeling for {os.path.basename(img_path)}?")
+                    response = messagebox.askyesno("Confirm labeling", f"Are you satisfied with your labeling for {Path(img_path).name}?")
 
                     root.destroy()
                     # Disable event picking
@@ -1242,7 +1243,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     # Ask for confirmation
                     root = ctk.CTk()
                     root.withdraw()
-                    response = messagebox.askyesno("Confirm labeling", f"Are you satisfied with your labeling for {os.path.basename(img_path)}?")
+                    response = messagebox.askyesno("Confirm labeling", f"Are you satisfied with your labeling for {Path(img_path).name}?")
                     # Disable event picking
                     fig.canvas.callbacks.blocked = True
                     # Confirmed
@@ -1366,7 +1367,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     plt.rcParams['toolbar'] = 'None'
     fig, ax = plt.subplots()
     fig = plt.gcf()
-    fig.canvas.manager.set_window_title(os.path.basename(img_path))
+    fig.canvas.manager.set_window_title(Path(img_path).name)
     ax.axis("off")
     for corner in imgp:
         x, y = corner.ravel()
@@ -1415,7 +1416,7 @@ def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False
     - extracted frames in folder
     '''
     
-    if not os.path.exists(os.path.splitext(video_path)[0] + '_00000.png') or overwrite_extraction:
+    if not Path(Path(video_path).exists().stem + '_00000.png') or overwrite_extraction:
         cap = cv2.VideoCapture(str(video_path))
         if cap.isOpened():
             fps = round(cap.get(cv2.CAP_PROP_FPS))
@@ -1425,7 +1426,7 @@ def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False
                 ret, frame = cap.read()
                 if ret == True:
                     if frame_nb % (fps*extract_every_N_sec) == 0:
-                        img_path = (os.path.splitext(video_path)[0] + '_' +str(frame_nb).zfill(5)+'.png')
+                        img_path = (Path(video_path).stem + '_' +str(frame_nb).zfill(5)+'.png')
                         cv2.imwrite(str(img_path), frame)
                     frame_nb+=1
                 else:
@@ -1449,7 +1450,7 @@ def trc_write(object_coords_3d, trc_path):
     NumFrames = 2
     NumMarkers = len(object_coords_3d)
     keypoints_names = np.arange(NumMarkers)
-    header_trc = ['PathFileType\t4\t(X/Y/Z)\t' + os.path.basename(trc_path), 
+    header_trc = ['PathFileType\t4\t(X/Y/Z)\t' + Path(trc_path).name, 
             'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames', 
             '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, NumFrames])),
             'Frame#\tTime\t' + '\t\t\t'.join(str(k) for k in keypoints_names) + '\t\t',
@@ -1488,7 +1489,7 @@ def toml_write(calib_path, C, S, D, K, R, T):
     - a .toml file cameras calibrations
     '''
 
-    with open(os.path.join(calib_path), 'w+') as cal_f:
+    with open(calib_path, 'w+') as cal_f:
         for c in range(len(C)):
             cam=f'[{C[c]}]\n'
             name = f'name = "{C[c]}"\n'
@@ -1511,7 +1512,7 @@ def recap_calibrate(ret, calib_path, calib_full_type):
     - Message in console
     '''
     
-    calib = rtoml.load(calib_path)
+    calib = rtoml.load(Path(calib_path))
     
     ret_m, ret_px = [], []
     for c, cam in enumerate(calib.keys()):
@@ -1545,7 +1546,7 @@ def calibrate_cams_all(config_dict):
 
     # Read config_dict
     project_dir = config_dict.get('project', {}).get('session_dir', '.')
-    calib_dir = [os.path.join(project_dir, c) for c in os.listdir(project_dir) if ('Calib' in c or 'calib' in c)][0]
+    calib_dir = [Path(project_dir) / c for c in os.listdir(project_dir) if ('Calib' in c or 'calib' in c)][0]
     calib_type = config_dict.get('calibration', {}).get('calibration_type', 'convert')
 
     if calib_type=='convert':
@@ -1553,30 +1554,30 @@ def calibrate_cams_all(config_dict):
         try:
             if convert_filetype=='qualisys':
                 convert_ext = '.qca.txt'
-                file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}*'))[0]
+                file_to_convert_path = glob.glob(Path(calib_dir) / f'*{convert_ext}*')[0]
                 binning_factor = config_dict.get('calibration', {}).get('convert', {}).get('qualisys', {}).get('binning_factor', 1)
             elif convert_filetype=='optitrack':
                 file_to_convert_path = ['']
                 binning_factor = 1
             elif convert_filetype=='vicon':
                 convert_ext = '.xcp'
-                file_to_convert_path = glob.glob(os.path.join(calib_dir, f'*{convert_ext}'))[0]
+                file_to_convert_path = glob.glob(Path(calib_dir) / f'*{convert_ext}')[0]
                 binning_factor = 1
             elif convert_filetype=='opencap': # all files with .pickle extension
                 convert_ext = '.pickle'
-                file_to_convert_path = sorted(glob.glob(os.path.join(calib_dir, f'*{convert_ext}')))
+                file_to_convert_path = sorted(glob.glob(Path(calib_dir) / f'*{convert_ext}'))
                 binning_factor = 1
             elif convert_filetype=='easymocap': #intri.yml and intri.yml
                 convert_ext = '.yml'
-                file_to_convert_path = sorted(glob.glob(os.path.join(calib_dir, f'*{convert_ext}')))
+                file_to_convert_path = sorted(glob.glob(Path(calib_dir) / f'*{convert_ext}'))
                 binning_factor = 1
             elif convert_filetype=='biocv': # all files without extension -> now with .calib extension
                 # convert_ext = 'no'
                 # list_dir = os.listdir(calib_dir)
-                # list_dir_noext = sorted([os.path.splitext(f)[0] for f in list_dir if os.path.splitext(f)[1]==''])
-                # file_to_convert_path = [os.path.join(calib_dir,f) for f in list_dir_noext if os.path.isfile(os.path.join(calib_dir, f))]
+                # list_dir_noext = sorted([Path(f).stem for f in list_dir if Path(f).suffix==''])
+                # file_to_convert_path = [Path(calib_dir) / f for f in list_dir_noext if Path(Path(calib_dir) / f.is_file())]
                 convert_ext = '.calib'
-                file_to_convert_path = sorted(glob.glob(os.path.join(calib_dir, f'*{convert_ext}')))
+                file_to_convert_path = sorted(glob.glob(Path(calib_dir) / f'*{convert_ext}'))
                 binning_factor = 1
             elif convert_filetype=='anipose' or convert_filetype=='freemocap' or convert_filetype=='caliscope': # no conversion needed, skips this stage
                 logging.info(f'\n--> No conversion needed from Caliscope, AniPose, nor from FreeMocap. Calibration skipped.\n')
@@ -1589,7 +1590,7 @@ def calibrate_cams_all(config_dict):
         except:
             raise NameError(f'No file with {convert_ext} extension found in {calib_dir}.')
         
-        calib_output_path = os.path.join(calib_dir, f'Calib_{convert_filetype}.toml')
+        calib_output_path = Path(calib_dir) / f'Calib_{convert_filetype}.toml'
         calib_full_type = '_'.join([calib_type, convert_filetype])
         args_calib_fun = [file_to_convert_path, binning_factor]
         
@@ -1599,7 +1600,7 @@ def calibrate_cams_all(config_dict):
         save_debug_images = config_dict.get('calibration', {}).get('calculate', {}).get('save_debug_images', True)
         extrinsics_method = extrinsics_config_dict.get('extrinsics_method', 'scene')
 
-        calib_output_path = os.path.join(calib_dir, f'Calib_{extrinsics_method}.toml')
+        calib_output_path = Path(calib_dir) / f'Calib_{extrinsics_method}.toml'
         calib_full_type = calib_type
         args_calib_fun = [calib_dir, intrinsics_config_dict, extrinsics_config_dict, save_debug_images]
 

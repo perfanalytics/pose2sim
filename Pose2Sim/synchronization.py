@@ -61,6 +61,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -1058,9 +1059,9 @@ def select_person(vid_or_img_files, cam_names, json_files_names_range, search_ar
     time_RAM_list = []
     
     try: # video files
-        video_files_dict = {cam_name: file for cam_name in cam_names for file in vid_or_img_files if cam_name in os.path.basename(file)}
+        video_files_dict = {cam_name: file for cam_name in cam_names for file in vid_or_img_files if cam_name in Path(file).name}
     except: # image directories
-        video_files_dict = {cam_name: files for cam_name in cam_names for files in vid_or_img_files if cam_name in os.path.basename(files[0])}
+        video_files_dict = {cam_name: files for cam_name in cam_names for files in vid_or_img_files if cam_name in Path(files[0]).name}
 
     for i, cam_name in enumerate(cam_names):
         vid_or_img_files_cam = video_files_dict.get(cam_name)
@@ -1199,7 +1200,7 @@ def load_frame_and_bounding_boxes(cap, frame_number, frame_to_json, pose_dir, js
     json_file_name = frame_to_json.get(frame_number)
     bounding_boxes_list = []
     if json_file_name:
-        json_file_path = os.path.join(pose_dir, json_dir_name, json_file_name)
+        json_file_path = Path(pose_dir) / json_dir_name / json_file_name
         bounding_boxes_list.extend(bounding_boxes(json_file_path))
 
     return frame_rgb, bounding_boxes_list
@@ -1261,7 +1262,7 @@ def convert_json2pandas(json_files, likelihood_threshold=0.6, keypoints_ids=[], 
                 # Remove points with low confidence
                 json_data = np.array([j if j[2]>likelihood_threshold else [np.nan, np.nan, np.nan] for j in json_data]).ravel().tolist() 
             except:
-                # print(f'No person found in {os.path.basename(json_dir)}, frame {i}')
+                # print(f'No person found in {Path(json_dir).name}, frame {i}')
                 json_data = [np.nan] * nb_coords*3
         json_coords.append(json_data)
     df_json_coords = pd.DataFrame(json_coords)
@@ -1393,8 +1394,8 @@ def synchronize_cams_all(config_dict):
     
     # Get parameters from Config.toml
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
-    pose_dir = os.path.realpath(os.path.join(project_dir, 'pose'))
-    sync_dir = os.path.abspath(os.path.join(pose_dir, '..', 'pose-sync'))
+    pose_dir = (Path(project_dir) / 'pose').resolve()
+    sync_dir = (Path(pose_dir) / '..', 'pose-sync').resolve()
     os.makedirs(sync_dir, exist_ok=True)
     pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet')
     # multi_person = config_dict.get('project', {}).get('multi_person', False)
@@ -1412,13 +1413,13 @@ def synchronize_cams_all(config_dict):
     filter_order = int(config_dict.get('synchronization', {}).get('filter_order', 4))
 
     # Determine frame rate
-    video_dir = os.path.join(project_dir, 'videos')
-    vid_or_img_files = sorted([f for f in glob.glob(os.path.join(video_dir, '*')) if is_video_file(f)])
+    video_dir = Path(project_dir) / 'videos'
+    vid_or_img_files = sorted([f for f in glob.glob(Path(video_dir) / '*') if is_video_file(f)])
     if not vid_or_img_files: # video_files is then img_dirs
         try:
-            image_folders = [f for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))]
+            image_folders = [f for f in os.listdir(video_dir) if Path(Path(video_dir) / f.is_dir())]
             for image_folder in image_folders:
-                img_files = sorted([f for f in glob.glob(os.path.join(video_dir, image_folder, '*')) if is_image_file(f)])
+                img_files = sorted([f for f in glob.glob(Path(video_dir) / image_folder / '*') if is_image_file(f)])
                 if img_files:
                     vid_or_img_files.append(img_files)
         except:
@@ -1462,18 +1463,18 @@ def synchronize_cams_all(config_dict):
     logging.info('Synchronizing...')
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
-        os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
+        os.listdir(Path(pose_dir) / pose_listdirs_names[0])[0]
     except:
         raise ValueError(f'No json files found in {pose_dir} subdirectories. Make sure you run Pose2Sim.poseEstimation() first.')
     pose_listdirs_names = sort_stringlist_by_last_number(pose_listdirs_names)
     json_dirs_names = [k for k in pose_listdirs_names if 'json' in k]
-    json_dirs = [os.path.join(pose_dir, j_d) for j_d in json_dirs_names] # list of json directories in pose_dir
-    json_files_names = [fnmatch.filter(os.listdir(os.path.join(pose_dir, js_dir)), '*.json') for js_dir in json_dirs_names]
+    json_dirs = [Path(pose_dir) / j_d for j_d in json_dirs_names] # list of json directories in pose_dir
+    json_files_names = [fnmatch.filter(os.listdir(Path(pose_dir) / js_dir), '*.json') for js_dir in json_dirs_names]
     json_files_names = [sort_stringlist_by_last_number(j) for j in json_files_names]
-    nb_frames_per_cam = [len(fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json')) for json_dir in json_dirs]
+    nb_frames_per_cam = [len(fnmatch.filter(os.listdir(json_dir), '*.json')) for json_dir in json_dirs]
     cam_nb = len(json_dirs)
     cam_list = list(range(cam_nb))
-    cam_names = [os.path.basename(j_dir).split('_')[0] for j_dir in json_dirs]
+    cam_names = [Path(j_dir).name.split('_')[0] for j_dir in json_dirs]
     
     # frame range selection
     f_range = [[0, min([len(j) for j in json_files_names])] if frame_range in ('all', 'auto', []) else frame_range][0]
@@ -1485,7 +1486,7 @@ def synchronize_cams_all(config_dict):
             approx_time_maxspeed *= cam_nb
 
         approx_frame_maxspeed = [int(fps * t) for t in approx_time_maxspeed]
-        nb_frames_per_cam = [len(fnmatch.filter(os.listdir(os.path.join(json_dir)), '*.json')) for json_dir in json_dirs]
+        nb_frames_per_cam = [len(fnmatch.filter(os.listdir(json_dir), '*.json')) for json_dir in json_dirs]
 
         search_around_frames = []
         for i, frame in enumerate(approx_frame_maxspeed):
@@ -1521,7 +1522,7 @@ def synchronize_cams_all(config_dict):
     if np.array([j==[] for j in json_files_names_range]).any():
         raise ValueError(f'No json files found within the specified frame range ({frame_range}) at the times {approx_time_maxspeed} +/- {time_range_around_maxspeed} s.')
     
-    json_files_range = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names_range[j]] for j, j_dir in enumerate(json_dirs_names)]
+    json_files_range = [[Path(pose_dir) / j_dir / j_file for j_file in json_files_names_range[j]] for j, j_dir in enumerate(json_dirs_names)]
     kpt_indices = [i for i,k in zip(keypoints_ids, keypoints_names) if k in keypoints_to_consider]
     kpt_id_in_df = np.array([[keypoints_ids.index(k)*2,keypoints_ids.index(k)*2+1]  for k in kpt_indices]).ravel()
     
@@ -1545,7 +1546,7 @@ def synchronize_cams_all(config_dict):
                 # Recalculate json_files_names_range and json_files_range with updated search_around_frames
                 json_files_names_range = [[j for j in json_files_cam if int(re.split(r'(\d+)',j)[-2]) in range(*frames_cam)] 
                                         for (json_files_cam, frames_cam) in zip(json_files_names,search_around_frames)]
-                json_files_range = [[os.path.join(pose_dir, j_dir, j_file) for j_file in json_files_names_range[j]] 
+                json_files_range = [[Path(pose_dir) / j_dir / j_file for j_file in json_files_names_range[j]] 
                                for j, j_dir in enumerate(json_dirs_names)]
 
         else:
@@ -1612,7 +1613,7 @@ def synchronize_cams_all(config_dict):
     for cam_id, cam_name in zip(cam_list, cam_names):
         offset_cam_section, max_corr_cam, fig = time_lagged_cross_corr(sum_speeds[ref_cam_id], sum_speeds[cam_id], lag_range, show=display_sync_plots, ref_cam_name=ref_cam_name, cam_name=cam_name)
         if save_plots and fig is not None:
-            fig.savefig(os.path.join(sync_dir, f'sync_{ref_cam_name}_vs_{cam_name}.png'))
+            fig.savefig(Path(sync_dir) / f'sync_{ref_cam_name}_vs_{cam_name}.png')
             plt.close(fig)
         offset_cam = offset_cam_section - (search_around_frames[ref_cam_id][0] - search_around_frames[cam_id][0])
         if isinstance(approx_time_maxspeed, list):
@@ -1626,12 +1627,12 @@ def synchronize_cams_all(config_dict):
 
     # rename json files according to the offset and copy them to pose-sync
     for d, j_dir in enumerate(json_dirs):
-        os.makedirs(os.path.join(sync_dir, os.path.basename(j_dir)), exist_ok=True)
+        os.makedirs(Path(sync_dir) / Path(j_dir.name), exist_ok=True)
         for j_file in json_files_names[d]:
             j_split = re.split(r'(\d+)',j_file)
             j_split[-2] = f'{int(j_split[-2])-offset[d]:06d}'
             if int(j_split[-2]) > 0:
                 json_offset_name = ''.join(j_split)
-                shutil.copy(os.path.join(pose_dir, os.path.basename(j_dir), j_file), os.path.join(sync_dir, os.path.basename(j_dir), json_offset_name))
+                shutil.copy(Path(pose_dir) / Path(j_dir.name, j_file), Path(sync_dir) / Path(j_dir.name, json_offset_name))
 
     logging.info(f'Synchronized json files saved in {sync_dir}.')

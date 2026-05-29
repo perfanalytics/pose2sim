@@ -37,6 +37,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -60,7 +61,7 @@ def main():
 def _is_video_file(path):
     '''Check if the given path is a video file based on its extension.'''
     video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.mpeg', '.mpg'}
-    return os.path.isfile(path) and os.path.splitext(path)[1].lower() in video_extensions
+    return Path(path).is_file() and Path(path).suffix.lower() in video_extensions
 
 
 def _parse_json(json_path):
@@ -116,7 +117,7 @@ def _frame_iterator(input_path, json_fnames):
         img_fnames = sorted(os.listdir(input_path))
         img_fnames = [e for e in img_fnames if not e.endswith('.db')]
         for img_fname, json_fname in zip(img_fnames, json_fnames):
-            img = cv2.imread(os.path.join(input_path, img_fname))
+            img = cv2.imread(Path(input_path) / img_fname)
             yield img, img_fname
 
     
@@ -137,9 +138,9 @@ def json_display_with_img_func(**args):
     from Pose2Sim.Utilities import json_display_with_img; json_display_with_img.json_display_with_img_func(json_folder=r'<json_folder>', input=r'<vid_or_img_folder>')
     '''
 
-    json_folder = os.path.realpath(args.get('json_folder'))
+    json_folder = Path(args.get('json_folder').resolve())
     json_fnames = sorted(os.listdir(json_folder))
-    input_path = os.path.realpath(args.get('input'))
+    input_path = Path(args.get('input').resolve())
     output_path = args.get('output_img_folder')
     output_type = args.get('output_type', 'video')
     save = _to_bool(args.get('save'))
@@ -154,7 +155,7 @@ def json_display_with_img_func(**args):
         else:
             output_path = base
     else:
-        output_path = os.path.realpath(output_path)
+        output_path = Path(output_path).resolve()
     
     # Set up video writer or output directory
     out_writer = None
@@ -173,12 +174,12 @@ def json_display_with_img_func(**args):
                 fps = 30
             
             h, w = first_img.shape[:2]
-            os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
+            os.makedirs(Path(output_path).parent or '.', exist_ok=True)
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             out_writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
             
             # Process the first frame we already read
-            xfrm, yfrm, conffrm = _parse_json(os.path.join(json_folder, json_fnames[0]))
+            xfrm, yfrm, conffrm = _parse_json(Path(json_folder) / json_fnames[0])
             _overlay_keypoints(first_img, xfrm, yfrm, conffrm)
             if display:
                 cv2.imshow('', first_img)
@@ -187,7 +188,7 @@ def json_display_with_img_func(**args):
             
             # Process remaining frames
             for (img, out_fname), json_fname in zip(frame_iter, json_fnames[1:]):
-                xfrm, yfrm, conffrm = _parse_json(os.path.join(json_folder, json_fname))
+                xfrm, yfrm, conffrm = _parse_json(Path(json_folder) / json_fname)
                 _overlay_keypoints(img, xfrm, yfrm, conffrm)
                 if display:
                     cv2.imshow('', img)
@@ -206,7 +207,7 @@ def json_display_with_img_func(**args):
     
     # Process frames (output_type == 'images' or not saving)
     for (img, out_fname), json_fname in zip(_frame_iterator(input_path, json_fnames), json_fnames):
-        xfrm, yfrm, conffrm = _parse_json(os.path.join(json_folder, json_fname))
+        xfrm, yfrm, conffrm = _parse_json(Path(json_folder) / json_fname)
         _overlay_keypoints(img, xfrm, yfrm, conffrm)
         
         if display:
@@ -215,7 +216,7 @@ def json_display_with_img_func(**args):
             if key & 0xFF == ord('q'):
                 break
         if save:
-            cv2.imwrite(os.path.join(output_path, out_fname), img)
+            cv2.imwrite(Path(output_path) / out_fname, img)
     
     if save:
         print(f'Saved overlayed images to: {output_path}')

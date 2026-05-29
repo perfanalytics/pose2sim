@@ -44,6 +44,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -99,7 +100,7 @@ def computeP(calib_file, undistort=False):
     K, R, T, Kh, H = [], [], [], [], []
     P = []
     
-    calib = rtoml.load(calib_file)
+    calib = rtoml.load(Path(calib_file))
     for cam in list(calib.keys()):
         if cam != 'metadata':
             S = np.array(calib[cam]['size'])
@@ -158,7 +159,7 @@ def retrieve_calib_params(calib_file):
     - T: translation vectors as list of 3x1 arrays
     '''
     
-    calib = rtoml.load(calib_file)
+    calib = rtoml.load(Path(calib_file))
 
     S, K, dist, optim_K, R, T = [], [], [], [], [], []
     for c, cam in enumerate(calib.keys()):
@@ -281,7 +282,7 @@ def dataset_to_openpose(coords_df, openpose_path_root, marker_list=['NOSB', 'sho
             json_dict_copy['people'][0]['pose_keypoints_2d'] = coords_list
 
         # write json file
-        json_file = os.path.join(os.path.dirname(openpose_path_root), f'{os.path.splitext(os.path.basename(openpose_path_root))[0]}_{frame:04d}.json')
+        json_file = Path(openpose_path_root).parent / f'{Path(openpose_path_root).stem}_{frame:04d}.json'
         with open(json_file, 'w') as js_f:
             js_f.write(json.dumps(json_dict_copy))
 
@@ -394,8 +395,8 @@ def reproj_from_trc_calib_func(**args):
     reproj_from_trc_calib -t input_trc_file -c input_calib_file -d -o output_file_root
     '''
 
-    input_trc_file = os.path.realpath(args.get('input_trc_file')) # invoked with argparse
-    input_calib_file = os.path.realpath(args.get('input_calib_file'))
+    input_trc_file = Path(args.get('input_trc_file')).resolve() # invoked with argparse
+    input_calib_file = Path(args.get('input_calib_file')).resolve()
     openpose_output = args.get('openpose')
     deeplabcut_output = args.get('deeplabcut')
     mmpose_output = args.get('mmpose')
@@ -403,8 +404,8 @@ def reproj_from_trc_calib_func(**args):
     undistort_points = args.get('undistort_points')
     output_file_root = args.get('output_file_root')
     if output_file_root == None:
-        output_file_root = input_trc_file.replace('.trc', '_reproj')
-    if os.path.exists(output_file_root):
+        output_file_root = input_trc_file.parent / (input_trc_file.stem + '_reproj')
+    if Path(output_file_root).exists():
         os.makedirs(output_file_root, exist_ok=True)
     if not openpose_output and not deeplabcut_output and not mmpose_output:
         raise ValueError('Output_format must be specified either "openpose" (-o), "deeplabcut" (-d), or "mmpose" (-m)')
@@ -414,7 +415,7 @@ def reproj_from_trc_calib_func(**args):
     data_trc_zup = pd.concat([data_trc.iloc[:,:2], yup2zup(data_trc.iloc[:,2:])], axis=1) # yup to zup system coordinates
     bodyparts = [d[:-2] for d in data_trc_zup.columns[2::3]]
     num_bodyparts = int(header_trc['NumMarkers'])
-    filename = os.path.splitext(os.path.basename(input_trc_file))[0]
+    filename = Path(input_trc_file).stem
     
     # Extract data from calibration file
     P_all = computeP(input_calib_file, undistort=undistort_points)
@@ -427,9 +428,9 @@ def reproj_from_trc_calib_func(**args):
         calib_params_dist_filt = [calib_params['dist'][i] for i in range(len(P_all))]
 
     # Create camera folders
-    reproj_dir = os.path.realpath(output_file_root)
-    cam_dirs = [os.path.join(reproj_dir, f'cam{cam+1:02d}_json') for cam in range(len(P_all))]
-    if not os.path.exists(reproj_dir): os.mkdir(reproj_dir)  
+    reproj_dir = Path(output_file_root).resolve()
+    cam_dirs = [Path(reproj_dir) / f'cam{cam+1:02d}_json' for cam in range(len(P_all))]
+    if not Path(reproj_dir).exists(): os.mkdir(reproj_dir)  
     try:
         [os.mkdir(cam_dir) for cam_dir in cam_dirs]
     except:
@@ -439,7 +440,7 @@ def reproj_from_trc_calib_func(**args):
     num_frames = [len(data_trc) if P_all.shape[1]==1 else min(P_all.shape[1], len(data_trc))][0]
     columns_iterables = [['DavidPagnon'], ['person0'], bodyparts, ['x','y']]
     columns_h5 = pd.MultiIndex.from_product(columns_iterables, names=['scorer', 'individuals', 'bodyparts', 'coords'])
-    rows_iterables = [[os.path.join(os.path.splitext(input_trc_file)[0],f'img_{i:03d}.jpg') for i in range(num_frames)]]
+    rows_iterables = [[f'{Path(input_trc_file).stem}/img_{i:03d}.jpg' for i in range(num_frames)]]
     rows_h5 = pd.MultiIndex.from_product(rows_iterables)
     data_h5 = pd.DataFrame(np.nan, index=rows_h5, columns=columns_h5)
 
@@ -487,23 +488,23 @@ def reproj_from_trc_calib_func(**args):
     # Save as h5 and csv if DeepLabCut format
     if deeplabcut_output:
         # to h5
-        h5_files = [os.path.join(cam_dir,f'{filename}_cam_{i+1:02d}_dlc.h5') for i,cam_dir in enumerate(cam_dirs)]
+        h5_files = [Path(cam_dir) / f'{filename}_cam_{i+1:02d}_dlc.h5' for i,cam_dir in enumerate(cam_dirs)]
         [data_proj[i].to_hdf(h5_files[i], index=True, key='reprojected_points') for i in range(len(P_all))]
 
         # to csv
-        csv_files = [os.path.join(cam_dir,f'{filename}_cam_{i+1:02d}_dlc.csv') for i,cam_dir in enumerate(cam_dirs)]
+        csv_files = [Path(cam_dir) / f'{filename}_cam_{i+1:02d}_dlc.csv' for i,cam_dir in enumerate(cam_dirs)]
         [data_proj[i].to_csv(csv_files[i], sep=',', index=True, lineterminator='\n') for i in range(len(P_all))]
 
     # Save as json if Coco/MMpose format
     if mmpose_output:
         for cam, cam_dir in enumerate(cam_dirs):
-            mmpose_json_file = os.path.join(cam_dir, f'{filename}_cam_{cam+1:02d}_mmpose.json')
+            mmpose_json_file = Path(cam_dir) / f'{filename}_cam_{cam+1:02d}_mmpose.json'
             dataset_to_mmpose2d(data_proj[cam], mmpose_json_file, calib_params_size[cam], markerset=markerset, marker_list=marker_list)
         
     # Save as json if OpenPose format
     if openpose_output:
         for cam, cam_dir in enumerate(cam_dirs):
-            openpose_path_root = os.path.join(cam_dir, f'{filename}_cam{cam+1:02d}_openpose.json')
+            openpose_path_root = Path(cam_dir) / f'{filename}_cam{cam+1:02d}_openpose.json'
             dataset_to_openpose(data_proj[cam], openpose_path_root, marker_list=marker_list)
             
     # Wrong format

@@ -566,7 +566,7 @@ def perform_IK_worker(args):
     # Reimport and reset settings in each worker process
     if not logging.getLogger().handlers:
         logging.basicConfig(format='%(message)s', level=logging.INFO, 
-            handlers=[logging.handlers.TimedRotatingFileHandler(os.path.join(session_dir, 'logs.txt'), when='D', interval=7), logging.StreamHandler()])
+            handlers=[logging.handlers.TimedRotatingFileHandler(Path(session_dir) / 'logs.txt', when='D', interval=7), logging.StreamHandler()])
     locale.setlocale(locale.LC_NUMERIC, 'C')
     opensim.Logger.setLevelString('Info')
     opensim.Logger.removeFileSink()
@@ -691,13 +691,13 @@ def kinematics_all(config_dict):
                     trimmed_extrema_percent=trimmed_extrema_percent
                 )
                 if not np.isnan(height):
-                    logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m")
+                    logging.info(f"Subject height automatically calculated for {Path(trc_file).name}: {round(height,2)} m")
                 else:
-                    logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
+                    logging.warning(f"Could not compute height from {Path(trc_file).name}. Using default height of {default_height}m.")
                     logging.warning(f"The person may be crouched or incorrectly detected. You may edit large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
                     height = default_height
             except Exception as e:
-                logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
+                logging.warning(f"Could not compute height from {Path(trc_file).name}. Using default height of {default_height}m.")
                 logging.warning(f"The person may be crouched, or incorrectly detected. You may edit large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
                 height = default_height
             subject_height.append(height)

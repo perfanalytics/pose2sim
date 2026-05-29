@@ -69,6 +69,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["HunMin Kim", "David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -280,7 +281,7 @@ def save_to_openpose(json_file_path, keypoints, scores):
     json_output = {"version": 1.3, "people": detections}
     
     # Save JSON output for each frame
-    json_output_dir = os.path.abspath(os.path.join(json_file_path, '..'))
+    json_output_dir = (Path(json_file_path) / '..').resolve()
     os.makedirs(json_output_dir, exist_ok=True)
     with open(json_file_path, 'w') as json_file:
         json.dump(json_output, json_file)
@@ -316,12 +317,12 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
     if cap.read()[0] == False:
         raise NameError(f"{video_path} is not a video. Images must be put in one subdirectory per camera.")
     
-    pose_dir = os.path.abspath(os.path.join(video_path, '..', '..', 'pose'))
+    pose_dir = (Path(video_path) / '..', '..', 'pose').resolve()
     os.makedirs(pose_dir, exist_ok=True)
-    video_name_wo_ext = os.path.splitext(os.path.basename(video_path))[0]
-    json_output_dir = os.path.join(pose_dir, f'{video_name_wo_ext}_json')
-    output_video_path = os.path.join(pose_dir, f'{video_name_wo_ext}_pose.mp4')
-    img_output_dir = os.path.join(pose_dir, f'{video_name_wo_ext}_img')
+    video_name_wo_ext = Path(video_path).stem
+    json_output_dir = Path(pose_dir) / f'{video_name_wo_ext}_json'
+    output_video_path = Path(pose_dir) / f'{video_name_wo_ext}_pose.mp4'
+    img_output_dir = Path(pose_dir) / f'{video_name_wo_ext}_img'
     
     W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) # Get the width and height from the raw video
 
@@ -333,8 +334,8 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
     if display_detection:
         screen_width, screen_height = get_screen_size()
         display_width, display_height = calculate_display_size(W, H, screen_width, screen_height, margin=50)
-        cv2.namedWindow(f"Pose Estimation {os.path.basename(video_path)}", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(f"Pose Estimation {os.path.basename(video_path)}", display_width, display_height)
+        cv2.namedWindow(f"Pose Estimation {Path(video_path).name}", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(f"Pose Estimation {Path(video_path).name}", display_width, display_height)
 
     frame_idx = 0
     cap = cv2.VideoCapture(video_path)
@@ -347,7 +348,7 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
     keypoints_ids = [node.id for _, _, node in RenderTree(skeleton_model) if node.id!=None]
     kpt_id_max = max(keypoints_ids)+1
 
-    with tqdm(iterable=range(*f_range), desc=f'Processing {os.path.basename(video_path)}') as pbar:
+    with tqdm(iterable=range(*f_range), desc=f'Processing {Path(video_path).name}') as pbar:
         while cap.isOpened():
             if frame_idx in range(*f_range):
                 # print('\nFrame ', frame_idx)
@@ -396,7 +397,7 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
                     
                 # Save to json
                 if 'openpose' in output_format:
-                    json_file_path = os.path.join(json_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.json')
+                    json_file_path = Path(json_output_dir) / f'{video_name_wo_ext}_{frame_idx:06d}.json'
                     save_to_openpose(json_file_path, keypoints, scores)
 
                 # Draw skeleton on the frame
@@ -419,7 +420,7 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
                         img_show = draw_skel(img_show, valid_X, valid_Y, skeleton_model)
                 
                 if display_detection:
-                    cv2.imshow(f"Pose Estimation {os.path.basename(video_path)}", img_show)
+                    cv2.imshow(f"Pose Estimation {Path(video_path).name}", img_show)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         break
 
@@ -427,8 +428,8 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
                     out.write(img_show)
 
                 if save_images:
-                    if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
-                    cv2.imwrite(os.path.join(img_output_dir, f'{video_name_wo_ext}_{frame_idx:06d}.jpg'), img_show)
+                    if not Path(img_output_dir).is_dir(): os.makedirs(img_output_dir)
+                    cv2.imwrite(Path(img_output_dir) / f'{video_name_wo_ext}_{frame_idx:06d}.jpg', img_show)
 
                 frame_idx += 1
                 pbar.update(1)
@@ -490,13 +491,13 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
     - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
     '''    
 
-    pose_dir = os.path.abspath(os.path.join(image_folder_path, '..', '..', 'pose'))
+    pose_dir = (Path(image_folder_path) / '..', '..', 'pose').resolve()
     os.makedirs(pose_dir, exist_ok=True)
-    json_output_dir = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_json')
-    output_video_path = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_pose.mp4')
-    img_output_dir = os.path.join(pose_dir, f'{os.path.basename(image_folder_path)}_img')
+    json_output_dir = Path(pose_dir) / f'{Path(image_folder_path.name}_json')
+    output_video_path = Path(pose_dir) / f'{Path(image_folder_path.name}_pose.mp4')
+    img_output_dir = Path(pose_dir) / f'{Path(image_folder_path.name}_img')
 
-    image_files = sorted([f for f in glob.glob(os.path.join(image_folder_path, '*')) if is_image_file(f)], key=natural_sort_key)
+    image_files = sorted([f for f in glob.glob(Path(image_folder_path) / '*') if is_image_file(f)], key=natural_sort_key)
     if len(image_files) == 0:
         raise NameError(f'No image files found in {image_folder_path}.')
 
@@ -512,15 +513,15 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
     if display_detection:
         screen_width, screen_height = get_screen_size()
         display_width, display_height = calculate_display_size(W, H, screen_width, screen_height, margin=50)
-        cv2.namedWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(f"Pose Estimation {os.path.basename(image_folder_path)}", display_width, display_height)
+        cv2.namedWindow(f"Pose Estimation {Path(image_folder_path).name}", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(f"Pose Estimation {Path(image_folder_path).name}", display_width, display_height)
     
     # Retrieve keypoint names from model
     keypoints_ids = [node.id for _, _, node in RenderTree(skeleton_model) if node.id!=None]
     kpt_id_max = max(keypoints_ids)+1
     
     f_range = [[0,len(image_files)] if frame_range in ('all', 'auto', []) else frame_range][0]
-    for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {os.path.basename(img_output_dir)}')):
+    for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {Path(img_output_dir).name}')):
         if frame_idx in range(*f_range):
             try:
                 frame = cv2.imread(image_file)
@@ -544,7 +545,7 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
 
             # Extract frame number from the filename
             if 'openpose' in output_format:
-                json_file_path = os.path.join(json_output_dir, f"{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.json")
+                json_file_path = Path(json_output_dir) / f"{Path(image_file.stem}_{frame_idx:06d}.json")
                 save_to_openpose(json_file_path, keypoints, scores)
 
             # Draw skeleton on the image
@@ -567,7 +568,7 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
                     img_show = draw_skel(img_show, valid_X, valid_Y, skeleton_model)
 
             if display_detection:
-                cv2.imshow(f"Pose Estimation {os.path.basename(image_folder_path)}", img_show)
+                cv2.imshow(f"Pose Estimation {Path(image_folder_path).name}", img_show)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
@@ -575,8 +576,8 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
                 out.write(img_show)
 
             if save_images:
-                if not os.path.isdir(img_output_dir): os.makedirs(img_output_dir)
-                cv2.imwrite(os.path.join(img_output_dir, f'{os.path.splitext(os.path.basename(image_file))[0]}_{frame_idx:06d}.png'), img_show)
+                if not Path(img_output_dir).is_dir(): os.makedirs(img_output_dir)
+                cv2.imwrite(Path(img_output_dir) / f'{Path(image_file.stem}_{frame_idx:06d}.png'), img_show)
 
     if save_video:
         logging.info(f"--> Output video saved to {output_video_path}.")
@@ -614,14 +615,14 @@ def estimate_pose_all(config_dict):
     # Read config
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
     # if batch
-    session_dir = os.path.realpath(os.path.join(project_dir, '..'))
+    session_dir = (Path(project_dir) / '..').resolve()
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else project_dir if 'Config.toml' in os.listdir(project_dir) else os.getcwd()
     frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
     multi_person = config_dict.get('project', {}).get('multi_person', False)
     max_workers_input = config_dict.get('pose', {}).get('parallel_workers_pose', 'auto')
-    video_dir = os.path.join(project_dir, 'videos')
-    pose_dir = os.path.join(project_dir, 'pose')
+    video_dir = Path(project_dir) / 'videos'
+    pose_dir = Path(project_dir) / 'pose'
 
     pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet')
     mode = config_dict.get('pose', {}).get('mode', 'balanced')
@@ -652,7 +653,7 @@ def estimate_pose_all(config_dict):
         deepsort_params = {}
 
     # Determine frame rate
-    video_files = sorted([f for f in glob.glob(os.path.join(video_dir, '*')) if is_video_file(f)], key=natural_sort_key)
+    video_files = sorted([f for f in glob.glob(Path(video_dir) / '*') if is_video_file(f)], key=natural_sort_key)
     frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
     if frame_rate == 'auto': 
         try:
@@ -673,7 +674,7 @@ def estimate_pose_all(config_dict):
     # Estimate pose
     try:
         pose_listdirs_names = next(os.walk(pose_dir))[1]
-        os.listdir(os.path.join(pose_dir, pose_listdirs_names[0]))[0]
+        os.listdir(Path(pose_dir) / pose_listdirs_names[0])[0]
         if not overwrite_pose:
             logging.info('Skipping pose estimation as it has already been done. Set overwrite_pose to true in Config.toml if you want to run it again.')
         else:
@@ -776,10 +777,10 @@ def estimate_pose_all(config_dict):
 
         else:
             # Process image folders
-            image_folders = sorted([os.path.join(video_dir, f) for f in os.listdir(video_dir) if os.path.isdir(os.path.join(video_dir, f))])
+            image_folders = sorted([Path(video_dir) / f for f in os.listdir(video_dir) if Path(Path(video_dir) / f.is_dir())])
             # Keep only folders that contain at least one image file
             image_folders = [folder for folder in image_folders 
-                            if any(is_image_file(os.path.join(folder, f)) for f in os.listdir(folder))]
+                            if any(is_image_file(Path(folder) / f) for f in os.listdir(folder))]
             if len(image_folders) == 0:
                 raise NameError(f'No video files and no image folders with recognized image extensions found in {video_dir}.')
             else:

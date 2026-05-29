@@ -58,6 +58,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -103,7 +104,7 @@ class TestWorkflow(unittest.TestCase):
             from Pose2Sim.Utilities.tests import TestWorkflow; TestWorkflow.test_workflow(mock_input='no')
             '''
 
-        root_dir = os.path.dirname(os.path.abspath(__file__))
+        root_dir = Path(__file__).resolve().parent
         os.chdir(root_dir)
 
         ###################
@@ -111,7 +112,7 @@ class TestWorkflow(unittest.TestCase):
         ###################
 
         project_dir = '../Demo_SinglePerson'
-        config_dict = rtoml.load(os.path.join(project_dir, 'Config.toml'))
+        config_dict = rtoml.load(Path(Path(project_dir) / 'Config.toml'))
 
         # lightweight, openvino, cpu
         os.chdir(project_dir)
@@ -162,7 +163,7 @@ class TestWorkflow(unittest.TestCase):
         ####################
         
         project_dir = '../Demo_MultiPerson'
-        config_dict = rtoml.load(os.path.join(project_dir, 'Config.toml'))
+        config_dict = rtoml.load(Path(Path(project_dir) / 'Config.toml'))
         
         # Body model with RTMO
         os.chdir(project_dir)

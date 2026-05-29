@@ -40,6 +40,7 @@ __copyright__ = "Copyright 2022, OpenCap"
 __credits__ = ["Antoine Falisse", "HunMin Kim", "David Pagnon"]
 __license__ = "Apache-2.0 License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -84,7 +85,7 @@ def getMarkers_upperExtremity_noPelvis2():
 def augment_markers_all(config_dict):
     # get parameters from Config.toml
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
-    pose_3d_dir = os.path.realpath(os.path.join(project_dir, 'pose-3d'))
+    pose_3d_dir = (Path(project_dir) / 'pose-3d').resolve()
     feet_on_floor = config_dict.get('markerAugmentation', {}).get('feet_on_floor', False)
     make_c3d = config_dict.get('markerAugmentation', {}).get('make_c3d', True)
     frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
@@ -95,15 +96,15 @@ def augment_markers_all(config_dict):
     trimmed_extrema_percent = config_dict.get('kinematics', {}).get('trimmed_extrema_percent', 50)
     default_height = config_dict.get('kinematics', {}).get('default_height', 1.7)
 
-    augmenterDir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'MarkerAugmenter')
+    augmenterDir = Path(__file__).resolve().parent / 'MarkerAugmenter'
     augmenterModelName = 'LSTM'
     augmenter_model = 'v0.3'
 
     # Apply all trc files
-    all_trc_files = [f for f in glob.glob(os.path.join(pose_3d_dir, '*.trc')) if augmenterModelName not in f]
-    trc_no_filtering = [f for f in glob.glob(os.path.join(pose_3d_dir, '*.trc')) if
+    all_trc_files = [f for f in glob.glob(Path(pose_3d_dir) / '*.trc') if augmenterModelName not in f]
+    trc_no_filtering = [f for f in glob.glob(Path(pose_3d_dir) / '*.trc') if
                         augmenterModelName not in f and 'filt' not in f]
-    trc_filtering = [f for f in glob.glob(os.path.join(pose_3d_dir, '*.trc')) if augmenterModelName not in f and 'filt' in f]
+    trc_filtering = [f for f in glob.glob(Path(pose_3d_dir) / '*.trc') if augmenterModelName not in f and 'filt' in f]
 
     if len(all_trc_files) == 0:
         raise ValueError('No trc files found.')
@@ -145,13 +146,13 @@ def augment_markers_all(config_dict):
                     trimmed_extrema_percent=trimmed_extrema_percent
                 )
                 if np.isfinite(height):
-                    logging.info(f"Subject height automatically calculated for {os.path.basename(trc_file)}: {round(height,2)} m\n")
+                    logging.info(f"Subject height automatically calculated for {Path(trc_file).name}: {round(height,2)} m\n")
                 else:
-                    logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
+                    logging.warning(f"Could not compute height from {Path(trc_file).name}. Using default height of {default_height}m.")
                     logging.warning(f"The person may be crouched or incorrectly detected. You may edit large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
                     height = default_height
             except Exception as e:
-                logging.warning(f"Could not compute height from {os.path.basename(trc_file)}. Using default height of {default_height}m.")
+                logging.warning(f"Could not compute height from {Path(trc_file).name}. Using default height of {default_height}m.")
                 logging.warning(f"The person may be crouched or incorrectly detected. You may edit large_hip_knee_angles, trimmed_extrema_percent, default_height in your Config.toml file.")
                 height = default_height
             subject_height.append(height)
@@ -173,7 +174,7 @@ def augment_markers_all(config_dict):
 
     for p in range(len(subject_mass)):
         trc_file = trc_files[p]
-        trc_file_out = os.path.splitext(trc_file)[0] + f'_{augmenterModelName}.trc'
+        trc_file_out = Path(trc_file).stem + f'_{augmenterModelName}.trc'
         
         # Lower body           
         augmenterModelType_lower = '{}_lower'.format(augmenter_model)
@@ -199,8 +200,8 @@ def augment_markers_all(config_dict):
         time_col = time_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
 
         trc_path_out = trc_file.replace('.trc', '_LSTM.trc')
-        trc_file_out = os.path.basename(trc_path_out)
-        header[0] = header[0].replace(os.path.basename(trc_file), trc_file_out)
+        trc_file_out = Path(trc_path_out).name
+        header[0] = header[0].replace(Path(trc_file).name, trc_file_out)
         header[2] = '\t'.join(part if i != 2 else str(frame_nb) for i, part in enumerate(header[2].split('\t')))
         header[2] = '\t'.join(part if i != 7 else str(frame_nb)+'\n' for i, part in enumerate(header[2].split('\t')))
 
@@ -219,8 +220,7 @@ def augment_markers_all(config_dict):
                 continue
             else:
                 logging.info(f'Running {augmenterModelType} marker augmentation.')
-            augmenterModelDir = os.path.join(augmenterDir, augmenterModelName, 
-                                             augmenterModelType)
+            augmenterModelDir = Path(augmenterDir) / augmenterModelName / augmenterModelType
             
             # %% Pre-process inputs.
             # Step 1: import .trc file with OpenPose marker trajectories.  
@@ -241,10 +241,10 @@ def augment_markers_all(config_dict):
                     (inputs, subject_mass[p]*np.ones((inputs.shape[0],1))), axis=1)
                 
             # Step 5: Pre-process data
-            pathMean = os.path.join(augmenterModelDir, "mean.npy")
+            pathMean = Path(augmenterModelDir) / "mean.npy"
             trainFeatures_mean = np.load(pathMean, allow_pickle=True)
  
-            pathSTD = os.path.join(augmenterModelDir, "std.npy")
+            pathSTD = Path(augmenterModelDir) / "std.npy"
             trainFeatures_std = np.load(pathSTD, allow_pickle=True)
 
             inputs = (inputs - trainFeatures_mean) / trainFeatures_std
@@ -253,7 +253,7 @@ def augment_markers_all(config_dict):
             inputs = np.reshape(inputs, (1, inputs.shape[0], inputs.shape[1]))
                 
             # %% Load model and weights, and predict outputs.
-            onnx_path = os.path.join(augmenterModelDir, "model.onnx")
+            onnx_path = Path(augmenterModelDir) / "model.onnx"
             session = ort.InferenceSession(onnx_path)
             outputs = session.run(['output_0'], {'inputs': inputs.astype(np.float32)})[0]
 

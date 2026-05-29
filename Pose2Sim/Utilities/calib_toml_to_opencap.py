@@ -32,6 +32,7 @@ __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
 from importlib.metadata import version
+from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -102,7 +103,7 @@ def read_toml(toml_path):
     - T (extrinsic translation)
     '''
 
-    calib = rtoml.load(toml_path)
+    calib = rtoml.load(Path(toml_path))
     C, S, D, K, R, T = [], [], [], [], [], []
     for cam in list(calib.keys()):
         if cam != 'metadata':
@@ -151,7 +152,7 @@ def write_opencap_pickle(output_calibration_folder, C, S, D, K, R, T):
                       }
 
         # write pickle
-        with open(os.path.join(output_calibration_folder, f'cam{i:02d}.pickle'), 'wb') as f_out:
+        with open(Path(output_calibration_folder) / f'cam{i:02d}.pickle', 'wb') as f_out:
             pickle.dump(calib_data, f_out)
     
 
@@ -168,14 +169,14 @@ def calib_toml_to_opencap_func(*args):
     '''
     
     try:
-        toml_path = os.path.realpath(args[0].get('toml_file')) # invoked with argparse
+        toml_path = Path(args[0].get('toml_file').resolve()) # invoked with argparse
         if args[0]['output_calibration_folder'] == None:
-            output_calibration_folder = os.path.dirname(toml_path)
+            output_calibration_folder = Path(toml_path).parent
         else:
-            output_calibration_folder = os.path.realpath(args[0]['output_calibration_folder'])
+            output_calibration_folder = Path(args[0]['output_calibration_folder']).resolve()
     except:
-        toml_path = os.path.realpath(args[0]) # invoked as a function
-        output_calibration_folder = os.path.dirname(toml_path)
+        toml_path = Path(args[0]).resolve() # invoked as a function
+        output_calibration_folder = Path(toml_path).parent
         
     C, S, D, K, R, T = read_toml(toml_path)
     write_opencap_pickle(output_calibration_folder, C, S, D, K, R, T)
