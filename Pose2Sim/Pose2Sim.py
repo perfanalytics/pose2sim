@@ -41,7 +41,7 @@ Pose2Sim.kinematics()
 
 
 ## INIT
-import toml
+import rtoml
 import os
 import time
 from copy import deepcopy
@@ -131,23 +131,23 @@ def read_config_files(config):
         if level == 1: # Trial
             try:
                 # if batch
-                session_config_dict = toml.load(os.path.join(config_dir, '..','Config.toml'))
-                trial_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
+                session_config_dict = rtoml.load(os.path.join(config_dir, '..','Config.toml'))
+                trial_config_dict = rtoml.load(os.path.join(config_dir, 'Config.toml'))
                 session_config_dict = recursive_update(session_config_dict,trial_config_dict)
             except:
                 # if single trial
-                session_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
+                session_config_dict = rtoml.load(os.path.join(config_dir, 'Config.toml'))
             session_config_dict.get("project", {}).update({"project_dir":config_dir})
             config_dicts = [session_config_dict]
 
         # Root level
         if level == 2:
-            session_config_dict = toml.load(os.path.join(config_dir, 'Config.toml'))
+            session_config_dict = rtoml.load(os.path.join(config_dir, 'Config.toml'))
             config_dicts = []
             # Create config dictionaries for all trials of the participant
             for (root,dirs,files) in os.walk(config_dir):
                 if 'Config.toml' in files and root != config_dir:
-                    trial_config_dict = toml.load(os.path.join(root, files[0]))
+                    trial_config_dict = rtoml.load(os.path.join(root, files[0]))
                     # deep copy, otherwise session_config_dict is modified at each iteration within the config_dicts list
                     temp_dict = deepcopy(session_config_dict)
                     temp_dict = recursive_update(temp_dict,trial_config_dict)

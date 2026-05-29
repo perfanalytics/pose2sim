@@ -34,7 +34,7 @@ classifiers = [
 urls = {Homepage = "https://github.com/perfanalytics/pose2sim", "Bug Tracker" = "https://github.com/perfanalytics/pose2sim/issues"}
 dependencies = [
     "opensim", 
-    "toml",
+    "rtoml",
     "lxml",
     "mpl_interactions",
     "PySide6-essentials",
@@ -49,6 +49,7 @@ dependencies = [
     "rtmlib", # pulls in onnxruntime and opencv-python
     "openvino",
     "customtkinter",
+    "av"
 ]
 
 [project.optional-dependencies]

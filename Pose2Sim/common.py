@@ -12,7 +12,7 @@ Functions shared between modules, and other utilities
 
 ## INIT
 import os
-import toml
+import rtoml
 import json
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
@@ -559,7 +559,7 @@ def retrieve_calib_params(calib_file):
     - T: translation vectors as list of 3x1 arrays
     '''
     
-    calib = toml.load(calib_file)
+    calib = rtoml.load(calib_file)
 
     cal_keys = [c for c in calib.keys() 
                 if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
@@ -591,7 +591,7 @@ def computeP(calib_file, undistort=False):
     - P: projection matrix as list of arrays
     '''
     
-    calib = toml.load(calib_file)
+    calib = rtoml.load(calib_file)
     
     cal_keys = [c for c in calib.keys() 
                 if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 

@@ -28,7 +28,7 @@ import os
 import numpy as np
 import cv2
 import glob
-import toml
+import rtoml
 import argparse
 
 
@@ -277,7 +277,7 @@ def recap_calibrate(ret, calib_path):
     - Message in console
     '''
     
-    calib = toml.load(calib_path)
+    calib = rtoml.load(calib_path)
     
     ret_m, ret_px = [], []
     for c, cam in enumerate(calib.keys()):

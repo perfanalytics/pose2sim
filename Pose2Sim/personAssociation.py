@@ -39,7 +39,7 @@ import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import json
 import itertools as it
-import toml
+import rtoml
 from tqdm import tqdm
 import cv2
 from anytree import RenderTree, PreOrderIter
@@ -618,7 +618,7 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
         # Error
         mean_error_px = np.around(np.nanmean(error), decimals=1)
         
-        calib = toml.load(calib_file)
+        calib = rtoml.load(calib_file)
         cal_keys = [c for c in calib.keys() 
                     if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
                     and isinstance(calib[c],dict)]

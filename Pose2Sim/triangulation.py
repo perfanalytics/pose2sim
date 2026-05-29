@@ -48,7 +48,7 @@ import json
 import itertools as it
 import pandas as pd
 import cv2
-import toml
+import rtoml
 from tqdm import tqdm
 from collections import Counter
 from anytree import RenderTree
@@ -260,7 +260,7 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     calib_dir = [os.path.join(session_dir, c) for c in os.listdir(session_dir) if os.path.isdir(os.path.join(session_dir, c)) and  'calib' in c.lower()][0]
     calib_files = glob.glob(os.path.join(calib_dir, '*.toml'))
     calib_file = max(calib_files, key=os.path.getctime) # lastly created calibration file
-    calib = toml.load(calib_file)
+    calib = rtoml.load(calib_file)
     cal_keys = [c for c in calib.keys() 
             if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
             and isinstance(calib[c],dict)]

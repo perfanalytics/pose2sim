@@ -45,7 +45,7 @@
 ## INIT
 import os
 import sys
-import toml
+import rtoml
 from unittest.mock import patch
 import unittest
 
@@ -111,7 +111,7 @@ class TestWorkflow(unittest.TestCase):
         ###################
 
         project_dir = '../Demo_SinglePerson'
-        config_dict = toml.load(os.path.join(project_dir, 'Config.toml'))
+        config_dict = rtoml.load(os.path.join(project_dir, 'Config.toml'))
 
         # lightweight, openvino, cpu
         os.chdir(project_dir)
@@ -162,7 +162,7 @@ class TestWorkflow(unittest.TestCase):
         ####################
         
         project_dir = '../Demo_MultiPerson'
-        config_dict = toml.load(os.path.join(project_dir, 'Config.toml'))
+        config_dict = rtoml.load(os.path.join(project_dir, 'Config.toml'))
         
         # Body model with RTMO
         os.chdir(project_dir)

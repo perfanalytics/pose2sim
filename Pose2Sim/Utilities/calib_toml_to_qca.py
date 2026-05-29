@@ -21,7 +21,7 @@
 import os
 import argparse
 import numpy as np
-import toml
+import rtoml
 from lxml import etree
 import cv2
 
@@ -61,7 +61,7 @@ def read_toml(toml_path):
     - T (extrinsic translation)
     '''
 
-    calib = toml.load(toml_path)
+    calib = rtoml.load(toml_path)
     C, S, D, K, R, T = [], [], [], [], [], []
     for cam in list(calib.keys()):
         if cam != 'metadata':

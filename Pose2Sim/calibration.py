@@ -40,7 +40,7 @@ np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather tha
 os.environ["OPENCV_LOG_LEVEL"]="FATAL"
 import cv2
 import glob
-import toml
+import rtoml
 import json
 import re
 from lxml import etree
@@ -496,7 +496,7 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
     if not overwrite_intrinsics and 'calib_file' in locals():
         logging.info(f'\nPreexisting calibration file found: \'{calib_file}\'.')
         logging.info(f'\nRetrieving intrinsic parameters from file. Set "overwrite_intrinsics" to true in Config.toml to recalculate them.')
-        calib_data = toml.load(calib_file)
+        calib_data = rtoml.load(calib_file)
 
         ret, C, S, D, K, R, T = [], [], [], [], [], [], []
         for cam in calib_data:
@@ -825,11 +825,9 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
     object_coords_3d = np.array(extrinsics_config_dict.get('scene', {}).get('object_coords_3d', []), np.float32)
     # backwards compatibility
     if not extrinsics_extension: 
-        extrinsics_extension = [extrinsics_config_dict.get('extrinsics_extension', 'png') if extrinsics_method == 'board'
-                            else extrinsics_config_dict.get('scene', {}).get('extrinsics_extension', 'png')][0]
-    if show_reprojection_error is None:
-        show_reprojection_error = [extrinsics_config_dict.get('board', {}).get('show_reprojection_error', True) if extrinsics_method == 'board'
-                                    else extrinsics_config_dict.get('scene', {}).get('show_reprojection_error', True)][0]
+        extrinsics_extension = extrinsics_config_dict.get('extrinsics_extension', 'png')
+    if not show_reprojection_error:
+        show_reprojection_error = extrinsics_config_dict.get('board', {}).get('show_reprojection_error', True)
 
     try:
         img_vid_files = sorted(glob.glob(os.path.join(calib_dir, 'extrinsics', '*', f'*.{extrinsics_extension}')))
@@ -1513,7 +1511,7 @@ def recap_calibrate(ret, calib_path, calib_full_type):
     - Message in console
     '''
     
-    calib = toml.load(calib_path)
+    calib = rtoml.load(calib_path)
     
     ret_m, ret_px = [], []
     for c, cam in enumerate(calib.keys()):

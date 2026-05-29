@@ -29,7 +29,7 @@
 import os
 import pandas as pd
 import numpy as np
-import toml
+import rtoml
 import cv2
 import json
 import re
@@ -99,7 +99,7 @@ def computeP(calib_file, undistort=False):
     K, R, T, Kh, H = [], [], [], [], []
     P = []
     
-    calib = toml.load(calib_file)
+    calib = rtoml.load(calib_file)
     for cam in list(calib.keys()):
         if cam != 'metadata':
             S = np.array(calib[cam]['size'])
@@ -158,7 +158,7 @@ def retrieve_calib_params(calib_file):
     - T: translation vectors as list of 3x1 arrays
     '''
     
-    calib = toml.load(calib_file)
+    calib = rtoml.load(calib_file)
 
     S, K, dist, optim_K, R, T = [], [], [], [], [], []
     for c, cam in enumerate(calib.keys()):
