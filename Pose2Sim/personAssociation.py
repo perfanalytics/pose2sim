@@ -681,7 +681,9 @@ def associate_all(config_dict):
     except:
         raise Exception(f'No .toml calibration directory found.')
     try:
+        print('\n\n\n\n\n', list(Path(calib_dir).glob('*.toml')))
         calib_files = list(Path(calib_dir).glob('*.toml'))
+        print(max(calib_files, key=lambda f: f.stat().st_birthtime))
         calib_file = max(calib_files, key=lambda f: f.stat().st_birthtime) # lastly created calibration file
     except:
         raise Exception(f'No .toml calibration file found in the {calib_dir}.')

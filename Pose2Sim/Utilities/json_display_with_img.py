@@ -149,7 +149,7 @@ def json_display_with_img_func(**args):
     
     # Default output path
     if output_path is None:
-        base = json_folder.replace('json', 'overlay') if 'json' in json_folder else json_folder + '_overlay'
+        base = json_folder.with_suffix('.overlay') if json_folder.suffix == '.json' else json_folder.with_name(f"{json_folder.name}_overlay")
         if output_type == 'video':
             output_path = base + '.mp4'
         else:

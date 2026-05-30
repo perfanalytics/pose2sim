@@ -900,7 +900,7 @@ def filter_all(config_dict):
         # Read file
         if filter_ik:
             Q_coords, time_col, header = read_mot(file_path_in)
-            file_path_out = file_path_in.replace('.mot', f'_filt_{filter_type}.mot')
+            file_path_out = file_path_in.with_stem(f"{file_path_in.stem}_filt_{filter_type}")
         else:
             Q_coords, frames_col, time_col, markers, header = read_trc(file_path_in)
             f_range = [[frames_col.iloc[0], frames_col.iloc[-1]]
