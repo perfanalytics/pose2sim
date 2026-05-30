@@ -27,9 +27,10 @@
 import os
 import numpy as np
 import cv2
-import glob
 import rtoml
 import argparse
+from importlib.metadata import version
+from pathlib import Path
 
 
 ## AUTHORSHIP INFORMATION
@@ -37,8 +38,6 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -191,7 +190,7 @@ def calib_checkerboard(criteria, **args):
     for cam in cam_listdirs_names:
         # Find corners in vid
         if video:
-            video = glob.glob(Path(calib_dir) / cam / '*.'+ extension)[0]
+            video = next((Path(calib_dir) / cam).glob('*.' + extension))
             cap = cv2.VideoCapture(video)
             ret_vid, img = cap.read()
             while ret_vid:
@@ -207,7 +206,7 @@ def calib_checkerboard(criteria, **args):
             
         # Find corners in images        
         else:
-            images = glob.glob(Path(calib_dir) / cam / '*.'+ extension)
+            images = list((Path(calib_dir) / cam).glob('*.' + extension))
             for image_f in images:
                 img = cv2.imread(image_f)
                 imgp = findCorners(img, corners_nb, criteria, show)

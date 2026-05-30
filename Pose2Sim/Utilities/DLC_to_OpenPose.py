@@ -22,7 +22,8 @@ import pandas as pd
 import numpy as np
 import os
 import json
-import re
+from importlib.metadata import version
+from pathlib import Path
 import argparse
 
 
@@ -31,8 +32,6 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"

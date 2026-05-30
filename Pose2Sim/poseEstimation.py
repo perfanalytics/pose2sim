@@ -33,13 +33,14 @@
 
 ## INIT
 import os
-import glob
 import json
 import re
 import logging
 import ast
 from tqdm import tqdm
 from anytree import RenderTree
+from importlib.metadata import version
+from pathlib import Path
 import numpy as np
 import cv2
 import threading
@@ -68,8 +69,6 @@ __author__ = "HunMin Kim, David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["HunMin Kim", "David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -317,7 +316,7 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
     if cap.read()[0] == False:
         raise NameError(f"{video_path} is not a video. Images must be put in one subdirectory per camera.")
     
-    pose_dir = (Path(video_path) / '..', '..', 'pose').resolve()
+    pose_dir = Path(video_path).parents[1] / 'pose'
     os.makedirs(pose_dir, exist_ok=True)
     video_name_wo_ext = Path(video_path).stem
     json_output_dir = Path(pose_dir) / f'{video_name_wo_ext}_json'
@@ -440,9 +439,9 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
     cap.release()
     if save_video:
         out.release()
-        logging.info(f"--> Output video saved to {output_video_path}.")
+        logging.info(f"--> Output video saved to {output_video_path.resolve()}.")
     if save_images:
-        logging.info(f"--> Output images saved to {img_output_dir}.")
+        logging.info(f"--> Output images saved to {img_output_dir.resolve()}.")
     if display_detection:
         cv2.destroyAllWindows()
 
@@ -491,13 +490,12 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
     - if save_images: Image files with the detected keypoints and confidence scores drawn on the frames
     '''    
 
-    pose_dir = (Path(image_folder_path) / '..', '..', 'pose').resolve()
+    pose_dir = Path(image_folder_path).parents[1] / 'pose'
     os.makedirs(pose_dir, exist_ok=True)
-    json_output_dir = Path(pose_dir) / f'{Path(image_folder_path.name}_json')
-    output_video_path = Path(pose_dir) / f'{Path(image_folder_path.name}_pose.mp4')
-    img_output_dir = Path(pose_dir) / f'{Path(image_folder_path.name}_img')
-
-    image_files = sorted([f for f in glob.glob(Path(image_folder_path) / '*') if is_image_file(f)], key=natural_sort_key)
+    json_output_dir = Path(pose_dir) / f'{Path(image_folder_path).stem}_json'
+    output_video_path = Path(pose_dir) / f'{Path(image_folder_path).stem}_pose.mp4'
+    img_output_dir = Path(pose_dir) / f'{Path(image_folder_path).stem}_img'
+    image_files = sorted([f for f in Path(image_folder_path).glob('*') if is_image_file(f)], key=natural_sort_key)
     if len(image_files) == 0:
         raise NameError(f'No image files found in {image_folder_path}.')
 
@@ -545,7 +543,7 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
 
             # Extract frame number from the filename
             if 'openpose' in output_format:
-                json_file_path = Path(json_output_dir) / f"{Path(image_file.stem}_{frame_idx:06d}.json")
+                json_file_path = Path(json_output_dir) / f"{Path(image_file.stem)}_{frame_idx:06d}.json"
                 save_to_openpose(json_file_path, keypoints, scores)
 
             # Draw skeleton on the image
@@ -577,7 +575,7 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
 
             if save_images:
                 if not Path(img_output_dir).is_dir(): os.makedirs(img_output_dir)
-                cv2.imwrite(Path(img_output_dir) / f'{Path(image_file.stem}_{frame_idx:06d}.png'), img_show)
+                cv2.imwrite(Path(img_output_dir) / f'{Path(image_file.stem)}_{frame_idx:06d}.png', img_show)
 
     if save_video:
         logging.info(f"--> Output video saved to {output_video_path}.")
@@ -653,7 +651,7 @@ def estimate_pose_all(config_dict):
         deepsort_params = {}
 
     # Determine frame rate
-    video_files = sorted([f for f in glob.glob(Path(video_dir) / '*') if is_video_file(f)], key=natural_sort_key)
+    video_files = sorted([f for f in Path(video_dir).glob('*') if is_video_file(f)], key=natural_sort_key)
     frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
     if frame_rate == 'auto': 
         try:
@@ -777,7 +775,7 @@ def estimate_pose_all(config_dict):
 
         else:
             # Process image folders
-            image_folders = sorted([Path(video_dir) / f for f in os.listdir(video_dir) if Path(Path(video_dir) / f.is_dir())])
+            image_folders = sorted([Path(video_dir) / f for f in os.listdir(video_dir) if (Path(video_dir) / f).is_dir()])
             # Keep only folders that contain at least one image file
             image_folders = [folder for folder in image_folders 
                             if any(is_image_file(Path(folder) / f) for f in os.listdir(folder))]

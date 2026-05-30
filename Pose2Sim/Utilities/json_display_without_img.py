@@ -26,8 +26,10 @@ import numpy as np
 import json
 import re
 import matplotlib.pyplot as plt 
-from matplotlib.animation import FuncAnimation, FileMovieWriter 
+from matplotlib.animation import FuncAnimation 
 import argparse
+from importlib.metadata import version
+from pathlib import Path
 
 
 ## AUTHORSHIP INFORMATION
@@ -35,8 +37,6 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"

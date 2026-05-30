@@ -46,6 +46,8 @@
 import os
 import sys
 import rtoml
+from importlib.metadata import version
+from pathlib import Path
 from unittest.mock import patch
 import unittest
 
@@ -57,8 +59,6 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -111,8 +111,8 @@ class TestWorkflow(unittest.TestCase):
         # SINGLE-PERSON   #
         ###################
 
-        project_dir = '../Demo_SinglePerson'
-        config_dict = rtoml.load(Path(Path(project_dir) / 'Config.toml'))
+        project_dir = root_dir.parent / 'Demo_SinglePerson'
+        config_dict = rtoml.load(Path(project_dir) / 'Config.toml')
 
         # lightweight, openvino, cpu
         os.chdir(project_dir)
@@ -162,8 +162,8 @@ class TestWorkflow(unittest.TestCase):
         # MULTI-PERSON     #
         ####################
         
-        project_dir = '../Demo_MultiPerson'
-        config_dict = rtoml.load(Path(Path(project_dir) / 'Config.toml'))
+        project_dir = root_dir.parent / 'Demo_MultiPerson'
+        config_dict = rtoml.load(Path(project_dir) / 'Config.toml')
         
         # Body model with RTMO
         os.chdir(project_dir)

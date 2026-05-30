@@ -32,7 +32,6 @@ OUTPUTS:
 
 ## INIT
 import os
-import glob
 import fnmatch
 import re
 import numpy as np
@@ -42,6 +41,8 @@ import itertools as it
 import rtoml
 from tqdm import tqdm
 import cv2
+from importlib.metadata import version
+from pathlib import Path
 from anytree import RenderTree, PreOrderIter
 from anytree.importer import DictImporter
 import logging
@@ -56,8 +57,6 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -612,8 +611,8 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
     min_cameras_for_triangulation = config_dict.get('triangulation', {}).get('min_cameras_for_triangulation', 2)
     poseTracked_dir = Path(project_dir) / 'pose-associated'
     calib_dir = [Path(session_dir) / c for c in os.listdir(session_dir) if (Path(session_dir) / c).is_dir() and 'calib' in c.lower()][0]
-    calib_files = glob.glob(str(Path(calib_dir) / '*.toml'))
-    calib_file = max(calib_files, key=lambda f: Path(f).stat().st_ctime) # lastly created calibration file
+    calib_files = list(Path(calib_dir).glob('*.toml'))
+    calib_file = max(calib_files, key=lambda f: f.stat().st_birthtime) # lastly created calibration file
     
     if not multi_person:
         # Error
@@ -682,8 +681,8 @@ def associate_all(config_dict):
     except:
         raise Exception(f'No .toml calibration directory found.')
     try:
-        calib_files = glob.glob(str(Path(calib_dir) / '*.toml'))
-        calib_file = max(calib_files, key=lambda f: Path(f).stat().st_ctime) # lastly created calibration file
+        calib_files = list(Path(calib_dir).glob('*.toml'))
+        calib_file = max(calib_files, key=lambda f: f.stat().st_birthtime) # lastly created calibration file
     except:
         raise Exception(f'No .toml calibration file found in the {calib_dir}.')
     pose_dir = Path(project_dir) / 'pose'

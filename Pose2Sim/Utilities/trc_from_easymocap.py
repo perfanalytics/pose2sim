@@ -33,10 +33,11 @@ KEYPOINT_NAMES = ['Nose', 'Neck','RShoulder','RElbow','RWrist','LShoulder','LElb
 ## INIT
 import argparse
 import os
-import glob
 import json
 import numpy as np
 import pandas as pd
+from importlib.metadata import version
+from pathlib import Path
 
 
 ## AUTHORSHIP INFORMATION
@@ -44,8 +45,6 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -163,7 +162,7 @@ def trc_from_easymocap_func(**kwargs):
     if not Path(output_trc_dir).exists(): os.makedirs(output_trc_dir)
     trc_root_name = input_keypoint_dir.parent.parent.name
 
-    keypoint_files = sorted(glob.glob(input_keypoint_dir+'/*.json'))
+    keypoint_files = sorted(Path(input_keypoint_dir).glob('*.json'))
     max_id = max_persons(keypoint_files)
     Q_df = df_from_easymocap(keypoint_files, max_id)
     write_trc(Q_df, output_trc_dir=output_trc_dir, trc_root_name=trc_root_name)

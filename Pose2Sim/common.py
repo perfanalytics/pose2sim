@@ -26,6 +26,8 @@ import sys
 import itertools as it
 import logging
 from anytree import PreOrderIter
+from importlib.metadata import version
+from pathlib import Path
 
 import customtkinter as ctk
 import matplotlib.pyplot as plt
@@ -38,8 +40,6 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Maya-Mocap"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -950,13 +950,13 @@ def convert_to_c3d(trc_path):
     Make Visual3D compatible c3d files from a trc path
 
     INPUT:
-    - trc_path: string, trc file to convert
+    - trc_path: Path, trc file to convert
 
     OUTPUT:
     - c3d file
     '''
 
-    c3d_path = trc_path.replace('.trc', '.c3d')
+    c3d_path = trc_path.with_suffix('.c3d')
     marker_names, trc_data_np = extract_trc_data(trc_path)
     create_c3d_file(c3d_path, marker_names, trc_data_np)
 

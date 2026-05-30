@@ -27,11 +27,12 @@
 '''
 
 ## INIT
-import os
 import numpy as np
 import opensim as osim
 import argparse
 from scipy import signal
+from importlib.metadata import version
+from pathlib import Path
 
 #direction = 'zup' # 'zup' or 'yup'
 
@@ -40,8 +41,6 @@ __author__ = "David Pagnon, Jonathan Camargo"
 __copyright__ = "Copyright 2023, BlendOSim & Sim2Blend"
 __credits__ = ["David Pagnon", "Jonathan Camargo"]
 __license__ = "MIT License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"

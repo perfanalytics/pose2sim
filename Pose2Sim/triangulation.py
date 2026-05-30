@@ -39,7 +39,6 @@ OUTPUTS:
 
 ## INIT
 import os
-import glob
 import fnmatch
 import re
 import numpy as np
@@ -49,6 +48,8 @@ import itertools as it
 import pandas as pd
 import cv2
 import rtoml
+from importlib.metadata import version
+from pathlib import Path
 from tqdm import tqdm
 from collections import Counter
 from anytree import RenderTree
@@ -66,8 +67,6 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -157,7 +156,7 @@ def make_trc(config_dict, Q, keypoints_names, id_person=-1):
 
     # Get frame_rate
     video_dir = Path(project_dir) / 'videos'
-    video_files = sorted([f for f in glob.glob(Path(video_dir) / '*') if is_video_file(f)])
+    video_files = sorted([f for f in Path(video_dir).glob('*') if is_video_file(f)])
     frame_rate = config_dict.get('project', {}).get('frame_rate', 'auto')
     if frame_rate == 'auto': 
         try:
@@ -259,9 +258,9 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     # if single trial
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else project_dir if 'Config.toml' in os.listdir(project_dir) else os.getcwd()
     calib_dir = [Path(session_dir) / c for c in os.listdir(session_dir) if (Path(session_dir) / c).is_dir() and 'calib' in c.lower()][0]
-    calib_files = glob.glob(str(Path(calib_dir) / '*.toml'))
-    calib_file = max(calib_files, key=lambda f: Path(f).stat().st_ctime) # lastly created calibration file
-    calib = rtoml.load(Path(calib_file))
+    calib_files = list(Path(calib_dir).glob('*.toml'))
+    calib_file = max(calib_files, key=lambda f: f.stat().st_birthtime) # lastly created calibration file
+    calib = rtoml.load(calib_file)
     cal_keys = [c for c in calib.keys() 
             if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
             and isinstance(calib[c],dict)]
@@ -688,7 +687,18 @@ def triangulate_all(config_dict):
     make_c3d = config_dict.get('triangulation', {}).get('make_c3d', True)
     
     try:
-        calib_dir = [Path(session_dir) / c for c in os.listdir(session_dir) if (Path(session_dir) / c).is_dir() and 'calib' in c.lower()][0]
+        calib_dir = [c for c in Path(session_dir).iterdir() if c.is_dir() and 'calib' in c.name.lower()][0]
+    except:
+        raise Exception(f'No .toml calibration directory found.')
+
+    try:
+        calib_files = list(Path(calib_dir).glob('*.toml'))
+        calib_file = max(calib_files, key=lambda p: p.stat().st_birthtime)  # lastly created calibration file
+    except:
+        raise Exception(f'No .toml calibration file found in the {calib_dir}.')
+
+    pose_dir = Path(project_dir) / 'pose'
+    poseSync_dir = Path(project_dir) / 'pose-sync'
     poseTracked_dir = Path(project_dir) / 'pose-associated'
     
     # Projection matrix from toml calibration file

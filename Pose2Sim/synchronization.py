@@ -38,10 +38,11 @@ import cv2
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib import patheffects
+from importlib.metadata import version
+from pathlib import Path
 from scipy import signal
 import json
 import os
-import glob
 import fnmatch
 import re
 import shutil
@@ -60,8 +61,6 @@ __author__ = "David Pagnon, HunMin Kim"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -1395,7 +1394,7 @@ def synchronize_cams_all(config_dict):
     # Get parameters from Config.toml
     project_dir = config_dict.get('project', {}).get('project_dir', '.')
     pose_dir = (Path(project_dir) / 'pose').resolve()
-    sync_dir = (Path(pose_dir) / '..', 'pose-sync').resolve()
+    sync_dir = Path(pose_dir).parent / 'pose-sync'
     os.makedirs(sync_dir, exist_ok=True)
     pose_model = config_dict.get('pose', {}).get('pose_model', 'Body_with_feet')
     # multi_person = config_dict.get('project', {}).get('multi_person', False)
@@ -1414,12 +1413,12 @@ def synchronize_cams_all(config_dict):
 
     # Determine frame rate
     video_dir = Path(project_dir) / 'videos'
-    vid_or_img_files = sorted([f for f in glob.glob(Path(video_dir) / '*') if is_video_file(f)])
+    vid_or_img_files = sorted([f for f in Path(video_dir).glob('*') if is_video_file(f)])
     if not vid_or_img_files: # video_files is then img_dirs
         try:
-            image_folders = [f for f in os.listdir(video_dir) if Path(Path(video_dir) / f.is_dir())]
+            image_folders = [f for f in os.listdir(video_dir) if Path(Path(video_dir) / f).is_dir()]
             for image_folder in image_folders:
-                img_files = sorted([f for f in glob.glob(Path(video_dir) / image_folder / '*') if is_image_file(f)])
+                img_files = sorted([f for f in (Path(video_dir) / image_folder).glob('*') if is_image_file(f)])
                 if img_files:
                     vid_or_img_files.append(img_files)
         except:

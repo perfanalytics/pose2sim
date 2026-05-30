@@ -39,11 +39,12 @@ import pandas as pd
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 os.environ["OPENCV_LOG_LEVEL"]="FATAL"
 import cv2
-import glob
 import rtoml
 import json
 import re
 from lxml import etree
+from importlib.metadata import version
+from pathlib import Path
 import warnings
 import customtkinter as ctk
 from tkinter import messagebox
@@ -59,8 +60,6 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -491,7 +490,7 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
     try:
         calib_files = glob.glob(str(Path(calib_dir) / '*.toml'))
-        calib_file = max(calib_files, key=lambda f: Path(f).stat().st_ctime) # lastly created calibration file
+        calib_file = max(calib_files, key=lambda f: Path(f).stat().st_birthtime) # lastly created calibration file
     except:
         pass
     if not overwrite_intrinsics and 'calib_file' in locals():
@@ -1554,18 +1553,18 @@ def calibrate_cams_all(config_dict):
         try:
             if convert_filetype=='qualisys':
                 convert_ext = '.qca.txt'
-                file_to_convert_path = glob.glob(Path(calib_dir) / f'*{convert_ext}*')[0]
+                file_to_convert_path = next(Path(calib_dir).glob(f'*{convert_ext}*'))
                 binning_factor = config_dict.get('calibration', {}).get('convert', {}).get('qualisys', {}).get('binning_factor', 1)
             elif convert_filetype=='optitrack':
                 file_to_convert_path = ['']
                 binning_factor = 1
             elif convert_filetype=='vicon':
                 convert_ext = '.xcp'
-                file_to_convert_path = glob.glob(Path(calib_dir) / f'*{convert_ext}')[0]
+                file_to_convert_path = next(Path(calib_dir).glob(f'*{convert_ext}'))
                 binning_factor = 1
             elif convert_filetype=='opencap': # all files with .pickle extension
                 convert_ext = '.pickle'
-                file_to_convert_path = sorted(glob.glob(Path(calib_dir) / f'*{convert_ext}'))
+                file_to_convert_path = sorted(Path(calib_dir).glob(f'*{convert_ext}'))
                 binning_factor = 1
             elif convert_filetype=='easymocap': #intri.yml and intri.yml
                 convert_ext = '.yml'
@@ -1575,9 +1574,9 @@ def calibrate_cams_all(config_dict):
                 # convert_ext = 'no'
                 # list_dir = os.listdir(calib_dir)
                 # list_dir_noext = sorted([Path(f).stem for f in list_dir if Path(f).suffix==''])
-                # file_to_convert_path = [Path(calib_dir) / f for f in list_dir_noext if Path(Path(calib_dir) / f.is_file())]
+                # file_to_convert_path = [Path(calib_dir) / f for f in list_dir_noext if Path(calib_dir) / f.is_file()]
                 convert_ext = '.calib'
-                file_to_convert_path = sorted(glob.glob(Path(calib_dir) / f'*{convert_ext}'))
+                file_to_convert_path = sorted(Path(calib_dir).glob(f'*{convert_ext}'))
                 binning_factor = 1
             elif convert_filetype=='anipose' or convert_filetype=='freemocap' or convert_filetype=='caliscope': # no conversion needed, skips this stage
                 logging.info(f'\n--> No conversion needed from Caliscope, AniPose, nor from FreeMocap. Calibration skipped.\n')

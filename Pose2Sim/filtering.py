@@ -23,16 +23,15 @@ OUTPUT:
 
 ## INIT
 import os
-import glob
 import math
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
-import pandas as pd
-import cv2
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import logging
 import platform
+from importlib.metadata import version
+from pathlib import Path
 
 from scipy import signal
 from scipy.interpolate import make_smoothing_spline
@@ -54,8 +53,6 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -886,7 +883,7 @@ def filter_all(config_dict):
     # Find input files
     if filter_ik:
         kinematics_dir = (Path(project_dir) / 'kinematics').resolve()
-        files_in = [f for f in glob.glob(Path(kinematics_dir) / '*.mot') if f.count('filt') <= 1]
+        files_in = [f for f in Path(kinematics_dir).glob('*.mot') if f.name.count('filt') <= 1]
         if not files_in:
             logging.error(f'No .mot files found in {kinematics_dir}. '
                         f'Make sure inverse kinematics has been run before filtering mot files, '
@@ -895,7 +892,7 @@ def filter_all(config_dict):
                                     f'Make sure inverse kinematics has been run before filtering mot files, '
                                     f'or set filter_ik to false in Config.toml to filter trc files instead.')
     else:
-        files_in = [f for f in glob.glob(Path(pose3d_dir) / '*.trc') if 'filt' not in f]
+        files_in = [f for f in Path(pose3d_dir).glob('*.trc') if 'filt' not in f.name]
 
     for person_id, file_path_in in enumerate(files_in):
         logging.info(f'\nFiltering {"IK mot" if filter_ik else "3D trc"} data for person {person_id}...')
@@ -913,7 +910,7 @@ def filter_all(config_dict):
             Q_coords = Q_coords.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
             frames_col = frames_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
             time_col = time_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
-            file_path_out = file_path_in.replace(file_path_in.split('_')[-1], f'{f_range[0]}-{f_range[1]}_filt_{filter_type}.trc')
+            file_path_out = file_path_in.with_name(file_path_in.name.replace(file_path_in.name.split('_')[-1], f'{f_range[0]}-{f_range[1]}_filt_{filter_type}.trc'))
             file_out = Path(file_path_out).name
             header[0] = header[0].replace(Path(file_path_in).name, file_out)
         frame_rate = (1/time_col.diff().mean()).round()
@@ -939,7 +936,7 @@ def filter_all(config_dict):
                         dpi = pw.canvases[0].figure.dpi
                         f.set_size_inches(1280/dpi, 720/dpi)
                         title = pw.tabs.tabText(n)
-                        plot_path = Path(plots_output_dir) / f'person{person_id:02d}_{title.replace(" " / "_".replace("/","_")}.png')
+                        plot_path = Path(plots_output_dir) / f'person{person_id:02d}_{title.replace(" ", "_").replace("/", "_")}.png'
                         f.savefig(plot_path, dpi=dpi, bbox_inches='tight')
 
             # Write output file

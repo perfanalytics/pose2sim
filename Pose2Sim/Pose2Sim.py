@@ -45,6 +45,8 @@ import rtoml
 import os
 import time
 from copy import deepcopy
+from importlib.metadata import version
+from pathlib import Path
 import logging, logging.handlers
 from datetime import datetime
 
@@ -54,8 +56,6 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -132,23 +132,23 @@ def read_config_files(config):
         if level == 1: # Trial
             try:
                 # if batch
-                session_config_dict = rtoml.load(Path(Path(config_dir) / '..' / 'Config.toml'))
-                trial_config_dict = rtoml.load(Path(Path(config_dir) / 'Config.toml'))
+                session_config_dict = rtoml.load(Path(config_dir).parent / 'Config.toml')
+                trial_config_dict = rtoml.load(Path(config_dir) / 'Config.toml')
                 session_config_dict = recursive_update(session_config_dict,trial_config_dict)
             except:
                 # if single trial
-                session_config_dict = rtoml.load(Path(Path(config_dir) / 'Config.toml'))
+                session_config_dict = rtoml.load(Path(config_dir) / 'Config.toml')
             session_config_dict.get("project", {}).update({"project_dir":config_dir})
             config_dicts = [session_config_dict]
 
         # Root level
         if level == 2:
-            session_config_dict = rtoml.load(Path(Path(config_dir) / 'Config.toml'))
+            session_config_dict = rtoml.load(Path(config_dir) / 'Config.toml')
             config_dicts = []
             # Create config dictionaries for all trials of the participant
             for (root,dirs,files) in os.walk(config_dir):
                 if 'Config.toml' in files and root != config_dir:
-                    trial_config_dict = rtoml.load(Path(Path(root) / files[0]))
+                    trial_config_dict = rtoml.load(Path(root) / files[0])
                     # deep copy, otherwise session_config_dict is modified at each iteration within the config_dicts list
                     temp_dict = deepcopy(session_config_dict)
                     temp_dict = recursive_update(temp_dict,trial_config_dict)
@@ -165,12 +165,12 @@ class Pose2SimPipeline:
             if type(config) == dict:
                 # Use project_dir from the config dict instead of os.getcwd()
                 project_dir = config.get('project', {}).get('project_dir', str(Path.cwd()))
-                self.session_dir = (Path(project_dir) if self.level==2 else Path(project_dir) / '..').resolve()
+                self.session_dir = (Path(project_dir) if self.level==2 else Path(project_dir).parent)
             else:
-                self.session_dir = (Path.cwd() if self.level==2 else Path.cwd() / '..').resolve()
+                self.session_dir = (Path.cwd() if self.level==2 else Path.cwd().parent)
             [Path(self.session_dir) / c for c in os.listdir(self.session_dir) if 'calib' in c.lower() and not c.lower().endswith('.py')][0]
         except:
-            self.session_dir = (Path(config.get('project', {}).get('project_dir', str(Path.cwd()))) if type(config) == dict else Path.cwd()).resolve()
+            self.session_dir = (Path(config.get('project', {}).get('project_dir', str(Path.cwd()))) if type(config) == dict else Path.cwd())
         use_custom_logging = self.config_dicts[0].get('logging', {}).get('use_custom_logging', False)
         if not use_custom_logging:
             setup_logging(self.session_dir)

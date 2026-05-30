@@ -21,14 +21,14 @@ OUTPUT:
 
 
 ## INIT
-import os
 import copy
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import pandas as pd
 import onnxruntime as ort
-import glob
 import logging
+from importlib.metadata import version
+from pathlib import Path
 
 from Pose2Sim.common import convert_to_c3d, natural_sort_key, read_trc, write_trc,  \
                             compute_height, add_shoulder_data, add_neck_hip_data
@@ -39,8 +39,6 @@ __author__ = "Antoine Falisse, adapted by HunMin Kim and David Pagnon"
 __copyright__ = "Copyright 2022, OpenCap"
 __credits__ = ["Antoine Falisse", "HunMin Kim", "David Pagnon"]
 __license__ = "Apache-2.0 License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -101,10 +99,10 @@ def augment_markers_all(config_dict):
     augmenter_model = 'v0.3'
 
     # Apply all trc files
-    all_trc_files = [f for f in glob.glob(Path(pose_3d_dir) / '*.trc') if augmenterModelName not in f]
-    trc_no_filtering = [f for f in glob.glob(Path(pose_3d_dir) / '*.trc') if
-                        augmenterModelName not in f and 'filt' not in f]
-    trc_filtering = [f for f in glob.glob(Path(pose_3d_dir) / '*.trc') if augmenterModelName not in f and 'filt' in f]
+    all_trc_files = [f for f in Path(pose_3d_dir).glob('*.trc') if augmenterModelName not in f.name]
+    trc_no_filtering = [f for f in Path(pose_3d_dir).glob('*.trc') if
+                        augmenterModelName not in f.name and 'filt' not in f.name]
+    trc_filtering = [f for f in Path(pose_3d_dir).glob('*.trc') if augmenterModelName not in f.name and 'filt' in f.name]
 
     if len(all_trc_files) == 0:
         raise ValueError('No trc files found.')
@@ -199,7 +197,7 @@ def augment_markers_all(config_dict):
         frames_col = frames_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
         time_col = time_col.iloc[f_index[0]:f_index[1]].reset_index(drop=True)
 
-        trc_path_out = trc_file.replace('.trc', '_LSTM.trc')
+        trc_path_out = trc_file.with_stem(trc_file.stem + '_LSTM')
         trc_file_out = Path(trc_path_out).name
         header[0] = header[0].replace(Path(trc_file).name, trc_file_out)
         header[2] = '\t'.join(part if i != 2 else str(frame_nb) for i, part in enumerate(header[2].split('\t')))

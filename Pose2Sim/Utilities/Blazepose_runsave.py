@@ -30,6 +30,8 @@ import pandas as pd
 import numpy as np
 import json
 import argparse
+from importlib.metadata import version
+from pathlib import Path
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -41,8 +43,6 @@ __author__ = "David Pagnon"
 __copyright__ = "Copyright 2023, Pose2Sim"
 __credits__ = ["David Pagnon"]
 __license__ = "BSD 3-Clause License"
-from importlib.metadata import version
-from pathlib import Path
 __version__ = version('pose2sim')
 __maintainer__ = "David Pagnon"
 __email__ = "contact@david-pagnon.com"
@@ -177,7 +177,7 @@ def blazepose_detec_func(**args):
     if to_csv or to_h5 or to_json or save_images or save_video:
         if output_folder == None: 
             output_folder = video_dir
-        if not Path(Path(output_folder).exists().resolve()):
+        if not Path(output_folder).exists().resolve():
             os.mkdir(Path(output_folder).resolve())
     
     # Run Blazepose
