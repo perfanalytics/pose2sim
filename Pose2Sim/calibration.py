@@ -489,8 +489,8 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
 
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
     try:
-        calib_files = glob.glob(str(Path(calib_dir) / '*.toml'))
-        calib_file = max(calib_files, key=lambda f: Path(f).stat().st_birthtime) # lastly created calibration file
+        calib_files = list(Path(calib_dir).glob('*.toml'))
+        calib_file = max(calib_files, key=lambda f: f.stat().st_birthtime) # lastly created calibration file
     except:
         pass
     if not overwrite_intrinsics and 'calib_file' in locals():
@@ -715,11 +715,11 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
         imgpoints = [] # 2d points in image plane
 
         logging.info(f'\nCamera {cam}:')
-        img_vid_files = glob.glob(Path(calib_dir) / 'intrinsics' / cam / f'*.{intrinsics_extension}')
+        img_vid_files = list((Path(calib_dir) / 'intrinsics' / cam).glob(f'*.{intrinsics_extension}'))
         if len(img_vid_files) == 0:
             logging.exception(f'The folder {Path(calib_dir) / "intrinsics" / cam} does not exist or does not contain any files with extension .{intrinsics_extension}.')
             raise ValueError(f'The folder {Path(calib_dir) / "intrinsics" / cam} does not exist or does not contain any files with extension .{intrinsics_extension}.')
-        img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
+        img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', str(c))]) #sorting paths with numbers
         
         # extract frames from video if video
         try:
@@ -728,8 +728,8 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
             if cap.read()[0] == False:
                 raise
             extract_frames(img_vid_files[0], extract_every_N_sec, overwrite_extraction)
-            img_vid_files = glob.glob(Path(calib_dir) / 'intrinsics' / cam / f'*.png')
-            img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)])
+            img_vid_files = list((Path(calib_dir) / 'intrinsics' / cam).glob('*.png'))
+            img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', str(c))])
         except:
             pass
 
@@ -830,9 +830,9 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
         show_reprojection_error = extrinsics_config_dict.get('board', {}).get('show_reprojection_error', True)
 
     try:
-        img_vid_files = sorted(glob.glob(Path(calib_dir) / 'extrinsics' / '*' / f'*.{extrinsics_extension}'))
+        img_vid_files = sorted((Path(calib_dir) / 'extrinsics').glob(f'*/*.{extrinsics_extension}'))
         if len(img_vid_files) == 0:
-            img_vid_files = sorted(glob.glob(Path(calib_dir) / 'extrinsics' / f'*.{extrinsics_extension}'))
+            img_vid_files = sorted((Path(calib_dir) / 'extrinsics').glob(f'*.{extrinsics_extension}'))
         if len(img_vid_files) == 0:
             raise
         img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
@@ -1568,7 +1568,7 @@ def calibrate_cams_all(config_dict):
                 binning_factor = 1
             elif convert_filetype=='easymocap': #intri.yml and intri.yml
                 convert_ext = '.yml'
-                file_to_convert_path = sorted(glob.glob(Path(calib_dir) / f'*{convert_ext}'))
+                file_to_convert_path = sorted(Path(calib_dir).glob(f'*{convert_ext}'))
                 binning_factor = 1
             elif convert_filetype=='biocv': # all files without extension -> now with .calib extension
                 # convert_ext = 'no'
