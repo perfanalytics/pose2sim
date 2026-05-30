@@ -42,7 +42,7 @@
 
 
 ## INIT
-import os
+from pathlib import Path
 import math
 import numpy as np
 np.set_printoptions(legacy='1.21')

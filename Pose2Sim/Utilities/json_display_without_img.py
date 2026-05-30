@@ -169,7 +169,7 @@ def json_display_without_img_func(**args):
             scat.set_offsets(np.c_[X[frame], image_height-Y[frame]])
             scat.set_array(CONF[frame])
             if save == True or save=='True' or save == '1':
-                output_name = Path(output_img_folder) / f'{Path(output_img_folder.name}_{str(frame).zfill(5)}.png')
+                output_name = Path(output_img_folder) / f'{Path(output_img_folder).name}_{str(frame).zfill(5)}.png'
                 plt.savefig(output_name)
         return scat,
     
