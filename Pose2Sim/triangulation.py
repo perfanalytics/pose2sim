@@ -259,7 +259,7 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else project_dir if 'Config.toml' in os.listdir(project_dir) else os.getcwd()
     calib_dir = [Path(session_dir) / c for c in os.listdir(session_dir) if (Path(session_dir) / c).is_dir() and 'calib' in c.lower()][0]
     calib_files = list(Path(calib_dir).glob('*.toml'))
-    calib_file = max(calib_files, key=lambda f: f.stat().st_birthtime) # lastly created calibration file
+    calib_file = max(calib_files, key=lambda f: f.stat().st_ctime) # lastly created calibration file
     calib = rtoml.load(calib_file)
     cal_keys = [c for c in calib.keys() 
             if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
@@ -693,7 +693,7 @@ def triangulate_all(config_dict):
 
     try:
         calib_files = list(Path(calib_dir).glob('*.toml'))
-        calib_file = max(calib_files, key=lambda p: p.stat().st_birthtime)  # lastly created calibration file
+        calib_file = max(calib_files, key=lambda p: p.stat().st_ctime)  # lastly created calibration file
     except:
         raise Exception(f'No .toml calibration file found in the {calib_dir}.')
 

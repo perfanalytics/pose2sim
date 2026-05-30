@@ -490,7 +490,7 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
     try:
         calib_files = list(Path(calib_dir).glob('*.toml'))
-        calib_file = max(calib_files, key=lambda f: f.stat().st_birthtime) # lastly created calibration file
+        calib_file = max(calib_files, key=lambda f: f.stat().st_ctime) # lastly created calibration file
     except:
         pass
     if not overwrite_intrinsics and 'calib_file' in locals():

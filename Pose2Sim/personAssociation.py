@@ -612,7 +612,7 @@ def recap_tracking(config_dict, error=0, nb_cams_excluded=0):
     poseTracked_dir = Path(project_dir) / 'pose-associated'
     calib_dir = [Path(session_dir) / c for c in os.listdir(session_dir) if (Path(session_dir) / c).is_dir() and 'calib' in c.lower()][0]
     calib_files = list(Path(calib_dir).glob('*.toml'))
-    calib_file = max(calib_files, key=lambda f: f.stat().st_birthtime) # lastly created calibration file
+    calib_file = max(calib_files, key=lambda f: f.stat().st_ctime) # lastly created calibration file
     
     if not multi_person:
         # Error
@@ -683,8 +683,8 @@ def associate_all(config_dict):
     try:
         print('\n\n\n\n\n', list(Path(calib_dir).glob('*.toml')))
         calib_files = list(Path(calib_dir).glob('*.toml'))
-        print(max(calib_files, key=lambda f: f.stat().st_birthtime))
-        calib_file = max(calib_files, key=lambda f: f.stat().st_birthtime) # lastly created calibration file
+        print(max(calib_files, key=lambda f: f.stat().st_ctime))
+        calib_file = max(calib_files, key=lambda f: f.stat().st_ctime) # lastly created calibration file
     except:
         raise Exception(f'No .toml calibration file found in the {calib_dir}.')
     pose_dir = Path(project_dir) / 'pose'
