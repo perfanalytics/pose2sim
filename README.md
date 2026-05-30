@@ -485,7 +485,11 @@ Initial project structure:
 > Uncluttered background and good lighting conditions will help you get better results. Note that tripods may sometimes be mistaken for people. 
 
 > [!TIP]
-> Consider using the [Lab Camera Optimizer](https://github.com/flodelaplace/lab-camera-optimizer) tool to help you position your cameras in difficult settings.
+> Camera placement:
+> 
+> - **With 2 cameras, one person:** Best results are achieved when one camera is in front of the person, the other at 45° to the side, at hip level (according to [Samani et al, 2026](https://link.springer.com/article/10.1186/s13104-026-07886-4)). With multiple people, try to place cameras in a way that minimizes occlusions.
+> - **With multiple cameras:** Make sure the cameras see the subjects from as many different angles as possible and with minimal occlusions. However, views right above the subjects do not yield good results.
+> - **In difficult settings with limited space and obstacles:** consider using the [Lab Camera Optimizer](https://github.com/flodelaplace/lab-camera-optimizer).
 > 
 > <img src="Content/Lab_cam_optimizer.png" width="760">
 
@@ -671,12 +675,12 @@ Output file:
 
 If you already have a calibration file, set `calibration_type` type to `convert` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
-> [!NOTE]
-> If the original calibration file does not provide any residual errors, they will be logged as NaN. This is not an error and can be ignored.
-
 > [!TIP]
 > If you want to use a calibration method that requires synchronized cameras, you can switch the steps and first run pose estimation and synchronization.\
 > ***Note:*** This suggestion is only valid if there is a fast motion of a body keypoint that allows you to synchronize on. Set "create synchronized videos = true" to do so, and then run calibration. <!-- Make sure calibration runs on the synchronized videos, not the original ones -->
+
+> [!NOTE]
+> If the original calibration file does not provide any residual errors, they will be logged as NaN. This is not an error and can be ignored.
 
 - **From [Caliscope](https://mprib.github.io/caliscope/)** (recommended *if your cameras are synchronized*), **[Dynamic Extrinsic Camera Calibrator](https://github.com/flodelaplace/lab-camera-dynamic-calibrator)** (based on keypoints: not checkerboard! But *requires synchronized videos, does not estimate intrinsics, and not commercially available*), **[AniPose](https://github.com/lambdaloop/anipose)**, or **[FreeMocap](https://github.com/freemocap/freemocap):**  
   - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
