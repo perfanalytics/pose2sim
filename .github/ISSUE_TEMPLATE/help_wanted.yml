@@ -1,0 +1,39 @@
+name: Help wanted
+description: Your configuration and problem
+title: "[Bug]: "
+labels: ["help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Your configuration and problem
+
+  - type: checkboxes
+    id: os
+    attributes:
+      label: Your OS
+      options:
+        - label: Windows
+        - label: Linux
+        - label: Mac
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Your Python version
+      description: Activate your environment and run `python -V`
+      placeholder: e.g., Python 3.13.3
+
+  - type: input
+    id: library-version
+    attributes:
+      label: What is your library version?
+      description: Activate your environment and run `uv pip show pose2sim` (and `uv pip show sports2d` if relevant)
+      placeholder: e.g., pose2sim 0.10.45, sports2d 0.8.31
+
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: Your problem
+      description: Please describe your problem
+      placeholder: Describe your issue here...
