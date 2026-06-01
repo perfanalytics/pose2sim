@@ -1,6 +1,6 @@
-name: Help wanted
+name: A problem?
 description: Your configuration and problem
-title: "[Bug]: "
+title: ""
 labels: ["help wanted"]
 body:
   - type: markdown
@@ -8,7 +8,7 @@ body:
       value: |
         Your configuration and problem
 
-  - type: checkboxes
+  - type: dropdown
     id: os
     attributes:
       label: Your OS
