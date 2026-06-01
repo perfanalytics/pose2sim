@@ -1,6 +1,6 @@
 name: A problem?
 description: Your configuration and problem
-title: ""
+title: "A problem?"
 labels: ["help wanted"]
 body:
   - type: markdown
