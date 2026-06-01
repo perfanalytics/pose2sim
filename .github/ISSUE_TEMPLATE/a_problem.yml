@@ -1,6 +1,5 @@
 name: A problem?
 description: Your configuration and problem
-title: "My issue"
 labels: ["help wanted"]
 body:
   - type: dropdown
