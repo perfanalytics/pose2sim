@@ -510,8 +510,7 @@ Initial project structure:
 > ```cmd
 > ffmpeg -i original_vid.MP4 `
 >   -vcodec libx264 -crf 30 -preset fast `
->   -vf "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease" \
->   -r 30 `
+>   -vf "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease" 
 >   -movflags +faststart `
 >   lighter_vid.mp4
 > ```
