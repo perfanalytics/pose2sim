@@ -15,9 +15,14 @@ assignees: ''
 
 
 ## Your Python version
-Activate your environment (see [here](https://perfanalytics.github.io/pose2sim/#1-set-up-a-uv-environment)) and run `python -V`
+> Activate your environment (see [here](https://perfanalytics.github.io/pose2sim/#1-set-up-a-uv-environment)) and run `python -V`
 
 
 
 ## Your library version
-Activate your environment (see [here](https://perfanalytics.github.io/pose2sim/#1-set-up-a-uv-environment)) and run `uv pip show pose2sim` (and if relevant, `uv pip show sports2d`).
+> Activate your environment (see [here](https://perfanalytics.github.io/pose2sim/#1-set-up-a-uv-environment)) and run `uv pip show pose2sim` (and if relevant, `uv pip show sports2d`).
+
+
+
+## Your problem
+> Please describe your problem
