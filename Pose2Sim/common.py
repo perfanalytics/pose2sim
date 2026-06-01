@@ -560,7 +560,7 @@ def retrieve_calib_params(calib_file):
     - T: translation vectors as list of 3x1 arrays
     '''
     
-    calib = rtoml.load(Path(calib_file))
+    calib = rtoml.load(calib_file)
 
     cal_keys = [c for c in calib.keys() 
                 if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
@@ -592,7 +592,7 @@ def computeP(calib_file, undistort=False):
     - P: projection matrix as list of arrays
     '''
     
-    calib = rtoml.load(Path(calib_file))
+    calib = rtoml.load(calib_file)
     
     cal_keys = [c for c in calib.keys() 
                 if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
@@ -956,6 +956,7 @@ def convert_to_c3d(trc_path):
     - c3d file
     '''
 
+    trc_path = Path(trc_path)
     c3d_path = trc_path.with_suffix('.c3d')
     marker_names, trc_data_np = extract_trc_data(trc_path)
     create_c3d_file(c3d_path, marker_names, trc_data_np)
