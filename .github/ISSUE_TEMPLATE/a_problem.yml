@@ -15,7 +15,7 @@ body:
     id: python-version
     attributes:
       label: Your Python version
-      description: [Activate your environment](https://perfanalytics.github.io/pose2sim/#1-set-up-a-uv-environment) and run `python -V`
+      description: '[Activate your environment](https://perfanalytics.github.io/pose2sim/#1-set-up-a-uv-environment) and run `python -V`'
       placeholder: e.g., Python 3.13.3
 
   - type: input
