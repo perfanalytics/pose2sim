@@ -1,21 +1,16 @@
 name: A problem?
 description: Your configuration and problem
-title: "A problem?"
+title: "My issue"
 labels: ["help wanted"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Your configuration and problem
-
   - type: dropdown
     id: os
     attributes:
       label: Your OS
       options:
-        - label: Windows
-        - label: Linux
-        - label: Mac
+        - Windows
+        - Linux
+        - Mac
 
   - type: input
     id: python-version
