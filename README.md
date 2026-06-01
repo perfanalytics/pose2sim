@@ -156,6 +156,7 @@ Open a terminal (conda, powershell, bash, or zsh).
 ```
 
 > [!TIP]
+> #### Activate your environment
 > Remembering the command for activating the uv environment can be a pain. Just type **Ctrl+R** in your terminal and start typing `activate` to find it.
 
 <br>
@@ -163,7 +164,7 @@ Open a terminal (conda, powershell, bash, or zsh).
 #### 2. Install Pose2Sim:
 
 Open a terminal (*conda, powershell, bash, or zsh*).\
-Activate your environment (see [here](#1-set-up-a-uv-environment)).
+[Activate your environment](#activate-your-environment).
 
 - OPTION 1: **Latest stable version:** 
 
@@ -185,7 +186,7 @@ Activate your environment (see [here](#1-set-up-a-uv-environment)).
 *For faster inference, you can run on the GPU.* \
 Be aware that GPU support takes almost 5 GB more on disk.
 
-Open a terminal, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `nvidia-smi`. If this results in an error, your GPU is probably not compatible with CUDA. If not, note the "CUDA version": it is the latest version your driver is compatible with (more information [on this post](https://stackoverflow.com/questions/60987997/why-torch-cuda-is-available-returns-false-even-after-installing-pytorch-with)).
+Open a terminal, [activate your environment](#activate-your-environment), and run `nvidia-smi`. If this results in an error, your GPU is probably not compatible with CUDA. If not, note the "CUDA version": it is the latest version your driver is compatible with (more information [on this post](https://stackoverflow.com/questions/60987997/why-torch-cuda-is-available-returns-false-even-after-installing-pytorch-with)).
 
 Then go to the [ONNXruntime requirement page](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), note the latest compatible CUDA and cuDNN requirements. Next, go to the [pyTorch website](https://pytorch.org/get-started/previous-versions/) and install the latest version that satisfies these requirements (beware that torch 2.4 ships with cuDNN 9, while torch 2.3 installs cuDNN 8). For example:
 
@@ -211,7 +212,7 @@ Check that everything went well within Python with these commands:
 <!-- print(f'torch version: {torch.__version__}, cuda version: {torch.version.cuda}, cudnn version: {torch.backends.cudnn.version()}, onnxruntime version: {ort.__version__}') -->
 
 > [!TIP]
-> **Note on storage use:**\
+> #### Note on storage use:
 >  A full installation takes up to 14 GB of storage space. HoweveGPU and GUI supports are not mandatory and take about 5 GB. Tcache can be cleared to save space if you don't care for futuinstallations to be instantaneous.
 > A minimal installation with carefully chosen pose models and without GPU support **would take less than 2 GB**. \
 > <img src="Content/Storage.png" width="760">
@@ -224,7 +225,7 @@ Check that everything went well within Python with these commands:
 
 <br>
 
-- Open a terminal (*conda, powershell, bash, or zsh*) and activate your environment (see [here](#1-set-up-a-uv-environment)).
+- Open a terminal (*conda, powershell, bash, or zsh*) and [activate your environment](#activate-your-environment).
 - Find the Demo folder under `<pose2sim_path>\Pose2Sim\Demo_SinglePerson`:
 
   ```powershell
@@ -303,7 +304,7 @@ https://github.com/user-attachments/assets/53bfd9e2-f542-410f-8e9f-7b70229d598b
 
 <br>
 
-Open a terminal (*conda, powershell, bash, or zsh*) and activate your environment (see [here](#1-set-up-a-uv-environment)).
+Open a terminal (*conda, powershell, bash, or zsh*) and [activate your environment](#activate-your-environment).
 
 ### Multi person analysis
 
@@ -485,13 +486,35 @@ Initial project structure:
 > Uncluttered background and good lighting conditions will help you get better results. Note that tripods may sometimes be mistaken for people. 
 
 > [!TIP]
-> Camera placement:
+> #### Camera placement:
 > 
 > - **With 2 cameras, one person:** Best results are achieved when one camera is in front of the person, the other at 45° to the side, at hip level (according to [Samani et al, 2026](https://link.springer.com/article/10.1186/s13104-026-07886-4)). With multiple people, try to place cameras in a way that minimizes occlusions.
 > - **With multiple cameras:** Make sure the cameras see the subjects from as many different angles as possible and with minimal occlusions. However, views right above the subjects do not yield good results.
 > - **In difficult settings with limited space and obstacles:** consider using the [Lab Camera Optimizer](https://github.com/flodelaplace/lab-camera-optimizer).
 > 
 > <img src="Content/Lab_cam_optimizer.png" width="760">
+
+> [!TIP]
+> #### Minimize storage use:
+> 
+> The main drawback of working with videos is the size of the files. Here are some example settings (inspired by [Hardy et al, 2026](https://cvbw2026.github.io/assets/papers/4.pdf)) to significantly reduce storage use with little impact on accuracy:
+> 
+> - **Compress videos:** Increasing crf from 20 to 30 has virtually no impact on accuracy, and *decreases storage use by up to 10 times*.
+> - **Decrease resolution:** Decreasing from HD (1080 x 1920) to SD (720 x 1280) has little impact, and *decreases storage use by about 8 times*.
+> - **Audio does not matter:** Audio tracks take between 1 and (rarely) 10% of the file size.
+> - **Camera number:** 6 is generally a good camera number. Of course, complex motions and occlusions require more cameras, and gait requires fewer.
+> - **Face blurring:** Preserves privacy with little impact on accuracy. Use this [Utility script](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/face_blurring.py).
+> - **Keep high framerate:** Framerates below 60 Hz lead to accuracy drops, especially for fast motions.
+> 
+> In practice, here is how you can compress your video and decrease its resolution with ffmpeg:
+> ```cmd
+> ffmpeg -i original_vid.MP4 `
+>   -vcodec libx264 -crf 30 -preset fast `
+>   -vf "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease" \
+>   -r 30 `
+>   -movflags +faststart `
+>   lighter_vid.mp4
+> ```
 
 </br>
 
@@ -501,7 +524,7 @@ Initial project structure:
 ### With RTMPose *(default)*:
 > [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose) is a state-of-the-art pose estimation solution that is accurate, fast, flexible, and natively integrated in Pose2Sim.
 
-Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, [activate your environment](#activate-your-environment), and run `ipython`:
 
 ```python
 from Pose2Sim import Pose2Sim
@@ -520,15 +543,14 @@ This will run pose estimation on your videos and save the results in the `pose` 
 > **See the [Too slow for you?](#too-slow-for-you) section to make it faster** by deactivating real-time display, running parallel pose estimation, using your GPU, increasing the detection frequency, and using a lighter model.
 
 > [!TIP]
-> **Other available models:**
-> 
+> #### Other available models
 > - **Whole body:** Use 'Whole_body' `pose_model` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) to track 133 keypoints on the body, face, and hands. Note that it is slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints.
-> - **Wrist motion:** Use 'Whole_body_wrist' `pose_model` (effectively runs the 'whole_body' model) but ignores all face and finger keypoints, except 2 per hand.
-> - **Lower body:** Use 'Lower_body' `pose_model`. Effectively runs the 'body_with_feet' model but ignores all upper body keypoints. 
+> - **Wrist motion:** Use 'Whole_body_wrist' `pose_model`. *Effectively runs the 'whole_body' model but ignores all face and finger keypoints, except 2 per hand.*
+> - **Lower body:** Use 'Lower_body' `pose_model`. *Effectively runs the 'body_with_feet' model but ignores all upper body keypoints.* 
 > - **Others:** You can also use the `Hand`, `Face`, `Animal`, or any other RTMlib model (see next tip).
 
 > [!TIP]
-> **To use custom detection and pose models:**
+> #### Use custom detection and pose models
 > - Other than 'lightweight', 'balanced', or 'performance' modes, you can use any other pose estimation models through [RTMLib](https://github.com/Tau-J/rtmlib) (hand, face, animal, or any custom trained models).
 > - The (optional) detection model, pose model, and input sizes can be written in a dictionary (**within triple quotes**) as shown below. Models can be local paths or URLs, with .onnx or .zip extensions. Make sure the input_sizes are **within square brackets**. 
 > 
@@ -654,7 +676,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 > _**Calculate camera intrinsic properties (lens characteristics) and extrinsic parameters (positions and orientations).\
 > Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_
 
-Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, [activate your environment](#activate-your-environment), and run `ipython`:
 
 ```python
 from Pose2Sim import Pose2Sim
@@ -806,7 +828,7 @@ For each camera, the algorithm computes mean vertical speed for the chosen keypo
 > [!TIP]
 > Skip this step if your cameras are natively synchronized.
 
-Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, [activate your environment](#activate-your-environment), and run `ipython`:
 
 ```python
 from Pose2Sim import Pose2Sim
@@ -847,7 +869,7 @@ You can choose the keypoints to synchronize on, the reference person, and the ti
 > [!TIP]
 > Skip this step if only one person is visible during the capture.
 
-Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, [activate your environment](#activate-your-environment), and run `ipython`:
 
 ```python
 from Pose2Sim import Pose2Sim
@@ -876,7 +898,7 @@ Pose2Sim.personAssociation()
 > - In the end, gaps smaller than `interp_if_gap_smaller_than` frames are interpolated.
 > See Config.toml file for more triangulation parameters.
 
-Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, [activate your environment](#activate-your-environment), and run `ipython`:
 
 ```python
 from Pose2Sim import Pose2Sim
@@ -921,7 +943,7 @@ The logs provide detailed statistics:
 > [!TIP]
 > Instead of, or in addition to filtering triangulated trc coordinates, you can also filter angle .mot files after inverse kinematics by setting `filter_ik = true` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
-Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, [activate your environment](#activate-your-environment)., and run `ipython`:
 
 ```python
 from Pose2Sim import Pose2Sim
@@ -951,7 +973,7 @@ Output:\
 > - Only works with models estimating at least the following keypoints (e.g., not COCO):`[RHip, LHip, RKnee, LKnee, RAnkle, LAnkle, RHeel, LHeel, RSmallToe, LSmallToe, RBigToe, LBigToe]`
 > - Will not work properly if missing values are not interpolated (i.e., if there are NaN values in the .trc file)
 
-Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, [activate your environment](#activate-your-environment)., and run `ipython`:
 
 ```python
 from Pose2Sim import Pose2Sim
@@ -985,7 +1007,7 @@ This can be either done fully automatically within Pose2Sim, or manually within 
 > - set `use_augmentation = false` is you don't want to use the results with augmented marker (this is sometimes better).
 > - Set `right_left_symmetry = false` if you have good reasons to think the participant is not symmetrical (e.g. if they wear a prosthetic limb).
 
-Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and run `ipython`:
+Open a terminal in your project folder, [activate your environment](#activate-your-environment), and run `ipython`:
 
 ```python
 from Pose2Sim import Pose2Sim
@@ -1088,17 +1110,14 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 
 # All the parameters
 
-> **All of the Pose2Sim parameters**
+> **All the Pose2Sim parameters**
 
 > [!TIP]
 > All the parameters are defined and documented in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. You can also pass a dictionary to any Pose2Sim function to override the config parameters (see [Demonstration Part-4](#demonstration-part-4-go-further)).
 
 <br>
 
-<details>
-  <summary><b>All the parameters</b> (CLICK TO SHOW)</summary>
-
-**Project**
+#### Project
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1109,7 +1128,9 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `frame_range` | `'auto'` | `'auto'`, `'all'`, or a range like `[10, 300]`. `'auto'` trims around frames with low reprojection error. If cameras are not synchronized, designates the frame range of the camera with the shortest recording. |
 | `exclude_from_batch` | `[]` | List of trial paths to exclude from batch analysis, e.g. `['S00_P00_Participant/S00_P00_T00_StaticTrial']`. |
 
-**Pose**
+<br>
+
+#### Pose
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1130,7 +1151,9 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `handle_LR_swap` | `false` | Not implemented yet. Will swap left/right labels if needed. |
 | `undistort_points` | `false` | Not implemented yet. Undistorts 2D points before triangulation. |
 
-**Synchronization**
+<br>
+
+#### Synchronization
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1144,7 +1167,11 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `filter_cutoff` | `6` | Low-pass filter cut-off frequency (Hz) applied before computing cross-correlation. |
 | `filter_order` | `4` | Order of the low-pass filter applied before cross-correlation. |
 
-**Calibration** — Take heart, calibration is not that complicated once you get the hang of it!
+<br>
+
+#### Calibration
+
+Take heart, calibration is not that complicated once you get the hang of it!
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1182,7 +1209,9 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `extrinsics_square_size` *(board only)* | `60` | Square size in mm (can be `[h, w]` for rectangles). |
 | `object_coords_3d` *(scene only)* | `[[...], ...]` | List of `[X, Y, Z]` 3D coordinates (in **metres**) of the points you will click on each camera image. Spread points as widely as possible for best accuracy. |
 
-**Person Association**
+<br>
+
+#### Person Association
 
 **Single person**
 
@@ -1199,7 +1228,9 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `reconstruction_error_threshold` | `0.1` | metres. Maximum 3D reconstruction error for two detections to be considered the same person across cameras. |
 | `min_affinity` | `0.2` | Correspondences with affinity below this value are discarded. Affinity is high when reconstruction error ≪ threshold. |
 
-**Triangulation**
+<br>
+
+#### Triangulation
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1217,7 +1248,9 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `show_interp_indices` | `true` | Print the frame indices that were interpolated for each keypoint. |
 | `make_c3d` | `true` | Also save triangulated data as a `.c3d` file alongside the `.trc` file. |
 
-**Filtering**
+<br>
+
+#### Filtering
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1288,7 +1321,9 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `cut_off_frequency` | `10` | Hz. Cut-off frequency applied to the velocity signal. |
 | `order` | `4` | Filter order. |
 
-**marker Augmentation**
+<br>
+
+#### Marker Augmentation
 
 > Requires at least the following markers: `[RHip, LHip, RKnee, LKnee, RAnkle, LAnkle, RHeel, LHeel, RSmallToe, LSmallToe, RBigToe, LBigToe]`
 
@@ -1297,7 +1332,9 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `feet_on_floor` | `false` | If `true`, markers are translated so that the feet touch the floor plane. Useful for ground reaction force or joint load estimation. |
 | `make_c3d` | `true` | Also save augmented marker data as a `.c3d` file. |
 
-**Kinematics**
+<br>
+
+#### Kinematics
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1313,13 +1350,14 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `large_hip_knee_angles` | `90` | degrees. Hip and knee angles above this value are considered unreliable and excluded from scaling. |
 | `trimmed_extrema_percent` | `50` | Percentage of the most extreme segment-length values removed before computing the mean for scaling. |
 
-**Logging**
+<br>
+
+#### Logging
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `use_custom_logging` | `false` | Set to `true` when Pose2Sim is embedded in an application that already configures Python logging. |
 
-</details>
 
 <br>
 
@@ -1329,7 +1367,7 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 
 We provide a list of standalone tools (see [Utilities](https://github.com/perfanalytics/pose2sim/tree/main/Pose2Sim/Utilities)), which can be either run as scripts, or imported as functions. Check usage in the docstring of each Python file. The figure below shows how some of these tools can be used to further extend Pose2Sim usage.
 
-Open a terminal in your project folder, activate your environment (see [here](#1-set-up-a-uv-environment)), and try any of these. Type in `name_of_script.py -h` for more instructions on how to use them.
+Open a terminal in your project folder, [activate your environment](#activate-your-environment), and try any of these. Type in `name_of_script.py -h` for more instructions on how to use them.
 
 <img src="Content/Pose2Sim_workflow_utilities.jpg" width="760">
 

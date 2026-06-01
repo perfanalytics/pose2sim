@@ -251,6 +251,9 @@ def _is_step(sec: dict) -> bool:
 def section_to_html(sec: dict) -> str:
     md = sec["content"]
 
+    # Apply general preprocessing
+    md = preprocess(md)
+
     # Add id anchors to h3/h4 sub-headings so sidebar sub-items can jump to them
     def add_heading_id(m: re.Match) -> str:
         hashes = m.group(1)
@@ -263,9 +266,6 @@ def section_to_html(sec: dict) -> str:
                 f'</h{lvl}>')
 
     md = re.sub(r"^(#{3,4}) +(.+)$", add_heading_id, md, flags=re.MULTILINE)
-
-    # Apply general preprocessing
-    md = preprocess(md)
 
     # Convert to HTML
     body = markdown.markdown(md, extensions=MD_EXTENSIONS, output_format="html", tab_length=2)
