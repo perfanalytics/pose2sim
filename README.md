@@ -33,7 +33,7 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 
 **`Pose2Sim` provides a workflow for 3D markerless kinematics (human or animal), as an alternative to traditional marker-based MoCap methods.**
 
-**Pose2Sim** is free and open-source, requiring low-cost hardware but with research-grade accuracy and production-grade robustness. It gives maximum control over clearly explained parameters. Any combination of phones, webcams, or GoPros can be used with fully clothed subjects, so it is particularly adapted to the sports field, the doctor's office, or for outdoor 3D animation capture.
+**Pose2Sim** is free and open-source, requiring low-cost hardware but with research-grade accuracy and production-grade robustness. It gives maximum control over clearly explained parameters. It also respects data privacy and GDPR rules since it runs locally. Any combination of phones, webcams, or GoPros can be used with fully clothed subjects, so it is particularly adapted to the sports field, the doctor's office, or for outdoor 3D animation capture.
 
 <br>
 
