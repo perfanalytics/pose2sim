@@ -88,23 +88,24 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
    5. [Demonstration Part-4: Go further](#demonstration-part-4-go-further)
    6. [Too slow for you?](#too-slow-for-you)
 2. [Use on your own data](#use-on-your-own-data)
-   1. [Setting up your project](#setting-up-your-project)
-   2. [2D pose estimation](#2d-pose-estimation)
+   1. [Start filming](#start-filming)
+   2. [Set up your project](#setting-up-your-project)
+   3. [2D pose estimation](#2d-pose-estimation)
       1. [With RTMPose (default)](#with-rtmpose-default)
       2. [With MMPose (coming soon)](#with-mmpose-coming-soon)
       3. [With DeepLabCut](#with-deeplabcut)
       4. [With OpenPose (legacy)](#with-openpose-legacy)
       5. [With Mediapipe BlazePose (legacy)](#with-mediapipe-blazepose-legacy)
       6. [With AlphaPose (legacy)](#with-alphapose-legacy)
-   3. [Camera calibration](#camera-calibration)
+   4. [Camera calibration](#camera-calibration)
       1. [Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-caliscope-anipose-freemocap-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
-   4. [Synchronization](#synchronization)
-   5. [Associate persons across cameras](#associate-persons-across-cameras)
-   6. [Triangulating keypoints](#triangulating-keypoints)
-   7. [Filtering 3D coordinates](#filtering-3d-coordinates)
-   8. [Marker augmentation](#marker-augmentation)
-   9. [OpenSim kinematics](#opensim-kinematics)
+   5. [Synchronization](#synchronization)
+   6. [Associate persons across cameras](#associate-persons-across-cameras)
+   7. [Triangulating keypoints](#triangulating-keypoints)
+   8. [Filtering 3D coordinates](#filtering-3d-coordinates)
+   9. [Marker augmentation](#marker-augmentation)
+   10. [OpenSim kinematics](#opensim-kinematics)
       1. [Within Pose2Sim](#within-pose2sim)
       2. [Within OpenSim GUI](#within-opensim-gui)
       3. [Command line](#command-line)
@@ -462,38 +463,32 @@ Very fast, too. Note that marker augmentation won't necessarily improve results 
 
 # Use on your own data
 
-## Setting up your project
-> _**Get yourself comfy!**_
+## Start filming
 
-> [!TIP]
-> If any of the following steps is not relevant for your use case (synchronization, person association, marker augmentation...), you can just skip it.
+> Start right away!
 
-1. Open a terminal, enter `uv pip show pose2sim`, report package location. \
-    Copy this path and do `cd <path>\pose2sim`.
-2. Copy the appropriate Demo folder as your project template (*Demo_SinglePerson*, *Demo_MultiPerson*, or *Demo_Batch*). \
-Paste it to your preferred location and rename as desired. 
-3. Edit the parameters in the `[project]` section of [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), e.g. `project_dir`, `participant_height`, `participant_mass`, etc.
-4. Add your videos to the `videos` folder. We recommend renaming them for clarity.
-4. The rest of the tutorial will explain to you how to populate the `Calibration` and `videos` folders, run each Pose2Sim step, and edit the `Config.toml` file.
-
-Initial project structure:
-
-> | SingleTrial     | BatchSession       |
-> |-----------------|--------------------|
-> | <pre><b>SingleTrial</b>                    <br>├── <b>calibration</b><br>├── <b>videos</b><br>└── <i><b>Config.toml</i></b></pre> |  <pre><b>BatchSession</b>                     <br>├── <b>calibration</b> <br>├── Trial_1   <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b> # Trial specific parameters<br>├── Trial_2 <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b> # Different trial parameters<br>└── <i><b>Config.toml</i></b> # Global parameters</pre>  | 
-
-> [!NOTE]
-> Uncluttered background and good lighting conditions will help you get better results. Note that tripods may sometimes be mistaken for people. 
+Film your participant(s) from at least 2 points of view.
 
 > [!TIP]
 > #### Camera placement:
 > 
 > - **With 2 cameras, one person:** Best results are achieved when one camera is in front of the person, the other at 45° to the side, both at hip level (according to [Samani et al, 2026](https://link.springer.com/article/10.1186/s13104-026-07886-4)). Acceptable results are achieved with one camera in front and one on the side at 90°; or two cameras in front, one at hip level and the other at eye level.\
 > **With 2 cameras, multiple people**: Try to place cameras in a way that minimizes occlusions.
-> - **With multiple cameras:** Make sure the cameras see the subjects from as many different angles as possible and with minimal occlusions. However, views right above the subjects do not yield good results.
+> - **With multiple cameras:** Make sure the cameras see the subjects from as many different angles as possible and with minimal occlusions. HowNote that top views right above the subjects do not yield good results.
 > - **In difficult settings with limited space and obstacles:** consider using the [Lab Camera Optimizer](https://github.com/flodelaplace/lab-camera-optimizer).
 > 
 > <img src="Content/Lab_cam_optimizer.png" width="760">
+
+> [!NOTE]
+> - **Synchronization:** If your cameras are not natively synchronized, you will need one of the participants to do a sharp vertical movement.\
+> More on it in the [Synchronization](#synchronization) section.
+> 
+> - **Calibration:** If your cameras are not natively calibrated, you will need to film a checkerboard (once in the camera's lifetime) and to retrieve the coordinates of some object in the scene (everytime you move the camera).\
+> More on it in the [Calibration](#camera-calibration) section.
+
+> [!NOTE]
+> Uncluttered background and good lighting conditions will help you get better results. Note that tripods may sometimes be mistaken for people. 
+
 
 > [!TIP]
 > #### Minimize storage use:
@@ -515,6 +510,28 @@ Initial project structure:
 >   -movflags +faststart `
 >   lighter_vid.mp4
 > ```
+
+<br>
+
+## Set up your project
+> _**Get yourself comfy!**_
+
+> [!TIP]
+> If any of the following steps is not relevant for your use case (synchronization, person association, marker augmentation...), you can just skip it.
+
+1. Open a terminal, enter `uv pip show pose2sim`, report package location. \
+    Copy this path and do `cd <path>\pose2sim`.
+2. Copy the appropriate Demo folder as your project template (*Demo_SinglePerson*, *Demo_MultiPerson*, or *Demo_Batch*). \
+Paste it to your preferred location and rename as desired. 
+3. Edit the parameters in the `[project]` section of [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), e.g. `project_dir`, `participant_height`, `participant_mass`, etc.
+4. Add your videos to the `videos` folder. We recommend renaming them for clarity.
+4. The rest of the tutorial will explain to you how to populate the `Calibration` and `videos` folders, run each Pose2Sim step, and edit the `Config.toml` file.
+
+Initial project structure:
+
+> | SingleTrial     | BatchSession       |
+> |-----------------|--------------------|
+> | <pre><b>SingleTrial</b>                    <br>├── <b>calibration</b><br>├── <b>videos</b><br>└── <i><b>Config.toml</i></b></pre> |  <pre><b>BatchSession</b>                     <br>├── <b>calibration</b> <br>├── Trial_1   <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b> # Trial specific parameters<br>├── Trial_2 <br>│   ├── <b>videos</b> <br>│   └── <i><b>Config.toml</i></b> # Different trial parameters<br>└── <i><b>Config.toml</i></b> # Global parameters</pre>  | 
 
 </br>
 
