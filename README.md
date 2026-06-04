@@ -488,7 +488,8 @@ Initial project structure:
 > [!TIP]
 > #### Camera placement:
 > 
-> - **With 2 cameras, one person:** Best results are achieved when one camera is in front of the person, the other at 45° to the side, at hip level (according to [Samani et al, 2026](https://link.springer.com/article/10.1186/s13104-026-07886-4)). With multiple people, try to place cameras in a way that minimizes occlusions.
+> - **With 2 cameras, one person:** Best results are achieved when one camera is in front of the person, the other at 45° to the side, both at hip level (according to [Samani et al, 2026](https://link.springer.com/article/10.1186/s13104-026-07886-4)). Acceptable results are achieved with one camera in front and one on the side at 90°; or two cameras in front, one at hip level and the other at eye level.\
+> **With 2 cameras, multiple people**: Try to place cameras in a way that minimizes occlusions.
 > - **With multiple cameras:** Make sure the cameras see the subjects from as many different angles as possible and with minimal occlusions. However, views right above the subjects do not yield good results.
 > - **In difficult settings with limited space and obstacles:** consider using the [Lab Camera Optimizer](https://github.com/flodelaplace/lab-camera-optimizer).
 > 
