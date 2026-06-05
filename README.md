@@ -89,7 +89,7 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
    6. [Too slow for you?](#too-slow-for-you)
 2. [Use on your own data](#use-on-your-own-data)
    1. [Start filming](#start-filming)
-   2. [Set up your project](#setting-up-your-project)
+   2. [Set up your project](#set-up-your-project)
    3. [Estimate 2D pose](#estimate-2d-pose)
       1. [With RTMPose (default)](#with-rtmpose-default)
       2. [With MMPose (coming soon)](#with-mmpose-coming-soon)
@@ -481,10 +481,10 @@ Film your participant(s) from at least 2 points of view.
 
 > [!NOTE]
 > - **Synchronization:** If your cameras are not natively synchronized, you will need one of the participants to do a sharp vertical movement.\
-> More on it in the [Synchronization](#synchronization) section.
+> More on it in the [Synchronization](#synchronize-your-cameras) section.
 > 
 > - **Calibration:** If your cameras are not natively calibrated, you will need to film a checkerboard (once in the camera's lifetime) and to retrieve the coordinates of some object in the scene (everytime you move the camera).\
-> More on it in the [Calibration](#camera-calibration) section.
+> More on it in the [Calibration](#calibrate-your-cameras) section.
 
 > [!NOTE]
 > Uncluttered background and good lighting conditions will help you get better results. Note that tripods may sometimes be mistaken for people. 
