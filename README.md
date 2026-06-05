@@ -90,21 +90,21 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 2. [Use on your own data](#use-on-your-own-data)
    1. [Start filming](#start-filming)
    2. [Set up your project](#setting-up-your-project)
-   3. [2D pose estimation](#2d-pose-estimation)
+   3. [Estimate 2D pose](#estimate-2d-pose)
       1. [With RTMPose (default)](#with-rtmpose-default)
       2. [With MMPose (coming soon)](#with-mmpose-coming-soon)
       3. [With DeepLabCut](#with-deeplabcut)
       4. [With OpenPose (legacy)](#with-openpose-legacy)
       5. [With Mediapipe BlazePose (legacy)](#with-mediapipe-blazepose-legacy)
       6. [With AlphaPose (legacy)](#with-alphapose-legacy)
-   4. [Camera calibration](#camera-calibration)
+   4. [Calibrate your cameras](#calibrate-your-cameras)
       1. [Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-caliscope-anipose-freemocap-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
-   5. [Synchronization](#synchronization)
+   5. [Synchronize your cameras](#synchronize-your-cameras)
    6. [Associate persons across cameras](#associate-persons-across-cameras)
-   7. [Triangulating keypoints](#triangulating-keypoints)
-   8. [Filtering 3D coordinates](#filtering-3d-coordinates)
-   9. [Marker augmentation](#marker-augmentation)
+   7. [Triangulate keypoints](#triangulate-keypoints)
+   8. [Filter 3D coordinates](#filter-3d-coordinates)
+   9. [Augment markers](#augment-marker)
    10. [OpenSim kinematics](#opensim-kinematics)
       1. [Within Pose2Sim](#within-pose2sim)
       2. [Within OpenSim GUI](#within-opensim-gui)
@@ -535,7 +535,7 @@ Initial project structure:
 
 </br>
 
-## 2D pose estimation
+## Estimate 2D pose
 > _**Estimate 2D pose from images with RTMPose or another pose estimation solution.**_ 
 
 ### With RTMPose *(default)*:
@@ -689,7 +689,7 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 
 </br>
 
-## Camera calibration
+## Calibrate your cameras
 > _**Calculate camera intrinsic properties (lens characteristics) and extrinsic parameters (positions and orientations).\
 > Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_
 
@@ -837,7 +837,7 @@ For the sake of practicality, there are voluntarily few board images for intrins
 
 </br>
 
-## Synchronization
+## Synchronize your cameras
 
 > _**2D points can be triangulated only if they represent the same body position across all cameras: therefore, views need to be synchronized. This module helps you do it.**_\
 For each camera, the algorithm computes mean vertical speed for the chosen keypoints, and synchronizes by finding the time offset for which the correlation is highest.
@@ -906,7 +906,7 @@ Pose2Sim.personAssociation()
 
 </br>
 
-## Triangulating keypoints
+## Triangulate keypoints
 > _**Robustly triangulate your 2D coordinates:**_
 > 
 > - The triangulation is **weighted** by the likelihood of each detected 2D keypoint, provided that their likelihood is above `likelihood_threshold_triangulation`.
@@ -940,7 +940,7 @@ The logs provide detailed statistics:
 
 </br>
 
-## Filtering 3D coordinates
+## Filter 3D coordinates
 
 > _**Filter your 3D coordinates.**_ Available filters:
 > 
@@ -978,7 +978,8 @@ Output:\
 
 </br>
 
-## Marker Augmentation
+## Augment markers
+
 > _**Use the [Stanford LSTM model](https://github.com/antoinefalisse/marker-augmentation) to estimate the position of 47 virtual markers.**_
 
 > [!TIP]
