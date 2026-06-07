@@ -50,6 +50,7 @@ dependencies = [
     "openvino",
     "customtkinter",
     "av",
+    "huggingface_hub",
     "caliscope"
 ]
 
