@@ -29,6 +29,10 @@ Please visit the website! (after leaving a **⭐star⭐**! 😇)
 
 # Pose2Sim
 
+> [!WARNING]
+> Since yesterday (7th June, 2026), the openmmlab website has been down and you cannot download their models anymore. This is a known issue, and I'm working to find a fix.
+
+
 https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 
 **`Pose2Sim` provides a workflow for 3D markerless kinematics (human or animal), as an alternative to traditional marker-based MoCap methods.**
