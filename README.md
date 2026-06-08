@@ -578,22 +578,22 @@ This will run pose estimation on your videos and save the results in the `pose` 
 > ```
 > # Equivalent to mode='balanced', with body_with_feet pose model
 > mode = """{'det_class':'YOLOX',
->        'det_model':'https://download.openmmlab.com/mmpose/v1/prects/rtmposev1/onnx_sdk/yolox_m_8xb8-300e_humanart-c2c7a14a.zip',
+>        'det_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/yolox_m_8xb8-300e_humanart-c2c7a14a.onnx',
 >        'det_input_size':[640, 640],
 >        'pose_class':'RTMPose',
->        'pose_model':'https://download.openmmlab.com/mmpose/v1/prects/rtmposev1/onnx_sdk/rtose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zi,
+>        'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.onnx',
 >        'pose_input_size':[192,256]}"""
 >
 > # With one-stage RTMO model 
 > # Requires pose_model = 'Body'. Marker augmentation won't work, Kimatic analysis will
 > mode = """{'pose_class':'RTMO', 
->        'pose_model':'https://download.openmmlab.com/mmpose/v1/prects/rtmo/onnx_sdk/rt-m_16xb16-600e_body7-640x640-39e78cc4_20231211.zip', 
+>        'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.onnx', 
 >        'pose_input_size':[640, 640]}"""
 > 
 > # With animal pose estimation:
 > # Marker augmentation won't work, and you will need to create your owOpenSim skeleton for kinematic analysis.
 > mode = """{'pose_class':'RTMPose',
->        'pose_model':'https://download.openmmlab.com/mmpose/v1/prects/rtmposev1/onnx_sdk/> rtose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.zip',
+>        'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.onnx',
 >        'pose_input_size':[256,256]}"""
 > 
 > # Same approach for hand or face pose estimation, check the RTMLib domentation for more information.

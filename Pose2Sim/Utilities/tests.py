@@ -170,7 +170,7 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("project").update({"project_dir":project_dir})
         config_dict.get("pose").update({"pose_model":'Body'})
         config_dict.get("pose").update({"mode":"""{'pose_class':'RTMO', 
-                                                'pose_model':'https://download.openmmlab.com/mmpose/v1/projects/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.zip', 
+                                                'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.onnx', 
                                                 'pose_input_size':[640, 640]}"""})
         config_dict.get("pose").update({"display_detection":False})
         config_dict.get("pose").update({"save_video":'none'})
