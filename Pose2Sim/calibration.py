@@ -515,6 +515,11 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
         logging.info(f'\nCalculating intrinsic parameters...')
         ret, C, S, D, K, R, T = calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=save_debug_images)
         nb_cams_intrinsics = len(C)
+        
+        # Early write intrinsics in calibration file
+        extrinsics_method = extrinsics_config_dict.get('extrinsics_method')#, 'scene')
+        calib_output_path = Path(calib_dir) / f'Calib_{extrinsics_method}.toml'
+        toml_write(calib_output_path, C, S, D, K, R, T)
 
     # calculate extrinsics
     if calculate_extrinsics:
@@ -671,7 +676,7 @@ def create_image_labels(img_path, imgpoints, calib_dir, prefix, reprojected_poin
     return save_path
 
 
-def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=True):
+def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=True, extrinsics_method='scene'):
     '''
     Calculate intrinsic parameters
     from images or videos of a checkerboard
