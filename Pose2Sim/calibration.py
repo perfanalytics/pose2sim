@@ -835,7 +835,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
             img_vid_files = sorted((Path(calib_dir) / 'extrinsics').glob(f'*.{extrinsics_extension}'))
         if len(img_vid_files) == 0:
             raise
-        img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c)]) #sorting paths with numbers
+        img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', str(c))]) #sorting paths with numbers
     except StopIteration:
         logging.exception(f'Error: The {Path(calib_dir) / "extrinsics"} folder does not exist or does not contain any files with extension .{extrinsics_extension}.')
         raise Exception(f'Error: The {Path(calib_dir) / "extrinsics"} folder does not exist or does not contain any files with extension .{extrinsics_extension}.')
