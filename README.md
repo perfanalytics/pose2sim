@@ -555,7 +555,7 @@ Initial project structure:
 > - rtmpose-t_simcc-face6_pt-in1k_120e-256x256-df79d9a5_20230529
 > - rtmpose-t_simcc-ucoco_dw-ucoco_270e-256x192-dcf277bf_20230728
 > - yolox_l_8xb8-300e_humanart-ce1d7a62
-```
+> ```
 
 ### With RTMPose *(default)*:
 > [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose) is a state-of-the-art pose estimation solution that is accurate, fast, flexible, and natively integrated in Pose2Sim.
