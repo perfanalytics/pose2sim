@@ -540,7 +540,7 @@ Initial project structure:
 
 > [!WARNING]
 > Since yesterday (7th June, 2026), the openmmlab website has been down and you cannot download their models anymore. I mirrored all the ones I had locally downloaded (44) to [HuggingFace](https://huggingface.co/datasets/DavidPagnon/rtmlib_models) but some are still missing (13). If you happen to have any of them, please tell me so I can upload them!\
-> On Windows, they should be located at `C:\Users\<YOUR_USERNAME>\.cache\rtmlib\hub\checkpoints` (replace <YOUR_USERNAME>)
+> On Windows, they should be located at `C:\Users\<YOUR_USERNAME>\.cache\rtmlib\hub\checkpoints` (replace `<YOUR_USERNAME`> with your actual username).\
 > ```
 > - rtmpose-l_simcc-body7_pt-body7-halpe26_700e-256x192-2abb7558_20230605
 > - rtmpose-l_simcc-body7_pt-body7_420e-256x192-4dba18fc_20230504
