@@ -29,10 +29,6 @@ Please visit the website! (after leaving a **⭐star⭐**! 😇)
 
 # Pose2Sim
 
-> [!WARNING]
-> Since yesterday (7th June, 2026), the openmmlab website has been down and you cannot download their models anymore. This is a known issue, and I'm working to find a fix.
-
-
 https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 
 **`Pose2Sim` provides a workflow for 3D markerless kinematics (human or animal), as an alternative to traditional marker-based MoCap methods.**
@@ -541,6 +537,25 @@ Initial project structure:
 
 ## Estimate 2D pose
 > _**Estimate 2D pose from images with RTMPose or another pose estimation solution.**_ 
+
+> [!WARNING]
+> Since yesterday (7th June, 2026), the openmmlab website has been down and you cannot download their models anymore. I mirrored all the ones I had locally downloaded (44) to [HuggingFace](https://huggingface.co/datasets/DavidPagnon/rtmlib_models) but some are still missing (13). If you happen to have any of them, please tell me so I can upload them!\
+> On Windows, they should be located at `C:\Users\<YOUR_USERNAME>\.cache\rtmlib\hub\checkpoints` (replace <YOUR_USERNAME>)
+> ```
+> - rtmpose-l_simcc-body7_pt-body7-halpe26_700e-256x192-2abb7558_20230605
+> - rtmpose-l_simcc-body7_pt-body7_420e-256x192-4dba18fc_20230504
+> - rtmpose-l_simcc-body7_pt-body7_420e-384x288-3f5a1437_20230504
+> - rtmpose-l_simcc-ucoco_dw-ucoco_270e-256x192-4d6dfc62_20230728
+> - rtmpose-l_simcc-ucoco_dw-ucoco_270e-384x288-2438fd99_20230728
+> - rtmpose-m_simcc-face6_pt-in1k_120e-256x256-72a37400_20230529
+> - rtmpose-m_simcc-ucoco_dw-ucoco_270e-256x192-c8b76419_20230728
+> - rtmpose-s_simcc-face6_pt-in1k_120e-256x256-d779fdef_20230529
+> - rtmpose-s_simcc-ucoco_dw-ucoco_270e-256x192-3fd922c8_20230728
+> - rtmpose-t_simcc-body7_pt-body7-halpe26_700e-256x192-6020f8a6_20230605
+> - rtmpose-t_simcc-face6_pt-in1k_120e-256x256-df79d9a5_20230529
+> - rtmpose-t_simcc-ucoco_dw-ucoco_270e-256x192-dcf277bf_20230728
+> - yolox_l_8xb8-300e_humanart-ce1d7a62
+```
 
 ### With RTMPose *(default)*:
 > [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose) is a state-of-the-art pose estimation solution that is accurate, fast, flexible, and natively integrated in Pose2Sim.
