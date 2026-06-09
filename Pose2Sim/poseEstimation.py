@@ -59,67 +59,69 @@ warnings.filterwarnings("ignore", category=RuntimeWarning, message="All-NaN slic
 warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in scalar divide")
 warnings.filterwarnings("ignore", message=".*Input.*has a dynamic shape.*but the runtime shape.*has zero elements.*")
 
-# Not safe, but to be used until OpenMMLab/RTMlib's SSL certificates are updated
-import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
+## FIXED
+# # Not safe, but to be used until OpenMMLab/RTMlib's SSL certificates are updated
+# import ssl
+# ssl._create_default_https_context = ssl._create_unverified_context
 
-# Patch rtmlib URLs to use HuggingFace mirror (OpenMMLab seems to have shut down)
-def _patch_rtmlib_urls(hf_repo="DavidPagnon/rtmlib_models"):
-    '''
-    Monkey-patches all high-level rtmlib classes (solutions).
-    For each URL value, extracts the filename (stem + ext, trying .onnx if
-    original is .zip) and looks it up in the HF index. If found, replaces
-    the URL. Logs a warning for any URL it cannot resolve.
-    '''
-
-    def build_hf_filename_index(hf_repo=hf_repo):
-        '''
-        Lists every file in the HF dataset repo and returns a dict:
-        { "model_filename.onnx": "https://huggingface.co/datasets/.../resolve/main/path/to/model_filename.onnx" }
-        '''
-        from huggingface_hub import list_repo_files
-        index = {}
-        base = f"https://huggingface.co/datasets/{hf_repo}/resolve/main/"
-        for path in list_repo_files(hf_repo, repo_type="dataset"):
-            filename = path.split("/")[-1]
-            index[filename] = base + path
-        logging.info(f"HF repo index built: {len(index)} files found in '{hf_repo}'.")
-        return index
- 
-    def rewrite(url):
-        '''
-        Find matching URL in HF repo or return original if not found
-        '''
-        filename = url.split("/")[-1]
-        stem     = Path(filename).stem
-        # Look for the same filename in the HF repo, trying both .zip and .onnx
-        for candidate in (stem + ".onnx",):
-            if candidate in index:
-                new_url = index[candidate]
-                return new_url
-
-    index = build_hf_filename_index(hf_repo)
-
-    # All rtmlib solution classes that carry a MODE dict with URLs
-    patched, failed = [], []
-    from rtmlib import BodyWithFeet, Wholebody, Body, Hand, Animal
-    for cls in [BodyWithFeet, Wholebody, Body, Hand, Animal]:
-        if not hasattr(cls, 'MODE'):
-            continue
-        for mode_name, cfg in cls.MODE.items():
-            for key, val in cfg.items():
-                if not isinstance(val, str) or not val.startswith("http"):
-                    continue
-                new_val = rewrite(val)
-                if new_val != val:
-                    cls.MODE[mode_name][key] = new_val
-                    patched.append(f"{cls.__name__}['{mode_name}']['{key}']")
-                else:
-                    failed.append(val)
- 
-    logging.info(f"rtmlib URL patch: {len(patched)} URLs redirected, {len(failed)} unresolved.")
- 
-_patch_rtmlib_urls(hf_repo="DavidPagnon/rtmlib_models")
+## FIXED
+# # Patch rtmlib URLs to use HuggingFace mirror (OpenMMLab seems to have shut down)
+# def _patch_rtmlib_urls(hf_repo="DavidPagnon/rtmlib_models"):
+#     '''
+#     Monkey-patches all high-level rtmlib classes (solutions).
+#     For each URL value, extracts the filename (stem + ext, trying .onnx if
+#     original is .zip) and looks it up in the HF index. If found, replaces
+#     the URL. Logs a warning for any URL it cannot resolve.
+#     '''
+#
+#     def build_hf_filename_index(hf_repo=hf_repo):
+#         '''
+#         Lists every file in the HF dataset repo and returns a dict:
+#         { "model_filename.onnx": "https://huggingface.co/datasets/.../resolve/main/path/to/model_filename.onnx" }
+#         '''
+#         from huggingface_hub import list_repo_files
+#         index = {}
+#         base = f"https://huggingface.co/datasets/{hf_repo}/resolve/main/"
+#         for path in list_repo_files(hf_repo, repo_type="dataset"):
+#             filename = path.split("/")[-1]
+#             index[filename] = base + path
+#         logging.info(f"HF repo index built: {len(index)} files found in '{hf_repo}'.")
+#         return index
+# 
+#     def rewrite(url):
+#         '''
+#         Find matching URL in HF repo or return original if not found
+#         '''
+#         filename = url.split("/")[-1]
+#         stem     = Path(filename).stem
+#         # Look for the same filename in the HF repo, trying both .zip and .onnx
+#         for candidate in (stem + ".onnx",):
+#             if candidate in index:
+#                 new_url = index[candidate]
+#                 return new_url
+#
+#     index = build_hf_filename_index(hf_repo)
+#
+#     # All rtmlib solution classes that carry a MODE dict with URLs
+#     patched, failed = [], []
+#     from rtmlib import BodyWithFeet, Wholebody, Body, Hand, Animal
+#     for cls in [BodyWithFeet, Wholebody, Body, Hand, Animal]:
+#         if not hasattr(cls, 'MODE'):
+#             continue
+#         for mode_name, cfg in cls.MODE.items():
+#             for key, val in cfg.items():
+#                 if not isinstance(val, str) or not val.startswith("http"):
+#                     continue
+#                 new_val = rewrite(val)
+#                 if new_val != val:
+#                     cls.MODE[mode_name][key] = new_val
+#                     patched.append(f"{cls.__name__}['{mode_name}']['{key}']")
+#                 else:
+#                     failed.append(val)
+# 
+#     logging.info(f"rtmlib URL patch: {len(patched)} URLs redirected, {len(failed)} unresolved.")
+# 
+# _patch_rtmlib_urls(hf_repo="DavidPagnon/rtmlib_models")
 
 
 ## AUTHORSHIP INFORMATION

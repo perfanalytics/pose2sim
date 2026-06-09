@@ -50,8 +50,8 @@ dependencies = [
     "openvino",
     "customtkinter",
     "av",
-    "huggingface_hub",
-    "caliscope"
+    "caliscope",
+    # "huggingface_hub", # if openmmlab servers shut down again
 ]
 
 [project.optional-dependencies]
