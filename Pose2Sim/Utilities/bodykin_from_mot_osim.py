@@ -236,8 +236,8 @@ def bodykin_from_mot_osim_func(*args):
             print(f'CoM file saved to {com_output_file}.\n')
 
     # Export to csv
-    np.savetxt(Path(output_csv_file).stem+'.csv', loc_rot_frame_all_np, delimiter=',', header=bodyHeader)
-    print(f'CSV file generated at {Path(output_csv_file).stem+".csv"}.\n')
+    np.savetxt(Path(output_csv_file).with_suffix('.csv'), loc_rot_frame_all_np, delimiter=',', header=bodyHeader)
+    print(f'CSV file generated at {Path(output_csv_file).with_suffix(".csv")}.\n')
 
     if calculate_com_vel:
         return CoM_pos_array, CoM_vel_array
