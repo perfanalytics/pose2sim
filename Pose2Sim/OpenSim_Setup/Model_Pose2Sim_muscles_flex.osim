@@ -728,11 +728,11 @@
 						<groups />
 					</WrapObjectSet>
 					<!--The mass of the body (kg)-->
-					<mass>0</mass>
+					<mass>0.0862</mass>
 					<!--The location (Vec3) of the mass center in the body frame.-->
 					<mass_center>0.0018 0.0264 0</mass_center>
 					<!--The elements of the inertia tensor (Vec6) as [Ixx Iyy Izz Ixy Ixz Iyz] measured about the mass_center and not the body origin.-->
-					<inertia>0 0 0 0 0 0</inertia>
+					<inertia>2.8700000000000001e-06 1.311e-05 1.311e-05 0 0 0</inertia>
 				</Body>
 				<Body name="tibia_r">
 					<!--The geometry used to display the axes of this Frame.-->
@@ -1393,11 +1393,11 @@
 						<groups />
 					</WrapObjectSet>
 					<!--The mass of the body (kg)-->
-					<mass>0</mass>
+					<mass>0.0862</mass>
 					<!--The location (Vec3) of the mass center in the body frame.-->
 					<mass_center>0.0018 0.0264 0</mass_center>
 					<!--The elements of the inertia tensor (Vec6) as [Ixx Iyy Izz Ixy Ixz Iyz] measured about the mass_center and not the body origin.-->
-					<inertia>0 0 0 0 0 0</inertia>
+					<inertia>2.8700000000000001e-06 1.311e-05 1.311e-05 0 0 0</inertia>
 				</Body>
 				<Body name="tibia_l">
 					<!--The geometry used to display the axes of this Frame.-->
