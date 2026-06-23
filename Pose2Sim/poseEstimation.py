@@ -286,7 +286,7 @@ def setup_backend_device(backend='auto', device='auto'):
         except:
             try:
                 import onnxruntime as ort
-                if 'MPSExecutionProvider' in ort.get_available_providers() or 'CoreMLExecutionProvider' in ort.get_available_providers():
+                if 'MPSExecutionProvider' in ort.get_available_providers(): # or 'CoreMLExecutionProvider' in ort.get_available_providers():
                     device = 'mps'
                     backend = 'onnxruntime'
                     logging.info(f"Valid MPS installation found: using ONNXRuntime backend with GPU.")
