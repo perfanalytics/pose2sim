@@ -863,7 +863,9 @@ def triangulate_all(config_dict):
             # print('Q before ordering ', np.array(Q)[:,:2])
             if f != f_range[0]:
                 Q = np.array(Q)
-                Q_old, Q, sorted_ids, frames_since_last_seen = sort_people_sports2d(Q_old, np.array(Q), max_dist=max_distance_m,
+                if 'Q_old' not in locals(): 
+                    Q_old = Q
+                Q_old, Q, sorted_ids, frames_since_last_seen = sort_people_sports2d(Q_old, Q, max_dist=max_distance_m,
                     max_unseen_frames=max_unseen_frames, frames_since_last_seen=frames_since_last_seen)
                 
                 # Update nb_persons_to_detect if new persons were added

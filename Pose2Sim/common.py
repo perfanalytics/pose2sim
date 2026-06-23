@@ -1286,7 +1286,7 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None, max_unseen
     '''
     Associate persons across frames (Sports2D method)
     Persons' indices are sometimes swapped when changing frame
-    A person is associated to another in the next frame when they are at a small distance
+    A person is associated to another in the next frame when their mean keypoint distance is smallest
     
     N.B.: Uses Hungarian algorithm (scipy.optimize.linear_sum_assignment): does not require min_with_single_indices anymore
           Broadcasts distances: does not require euclidean_distance anymore
@@ -1305,8 +1305,8 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None, max_unseen
                               was last seen. Required when max_unseen_frames is not None. Updated and returned.
     
     OUTPUTS:
-    - sorted_prev_keypoints: array with reordered persons with values of previous frame if current is empty
-    - sorted_keypoints: array with reordered persons
+    - tracked_keypoints: array with reordered persons with values of previous frame in empty slots
+    - sorted_keypoints: array with reordered persons with nans in empty slots
     - sorted_scores: array with reordered scores (if scores provided, else sorted_ids)
     - frames_since_last_seen: updated staleness counter array (only returned when max_unseen_frames is not None)
     '''
@@ -1348,8 +1348,11 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None, max_unseen
         dist_matrix[stale_mask, :] = 1e10
 
     # Hungarian algorithm instead of min_with_single_indices in previous versions (faster when many people)
-    # Finds the associations with smallest distances between previous and current frame, each person associated only once
-    pre_ids, curr_ids = linear_sum_assignment(dist_matrix)
+    # Finds the associations with smallest distances between previous and current frame, each person associated only once, with max distance threshold
+    assignment_matrix = dist_matrix
+    if max_dist is not None:
+        assignment_matrix = np.where(dist_matrix > max_dist, 1e10, dist_matrix)
+    pre_ids, curr_ids = linear_sum_assignment(assignment_matrix)
     
     # Filter associations based on max_dist threshold
     valid_associations = []
@@ -1392,7 +1395,7 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None, max_unseen
     keyptpre_padded = pad_shape(keyptpre, n_total, fill_value=np.nan)
     
     # Keep track of previous values when missing
-    sorted_prev_keypoints = np.where(
+    tracked_keypoints = np.where(
         np.isnan(sorted_keypoints) & ~np.isnan(keyptpre_padded), 
         keyptpre_padded, 
         sorted_keypoints)
@@ -1407,14 +1410,14 @@ def sort_people_sports2d(keyptpre, keypt, scores=None, max_dist=None, max_unseen
     
     if use_staleness:
         if scores is not None:
-            return sorted_prev_keypoints, sorted_keypoints, sorted_scores, updated_fsls
+            return tracked_keypoints, sorted_keypoints, sorted_scores, updated_fsls
         else:
-            return sorted_prev_keypoints, sorted_keypoints, sorted_ids, updated_fsls
+            return tracked_keypoints, sorted_keypoints, sorted_ids, updated_fsls
     else:
         if scores is not None:
-            return sorted_prev_keypoints, sorted_keypoints, sorted_scores
+            return tracked_keypoints, sorted_keypoints, sorted_scores
         else:
-            return sorted_prev_keypoints, sorted_keypoints, sorted_ids
+            return tracked_keypoints, sorted_keypoints, sorted_ids
 
 
 def sort_people_rtmlib(pose_tracker, keypoints, scores):
