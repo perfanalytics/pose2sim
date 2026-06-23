@@ -1337,7 +1337,7 @@ def time_lagged_cross_corr(camx, camy, lag_range, show=True, ref_cam_name='0', c
     if not np.isnan(pearson_r).all():
         max_corr = np.nanmax(pearson_r)
 
-        f, ax = plt.subplots(2,1, num='Synchronizing cameras')
+        f, ax = plt.subplots(2,1, num='Synchronizing cameras', clear=True)
         # speed
         camx.plot(ax=ax[0], label = f'Reference: {ref_cam_name}')
         camy.plot(ax=ax[0], label = f'Compared: {cam_name}')
