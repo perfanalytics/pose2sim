@@ -98,4 +98,4 @@ jobs:
           PYTHONUNBUFFERED: "1"
           KMP_DUPLICATE_LIB_OK: TRUE
         run: |
-          uv run pytest -v Pose2Sim/Utilities/tests.py --capture=sys
+          uv run pytest -v --log-cli-level=INFO --capture=tee-sys Pose2Sim/Utilities/tests.py
