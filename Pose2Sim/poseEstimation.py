@@ -310,8 +310,8 @@ def setup_backend_device(backend='auto', device='auto'):
         logging.info("Valid ROCM installation found: using ONNXRuntime backend with GPU.")
         return 'onnxruntime', 'rocm'
  
-    # onnxruntime, mps ('CoreMLExecutionProvider' not supported on latest MacOS versions. Should be fixed when 'ModelFormat' is 'MLProgram' by default)
-    if 'MPSExecutionProvider' in available_providers: # or 'CoreMLExecutionProvider' in available_providers:
+    # onnxruntime, mps
+    if 'MPSExecutionProvider' in available_providers or 'CoreMLExecutionProvider' in available_providers:
         logging.info("Valid MPS installation found: using ONNXRuntime backend with GPU.")
         return 'onnxruntime', 'mps'
  
@@ -841,9 +841,9 @@ def estimate_pose_all(config_dict):
             else:
                 try:
                     pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
-                except:
-                    logging.error('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
-                    raise ValueError('Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid.')
+                except Exception as e:
+                    logging.error(f'Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid. {e}')
+                    raise ValueError(f'Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid. {e}')
                 for video_path in video_files:
                     pose_tracker.reset()
                     if tracking_mode == 'deepsort':
