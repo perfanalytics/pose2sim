@@ -262,45 +262,62 @@ def setup_backend_device(backend='auto', device='auto'):
     4. CPU with OpenVINO backend (default fallback)
     '''
 
-    if device!='auto' and backend!='auto':
-        device = device.lower()
+    valid_backends = ['onnxruntime', 'openvino']
+    valid_devices = ['cpu', 'cuda', 'rocm', 'mps']
+
+    # Backend and device validation
+    if backend != 'auto':
         backend = backend.lower()
+        if backend not in valid_backends:
+            logging.warning(f"Backend '{backend}' not recognized. Falling back to auto-detection.")
+            backend = 'auto'
 
-    if device=='auto' or backend=='auto':
-        if device=='auto' and backend!='auto' or device!='auto' and backend=='auto':
-            logging.warning(f"If you set device or backend to 'auto', you must set the other to 'auto' as well. Both device and backend will be determined automatically.")
+    if device != 'auto':
+        device = device.lower()
+        if device not in valid_devices:
+            logging.warning(f"Device '{device}' not recognized. Falling back to auto-detection.")
+            device = 'auto'
 
-        try:
-            import torch
-            import onnxruntime as ort
-            if torch.cuda.is_available() == True and 'CUDAExecutionProvider' in ort.get_available_providers():
-                device = 'cuda'
-                backend = 'onnxruntime'
-                logging.info(f"Valid CUDA installation found: using ONNXRuntime backend with GPU.")
-            elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
-                device = 'rocm'
-                backend = 'onnxruntime'
-                logging.info(f"Valid ROCM installation found: using ONNXRuntime backend with GPU.")
-            else:
-                raise 
-        except:
-            try:
-                import onnxruntime as ort
-                if 'MPSExecutionProvider' in ort.get_available_providers(): # or 'CoreMLExecutionProvider' in ort.get_available_providers():
-                    device = 'mps'
-                    backend = 'onnxruntime'
-                    logging.info(f"Valid MPS installation found: using ONNXRuntime backend with GPU.")
-                else:
-                    raise
-            except:
-                device = 'cpu'
-                backend = 'openvino'
-                logging.info(f"No valid CUDA installation found: using OpenVINO backend with CPU.")
+    if device != 'auto' and backend == 'auto':
+        logging.warning(f"Backend is set to 'auto' but device is not. Both will be determined automatically.")
+    elif device == 'auto' and backend != 'auto':
+        logging.warning(f"Device is set to 'auto' but backend is not. Both will be determined automatically.")
 
-    else:
-        logging.info(f"Using {device} device with {backend} backend.")    
+    if backend != 'auto' and device != 'auto':
+        logging.info(f"Using {device} device with {backend} backend.")
+        return backend, device
+
+    # Automatic determination of device and backend
+    # check for ONNXRuntime
+    try:
+        import onnxruntime as ort
+        available_providers = ort.get_available_providers()
+    except ImportError:
+        logging.warning("ONNXRuntime not installed, falling back to OpenVINO backend with CPU.")
+        return 'openvino', 'cpu'
+
+    # onnxruntime, CUDA
+    try:
+        import torch
+        if torch.cuda.is_available() and 'CUDAExecutionProvider' in available_providers:
+            logging.info("Valid CUDA installation found: using ONNXRuntime backend with GPU.")
+            return 'onnxruntime', 'cuda'
+    except Exception:
+        pass
     
-    return backend, device
+    # onnxruntime, ROCm
+    if 'ROCMExecutionProvider' in available_providers:
+        logging.info("Valid ROCM installation found: using ONNXRuntime backend with GPU.")
+        return 'onnxruntime', 'rocm'
+ 
+    # onnxruntime, mps ('CoreMLExecutionProvider' not supported on latest MacOS versions. Should be fixed when 'ModelFormat' is 'MLProgram' by default)
+    if 'MPSExecutionProvider' in available_providers: # or 'CoreMLExecutionProvider' in available_providers:
+        logging.info("Valid MPS installation found: using ONNXRuntime backend with GPU.")
+        return 'onnxruntime', 'mps'
+ 
+    # openvino, cpu
+    logging.info("No valid CUDA, ROCM, or MPS installation found: using OpenVINO backend with CPU.")
+    return 'openvino', 'cpu'
 
 
 def save_to_openpose(json_file_path, keypoints, scores):

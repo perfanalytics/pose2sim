@@ -423,7 +423,7 @@ Run it only when your cameras are moved or changed. If they are not, just copy a
 
 **Pose2Sim.poseEstimation():**
 
-- **Use your GPU**: This makes pose estimation significantly faster, without any impact on accuracy. See [Installation](#installation) section for more information.\
+- **Use your GPU**: This makes pose estimation significantly faster, without any impact on accuracy. See [Installation](#3-optional) section for more information.\
 *1 min 23 s -> 38 s on my average laptop*
 - Set `display_detection = false`. Do not display results in real time.\
 *38 s -> 30 s*
