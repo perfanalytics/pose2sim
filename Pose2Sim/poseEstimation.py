@@ -139,7 +139,6 @@ __status__ = "Development"
 def setup_pose_tracker(ModelClass, det_frequency, mode, tracking, backend, device):
     '''
     Set up the RTMLib pose tracker with the appropriate model and backend.
-    If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
 
     INPUTS:
     - ModelClass: class. The RTMlib model class to use for pose detection (Body, BodyWithFeet, Wholebody)
@@ -156,15 +155,32 @@ def setup_pose_tracker(ModelClass, det_frequency, mode, tracking, backend, devic
     backend, device = setup_backend_device(backend=backend, device=device)
 
     # Initialize the pose tracker with Halpe26 model
-    pose_tracker = PoseTracker(
-        ModelClass,
-        det_frequency=det_frequency,
-        mode=mode,
-        backend=backend,
-        device=device,
-        tracking=tracking,
-        to_openpose=False)
+    try:
+        pose_tracker = PoseTracker(
+            ModelClass,
+            det_frequency=det_frequency,
+            mode=mode,
+            backend=backend,
+            device=device,
+            tracking=tracking,
+            to_openpose=False)
         
+        # Dry run to catch inference failures (see https://github.com/Tau-J/rtmlib/issues/77)
+        dummy_img = np.zeros((480, 640, 3), dtype=np.uint8)
+        pose_tracker(dummy_img)
+    
+    # Fallback to OpenVINO CPU
+    except Exception as e:
+        logging.warning(f"Pose tracker failed with {backend}/{device}: {e}. Falling back to OpenVINO backend with CPU.")
+        pose_tracker = PoseTracker(
+            ModelClass,
+            det_frequency=det_frequency,
+            mode=mode,
+            backend='openvino',
+            device='cpu',
+            tracking=tracking,
+            to_openpose=False)
+
     return pose_tracker
 
 
