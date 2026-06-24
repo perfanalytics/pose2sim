@@ -139,6 +139,7 @@ __status__ = "Development"
 def setup_pose_tracker(ModelClass, det_frequency, mode, tracking, backend, device):
     '''
     Set up the RTMLib pose tracker with the appropriate model and backend.
+    If CUDA is available, use it with ONNXRuntime backend; else use CPU with openvino
 
     INPUTS:
     - ModelClass: class. The RTMlib model class to use for pose detection (Body, BodyWithFeet, Wholebody)
@@ -155,32 +156,15 @@ def setup_pose_tracker(ModelClass, det_frequency, mode, tracking, backend, devic
     backend, device = setup_backend_device(backend=backend, device=device)
 
     # Initialize the pose tracker with Halpe26 model
-    try:
-        pose_tracker = PoseTracker(
-            ModelClass,
-            det_frequency=det_frequency,
-            mode=mode,
-            backend=backend,
-            device=device,
-            tracking=tracking,
-            to_openpose=False)
+    pose_tracker = PoseTracker(
+        ModelClass,
+        det_frequency=det_frequency,
+        mode=mode,
+        backend=backend,
+        device=device,
+        tracking=tracking,
+        to_openpose=False)
         
-        # Dry run to catch inference failures (see https://github.com/Tau-J/rtmlib/issues/77)
-        dummy_img = np.zeros((480, 640, 3), dtype=np.uint8)
-        pose_tracker(dummy_img)
-    
-    # Fallback to OpenVINO CPU
-    except Exception as e:
-        logging.warning(f"Pose tracker failed with {backend}/{device}: {e}. Falling back to OpenVINO backend with CPU.")
-        pose_tracker = PoseTracker(
-            ModelClass,
-            det_frequency=det_frequency,
-            mode=mode,
-            backend='openvino',
-            device='cpu',
-            tracking=tracking,
-            to_openpose=False)
-
     return pose_tracker
 
 
@@ -326,10 +310,11 @@ def setup_backend_device(backend='auto', device='auto'):
         logging.info("Valid ROCM installation found: using ONNXRuntime backend with GPU.")
         return 'onnxruntime', 'rocm'
  
-    # onnxruntime, mps
-    if 'MPSExecutionProvider' in available_providers or 'CoreMLExecutionProvider' in available_providers:
-        logging.info("Valid MPS installation found: using ONNXRuntime backend with GPU.")
-        return 'onnxruntime', 'mps'
+    # # Issues currently with mps inference (see https://github.com/Tau-J/rtmlib/issues/77)
+    # # onnxruntime, mps 
+    # if 'MPSExecutionProvider' in available_providers or 'CoreMLExecutionProvider' in available_providers:
+    #     logging.info("Valid MPS installation found: using ONNXRuntime backend with GPU.")
+    #     return 'onnxruntime', 'mps'
  
     # openvino, cpu
     logging.info("No valid CUDA, ROCM, or MPS installation found: using OpenVINO backend with CPU.")
