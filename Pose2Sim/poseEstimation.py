@@ -278,9 +278,9 @@ def setup_backend_device(backend='auto', device='auto'):
             logging.warning(f"Device '{device}' not recognized. Falling back to auto-detection.")
             device = 'auto'
 
-    if device != 'auto' and backend == 'auto':
+    if backend == 'auto' and device != 'auto':
         logging.warning(f"Backend is set to 'auto' but device is not. Both will be determined automatically.")
-    elif device == 'auto' and backend != 'auto':
+    elif backend != 'auto' and device == 'auto':
         logging.warning(f"Device is set to 'auto' but backend is not. Both will be determined automatically.")
 
     if backend != 'auto' and device != 'auto':
@@ -311,10 +311,11 @@ def setup_backend_device(backend='auto', device='auto'):
         return 'onnxruntime', 'rocm'
  
     # # Issues currently with mps inference (see https://github.com/Tau-J/rtmlib/issues/77)
-    # # onnxruntime, mps 
-    # if 'MPSExecutionProvider' in available_providers or 'CoreMLExecutionProvider' in available_providers:
-    #     logging.info("Valid MPS installation found: using ONNXRuntime backend with GPU.")
-    #     return 'onnxruntime', 'mps'
+    # onnxruntime, mps 
+    if 'MPSExecutionProvider' in available_providers or 'CoreMLExecutionProvider' in available_providers:
+        logging.info("Valid MPS installation found: using ONNXRuntime backend with GPU.")
+        # return 'onnxruntime', 'mps'
+        return 'onnxruntime', 'cpu'
  
     # openvino, cpu
     logging.info("No valid CUDA, ROCM, or MPS installation found: using OpenVINO backend with CPU.")
