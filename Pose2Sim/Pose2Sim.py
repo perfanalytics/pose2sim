@@ -114,15 +114,28 @@ def read_config_files(config):
     and output a dictionary with all the parameters.
     '''
 
-    if type(config)==dict:
+    if isinstance(config, dict):
         level = 2 # log_dir = os.getcwd()
         config_dicts = [config]
-        if config_dicts[0].get('project', {}).get('project_dir') == None:
-            config_dicts[0].get('project', {}).get('project_dir') == '.'
+        
+        # Load defaults from <project_dir>/Config.toml, then override with provided dict
+        project_dir = config_dicts[0].get('project', {}).get('project_dir')
+        if project_dir == None:
+            project_dir = '.'
+            config_dicts[0].get('project', {}).update({'project_dir': project_dir})
             logging.warning('Project directory not specified in config dictionary: using current directory. ' \
             'Set it to a custom directory with config_dict = {"project": {"project_dir": "<Custom_directory>"}}.')
-            # raise ValueError('Please specify the project directory in config_dict:\n \
-            #                  config_dict.get("project").update({"project_dir":"<YOUR_PROJECT_DIRECTORY>"})')
+
+        default_config_path = Path(project_dir) / 'Config.toml'
+        if default_config_path.is_file():
+            default_config_dict = rtoml.load(default_config_path)
+            merged_config = recursive_update(deepcopy(default_config_dict), deepcopy(config))
+        else:
+            merged_config = deepcopy(config)
+            logging.warning(f'No default Config.toml found at {default_config_path}.')
+        merged_config.setdefault('project', {})
+        merged_config['project'].setdefault('project_dir', str(project_dir))
+        config_dicts = [merged_config]
     else:
         # if launched without an argument, config == None, else it is the path to the config directory
         config_dir = ['.' if config == None else config][0]

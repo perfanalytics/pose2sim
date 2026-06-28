@@ -18,5 +18,7 @@ dist/
 **/pose-sync/
 **/pose-associated/
 **/kinematics/
+**/debug_images/
 
 Content/website/index.html
+
