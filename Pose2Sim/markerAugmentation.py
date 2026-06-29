@@ -112,26 +112,30 @@ def augment_markers_all(config_dict):
         trc_files = trc_no_filtering
     sorted(trc_files, key=natural_sort_key)
 
+    # Add missing markers if needed
+    for trc_file in trc_files:
+        # Import TRC file
+        trc_data, frames_col, time_col, markers, header = read_trc(trc_file)
+        
+        # Create missing markers if needed
+        if not all(col in trc_data.columns for col in ['RShoulder', 'LShoulder', 'Neck', 'Hip']):
+            # add shoulder data if not in file
+            trc_data, markers, header = add_shoulder_data(trc_data, markers, header)
+            # add neck and midhip data if not in file
+            trc_data, markers, header = add_neck_hip_data(trc_data, markers, header)
+            # Overwrite TRC file
+            write_trc(trc_file, trc_data, frames_col, time_col, header)
+
     # Calculate subject heights
     if subject_height is None or subject_height == 0:
         subject_height = [default_height] * len(trc_files)
         logging.warning(f"No subject height found in Config.toml. Using default height of {default_height}m.")
     elif isinstance(subject_height, str) and subject_height.lower() == 'auto':
         subject_height = []
-        
         for trc_file in trc_files:
             # Import TRC file
             trc_data, frames_col, time_col, markers, header = read_trc(trc_file)
             
-            # Create missing markers if needed
-            if not all(col in trc_data.columns for col in ['RShoulder', 'LShoulder', 'Neck', 'Hip']):
-                # add shoulder data if not in file
-                trc_data, markers, header = add_shoulder_data(trc_data, markers, header)
-                # add neck and midhip data if not in file
-                trc_data, markers, header = add_neck_hip_data(trc_data, markers, header)
-                # Overwrite TRC file
-                write_trc(trc_file, trc_data, frames_col, time_col, header)
-
             try:
                 # frame range selection
                 f_range = [[frames_col.iloc[0], frames_col.iloc[-1]+1] if (frame_range in ('all', 'auto', []) or frames_col.iloc[0]>frame_range[0] or frames_col.iloc[1]<frame_range[1]) else frame_range][0]
@@ -170,6 +174,7 @@ def augment_markers_all(config_dict):
         logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.")
         subject_mass += [70] * (len(trc_files) - len(subject_mass))
 
+    # Run marker augmentation
     for p in range(len(subject_mass)):
         trc_file = trc_files[p]
         trc_file_out = Path(trc_file).stem + f'_{augmenterModelName}.trc'
