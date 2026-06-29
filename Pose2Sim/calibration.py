@@ -498,11 +498,18 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
         logging.info(f'\nRetrieving intrinsic parameters from file. Set "overwrite_intrinsics" to true in Config.toml to recalculate them.')
         calib_data = rtoml.load(Path(calib_file))
 
+        # Flatten camera names
+        calib_data = {f"cameras.{k}": v for k, v in calib_data["cameras"].items()}
+
+        # Retrieve data
         ret, C, S, D, K, R, T = [], [], [], [], [], [], []
         for cam in calib_data:
             if cam != 'metadata':
                 ret += [0.0]
-                C += [calib_data[cam]['name']]
+                if 'name' in calib_data[cam]:
+                    C += [calib_data[cam]['name']]
+                else:
+                    C += [cam.replace('.','_')]
                 S += [calib_data[cam]['size']]
                 K += [np.array(calib_data[cam]['matrix'])]
                 D += [calib_data[cam]['distortions']]
