@@ -1137,7 +1137,6 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 
 <details>
    <summary><b>Project</b> (CLICK TO SHOW)</summary>
-     <pre>
 
     | Parameter | Default | Description |
     |-----------|---------|-------------|
@@ -1148,7 +1147,6 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
     | `frame_range` | `'auto'` | `'auto'`, `'all'`, or a range like `[10, 300]`. `'auto'` trims around frames with low reprojection error. If cameras are not synchronized, designates the frame range of the camera with the shortest recording. |
     | `exclude_from_batch` | `[]` | List of trial paths to exclude from batch analysis, e.g. `['S00_P00_Participant/S00_P00_T00_StaticTrial']`. |
 
-    </pre>
  </details>
 
 
@@ -1156,7 +1154,6 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 
 <details>
    <summary><b>Pose</b> (CLICK TO SHOW)</summary>
-     <pre>
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1177,14 +1174,12 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `handle_LR_swap` | `false` | Not implemented yet. Will swap left/right labels if needed. |
 | `undistort_points` | `false` | Not implemented yet. Undistorts 2D points before triangulation. |
 
-    </pre>
  </details>
 
 <br>
 
 <details>
    <summary><b>Synchronization</b> (CLICK TO SHOW)</summary>
-     <pre>
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1198,14 +1193,12 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `filter_cutoff` | `6` | Low-pass filter cut-off frequency (Hz) applied before computing cross-correlation. |
 | `filter_order` | `4` | Order of the low-pass filter applied before cross-correlation. |
 
-    </pre>
  </details>
 
 <br>
 
 <details>
    <summary><b>Calibration</b> (CLICK TO SHOW)</summary>
-     <pre>
 
 Take heart, calibration is not that complicated once you get the hang of it!
 
@@ -1245,14 +1238,12 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `extrinsics_square_size` *(board only)* | `60` | Square size in mm (can be `[h, w]` for rectangles). |
 | `object_coords_3d` *(scene only)* | `[[...], ...]` | List of `[X, Y, Z]` 3D coordinates (in **metres**) of the points you will click on each camera image. Spread points as widely as possible for best accuracy. |
 
-    </pre>
  </details>
 
 <br>
 
 <details>
    <summary><b>Person Association</b> (CLICK TO SHOW)</summary>
-     <pre>
 
 **Single person**
 
@@ -1269,14 +1260,12 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `reconstruction_error_threshold` | `0.1` | metres. Maximum 3D reconstruction error for two detections to be considered the same person across cameras. |
 | `min_affinity` | `0.2` | Correspondences with affinity below this value are discarded. Affinity is high when reconstruction error ≪ threshold. |
 
-    </pre>
  </details>
 
 <br>
 
 <details>
    <summary><b>Triangulation</b> (CLICK TO SHOW)</summary>
-     <pre>
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1294,14 +1283,12 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `show_interp_indices` | `true` | Print the frame indices that were interpolated for each keypoint. |
 | `make_c3d` | `true` | Also save triangulated data as a `.c3d` file alongside the `.trc` file. |
 
-    </pre>
  </details>
 
 <br>
 
 <details>
    <summary><b>Filtering</b> (CLICK TO SHOW)</summary>
-     <pre>
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1372,14 +1359,12 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `cut_off_frequency` | `10` | Hz. Cut-off frequency applied to the velocity signal. |
 | `order` | `4` | Filter order. |
 
-      </pre>
   </details>
 
 <br>
 
 <details>
    <summary><b>Marker Augmentation</b> (CLICK TO SHOW)</summary>
-     <pre>
 
 > Requires at least the following markers: `[RHip, LHip, RKnee, LKnee, RAnkle, LAnkle, RHeel, LHeel, RSmallToe, LSmallToe, RBigToe, LBigToe]`
 
@@ -1388,14 +1373,12 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `feet_on_floor` | `false` | If `true`, markers are translated so that the feet touch the floor plane. Useful for ground reaction force or joint load estimation. |
 | `make_c3d` | `true` | Also save augmented marker data as a `.c3d` file. |
 
-    </pre>
   </details>
 
 <br>
 
 <details>
    <summary><b>Kinematics</b> (CLICK TO SHOW)</summary>
-     <pre>
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1411,20 +1394,17 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `large_hip_knee_angles` | `90` | degrees. Hip and knee angles above this value are considered unreliable and excluded from scaling. |
 | `trimmed_extrema_percent` | `50` | Percentage of the most extreme segment-length values removed before computing the mean for scaling. |
 
-      </pre>
     </details>
 
 <br>
 
 <details>
    <summary><b>Logging</b> (CLICK TO SHOW)</summary>
-     <pre>
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `use_custom_logging` | `false` | Set to `true` when Pose2Sim is embedded in an application that already configures Python logging. |
 
-    </pre>
   </details>
 
 <br>
