@@ -272,7 +272,7 @@ def section_to_html(sec: dict) -> str:
 
     # Wrap <pre><code> in .code-block for dark styling
     body = re.sub(
-        r'(?:<div class="highlight">)?(<pre>.*?</pre>)(?:</div>)?',
+        r'(?:<div class="highlight">)?(<pre(?:\s[^>]*)?>.*?</pre>)(?:</div>)?',
         r'<div class="code-block">\1</div>',
         body, flags=re.DOTALL,
     )
