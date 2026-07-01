@@ -516,6 +516,50 @@ p {
     display: block;
     white-space: pre-wrap;
     word-break: break-word;
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+/* Copy button */
+.copy-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 5px;
+    color: #94a3b8;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.code-block:hover .copy-btn {
+    opacity: 1;
+}
+
+.copy-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #e2e8f0;
+}
+
+.copy-btn.copied {
+    color: #4ade80;
+    border-color: rgba(74, 222, 128, 0.4);
+    opacity: 1;
+}
+
+.copy-btn:focus { outline: none; }
+.copy-btn:focus-visible { outline: 2px solid rgba(255,255,255,0.4); outline-offset: 2px; }
+
+.copy-btn svg {
+    flex-shrink: 0;
 }
 
 /* Info Boxes */
