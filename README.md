@@ -1534,6 +1534,8 @@ Reprojects 3D coordinates of a trc file to the image planes defined by a calibra
    </pre>
 </details>
 
+<br>
+
 # How to cite and how to contribute
 ### How to cite
 If you use this Pose2Sim, please cite [Pagnon et al., 2022b](https://doi.org/10.21105/joss.04362), [Pagnon et al., 2022a](https://www.mdpi.com/1424-8220/22/7/2712), or [Pagnon et al., 2021](https://www.mdpi.com/1424-8220/21/19/6530).

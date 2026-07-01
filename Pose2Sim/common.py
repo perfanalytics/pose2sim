@@ -1692,27 +1692,6 @@ def draw_keypts(img, X, Y, scores, cmap_str='RdYlGn'):
     return img
 
 
-def get_screen_size():
-    '''
-    Get the screen dimensions
-
-    INPUTS:
-    - None
-
-    OUTPUTS:
-    - tuple of int: (screen_width, screen_height)
-    '''
-
-    screen = QGuiApplication.primaryScreen()
-    if screen is None:
-        # Fallback: create temporary app
-        app = QGuiApplication([])
-        screen = app.primaryScreen()
-    screen_width, screen_height = screen.size().width(), screen.size().height()
-    
-    return screen_width, screen_height
-
-
 def calculate_display_size(W, H, screen_width, screen_height, margin=100):
     '''
     Calculate the optimal display size for the image
@@ -1740,6 +1719,40 @@ def calculate_display_size(W, H, screen_width, screen_height, margin=100):
     new_height = int(H * scale_factor)
     
     return new_width, new_height
+
+
+def _import_qt():
+    try:
+        from PySide6.QtGui import QGuiApplication
+        from PySide6.QtWidgets import QMessageBox, QApplication
+        from PySide6.QtCore import Qt
+        return QGuiApplication, QMessageBox, QApplication, Qt
+    except Exception as e:
+        raise RuntimeError(
+            "Qt GUI dependencies are unavailable in this environment. "
+            "Install system OpenGL/EGL libraries or run in a desktop environment."
+        ) from e
+
+
+def get_screen_size():
+    '''
+    Get the screen dimensions
+
+    INPUTS:
+    - None
+
+    OUTPUTS:
+    - tuple of int: (screen_width, screen_height)
+    '''
+
+    screen = QGuiApplication.primaryScreen()
+    if screen is None:
+        # Fallback: create temporary app
+        app = QGuiApplication([])
+        screen = app.primaryScreen()
+    screen_width, screen_height = screen.size().width(), screen.size().height()
+    
+    return screen_width, screen_height
 
 
 def set_always_on_top(fig):
@@ -1774,6 +1787,9 @@ def set_always_on_top(fig):
 
 
 def show_qt_message_box(title, message, question=False, parent=None):
+
+    _, QMessageBox, QApplication, Qt = _import_qt()
+
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
