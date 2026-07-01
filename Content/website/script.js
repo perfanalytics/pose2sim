@@ -7,6 +7,34 @@ let sections    = [];   // Array of section IDs in DOM order
 let currentIdx  = 0;    // Index of currently visible section
 let viewAllMode = false;
 
+
+function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+    }
+
+    return new Promise((resolve, reject) => {
+        try {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'fixed';
+            textarea.style.top = '-9999px';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+
+            const ok = document.execCommand('copy');
+            document.body.removeChild(textarea);
+            if (ok) resolve();
+            else reject(new Error('Copy command was rejected.'));
+        } catch (err) {
+            reject(err);
+        }
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Initialisation
 // ---------------------------------------------------------------------------
@@ -41,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => {
             const code = block.querySelector('code');
             const text = code ? code.innerText : block.innerText;
-            navigator.clipboard.writeText(text).then(() => {
+            copyTextToClipboard(text).then(() => {
                 btn.classList.add('copied');
                 btn.querySelector('svg').innerHTML = `<polyline points="20 6 9 17 4 12"></polyline>`;
                 btn.querySelector('span').textContent = 'Copied!';
@@ -50,6 +78,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     btn.querySelector('svg').innerHTML = `<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>`;
                     btn.querySelector('span').textContent = 'Copy';
                 }, 2000);
+            }).catch(() => {
+                btn.querySelector('span').textContent = 'Copy failed';
+                setTimeout(() => {
+                    btn.querySelector('span').textContent = 'Copy';
+                }, 1500);
             });
         });
         block.appendChild(btn);

@@ -544,6 +544,16 @@ p {
     opacity: 1;
 }
 
+.code-block:focus-within .copy-btn {
+    opacity: 1;
+}
+
+@media (hover: none), (pointer: coarse) {
+    .copy-btn {
+        opacity: 1;
+    }
+}
+
 .copy-btn:hover {
     background: rgba(255, 255, 255, 0.15);
     color: #e2e8f0;
