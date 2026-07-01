@@ -29,7 +29,8 @@ OUTPUTS:
 
 
 ## INIT
-from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort_key, zup2yup, set_always_on_top
+from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort_key, zup2yup, \
+                            set_always_on_top, show_qt_message_box
 
 import os
 import logging
@@ -46,10 +47,12 @@ from lxml import etree
 from importlib.metadata import version
 from pathlib import Path
 import warnings
-import customtkinter as ctk
-from tkinter import messagebox
+from PySide6.QtWidgets import QMessageBox, QApplication
+from PySide6.QtCore import Qt
 import matplotlib.pyplot as plt
 from mpl_interactions import zoom_factory, panhandler
+import matplotlib as mpl
+mpl.use('qtagg')
 from PIL import Image
 from contextlib import contextmanager,redirect_stderr,redirect_stdout
 from os import devnull
@@ -499,7 +502,8 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
         calib_data = rtoml.load(Path(calib_file))
 
         # Flatten camera names
-        calib_data = {f"cameras.{k}": v for k, v in calib_data["cameras"].items()}
+        if "cameras" in calib_data:
+            calib_data = {f"cameras.{k}": v for k, v in calib_data["cameras"].items()}
 
         # Retrieve data
         ret, C, S, D, K, R, T = [], [], [], [], [], [], []
@@ -718,7 +722,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
             imgp_data = json.load(f)
         image_points = imgp_data['intrinsics']
 
-    for i,cam in enumerate(intrinsics_cam_listdirs_names):
+    for cam in intrinsics_cam_listdirs_names:
         # Prepare object points
         objp = np.zeros((intrinsics_corners_nb[0]*intrinsics_corners_nb[1],3), np.float32) 
         objp[:,:2] = np.mgrid[0:intrinsics_corners_nb[0],0:intrinsics_corners_nb[1]].T.reshape(-1,2)
@@ -759,10 +763,11 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
                         objp = np.array(objp).reshape(-1, 3)
                         saved_img_path = create_image_labels(img_path, imgp, calib_dir, 'int', reprojected_points=None, show=True, save=save_debug_images)
                         # Are you satisfied? If so, add to imgpoints and continue; else, redo detection
-                        root = ctk.CTk()
-                        root.withdraw()
-                        satisfied = messagebox.askyesno("Loaded previous labels", f"Are you satisfied with the previous labels for {cam_name}?")
-                        root.destroy()
+                        satisfied = show_qt_message_box(
+                            "Loaded previous labels", 
+                            f"Are you satisfied with the previous labels for {cam_name}?",
+                            question=True
+                        )
                         if satisfied:
                             imgpoints.append(imgp)
                             objpoints.append(objp)
@@ -916,10 +921,11 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
                     saved_img_path = create_image_labels(img_vid_file, imgp, calib_dir, 'ext', reprojected_points=proj_obj_all, show=show_reprojection_error, save=save_debug_images)
 
                     # Are you satisfied? If so, add to imgpoints and continue; else, redo detection
-                    root = ctk.CTk()
-                    root.withdraw()
-                    satisfied = messagebox.askyesno("Loaded previous labels", f"Are you satisfied with the previous labels for {cam_name}?")
-                    root.destroy()
+                    satisfied = show_qt_message_box(
+                        "Loaded previous labels", 
+                        f"Are you satisfied with the previous labels for {cam_name}?",
+                        question=True
+                    )
                     if satisfied:
                         # Calculate reprojection error
                         imgp = np.array(imgp).reshape(-1, 2)
@@ -1181,15 +1187,15 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     fig_3d.canvas.draw()
 
                     # Ask for confirmation
-                    root = ctk.CTk()
-                    root.withdraw()
-                    response = messagebox.askyesno("Confirm labeling", f"Are you satisfied with your labeling for {Path(img_path).name}?")
-
-                    root.destroy()
+                    satisfied = show_qt_message_box(
+                        "Confirm labeling", 
+                        f"Are you satisfied with your labeling for {Path(img_path).name}?",
+                        question=True
+                    )
                     # Disable event picking
                     fig.canvas.callbacks.blocked = True
                     # Confirmed
-                    if response == True:
+                    if satisfied == True:
                         plt.close('all')
                         # if all objp have been clicked or indicated as not visible, close all
                         objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])[:-1]
@@ -1252,13 +1258,15 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     ax_3d.scatter(*objp[count], marker='o', color='g')
                     fig_3d.canvas.draw()
                     # Ask for confirmation
-                    root = ctk.CTk()
-                    root.withdraw()
-                    response = messagebox.askyesno("Confirm labeling", f"Are you satisfied with your labeling for {Path(img_path).name}?")
+                    satisfied = show_qt_message_box(
+                        "Confirm labeling",
+                        f"Are you satisfied with your labeling for {Path(img_path).name}?",
+                        question=True
+                    )
                     # Disable event picking
                     fig.canvas.callbacks.blocked = True
                     # Confirmed
-                    if response == True:
+                    if satisfied == True:
                         plt.close('all')
                         # retrieve objp_confirmed
                         objp_confirmed = np.array([[objp[count]] if 'objp_confirmed' not in globals() else objp_confirmed+[objp[count]]][0])

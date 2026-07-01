@@ -29,7 +29,9 @@ from anytree import PreOrderIter
 from importlib.metadata import version
 from pathlib import Path
 
-import customtkinter as ctk
+from PySide6.QtGui import QGuiApplication
+from PySide6.QtWidgets import QMessageBox, QApplication
+from PySide6.QtCore import Qt
 import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="c3d")
@@ -1701,10 +1703,12 @@ def get_screen_size():
     - tuple of int: (screen_width, screen_height)
     '''
 
-    root = ctk.CTk()
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-    root.destroy()
+    screen = QGuiApplication.primaryScreen()
+    if screen is None:
+        # Fallback: create temporary app
+        app = QGuiApplication([])
+        screen = app.primaryScreen()
+    screen_width, screen_height = screen.size().width(), screen.size().height()
     
     return screen_width, screen_height
 
@@ -1767,3 +1771,26 @@ def set_always_on_top(fig):
             window.show()
         except (ImportError, AttributeError):
             pass
+
+
+def show_qt_message_box(title, message, question=False, parent=None):
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+    
+    msg_box = QMessageBox(parent)
+    msg_box.setWindowTitle(title)
+    msg_box.setText(message)
+    msg_box.setWindowFlags(msg_box.windowFlags() | Qt.WindowStaysOnTopHint)
+    msg_box.setIcon(QMessageBox.Icon.NoIcon)
+    if question:
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        msg_box.setDefaultButton(QMessageBox.StandardButton.Yes)
+        result = msg_box.exec()
+        return result == QMessageBox.StandardButton.Yes
+    else:
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
+        return True
+
+

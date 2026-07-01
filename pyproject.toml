@@ -48,7 +48,6 @@ dependencies = [
     "c3d",
     "rtmlib", # pulls in onnxruntime and opencv-python
     "openvino",
-    "customtkinter",
     "av",
     "caliscope",
     # "huggingface_hub", # if openmmlab servers shut down again

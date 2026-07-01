@@ -29,7 +29,6 @@ np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather tha
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import logging
-import platform
 from importlib.metadata import version
 from pathlib import Path
 
@@ -670,9 +669,7 @@ def display_figures_trc(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0
     - matplotlib window with tabbed figures for each keypoint
     '''
 
-    os_name = platform.system()
-    if os_name == 'Windows':
-        mpl.use('qtagg') # windows
+    mpl.use('qtagg')
     mpl.rc('figure', max_open_warning=0)
 
     pw = plotWindow()
@@ -726,9 +723,7 @@ def display_figures_mot(Q_unfilt, Q_filt, time_col, col_names, person_id=0, show
     - plotWindow with tabbed figures
     '''
 
-    os_name = platform.system()
-    if os_name == 'Windows':
-        mpl.use('qtagg')
+    mpl.use('qtagg')
     mpl.rc('figure', max_open_warning=0)
 
     pw = plotWindow()

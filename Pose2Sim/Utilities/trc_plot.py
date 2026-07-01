@@ -20,10 +20,7 @@ import pandas as pd
 import sys
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import platform
-os_name = platform.system()
-if os_name == 'Windows':
-    mpl.use('qtagg') # windows
+mpl.use('qtagg')
 mpl.rc('figure', max_open_warning=0)
 from scipy import signal
 from scipy.ndimage import gaussian_filter1d
