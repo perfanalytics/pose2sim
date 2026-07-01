@@ -98,7 +98,7 @@ class plotWindow():
     '''
     Display several figures in tabs
     Taken from https://github.com/superjax/plotWindow/blob/master/plotWindow.py
-
+ 
     USAGE:
     pw = plotWindow()
     f = plt.figure()
@@ -108,7 +108,7 @@ class plotWindow():
     plt.plot(x2, y2)
     pw.addPlot("2", f)
     '''
-
+ 
     def __init__(self, parent=None):
         # Lazy imports: PySide6 requires a display server and crashes on headless
         # environments (e.g. CI runners) if imported at module level. Since
@@ -117,12 +117,12 @@ class plotWindow():
         from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
         from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
         from PySide6.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout
-
+ 
         self.FigureCanvas = FigureCanvas
         self.NavigationToolbar = NavigationToolbar
         self.QWidget = QWidget
         self.QVBoxLayout = QVBoxLayout
-
+ 
         self.app = QApplication.instance()
         if not self.app:
             self.app = QApplication(sys.argv)
@@ -137,27 +137,34 @@ class plotWindow():
         self.MainWindow.setCentralWidget(self.tabs)
         self.MainWindow.resize(1280, 720)
         self.MainWindow.show()
-
+ 
     def addPlot(self, title, figure):
         new_tab = self.QWidget()
         layout = self.QVBoxLayout()
         new_tab.setLayout(layout)
-
+ 
         figure.subplots_adjust(left=0.1, right=0.99, bottom=0.1, top=0.91, wspace=0.2, hspace=0.2)
         new_canvas = self.FigureCanvas(figure)
         new_toolbar = self.NavigationToolbar(new_canvas, new_tab)
-
+ 
         layout.addWidget(new_canvas)
         layout.addWidget(new_toolbar)
         self.tabs.addTab(new_tab, title)
-
+ 
         self.toolbar_handles.append(new_toolbar)
         self.canvases.append(new_canvas)
         self.figure_handles.append(figure)
         self.tab_handles.append(new_tab)
-
+ 
     def show(self):
         self.app.exec()
+        self.close()
+ 
+    def close(self):
+        for figure in self.figure_handles:
+            plt.close(figure)
+        self.MainWindow.close()
+        self.MainWindow.deleteLater()
 
 
 ## FUNCTIONS
