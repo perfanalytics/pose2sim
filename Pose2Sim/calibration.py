@@ -47,8 +47,6 @@ from lxml import etree
 from importlib.metadata import version
 from pathlib import Path
 import warnings
-from PySide6.QtWidgets import QMessageBox, QApplication
-from PySide6.QtCore import Qt
 import matplotlib.pyplot as plt
 from mpl_interactions import zoom_factory, panhandler
 import matplotlib as mpl
