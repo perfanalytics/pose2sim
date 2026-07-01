@@ -135,12 +135,12 @@ Open a terminal (conda, powershell, bash, or zsh).
 *On Windows:*
 
 ```powershell
-# Install uv
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-# Create uv environment
-uv venv "$env:USERPROFILE\.venv\pose2sim" --python 3.13 # or 3.11, or 3.12 
-# Activate the uv environment
-& "$env:USERPROFILE\.venv\pose2sim\Scripts\Activate.ps1"
+  # Install uv
+  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+  # Create uv environment
+  uv venv "$env:USERPROFILE\.venv\pose2sim" --python 3.13 # or 3.11, or 3.12 
+  # Activate the uv environment
+  & "$env:USERPROFILE\.venv\pose2sim\Scripts\Activate.ps1"
 ```
 
 <br>
@@ -148,12 +148,12 @@ uv venv "$env:USERPROFILE\.venv\pose2sim" --python 3.13 # or 3.11, or 3.12
 *On Linux or MacOS:*
 
 ```bash
-# Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-# Create uv environment
-uv venv ~/.venv/pose2sim --python 3.13 # or 3.11, or 3.12 
-# Activate the uv environment
-source ~/.venv/pose2sim/bin/activate
+  # Install uv
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  # Create uv environment
+  uv venv ~/.venv/pose2sim --python 3.13 # or 3.11, or 3.12 
+  # Activate the uv environment
+  source ~/.venv/pose2sim/bin/activate
 ```
 
 > [!TIP]
@@ -170,15 +170,15 @@ Open a terminal (*conda, powershell, bash, or zsh*).\
 - OPTION 1: **Latest stable version:** 
 
   ```cmd
-  uv pip install pose2sim --upgrade
+    uv pip install pose2sim --upgrade
   ```
 
 - OPTION 2: **For developers who want to test and edit the bleeding edge version:**
 
   ```cmd
-  git clone --depth 1 https://github.com/perfanalytics/pose2sim.git
-  cd pose2sim
-  uv pip install -e .
+    git clone --depth 1 https://github.com/perfanalytics/pose2sim.git
+    cd pose2sim
+    uv pip install -e .
   ```
 
 <br>
@@ -192,22 +192,22 @@ Open a terminal, [activate your environment](#activate-your-environment), and ru
 Then go to the [ONNXruntime requirement page](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), note the latest compatible CUDA and cuDNN requirements. Next, go to the [pyTorch website](https://pytorch.org/get-started/previous-versions/) and install the latest version that satisfies these requirements (beware that torch 2.4 ships with cuDNN 9, while torch 2.3 installs cuDNN 8). For example:
 
 ```cmd
-uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+  uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 ```
 
 Finally, install ONNX Runtime with GPU support:
 
 ```cmd
-uv pip uninstall onnxruntime
-uv pip install onnxruntime-gpu
+  uv pip uninstall onnxruntime
+  uv pip install onnxruntime-gpu
 ```
 
 Check that everything went well within Python with these commands:
 
 ```python
-import torch; import onnxruntime as ort
-print(torch.cuda.is_available(), ort.get_available_providers())
-# Should print "True ['CUDAExecutionProvider', ...]"
+  import torch; import onnxruntime as ort
+  print(torch.cuda.is_available(), ort.get_available_providers())
+  # Should print "True ['CUDAExecutionProvider', ...]"
 ```  
 
 <!-- print(f'torch version: {torch.__version__}, cuda version: {torch.version.cuda}, cudnn version: {torch.backends.cudnn.version()}, onnxruntime version: {ort.__version__}') -->
@@ -244,15 +244,15 @@ print(torch.cuda.is_available(), ort.get_available_providers())
 - Try the following code:
 
   ```python
-  from Pose2Sim import Pose2Sim
-  Pose2Sim.calibration()
-  Pose2Sim.poseEstimation()
-  Pose2Sim.synchronization()
-  Pose2Sim.personAssociation()
-  Pose2Sim.triangulation()
-  Pose2Sim.filtering()
-  Pose2Sim.markerAugmentation()
-  Pose2Sim.kinematics()
+    from Pose2Sim import Pose2Sim
+    Pose2Sim.calibration()
+    Pose2Sim.poseEstimation()
+    Pose2Sim.synchronization()
+    Pose2Sim.personAssociation()
+    Pose2Sim.triangulation()
+    Pose2Sim.filtering()
+    Pose2Sim.markerAugmentation()
+    Pose2Sim.kinematics()
   ```
 
 > [!NOTE]
@@ -314,10 +314,10 @@ Open a terminal (*conda, powershell, bash, or zsh*) and [activate your environme
 Similarly to [Part-1](#demonstration-part-1-end-to-end-video-to-3d-joint-angle-computation), find the Multi-Person Demo folder under `<pose2sim_path>\Pose2Sim\Demo_MultiPerson`, and move it and rename it if you like. Make sure you set `multi_person = true` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_MultiPerson/Config.toml) file. Go to the <Demo_MultiPerson> folder and start python:
 
 ```python
-cd <Demo_MultiPerson_path>
-ipython
-from Pose2Sim import Pose2Sim
-Pose2Sim.runAll()
+  cd <Demo_MultiPerson_path>
+  ipython
+  from Pose2Sim import Pose2Sim
+  Pose2Sim.runAll()
 ```
 
 <br>
