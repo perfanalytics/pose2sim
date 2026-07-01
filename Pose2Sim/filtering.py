@@ -938,7 +938,7 @@ def filter_all(config_dict):
                         title = pw.tabs.tabText(n)
                         plot_path = Path(plots_output_dir) / f'person{person_id:02d}_{title.replace(" ", "_").replace("/", "_")}.png'
                         f.savefig(plot_path, dpi=dpi, bbox_inches='tight')
-                
+                pw.close()
 
             # Write output file
             if filter_ik:
