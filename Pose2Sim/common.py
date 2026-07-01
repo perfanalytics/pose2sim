@@ -1716,10 +1716,9 @@ def calculate_display_size(W, H, screen_width, screen_height, margin=100):
 
 def _import_qt():
     try:
-        from PySide6.QtGui import QGuiApplication
         from PySide6.QtWidgets import QMessageBox, QApplication
         from PySide6.QtCore import Qt
-        return QGuiApplication, QMessageBox, QApplication, Qt
+        return QMessageBox, QApplication, Qt
     except Exception as e:
         raise RuntimeError(
             "Qt GUI dependencies are unavailable in this environment. "
@@ -1738,12 +1737,11 @@ def get_screen_size():
     - tuple of int: (screen_width, screen_height)
     '''
 
-    QGuiApplication, _, _, _ = _import_qt()
-    screen = QGuiApplication.primaryScreen()
-    if screen is None:
-        # Fallback: create temporary app
-        app = QGuiApplication([])
-        screen = app.primaryScreen()
+    _, QApplication, _ = _import_qt()
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+    screen = app.primaryScreen()
     screen_width, screen_height = screen.size().width(), screen.size().height()
     
     return screen_width, screen_height
@@ -1782,7 +1780,7 @@ def set_always_on_top(fig):
 
 def show_qt_message_box(title, message, question=False, parent=None):
 
-    _, QMessageBox, QApplication, Qt = _import_qt()
+    QMessageBox, QApplication, Qt = _import_qt()
 
     app = QApplication.instance()
     if app is None:
