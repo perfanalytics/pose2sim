@@ -305,7 +305,7 @@ HTML_TEMPLATE = """\
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pose2Sim Documentation</title>
     <link rel="icon" type="image/x-icon" href="Pose2Sim_favicon.ico"> 
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="{style_href}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -393,7 +393,7 @@ HTML_TEMPLATE = """\
         </footer>
     </main>
 
-    <script src="script.js"></script>
+    <script src="{script_src}"></script>
     <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
 </body>
 </html>
@@ -429,7 +429,16 @@ def main() -> None:
         section_to_html(s) for s in sections if _is_step(s)
     )
 
-    html = HTML_TEMPLATE.format(toc=toc_html, sections=sections_html)
+    asset_version = int(max(
+        (SCRIPT_DIR / "script.js").stat().st_mtime,
+        (SCRIPT_DIR / "style.css").stat().st_mtime,
+    ))
+    html = HTML_TEMPLATE.format(
+        toc=toc_html,
+        sections=sections_html,
+        style_href=f"style.css?v={asset_version}",
+        script_src=f"script.js?v={asset_version}",
+    )
     OUTPUT_PATH.write_text(html, encoding="utf-8")
     print(f"Done. Written to {OUTPUT_PATH}")
 
