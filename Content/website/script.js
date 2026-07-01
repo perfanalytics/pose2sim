@@ -27,6 +27,34 @@ document.addEventListener('DOMContentLoaded', () => {
     updateNavButtons();
     updateActiveNav(targetSection);
 
+    // Inject copy buttons into all code blocks
+    document.querySelectorAll('.code-block').forEach(block => {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.setAttribute('aria-label', 'Copy code');
+        btn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copy</span>`;
+        btn.addEventListener('click', () => {
+            const code = block.querySelector('code');
+            const text = code ? code.innerText : block.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                btn.classList.add('copied');
+                btn.querySelector('svg').innerHTML = `<polyline points="20 6 9 17 4 12"></polyline>`;
+                btn.querySelector('span').textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.querySelector('svg').innerHTML = `<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>`;
+                    btn.querySelector('span').textContent = 'Copy';
+                }, 2000);
+            });
+        });
+        block.appendChild(btn);
+    });
+
     // Intercept in-content anchor link clicks so hidden sections become visible
     document.addEventListener('click', e => {
         const link = e.target.closest('a[href^="#"]');
@@ -235,22 +263,3 @@ document.addEventListener('keydown', e => {
     if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   previousSection();
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextSection();
 });
-
-// ---------------------------------------------------------------------------
-// Copy button (called via onclick baked into HTML by build.py)
-// ---------------------------------------------------------------------------
-function copyCode(btn) {
-    const block = btn.closest('.code-block');
-    const code  = block ? block.querySelector('code') : null;
-    const text  = code ? code.innerText : (block ? block.innerText : '');
-    navigator.clipboard.writeText(text).then(() => {
-        btn.classList.add('copied');
-        btn.querySelector('svg').innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
-        btn.querySelector('span').textContent = 'Copied!';
-        setTimeout(() => {
-            btn.classList.remove('copied');
-            btn.querySelector('svg').innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>';
-            btn.querySelector('span').textContent = 'Copy';
-        }, 2000);
-    });
-}
