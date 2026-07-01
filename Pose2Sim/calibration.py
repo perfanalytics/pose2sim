@@ -1277,7 +1277,6 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                                 del globals()[var_to_delete]
                     # Not confirmed
                     else:
-                        root.destroy()
                         # Remove lastpoint from image
                         new_xydata = scat.get_offsets()[:-1]
                         scat.set_offsets(new_xydata)
