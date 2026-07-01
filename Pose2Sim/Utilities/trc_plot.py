@@ -18,13 +18,6 @@
 ## INIT
 import pandas as pd
 import sys
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-mpl.use('qtagg')
-mpl.rc('figure', max_open_warning=0)
-from scipy import signal
-from scipy.ndimage import gaussian_filter1d
-from statsmodels.nonparametric.smoothers_lowess import lowess
 import argparse
 
 
@@ -128,7 +121,12 @@ def display_figures_fun(Q, time_col, keypoints_names):
     OUTPUT:
     - matplotlib window with tabbed figures for each keypoint
     '''
-    
+
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    mpl.use('qtagg')
+    mpl.rc('figure', max_open_warning=0)
+
     pw = plotWindow()
     for id, keypoint in enumerate(keypoints_names):
         f = plt.figure()
@@ -169,7 +167,7 @@ def trc_plot_func(*args):
 
     # Read trc coordinates values
     trc_df = pd.read_csv(trc_path, sep="\t", skiprows=4)
-    time_col =trc_df.iloc[:,1]
+    time_col = trc_df.iloc[:,1]
     Q_coord = trc_df.drop(trc_df.columns[[0, 1]], axis=1)
 
     # Display figures

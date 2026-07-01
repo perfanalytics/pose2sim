@@ -109,10 +109,6 @@ class plotWindow():
     '''
  
     def __init__(self, parent=None):
-        # Lazy imports: PySide6 requires a display server and crashes on headless
-        # environments (e.g. CI runners) if imported at module level. Since
-        # common.py is imported by nearly every module, we defer Qt imports to
-        # here so only code that actually creates a plotWindow needs a display.
         from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
         from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
         from PySide6.QtWidgets import QMainWindow, QApplication, QWidget, QTabWidget, QVBoxLayout

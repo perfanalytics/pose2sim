@@ -25,8 +25,6 @@ import os
 import numpy as np
 import json
 import re
-import matplotlib.pyplot as plt 
-from matplotlib.animation import FuncAnimation 
 import argparse
 from importlib.metadata import version
 from pathlib import Path
@@ -75,6 +73,9 @@ def sort_stringlist_by_last_number(string_list):
 
 
 def save_inp_as_output(_img, c_name, dpi=100):
+
+    import matplotlib.pyplot as plt 
+
     h, w, _ = _img.shape
     fig, axes = plt.subplots(figsize=(h/dpi, w/dpi))
     fig.subplots_adjust(top=1.0, bottom=0, right=1.0, left=0, hspace=0, wspace=0) 
@@ -162,6 +163,10 @@ def json_display_without_img_func(**args):
         CONF += [conffrm]
 
     # Scatterplot
+
+    import matplotlib.pyplot as plt 
+    from matplotlib.animation import FuncAnimation 
+
     def update(frame):
         if frame==len(json_fnames)-1:
             plt.close(fig)

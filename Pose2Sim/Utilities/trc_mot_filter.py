@@ -48,10 +48,6 @@ import numpy as np
 np.set_printoptions(legacy='1.21')
 import pandas as pd
 import sys
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-mpl.use('qtagg')
-mpl.rc('figure', max_open_warning=0)
 from scipy import signal
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
@@ -776,6 +772,11 @@ def display_figures_trc(Q_unfilt, Q_filt, time_col, keypoints_names):
     - matplotlib window with tabbed figures for each keypoint
     '''
     
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    mpl.use('qtagg')
+    mpl.rc('figure', max_open_warning=0)
+    
     pw = plotWindow()
     pw.MainWindow.setWindowTitle('TRC Filtering Results')
     for id, keypoint in enumerate(keypoints_names):
@@ -821,6 +822,11 @@ def display_figures_mot(Q_unfilt, Q_filt, time_col, col_names):
     OUTPUT:
     - matplotlib window with tabbed figures
     '''
+
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    mpl.use('qtagg')
+    mpl.rc('figure', max_open_warning=0)
 
     pw = plotWindow()
     pw.MainWindow.setWindowTitle('MOT Filtering Results')
