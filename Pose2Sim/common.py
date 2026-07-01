@@ -29,9 +29,6 @@ from anytree import PreOrderIter
 from importlib.metadata import version
 from pathlib import Path
 
-from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import QMessageBox, QApplication
-from PySide6.QtCore import Qt
 import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="c3d")
@@ -1745,6 +1742,7 @@ def get_screen_size():
     - tuple of int: (screen_width, screen_height)
     '''
 
+    QGuiApplication, _, _, _ = _import_qt()
     screen = QGuiApplication.primaryScreen()
     if screen is None:
         # Fallback: create temporary app
