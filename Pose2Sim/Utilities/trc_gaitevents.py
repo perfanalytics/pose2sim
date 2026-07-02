@@ -67,6 +67,7 @@
 
 
 ## INIT
+import os
 from importlib.metadata import version
 from pathlib import Path
 import argparse

@@ -18,6 +18,7 @@
 ## INIT
 import pandas as pd
 import sys
+import os
 import argparse
 import matplotlib as mpl
 if 'DISPLAY' in os.environ:

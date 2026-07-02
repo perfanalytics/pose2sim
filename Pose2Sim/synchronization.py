@@ -31,6 +31,7 @@
 '''
 
 ## INIT
+import os
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import pandas as pd
@@ -47,7 +48,6 @@ from importlib.metadata import version
 from pathlib import Path
 from scipy import signal
 import json
-import os
 import fnmatch
 import re
 import shutil
