@@ -669,8 +669,10 @@ def display_figures_trc(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0
     - matplotlib window with tabbed figures for each keypoint
     '''
 
+    import matplotlib as mpl
     mpl.use('qtagg')
     mpl.rc('figure', max_open_warning=0)
+    import matplotlib.pyplot as plt
 
     pw = plotWindow()
     pw.MainWindow.setWindowTitle('Person '+ str(person_id) + ' coordinates')
@@ -723,8 +725,10 @@ def display_figures_mot(Q_unfilt, Q_filt, time_col, col_names, person_id=0, show
     - plotWindow with tabbed figures
     '''
 
+    import matplotlib as mpl
     mpl.use('qtagg')
     mpl.rc('figure', max_open_warning=0)
+    import matplotlib.pyplot as plt
 
     pw = plotWindow()
     pw.MainWindow.setWindowTitle('Person ' + str(person_id) + ' mot data')

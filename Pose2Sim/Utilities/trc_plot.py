@@ -122,10 +122,10 @@ def display_figures_fun(Q, time_col, keypoints_names):
     - matplotlib window with tabbed figures for each keypoint
     '''
 
-    import matplotlib.pyplot as plt
     import matplotlib as mpl
     mpl.use('qtagg')
     mpl.rc('figure', max_open_warning=0)
+    import matplotlib.pyplot as plt
 
     pw = plotWindow()
     for id, keypoint in enumerate(keypoints_names):

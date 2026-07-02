@@ -772,10 +772,10 @@ def display_figures_trc(Q_unfilt, Q_filt, time_col, keypoints_names):
     - matplotlib window with tabbed figures for each keypoint
     '''
     
-    import matplotlib.pyplot as plt
     import matplotlib as mpl
     mpl.use('qtagg')
     mpl.rc('figure', max_open_warning=0)
+    import matplotlib.pyplot as plt
     
     pw = plotWindow()
     pw.MainWindow.setWindowTitle('TRC Filtering Results')
@@ -823,10 +823,10 @@ def display_figures_mot(Q_unfilt, Q_filt, time_col, col_names):
     - matplotlib window with tabbed figures
     '''
 
-    import matplotlib.pyplot as plt
     import matplotlib as mpl
     mpl.use('qtagg')
     mpl.rc('figure', max_open_warning=0)
+    import matplotlib.pyplot as plt
 
     pw = plotWindow()
     pw.MainWindow.setWindowTitle('MOT Filtering Results')
