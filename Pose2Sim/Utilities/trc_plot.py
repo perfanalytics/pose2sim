@@ -19,6 +19,12 @@
 import pandas as pd
 import sys
 import argparse
+import matplotlib as mpl
+if 'DISPLAY' in os.environ:
+    mpl.use('qtagg')
+else:
+    mpl.use('Agg')  # Non-interactive backend for headless
+import matplotlib.pyplot as plt
 
 
 ## AUTHORSHIP INFORMATION
@@ -122,11 +128,7 @@ def display_figures_fun(Q, time_col, keypoints_names):
     - matplotlib window with tabbed figures for each keypoint
     '''
 
-    import matplotlib as mpl
-    mpl.use('qtagg')
     mpl.rc('figure', max_open_warning=0)
-    import matplotlib.pyplot as plt
-
     pw = plotWindow()
     for id, keypoint in enumerate(keypoints_names):
         f = plt.figure()

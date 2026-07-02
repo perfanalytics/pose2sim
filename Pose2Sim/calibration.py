@@ -36,9 +36,15 @@ import os
 import logging
 import pickle
 import numpy as np
-import pandas as pd
+import matplotlib as mpl
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 os.environ["OPENCV_LOG_LEVEL"]="FATAL"
+if 'DISPLAY' in os.environ:
+    mpl.use('qtagg')
+else:
+    mpl.use('Agg')  # Non-interactive backend for headless
+import matplotlib.pyplot as plt
+import pandas as pd
 import cv2
 import rtoml
 import json
@@ -655,11 +661,7 @@ def create_image_labels(img_path, imgpoints, calib_dir, prefix, reprojected_poin
     cv2.putText(img, '  Reprojected object points', (20, 60), cv2.FONT_HERSHEY_SIMPLEX, .7, (0,0,0), 2, lineType = cv2.LINE_AA)    
 
     if show:
-        import matplotlib as mpl
-        mpl.use('qtagg')
-        import matplotlib.pyplot as plt
         from PIL import Image
-
         im_pil = Image.fromarray(img)
         plt.rcParams['toolbar'] = 'None'
         fig = plt.figure()
@@ -699,10 +701,6 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
     - D: distorsion: list of arrays of floats
     - K: intrinsic parameters: list of 3x3 arrays of floats
     '''
-
-    import matplotlib as mpl
-    mpl.use('qtagg')
-    import matplotlib.pyplot as plt
 
     try:
         intrinsics_cam_listdirs_names = sorted(next(os.walk(Path(calib_dir) / 'intrinsics'))[1])
@@ -834,10 +832,6 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
     - R: extrinsic rotation: list of arrays of floats (Rodrigues)
     - T: extrinsic translation: list of arrays of floats
     '''
-
-    import matplotlib as mpl
-    mpl.use('qtagg')
-    import matplotlib.pyplot as plt
 
     extrinsics_method = extrinsics_config_dict.get('extrinsics_method', 'scene')
     extrinsics_extension = extrinsics_config_dict.get('extrinsics_extension', 'png')
@@ -1096,10 +1090,6 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     - imgp_confirmed: image points that have been correctly identified. array of [[2d corner coordinates]]
     - only if objp!=[]: objp_confirmed: array of [3d corner coordinates]
     '''
-
-    import matplotlib as mpl
-    mpl.use('qtagg')
-    import matplotlib.pyplot as plt
 
     global old_image_path
     old_image_path = img_path

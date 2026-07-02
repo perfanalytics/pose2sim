@@ -28,6 +28,12 @@ import re
 import argparse
 from importlib.metadata import version
 from pathlib import Path
+import matplotlib as mpl
+if 'DISPLAY' in os.environ:
+    mpl.use('qtagg')
+else:
+    mpl.use('Agg')  # Non-interactive backend for headless
+import matplotlib.pyplot as plt
 
 
 ## AUTHORSHIP INFORMATION
@@ -73,9 +79,6 @@ def sort_stringlist_by_last_number(string_list):
 
 
 def save_inp_as_output(_img, c_name, dpi=100):
-
-    import matplotlib.pyplot as plt 
-
     h, w, _ = _img.shape
     fig, axes = plt.subplots(figsize=(h/dpi, w/dpi))
     fig.subplots_adjust(top=1.0, bottom=0, right=1.0, left=0, hspace=0, wspace=0) 
@@ -163,8 +166,6 @@ def json_display_without_img_func(**args):
         CONF += [conffrm]
 
     # Scatterplot
-
-    import matplotlib.pyplot as plt 
     from matplotlib.animation import FuncAnimation 
 
     def update(frame):

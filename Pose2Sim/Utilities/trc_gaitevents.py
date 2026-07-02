@@ -74,6 +74,12 @@ import pandas as pd
 import numpy as np
 from scipy import signal
 from scipy.ndimage import gaussian_filter1d
+import matplotlib as mpl
+if 'DISPLAY' in os.environ:
+    mpl.use('qtagg')
+else:
+    mpl.use('Agg')  # Non-interactive backend for headless
+import matplotlib.pyplot as plt
 
 
 ## AUTHORSHIP INFORMATION
@@ -351,8 +357,6 @@ def gait_events_fwd_coords(trc_path, gait_direction, motion_type='gait', markers
 
     # Plot
     if plot:
-        import matplotlib.pyplot as plt
-
         plt.plot(time_col, max_r_heel_hip_proj, 'C0', label='Right on')
         plt.plot(time_col[frame_Ron], max_r_heel_hip_proj[frame_Ron], 'g+')
 
@@ -450,8 +454,6 @@ def gait_events_height_coords(trc_path, up_direction, height_threshold=6, motion
 
     # Plot
     if plot:
-        import matplotlib.pyplot as plt
-
         plt.plot(time_col[1:], Rfoot_height_filtered, 'C0', label='Right foot height filtered')
         plt.plot(time_col[1:][frame_Ron], Rfoot_height_filtered[frame_Ron], 'g+')
         plt.plot(time_col[1:][frame_Roff], Rfoot_height_filtered[frame_Roff], 'r+')
@@ -551,8 +553,6 @@ def gait_events_fwd_vel(trc_path, gait_direction, forward_velocity_threshold=1, 
 
     # Plot
     if plot:
-        import matplotlib.pyplot as plt
-
         plt.plot(time_col[1:], Rfoot_speed_filtered, 'C0', label='Right foot speed filtered')
         plt.plot(time_col[1:][frame_Ron], Rfoot_speed_filtered[frame_Ron], 'g+')
         plt.plot(time_col[1:][frame_Roff], Rfoot_speed_filtered[frame_Roff], 'r+')

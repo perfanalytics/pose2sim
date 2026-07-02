@@ -26,11 +26,15 @@ import os
 import math
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 import logging
 from importlib.metadata import version
 from pathlib import Path
+import matplotlib as mpl
+if 'DISPLAY' in os.environ:
+    mpl.use('qtagg')
+else:
+    mpl.use('Agg')  # Non-interactive backend for headless
+import matplotlib.pyplot as plt
 
 from scipy import signal
 from scipy.interpolate import make_smoothing_spline
@@ -669,11 +673,7 @@ def display_figures_trc(Q_unfilt, Q_filt, time_col, keypoints_names, person_id=0
     - matplotlib window with tabbed figures for each keypoint
     '''
 
-    import matplotlib as mpl
-    mpl.use('qtagg')
     mpl.rc('figure', max_open_warning=0)
-    import matplotlib.pyplot as plt
-
     pw = plotWindow()
     pw.MainWindow.setWindowTitle('Person '+ str(person_id) + ' coordinates')
     for id, keypoint in enumerate(keypoints_names):
@@ -725,11 +725,7 @@ def display_figures_mot(Q_unfilt, Q_filt, time_col, col_names, person_id=0, show
     - plotWindow with tabbed figures
     '''
 
-    import matplotlib as mpl
-    mpl.use('qtagg')
     mpl.rc('figure', max_open_warning=0)
-    import matplotlib.pyplot as plt
-
     pw = plotWindow()
     pw.MainWindow.setWindowTitle('Person ' + str(person_id) + ' mot data')
     

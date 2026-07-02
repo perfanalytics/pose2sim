@@ -35,6 +35,11 @@ import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import pandas as pd
 import cv2
+import matplotlib as mpl
+if 'DISPLAY' in os.environ:
+    mpl.use('qtagg')
+else:
+    mpl.use('Agg')  # Non-interactive backend for headless
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib import patheffects

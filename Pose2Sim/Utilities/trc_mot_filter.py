@@ -59,6 +59,12 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 import argparse
+import matplotlib as mpl
+if 'DISPLAY' in os.environ:
+    mpl.use('qtagg')
+else:
+    mpl.use('Agg')  # Non-interactive backend for headless
+import matplotlib.pyplot as plt
 
 
 ## AUTHORSHIP INFORMATION
@@ -772,11 +778,7 @@ def display_figures_trc(Q_unfilt, Q_filt, time_col, keypoints_names):
     - matplotlib window with tabbed figures for each keypoint
     '''
     
-    import matplotlib as mpl
-    mpl.use('qtagg')
     mpl.rc('figure', max_open_warning=0)
-    import matplotlib.pyplot as plt
-    
     pw = plotWindow()
     pw.MainWindow.setWindowTitle('TRC Filtering Results')
     for id, keypoint in enumerate(keypoints_names):
@@ -823,11 +825,7 @@ def display_figures_mot(Q_unfilt, Q_filt, time_col, col_names):
     - matplotlib window with tabbed figures
     '''
 
-    import matplotlib as mpl
-    mpl.use('qtagg')
     mpl.rc('figure', max_open_warning=0)
-    import matplotlib.pyplot as plt
-
     pw = plotWindow()
     pw.MainWindow.setWindowTitle('MOT Filtering Results')
     

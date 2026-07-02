@@ -12,6 +12,12 @@ Functions shared between modules, and other utilities
 
 ## INIT
 import os
+import matplotlib as mpl
+if 'DISPLAY' in os.environ:
+    mpl.use('qtagg')
+else:
+    mpl.use('Agg')  # Non-interactive backend for headless
+import matplotlib.pyplot as plt
 import rtoml
 import json
 import numpy as np
@@ -29,7 +35,6 @@ from anytree import PreOrderIter
 from importlib.metadata import version
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="c3d")
 
