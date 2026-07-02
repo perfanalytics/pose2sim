@@ -33,6 +33,7 @@
 
 ## INIT
 import os
+import platform
 import json
 import re
 import logging
@@ -285,6 +286,8 @@ def setup_backend_device(backend='auto', device='auto'):
 
     if backend != 'auto' and device != 'auto':
         logging.info(f"Using {device} device with {backend} backend.")
+        if backend == 'openvino' and platform.system() == 'Darwin':
+            logging.warning(f"OpenVINO backend does not work on macOS for RTMO models.")
         return backend, device
 
     # Automatic determination of device and backend
@@ -312,11 +315,11 @@ def setup_backend_device(backend='auto', device='auto'):
             logging.info("Valid MPS installation found: using ONNXRuntime backend with GPU.")
             return 'onnxruntime', 'mps'
         else:
-            logging.warning("ONNXRuntime > 1.26.0 is incompatible with the detection models. Please consider downgrading to 1.26.0: `uv pip install onnxruntime==1.26.0`. In the meantime, switching to ONNXRuntime backend with CPU.")
+            logging.warning("ONNXRuntime > 1.26.0 is incompatible with the detection models. Please consider downgrading to 1.26.0: `uv pip install onnxruntime==1.26.0`. In the meantime, switching to ONNXRuntime backend with CPU. ")
             return 'onnxruntime', 'cpu'
  
     # openvino, cpu
-    logging.info("No valid CUDA, ROCM, or MPS installation found: using OpenVINO backend with CPU.")
+    logging.info("No valid CUDA, ROCM, or MPS installation found: using OpenVINO backend with CPU. Does not work on macOS for RTMO models.")
     return 'openvino', 'cpu'
 
 
