@@ -288,13 +288,8 @@ def setup_backend_device(backend='auto', device='auto'):
         return backend, device
 
     # Automatic determination of device and backend
-    # check for ONNXRuntime
-    try:
-        import onnxruntime as ort
-        available_providers = ort.get_available_providers()
-    except ImportError:
-        logging.warning("ONNXRuntime not installed, falling back to OpenVINO backend with CPU.")
-        return 'openvino', 'cpu'
+    import onnxruntime as ort
+    available_providers = ort.get_available_providers()
 
     # onnxruntime, CUDA
     try:
@@ -317,8 +312,8 @@ def setup_backend_device(backend='auto', device='auto'):
             logging.info("Valid MPS installation found: using ONNXRuntime backend with GPU.")
             return 'onnxruntime', 'mps'
         else:
-            logging.warning("ONNXRuntime > 1.26.0 is incompatible with the detection models. Please consider downgrading to 1.26.0: `uv pip install onnxruntime==1.26.0`. In the meantime, switching to OpenVINO backend with CPU.")
-            return 'openvino', 'cpu'
+            logging.warning("ONNXRuntime > 1.26.0 is incompatible with the detection models. Please consider downgrading to 1.26.0: `uv pip install onnxruntime==1.26.0`. In the meantime, switching to ONNXRuntime backend with CPU.")
+            return 'onnxruntime', 'cpu'
  
     # openvino, cpu
     logging.info("No valid CUDA, ROCM, or MPS installation found: using OpenVINO backend with CPU.")
