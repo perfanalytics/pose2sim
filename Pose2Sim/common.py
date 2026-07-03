@@ -22,6 +22,7 @@ try:
 except Exception as e:
     logging.warning(f"GUI not available ({e}), falling back to 'Agg' backend.")
     mpl.use('Agg')
+    import matplotlib.pyplot as plt
 import rtoml
 import json
 import numpy as np

@@ -29,6 +29,7 @@ try:
 except Exception as e:
     print(f"GUI not available ({e}), falling back to 'Agg' backend.")
     mpl.use('Agg')
+    import matplotlib.pyplot as plt
 
 
 ## AUTHORSHIP INFORMATION
