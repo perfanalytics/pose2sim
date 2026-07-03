@@ -12,6 +12,7 @@ Functions shared between modules, and other utilities
 
 ## INIT
 import os
+import logging
 import matplotlib as mpl
 try:
     mpl.use('qtagg')
@@ -31,7 +32,6 @@ import cv2
 import c3d
 import sys
 import itertools as it
-import logging
 from anytree import PreOrderIter
 from importlib.metadata import version
 from pathlib import Path

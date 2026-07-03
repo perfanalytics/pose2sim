@@ -32,6 +32,7 @@
 
 ## INIT
 import os
+import logging
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 import pandas as pd
@@ -55,7 +56,6 @@ import shutil
 from anytree import RenderTree
 from anytree.importer import DictImporter
 from matplotlib.widgets import TextBox, Button
-import logging
 
 from Pose2Sim.common import sort_stringlist_by_last_number, bounding_boxes, interpolate_zeros_nans, \
                             is_video_file, is_image_file
