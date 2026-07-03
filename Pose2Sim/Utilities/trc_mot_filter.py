@@ -63,10 +63,12 @@ import argparse
 import matplotlib as mpl
 try:
     mpl.use('qtagg')
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    plt.close(fig)
 except Exception as e:
     print(f"GUI not available ({e}), falling back to 'Agg' backend.")
     mpl.use('Agg')
-import matplotlib.pyplot as plt
 
 
 ## AUTHORSHIP INFORMATION

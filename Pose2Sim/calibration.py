@@ -36,15 +36,17 @@ import os
 import logging
 import pickle
 import numpy as np
-import matplotlib as mpl
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 os.environ["OPENCV_LOG_LEVEL"]="FATAL"
+import matplotlib as mpl
 try:
     mpl.use('qtagg')
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    plt.close(fig)
 except Exception as e:
     logging.warning(f"GUI not available ({e}), falling back to 'Agg' backend.")
     mpl.use('Agg')
-import matplotlib.pyplot as plt
 import pandas as pd
 import cv2
 import rtoml
