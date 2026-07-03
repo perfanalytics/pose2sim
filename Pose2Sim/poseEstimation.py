@@ -311,11 +311,12 @@ def setup_backend_device(backend='auto', device='auto'):
     # # Issues currently with mps inference (see https://github.com/Tau-J/rtmlib/issues/77)
     # onnxruntime, mps 
     if 'MPSExecutionProvider' in available_providers or 'CoreMLExecutionProvider' in available_providers:
-        if ort.__version__ < '1.27.0':
+        if ort.__version__ <= '1.26.0':
             logging.info("Valid MPS installation found: using ONNXRuntime backend with GPU.")
+            return 'onnxruntime', 'mps'
         else:
-            logging.warning("ONNXRuntime > 1.26.0 with MPS device is incompatible with the RTMO detection models. Please consider downgrading to 1.26.0: `uv pip install onnxruntime==1.26.0` or using a different backend / device combination.")
-        return 'onnxruntime', 'mps'
+            logging.warning("The detection models do not support 'mps' device with ONNXRuntime > 1.26.0. Please consider downgrading: `uv pip install onnxruntime==1.26.0`. Switching to ONNXRuntime backend with CPU. ")
+            return 'onnxruntime', 'cpu'
  
     # openvino, cpu
     logging.info("No valid CUDA, ROCM, or MPS installation found: using OpenVINO backend with CPU. Does not work on macOS for RTMO models.")
