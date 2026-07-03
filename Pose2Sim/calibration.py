@@ -39,10 +39,11 @@ import numpy as np
 import matplotlib as mpl
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 os.environ["OPENCV_LOG_LEVEL"]="FATAL"
-if 'DISPLAY' in os.environ:
+try:
     mpl.use('qtagg')
-else:
-    mpl.use('Agg')  # Non-interactive backend for headless
+except Exception as e:
+    logging.warning(f"GUI not available ({e}), falling back to 'Agg' backend.")
+    mpl.use('Agg')
 import matplotlib.pyplot as plt
 import pandas as pd
 import cv2

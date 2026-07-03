@@ -37,10 +37,11 @@ np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather tha
 import pandas as pd
 import cv2
 import matplotlib as mpl
-if 'DISPLAY' in os.environ:
+try:
     mpl.use('qtagg')
-else:
-    mpl.use('Agg')  # Non-interactive backend for headless
+except Exception as e:
+    logging.warning(f"GUI not available ({e}), falling back to 'Agg' backend.")
+    mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib import patheffects

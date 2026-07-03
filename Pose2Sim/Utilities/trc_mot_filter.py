@@ -61,10 +61,11 @@ from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 import argparse
 import matplotlib as mpl
-if 'DISPLAY' in os.environ:
+try:
     mpl.use('qtagg')
-else:
-    mpl.use('Agg')  # Non-interactive backend for headless
+except Exception as e:
+    logging.warning(f"GUI not available ({e}), falling back to 'Agg' backend.")
+    mpl.use('Agg')
 import matplotlib.pyplot as plt
 
 

@@ -13,10 +13,11 @@ Functions shared between modules, and other utilities
 ## INIT
 import os
 import matplotlib as mpl
-if 'DISPLAY' in os.environ:
+try:
     mpl.use('qtagg')
-else:
-    mpl.use('Agg')  # Non-interactive backend for headless
+except Exception as e:
+    logging.warning(f"GUI not available ({e}), falling back to 'Agg' backend.")
+    mpl.use('Agg')
 import matplotlib.pyplot as plt
 import rtoml
 import json
