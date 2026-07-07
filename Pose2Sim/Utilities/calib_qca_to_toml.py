@@ -205,7 +205,7 @@ def calib_qca_to_toml_func(*args):
     '''
     
     try:
-        qca_path = args[0].get('input_file') # invoked with argparse
+        qca_path = str(args[0].get('input_file')) # invoked with argparse
         binning_factor = int(args[0]['binning_factor'])
         if args[0]['output_file'] == None:
             toml_path = qca_path.replace('.qca.txt', '.toml')

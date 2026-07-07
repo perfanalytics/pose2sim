@@ -1021,11 +1021,11 @@ def trc_filter_func(**args):
     
     if is_mot:
         if output_path is None:
-            output_path = input_path.replace('.mot', f'_filt_{filter_type}.mot')
+            output_path = str(input_path).replace('.mot', f'_filt_{filter_type}.mot')
         write_mot(output_path, Q_filt, time_col, header)
     else:
         if output_path is None:
-            output_path = input_path.replace('.trc', f'_filt_{filter_type}.trc')
+            output_path = str(input_path).replace('.trc', f'_filt_{filter_type}.trc')
         with open(output_path, 'w') as trc_o:
             [trc_o.write(line) for line in header]
             Q_filt.insert(0, 'Frame#', frames_col)

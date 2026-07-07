@@ -116,8 +116,8 @@ def trc_from_mot_osim_func(**args):
     trc_from_mot_osim -m input_mot_file -o input_osim_file -t trc_output_file -l r_knee r_hip 
     '''
 
-    motion_path = args.get('input_mot_file') # invoked with argparse
-    osim_path = args.get('input_osim_file')
+    motion_path = str(args.get('input_mot_file')) # invoked with argparse
+    osim_path = str(args.get('input_osim_file'))
     trc_path = args.get('trc_output_file')
     if trc_path == None:
         trc_path = motion_path.replace('.mot', '.trc')

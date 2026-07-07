@@ -56,7 +56,7 @@ def trc_desample_func(*args):
     '''
     
     try:
-        trc_path = args[0]['input_file'] # invoked with argparse
+        trc_path = str(args[0]['input_file']) # invoked with argparse
         f_out = int(args[0]['output_frequency'])
         if args[0]['output_file'] == None:
             trc_desampled_path = trc_path.replace('.trc', f'_{f_out}fps.trc')

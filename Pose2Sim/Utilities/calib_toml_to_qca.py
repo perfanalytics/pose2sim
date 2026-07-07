@@ -168,7 +168,7 @@ def calib_toml_to_qca_func(**args):
         OR calib_toml_to_qca -i input_toml_file --binning_factor 2 --pixel_size 5.54e-3 -o output_qca_file
     '''
     
-    toml_path = args.get('input_file')
+    toml_path = str(args.get('input_file'))
     qca_path = args.get('output_file')
     if qca_path == None:
         qca_path = toml_path.replace('.toml', '.qca.txt')

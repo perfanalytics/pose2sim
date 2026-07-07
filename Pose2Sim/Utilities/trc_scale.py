@@ -56,17 +56,17 @@ def trc_scale_func(*args):
     '''
 
     try:
-        trc_path = args[0]['input'] # invoked with argparse
+        trc_path = str(args[0]['input']) # invoked with argparse
         scale_factor = args[0]['scale_factor']
         if args[0]['output'] == None:
             trc_scaled_path = trc_path.replace('.trc', '_scaled.trc')
         else:
-            trc_scaled_path = args[0]['output']
+            trc_scaled_path = str(args[0]['output'])
     except:
         trc_path = args[0] # invoked as a function
         scale_factor = args[1]
         try:
-            trc_scaled_path = args[2]
+            trc_scaled_path = str(args[2])
         except:
             trc_scaled_path = trc_path.replace('.trc', '_scaled.trc')
 

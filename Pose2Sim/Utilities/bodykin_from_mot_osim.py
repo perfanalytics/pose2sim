@@ -75,8 +75,8 @@ def bodykin_from_mot_osim_func(*args):
     '''
     
     try:
-        motion_path = args[0]['input_mot_file'] # invoked with argparse
-        osim_path = args[0]['input_osim_file']
+        motion_path = str(args[0]['input_mot_file']) # invoked with argparse
+        osim_path = str(args[0]['input_osim_file'])
         calculate_com_vel = args[0]['calculate_com_vel']
         save_com_file = args[0]['save_com_file']
         if args[0]['csv_output_file'] == None:
@@ -109,7 +109,7 @@ def bodykin_from_mot_osim_func(*args):
         try:
             com_output_file = args[6]
         except:
-            com_output_file = motion_path.replace('.mot', '_com.csv')
+            com_output_file = str(motion_path).replace('.mot', '_com.csv')
 
     # if a user has requested to save the CoM data, without specifying to calculate it we can change that variable
     if save_com_file == True and calculate_com_vel == False: calculate_com_vel = True

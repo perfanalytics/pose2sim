@@ -55,15 +55,15 @@ def trc_Zup_to_Yup_func(*args):
     '''
 
     try:
-        trc_path = args[0]['input'] # invoked with argparse
+        trc_path = str(args[0]['input']) # invoked with argparse
         if args[0]['output'] == None:
             trc_yup_path = trc_path.replace('.trc', '_Yup.trc')
         else:
-            trc_yup_path = args[0]['output']
+            trc_yup_path = str(args[0]['output'])
     except:
         trc_path = args[0] # invoked as a function
         try:
-            trc_yup_path = args[1]
+            trc_yup_path = str(args[1])
         except:
             trc_yup_path = trc_path.replace('.trc', '_Yup.trc')
 

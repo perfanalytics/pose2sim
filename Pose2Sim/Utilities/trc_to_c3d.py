@@ -115,11 +115,11 @@ def trc_to_c3d_func(*args):
     '''
 
     try:
-        trc_path = args[0]['trc_path'] # invoked with argparse
+        trc_path = str(args[0]['trc_path']) # invoked with argparse
         if args[0]['c3d_path'] == None:
             c3d_path = trc_path.replace('.trc', '.c3d')
         else:
-            c3d_path = args[0]['c3d_path']
+            c3d_path = str(args[0]['c3d_path'])
     except:
         trc_path = args[0] # invoked as a function
         c3d_path = trc_path.replace('.trc', '.c3d')
