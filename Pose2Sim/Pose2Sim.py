@@ -63,13 +63,13 @@ __status__ = "Development"
 
 
 ## FUNCTIONS
-def setup_logging(session_dir):
+def setup_logging(project_dir):
     '''
     Create logging file and stream handlers
     '''
 
     logging.basicConfig(format='%(message)s', level=logging.INFO,
-        handlers = [logging.handlers.TimedRotatingFileHandler(Path(session_dir) / 'logs.txt', when='D', interval=7), logging.StreamHandler()])
+        handlers = [logging.handlers.TimedRotatingFileHandler(Path(project_dir) / 'logs.txt', when='D', interval=7), logging.StreamHandler()])
 
 
 def recursive_update(dict_to_update, dict_with_new_values):
@@ -114,11 +114,11 @@ def read_config_files(config):
     and output a dictionary with all the parameters.
     '''
 
+    # If config is a dictionary: Load from <project_dir>/Config.toml or from default 'Demo_SinglePerson/Config.toml', then override with provided dict
     if isinstance(config, dict):
         level = 2 # log_dir = os.getcwd()
         config_dicts = [config]
         
-        # Load defaults from <project_dir>/Config.toml, then override with provided dict
         project_dir = config_dicts[0].get('project', {}).get('project_dir')
         if project_dir == None:
             project_dir = '.'
@@ -126,18 +126,37 @@ def read_config_files(config):
             logging.warning('Project directory not specified in config dictionary: using current directory. ' \
             'Set it to a custom directory with config_dict = {"project": {"project_dir": "<Custom_directory>"}}.')
 
-        default_config_path = Path(project_dir) / 'Config.toml'
-        if default_config_path.is_file():
-            default_config_dict = rtoml.load(default_config_path)
-            merged_config = recursive_update(deepcopy(default_config_dict), deepcopy(config))
+        project_config_path = Path(project_dir) / 'Config.toml'
+        default_config_path = Path(__file__).resolve().parent / 'Demo_SinglePerson' / 'Config.toml'
+        if project_config_path.is_file():
+            default_config_dict = rtoml.load(project_config_path)
         else:
-            merged_config = deepcopy(config)
-            logging.warning(f'No default Config.toml found at {default_config_path}.')
+            default_config_dict = rtoml.load(default_config_path)
+            logging.warning(f'No Config.toml found at {project_config_path}. Using default config from {default_config_path}.')
+        merged_config = recursive_update(deepcopy(default_config_dict), deepcopy(config))
         merged_config.setdefault('project', {})
         merged_config['project'].setdefault('project_dir', str(project_dir))
         config_dicts = [merged_config]
+
+    # If config is a path (str or Path) to a .toml file, just read it
+    elif config is not None and Path(config).is_file() and Path(config).suffix.lower() == '.toml':
+        config_path = Path(config)
+        config_dir = config_path.parent
+        level = 1
+        try:
+            # if batch: merge with parent session Config.toml if it exists
+            session_config_dict = rtoml.load(config_dir.parent / 'Config.toml')
+            trial_config_dict = rtoml.load(config_path)
+            session_config_dict = recursive_update(session_config_dict, trial_config_dict)
+        except Exception:
+            # if single trial, or no parent Config.toml
+            session_config_dict = rtoml.load(config_path)
+        session_config_dict.setdefault('project', {})
+        session_config_dict['project'].update({'project_dir': str(config_dir)})
+        config_dicts = [session_config_dict]
+
+    # if launched without an argument, config == None, else it is the path to the config directory
     else:
-        # if launched without an argument, config == None, else it is the path to the config directory
         config_dir = ['.' if config == None else config][0]
         level = determine_level(config_dir)
 
@@ -155,7 +174,7 @@ def read_config_files(config):
             config_dicts = [session_config_dict]
 
         # Root level
-        if level == 2:
+        elif level == 2:
             session_config_dict = rtoml.load(Path(config_dir) / 'Config.toml')
             config_dicts = []
             # Create config dictionaries for all trials of the participant
@@ -168,12 +187,29 @@ def read_config_files(config):
                     temp_dict.get("project", {}).update({"project_dir":Path(root)})
                     if not Path(root).name in temp_dict.get("project", {}).get('exclude_from_batch', []):
                         config_dicts.append(temp_dict)
+        
+        else:
+            raise FileNotFoundError('You need a Config.toml file in each trial or root folder.')
 
     return level, config_dicts
+
 
 class Pose2SimPipeline:
     def __init__(self, config=None):
         self.level, self.config_dicts = read_config_files(config)
+
+        # Determine project_dir: the trial's own folder when called at trial level, or the root folder when called at root level. Logs are saved here.
+        if isinstance(config, dict):
+            root_project_dir = config.get('project', {}).get('project_dir', str(Path.cwd()))
+        elif config is not None and Path(config).is_file() and Path(config).suffix.lower() == '.toml':
+            root_project_dir = str(Path(config).parent)
+        else:
+            root_project_dir = '.' if config is None else str(config)
+        self.project_dir = (
+            Path(root_project_dir) if self.level == 2
+            else Path(self.config_dicts[0]['project']['project_dir'])
+        )
+
         try:
             if type(config) == dict:
                 # Use project_dir from the config dict instead of os.getcwd()
@@ -184,9 +220,10 @@ class Pose2SimPipeline:
             [Path(self.session_dir) / c for c in os.listdir(self.session_dir) if 'calib' in c.lower() and not c.lower().endswith('.py')][0]
         except:
             self.session_dir = (Path(config.get('project', {}).get('project_dir', str(Path.cwd()))) if type(config) == dict else Path.cwd())
+
         use_custom_logging = self.config_dicts[0].get('logging', {}).get('use_custom_logging', False)
         if not use_custom_logging:
-            setup_logging(self.session_dir)
+            setup_logging(self.project_dir)
 
     def _log_step_header(self, step_name, config_dict):
         project_dir = Path(config_dict.get('project', {}).get('project_dir', '.'))
