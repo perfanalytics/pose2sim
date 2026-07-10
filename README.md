@@ -1167,10 +1167,14 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `overwrite_pose` | `false` | If `false`, skips pose estimation when results already exist. |
 | `save_video` | `'to_video'` | `'to_video'`, `'to_images'`, `'none'`, or `['to_video', 'to_images']`. |
 | `output_format` | `'openpose'` | `'openpose'`, `'mmpose'`, `'deeplabcut'`, `'none'`, or a list. Only `'openpose'` is fully supported downstream. |
-| `average_likelihood_threshold_pose` | `0.5` | Detections are dropped when their average keypoint likelihood is below this threshold. |
-| `tracking_mode` | `'sports2d'` | Person tracker used between frames: `'none'`, `'sports2d'` (fast, recommended), or `'deepsort'` (slower but more customizable). |
-| `max_distance_px` | `100` | Pixels. A person detected farther than this distance from their previous position is treated as a new individual. |
-| `deepsort_params` | `"""{'max_age':30, 'n_init':3, 'nms_max_overlap':0.8, 'max_cosine_distance':0.3, 'nn_budget':200, 'max_iou_distance':0.8}"""` | DeepSort hyperparameters as a `"""{dictionary}"""`. See [DeepSort docs](https://github.com/levan92/deep_sort_realtime) for details. |
+| `average_likelihood_threshold` | `0.5` | Detections are dropped when their average keypoint likelihood is below this threshold. |
+| `tracking_mode` | `'sports2d'` | Person tracker used between frames: `'sports2d'` (fast, recommended) or `'deepsort'` (slower, harder to parametrize). |
+| `predict_displacement` | `false` | If `true`, predicts each person's next position by linear extrapolation. Use for sustained straight-line motion (sprinting, cycling) or long occlusions. Avoid for sudden direction changes (basketball, hopping). |
+| `match_by` | `'keypoints'` | How persons are matched across frames: `'keypoints'` (mean per-keypoint distance), `'centroid'` (distance between keypoint centroids), or `'bbox'` (1 − IoU of bounding boxes).<br>- Favor `'keypoints'` when people pass close to each other with distinct limb positions and limited frame-to-frame motion.<br>- Favor `'centroid'` in crowded scenes where people are very small (< 40 px).<br>- Favor `'bbox'` with `predict_displacement=true` for people of different sizes moving in a straight line with fast limb motion and large occlusions. |
+| `max_distance_px` | `250` | Pixels. Maximum distance a person can jump from their previous position before being considered a new individual. Only used when `match_by` is `'keypoints'` or `'centroid'`. Increase if `predict_displacement=false`. |
+| `min_iou` | `0.2` | Minimum IoU overlap between consecutive bounding boxes for two detections to be associated. Only used when `match_by='bbox'`. Lower it if `predict_displacement=false`. |
+| `max_unseen_frames` | `100` | Maximum number of frames a person can be absent before the next detection passing by is assigned a new ID. |
+| `deepsort_params` | `"""{'max_age':30, 'n_init':3, 'max_cosine_distance':0.3, 'max_iou_distance':0.8, 'embedder_gpu': True, 'embedder':'torchreid'}"""` | DeepSort hyperparameters as a `"""{dictionary}"""`. See [DeepSort docs](https://github.com/levan92/deep_sort_realtime) for details. Requires `uv pip install torch torchvision torchreid gdown tensorboard`. |
 | `handle_LR_swap` | `false` | Not implemented yet. Will swap left/right labels if needed. |
 | `undistort_points` | `false` | Not implemented yet. Undistorts 2D points before triangulation. |
 
@@ -1272,6 +1276,8 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `reproj_error_threshold_triangulation` | `15` | px. Triangulated points with reprojection error above this threshold are rejected and a camera is removed for retry. |
 | `likelihood_threshold_triangulation` | `0.3` | 2D detections with likelihood below this value are ignored for triangulation. |
 | `min_cameras_for_triangulation` | `2` | Minimum number of cameras required to attempt triangulation. Triangulation is skipped for a given frame/keypoint if fewer cameras remain after filtering. |
+| `predict_displacement` | `false` | If `true`, predicts each person's next 3D position by linear extrapolation before matching. Use for sustained straight-line motion or long occlusions; avoid for sudden direction changes. |
+| `match_by` | `'keypoints'` | How persons are matched across frames in 3D: `'keypoints'` (mean per-keypoint distance) or `'centroid'` (distance between keypoint centroids).<br>- Favor `'keypoints'` when depth is reliable (multiview triangulation) and people may be close together.<br>- Favor `'centroid'` when depth is unreliable (monocular 3D, not yet supported in Pose2Sim). |
 | `max_distance_m` | `1.0` | metres. Maximum distance a person can move between frames before being considered a new individual. |
 | `max_unseen_frames` | `100` | Maximum number of consecutive frames a person can be absent before the next detection is assigned a new ID. |
 | `interp_if_gap_smaller_than` | `20` | frames. Gaps smaller than this are interpolated; larger gaps are left as-is (or filled with `fill_large_gaps_with`). |
