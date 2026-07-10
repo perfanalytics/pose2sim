@@ -81,6 +81,14 @@ __status__ = "Development"
 plt.rcParams['toolbar'] = 'none'
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
+# Matplotlib compatibility fix
+from matplotlib.backend_bases import ResizeEvent
+for _attr, _default in (('inaxes', None), ('x', None), ('y', None),
+                         ('xdata', None), ('ydata', None), ('dblclick', False),
+                         ('button', None), ('key', None)):
+    if not hasattr(ResizeEvent, _attr):
+        setattr(ResizeEvent, _attr, _default)
+
 # Define keypoint UI parameters
 TITLE_SIZE = 12
 LABEL_SIZE_KEYPOINTS = 8 # defined twice

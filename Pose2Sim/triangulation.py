@@ -676,6 +676,8 @@ def triangulate_all(config_dict):
     likelihood_threshold = config_dict.get('triangulation', {}).get('likelihood_threshold_triangulation', 0.3)
     interpolation_kind = config_dict.get('triangulation', {}).get('interpolation', 'linear')
     interp_gap_smaller_than = config_dict.get('triangulation', {}).get('interp_if_gap_smaller_than', 20)
+    use_prediction = config_dict.get('triangulation', {}).get('predict_displacement', False)
+    match_by = config_dict.get('triangulation', {}).get('match_by', 'keypoints')
     max_distance_m = config_dict.get('triangulation', {}).get('max_distance_m', 1.0)
     max_unseen_frames = config_dict.get('triangulation', {}).get('max_unseen_frames', 100)
     remove_incomplete_frames = config_dict.get('triangulation', {}).get('remove_incomplete_frames', False)
@@ -865,8 +867,18 @@ def triangulate_all(config_dict):
                 Q = np.array(Q)
                 if 'Q_old' not in locals(): 
                     Q_old = Q
-                Q_old, Q, sorted_ids, frames_since_last_seen = sort_people_sports2d(Q_old, Q, max_dist=max_distance_m,
-                    max_unseen_frames=max_unseen_frames, frames_since_last_seen=frames_since_last_seen)
+                if use_prediction:
+                    pred_displacement = np.zeros((len(Q), 3))
+                else:
+                    pred_displacement = None
+                ret = sort_people_sports2d(Q_old, Q, scores=None, 
+                                        match_by=match_by, pred_displacement=pred_displacement, 
+                                        max_dist=max_distance_m, 
+                                        max_unseen_frames=max_unseen_frames, frames_since_last_seen=frames_since_last_seen)
+                if use_prediction:
+                    Q_old, Q, sorted_ids, frames_since_last_seen, pred_displacement = ret
+                else:
+                    Q_old, Q, sorted_ids, frames_since_last_seen = ret
                 
                 # Update nb_persons_to_detect if new persons were added
                 if len(Q) > nb_persons_to_detect:
