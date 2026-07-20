@@ -391,6 +391,9 @@ Pose2Sim.runAll()
   config_dict = {"project": {"project_dir": "<Demo_SinglePerson_path>"}, 
                  "pose": {"pose_model": "whole_body", "overwrite_pose": True}}
   Pose2Sim.poseEstimation(config_dict)
+
+  # Or else, you can simply pass the path to a .toml file
+  Pose2Sim.poseEstimation("<Custom_path>/your_config.toml")
   ```
 
 <br>
