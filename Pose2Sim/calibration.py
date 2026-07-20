@@ -270,49 +270,57 @@ def read_vicon(vicon_path):
 
     root = etree.parse(vicon_path).getroot()
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
-    vid_id = []
+    vid_id, vid_ids = 0, []
+
+    video_path = Path(vicon_path).parents[1] / 'videos'
+    if not video_path.exists():
+        logging.error(f'No video folder found at {video_path}. Required for Vicon calibration.')
+        raise FileNotFoundError(f'No video folder found at {video_path}. Required for Vicon calibration.')
     
-    # Camera name and image size
-    for i, tag in enumerate(root.findall('Camera')):
-        C += [tag.attrib.get('DEVICEID')]
-        S += [[float(t) for t in tag.attrib.get('SENSOR_SIZE').split()]]
-        ret += [float(tag.findall('KeyFrames/KeyFrame')[0].attrib.get('WORLD_ERROR'))]
-        vid_id += [i]
-        
-    # Intrinsic parameters: distorsion and intrinsic matrix
     for cam_elem in root.findall('Camera'):
-        try:
-            dist = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('VICON_RADIAL2').split()[3:5]
-        except:
-            dist = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('VICON_RADIAL').split()
-        D += [[float(d) for d in dist] + [0.0, 0.0]]
+        if cam_elem.attrib.get('SYSTEM') == 'DV':
+            vid_ids += [vid_id]
+            vid_id += 1
 
-        fu = float(cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('FOCAL_LENGTH'))
-        fv = fu / float(cam_elem.attrib.get('PIXEL_ASPECT_RATIO'))
-        cam_center = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('PRINCIPAL_POINT').split()
-        cu, cv = [float(c) for c in cam_center]
-        K += [np.array([fu, 0., cu, 0., fv, cv, 0., 0., 1.]).reshape(3,3)]
+            # Camera name and errors
+            cam_name = cam_elem.attrib.get('DEVICEID')
+            C += [cam_name]
+            ret += [float(cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('WORLD_ERROR'))]
+            
+            # Image size and errors
+            cam_path = list(video_path.glob(f'*{cam_name}*'))[0]
+            cap = cv2.VideoCapture(cam_path)
+            img_res = [int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))]
+            S += [img_res]
 
-    # Extrinsic parameters: rotation matrix and translation vector
-    for cam_elem in root.findall('Camera'):
-        rot = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('ORIENTATION').split()
-        R_quat = [float(r) for r in rot]
-        R_mat = quat2mat(R_quat, scalar_idx=3)
-        R += [R_mat]
+            # Distorsion
+            try:
+                dist = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('VICON_RADIAL2').split()[3:5]
+            except:
+                dist = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('VICON_RADIAL').split()
+            D += [[float(d) for d in dist] + [0.0, 0.0]]
 
-        trans = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('POSITION').split()
-        T += [[float(t)/1000 for t in trans]]
+            # Intrinsic parameters: focal length and principal point (with offset)
+            fu = float(cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('FOCAL_LENGTH'))
+            fv = fu / float(cam_elem.attrib.get('PIXEL_ASPECT_RATIO'))
+            cam_center = [float(c) for c in cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('PRINCIPAL_POINT').split()]
+            sensor_size = [float(t) for t in cam_elem.attrib.get('SENSOR_SIZE').split()]
+            roi_offset = [(sensor_size[i] - img_res[i])/2 for i in range(2)]
+            cu, cv = [cam_center[i] - roi_offset[i] for i in range(2)]
+            K += [np.array([fu, 0., cu, 0., fv, cv, 0., 0., 1.]).reshape(3,3)]
 
-    # Camera names by natural order
-    C_vid_id = [v for v in vid_id if 'video' in root.findall('Camera')[v].attrib.get('TYPE', '').lower()]
-    C_vid = [root.findall('Camera')[v].attrib.get('DEVICEID') for v in C_vid_id]
-    C = sorted(C_vid, key=natural_sort_key)
-    C_id_sorted = [i for v_sorted in C for i,v in enumerate(root.findall('Camera')) if v.attrib.get('DEVICEID')==v_sorted]
-    S = [S[c] for c in C_id_sorted]
-    D = [D[c] for c in C_id_sorted]
-    K = [K[c] for c in C_id_sorted]
-    R = [R[c] for c in C_id_sorted]
-    T = [T[c] for c in C_id_sorted]
+            # Extrinsic parameters: rotation matrix and translation vector
+            rot = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('ORIENTATION').split()
+            R_quat = [float(r) for r in rot]
+            R_mat = quat2mat(R_quat, scalar_idx=3)
+            R += [R_mat]
+
+            trans = cam_elem.findall('KeyFrames/KeyFrame')[0].attrib.get('POSITION').split()
+            T += [[float(t)/1000 for t in trans]]
+
+    # Camera by natural order of their names
+    sorted_cams = sorted(zip(C, S, D, K, R, T), key=natural_sort_key)
+    C, S, D, K, R, T = zip(*sorted_cams)
 
     return ret, C, S, D, K, R, T
 
