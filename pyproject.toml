@@ -50,6 +50,7 @@ dependencies = [
     "openvino",
     "av",
     "caliscope",
+    "bvhsdk"
     # "huggingface_hub", # if openmmlab servers shut down again
 ]
 
@@ -80,6 +81,7 @@ face_blurring = "Pose2Sim.Utilities.face_blurring:main"
 json_display_with_img = "Pose2Sim.Utilities.json_display_with_img:main"
 json_display_without_img = "Pose2Sim.Utilities.json_display_without_img:main"
 MMPose_to_OpenPose = "Pose2Sim.Utilities.MMPose_to_OpenPose:main"
+osim_to_bvh = "Pose2Sim.Utilities.osim_to_bvh:main"
 reproj_from_trc_calib = "Pose2Sim.Utilities.reproj_from_trc_calib:main"
 trc_combine = "Pose2Sim.Utilities.trc_combine:main"
 trc_desample = "Pose2Sim.Utilities.trc_desample:main"
