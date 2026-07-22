@@ -4165,7 +4165,224 @@
 		</ConstraintSet>
 		<!--Forces in the model (includes Actuators).-->
 		<ForceSet name="forceset">
-			<objects />
+			<objects>
+				<SmoothSphereHalfSpaceForce name="SmoothSphereHalfSpaceForce_s1_r">
+					<!--Path to a Component that satisfies the Socket 'sphere' of type ContactSphere (description: The sphere participating in this contact.).-->
+					<socket_sphere>/contactgeometryset/s1_r</socket_sphere>
+					<!--Path to a Component that satisfies the Socket 'half_space' of type ContactHalfSpace (description: The half-space participating in this contact.).-->
+					<socket_half_space>/contactgeometryset/floor</socket_half_space>
+					<!--The stiffness constant (i.e., plain strain modulus), default is 1 (N/m^2)-->
+					<stiffness>1000000</stiffness>
+					<!--The dissipation coefficient, default is 0 (s/m).-->
+					<dissipation>2</dissipation>
+					<!--The coefficient of static friction, default is 0.-->
+					<static_friction>0.80000000000000004</static_friction>
+					<!--The coefficient of dynamic friction, default is 0.-->
+					<dynamic_friction>0.80000000000000004</dynamic_friction>
+					<!--The coefficient of viscous friction, default is 0.-->
+					<viscous_friction>0.5</viscous_friction>
+					<!--The transition velocity, default is 0.01 (m/s).-->
+					<transition_velocity>0.20000000000000001</transition_velocity>
+				</SmoothSphereHalfSpaceForce>
+				<SmoothSphereHalfSpaceForce name="SmoothSphereHalfSpaceForce_s2_r">
+					<!--Path to a Component that satisfies the Socket 'sphere' of type ContactSphere (description: The sphere participating in this contact.).-->
+					<socket_sphere>/contactgeometryset/s2_r</socket_sphere>
+					<!--Path to a Component that satisfies the Socket 'half_space' of type ContactHalfSpace (description: The half-space participating in this contact.).-->
+					<socket_half_space>/contactgeometryset/floor</socket_half_space>
+					<!--The stiffness constant (i.e., plain strain modulus), default is 1 (N/m^2)-->
+					<stiffness>1000000</stiffness>
+					<!--The dissipation coefficient, default is 0 (s/m).-->
+					<dissipation>2</dissipation>
+					<!--The coefficient of static friction, default is 0.-->
+					<static_friction>0.80000000000000004</static_friction>
+					<!--The coefficient of dynamic friction, default is 0.-->
+					<dynamic_friction>0.80000000000000004</dynamic_friction>
+					<!--The coefficient of viscous friction, default is 0.-->
+					<viscous_friction>0.5</viscous_friction>
+					<!--The transition velocity, default is 0.01 (m/s).-->
+					<transition_velocity>0.20000000000000001</transition_velocity>
+				</SmoothSphereHalfSpaceForce>
+				<SmoothSphereHalfSpaceForce name="SmoothSphereHalfSpaceForce_s3_r">
+					<!--Path to a Component that satisfies the Socket 'sphere' of type ContactSphere (description: The sphere participating in this contact.).-->
+					<socket_sphere>/contactgeometryset/s3_r</socket_sphere>
+					<!--Path to a Component that satisfies the Socket 'half_space' of type ContactHalfSpace (description: The half-space participating in this contact.).-->
+					<socket_half_space>/contactgeometryset/floor</socket_half_space>
+					<!--The stiffness constant (i.e., plain strain modulus), default is 1 (N/m^2)-->
+					<stiffness>1000000</stiffness>
+					<!--The dissipation coefficient, default is 0 (s/m).-->
+					<dissipation>2</dissipation>
+					<!--The coefficient of static friction, default is 0.-->
+					<static_friction>0.80000000000000004</static_friction>
+					<!--The coefficient of dynamic friction, default is 0.-->
+					<dynamic_friction>0.80000000000000004</dynamic_friction>
+					<!--The coefficient of viscous friction, default is 0.-->
+					<viscous_friction>0.5</viscous_friction>
+					<!--The transition velocity, default is 0.01 (m/s).-->
+					<transition_velocity>0.20000000000000001</transition_velocity>
+				</SmoothSphereHalfSpaceForce>
+				<SmoothSphereHalfSpaceForce name="SmoothSphereHalfSpaceForce_s4_r">
+					<!--Path to a Component that satisfies the Socket 'sphere' of type ContactSphere (description: The sphere participating in this contact.).-->
+					<socket_sphere>/contactgeometryset/s4_r</socket_sphere>
+					<!--Path to a Component that satisfies the Socket 'half_space' of type ContactHalfSpace (description: The half-space participating in this contact.).-->
+					<socket_half_space>/contactgeometryset/floor</socket_half_space>
+					<!--The stiffness constant (i.e., plain strain modulus), default is 1 (N/m^2)-->
+					<stiffness>1000000</stiffness>
+					<!--The dissipation coefficient, default is 0 (s/m).-->
+					<dissipation>2</dissipation>
+					<!--The coefficient of static friction, default is 0.-->
+					<static_friction>0.80000000000000004</static_friction>
+					<!--The coefficient of dynamic friction, default is 0.-->
+					<dynamic_friction>0.80000000000000004</dynamic_friction>
+					<!--The coefficient of viscous friction, default is 0.-->
+					<viscous_friction>0.5</viscous_friction>
+					<!--The transition velocity, default is 0.01 (m/s).-->
+					<transition_velocity>0.20000000000000001</transition_velocity>
+				</SmoothSphereHalfSpaceForce>
+				<SmoothSphereHalfSpaceForce name="SmoothSphereHalfSpaceForce_s5_r">
+					<!--Path to a Component that satisfies the Socket 'sphere' of type ContactSphere (description: The sphere participating in this contact.).-->
+					<socket_sphere>/contactgeometryset/s5_r</socket_sphere>
+					<!--Path to a Component that satisfies the Socket 'half_space' of type ContactHalfSpace (description: The half-space participating in this contact.).-->
+					<socket_half_space>/contactgeometryset/floor</socket_half_space>
+					<!--The stiffness constant (i.e., plain strain modulus), default is 1 (N/m^2)-->
+					<stiffness>1000000</stiffness>
+					<!--The dissipation coefficient, default is 0 (s/m).-->
+					<dissipation>2</dissipation>
+					<!--The coefficient of static friction, default is 0.-->
+					<static_friction>0.80000000000000004</static_friction>
+					<!--The coefficient of dynamic friction, default is 0.-->
+					<dynamic_friction>0.80000000000000004</dynamic_friction>
+					<!--The coefficient of viscous friction, default is 0.-->
+					<viscous_friction>0.5</viscous_friction>
+					<!--The transition velocity, default is 0.01 (m/s).-->
+					<transition_velocity>0.20000000000000001</transition_velocity>
+				</SmoothSphereHalfSpaceForce>
+				<SmoothSphereHalfSpaceForce name="SmoothSphereHalfSpaceForce_s6_r">
+					<!--Path to a Component that satisfies the Socket 'sphere' of type ContactSphere (description: The sphere participating in this contact.).-->
+					<socket_sphere>/contactgeometryset/s6_r</socket_sphere>
+					<!--Path to a Component that satisfies the Socket 'half_space' of type ContactHalfSpace (description: The half-space participating in this contact.).-->
+					<socket_half_space>/contactgeometryset/floor</socket_half_space>
+					<!--The stiffness constant (i.e., plain strain modulus), default is 1 (N/m^2)-->
+					<stiffness>1000000</stiffness>
+					<!--The dissipation coefficient, default is 0 (s/m).-->
+					<dissipation>2</dissipation>
+					<!--The coefficient of static friction, default is 0.-->
+					<static_friction>0.80000000000000004</static_friction>
+					<!--The coefficient of dynamic friction, default is 0.-->
+					<dynamic_friction>0.80000000000000004</dynamic_friction>
+					<!--The coefficient of viscous friction, default is 0.-->
+					<viscous_friction>0.5</viscous_friction>
+					<!--The transition velocity, default is 0.01 (m/s).-->
+					<transition_velocity>0.20000000000000001</transition_velocity>
+				</SmoothSphereHalfSpaceForce>
+				<SmoothSphereHalfSpaceForce name="SmoothSphereHalfSpaceForce_s1_l">
+					<!--Path to a Component that satisfies the Socket 'sphere' of type ContactSphere (description: The sphere participating in this contact.).-->
+					<socket_sphere>/contactgeometryset/s1_l</socket_sphere>
+					<!--Path to a Component that satisfies the Socket 'half_space' of type ContactHalfSpace (description: The half-space participating in this contact.).-->
+					<socket_half_space>/contactgeometryset/floor</socket_half_space>
+					<!--The stiffness constant (i.e., plain strain modulus), default is 1 (N/m^2)-->
+					<stiffness>1000000</stiffness>
+					<!--The dissipation coefficient, default is 0 (s/m).-->
+					<dissipation>2</dissipation>
+					<!--The coefficient of static friction, default is 0.-->
+					<static_friction>0.80000000000000004</static_friction>
+					<!--The coefficient of dynamic friction, default is 0.-->
+					<dynamic_friction>0.80000000000000004</dynamic_friction>
+					<!--The coefficient of viscous friction, default is 0.-->
+					<viscous_friction>0.5</viscous_friction>
+					<!--The transition velocity, default is 0.01 (m/s).-->
+					<transition_velocity>0.20000000000000001</transition_velocity>
+				</SmoothSphereHalfSpaceForce>
+				<SmoothSphereHalfSpaceForce name="SmoothSphereHalfSpaceForce_s2_l">
+					<!--Path to a Component that satisfies the Socket 'sphere' of type ContactSphere (description: The sphere participating in this contact.).-->
+					<socket_sphere>/contactgeometryset/s2_l</socket_sphere>
+					<!--Path to a Component that satisfies the Socket 'half_space' of type ContactHalfSpace (description: The half-space participating in this contact.).-->
+					<socket_half_space>/contactgeometryset/floor</socket_half_space>
+					<!--The stiffness constant (i.e., plain strain modulus), default is 1 (N/m^2)-->
+					<stiffness>1000000</stiffness>
+					<!--The dissipation coefficient, default is 0 (s/m).-->
+					<dissipation>2</dissipation>
+					<!--The coefficient of static friction, default is 0.-->
+					<static_friction>0.80000000000000004</static_friction>
+					<!--The coefficient of dynamic friction, default is 0.-->
+					<dynamic_friction>0.80000000000000004</dynamic_friction>
+					<!--The coefficient of viscous friction, default is 0.-->
+					<viscous_friction>0.5</viscous_friction>
+					<!--The transition velocity, default is 0.01 (m/s).-->
+					<transition_velocity>0.20000000000000001</transition_velocity>
+				</SmoothSphereHalfSpaceForce>
+				<SmoothSphereHalfSpaceForce name="SmoothSphereHalfSpaceForce_s3_l">
+					<!--Path to a Component that satisfies the Socket 'sphere' of type ContactSphere (description: The sphere participating in this contact.).-->
+					<socket_sphere>/contactgeometryset/s3_l</socket_sphere>
+					<!--Path to a Component that satisfies the Socket 'half_space' of type ContactHalfSpace (description: The half-space participating in this contact.).-->
+					<socket_half_space>/contactgeometryset/floor</socket_half_space>
+					<!--The stiffness constant (i.e., plain strain modulus), default is 1 (N/m^2)-->
+					<stiffness>1000000</stiffness>
+					<!--The dissipation coefficient, default is 0 (s/m).-->
+					<dissipation>2</dissipation>
+					<!--The coefficient of static friction, default is 0.-->
+					<static_friction>0.80000000000000004</static_friction>
+					<!--The coefficient of dynamic friction, default is 0.-->
+					<dynamic_friction>0.80000000000000004</dynamic_friction>
+					<!--The coefficient of viscous friction, default is 0.-->
+					<viscous_friction>0.5</viscous_friction>
+					<!--The transition velocity, default is 0.01 (m/s).-->
+					<transition_velocity>0.20000000000000001</transition_velocity>
+				</SmoothSphereHalfSpaceForce>
+				<SmoothSphereHalfSpaceForce name="SmoothSphereHalfSpaceForce_s4_l">
+					<!--Path to a Component that satisfies the Socket 'sphere' of type ContactSphere (description: The sphere participating in this contact.).-->
+					<socket_sphere>/contactgeometryset/s4_l</socket_sphere>
+					<!--Path to a Component that satisfies the Socket 'half_space' of type ContactHalfSpace (description: The half-space participating in this contact.).-->
+					<socket_half_space>/contactgeometryset/floor</socket_half_space>
+					<!--The stiffness constant (i.e., plain strain modulus), default is 1 (N/m^2)-->
+					<stiffness>1000000</stiffness>
+					<!--The dissipation coefficient, default is 0 (s/m).-->
+					<dissipation>2</dissipation>
+					<!--The coefficient of static friction, default is 0.-->
+					<static_friction>0.80000000000000004</static_friction>
+					<!--The coefficient of dynamic friction, default is 0.-->
+					<dynamic_friction>0.80000000000000004</dynamic_friction>
+					<!--The coefficient of viscous friction, default is 0.-->
+					<viscous_friction>0.5</viscous_friction>
+					<!--The transition velocity, default is 0.01 (m/s).-->
+					<transition_velocity>0.20000000000000001</transition_velocity>
+				</SmoothSphereHalfSpaceForce>
+				<SmoothSphereHalfSpaceForce name="SmoothSphereHalfSpaceForce_s5_l">
+					<!--Path to a Component that satisfies the Socket 'sphere' of type ContactSphere (description: The sphere participating in this contact.).-->
+					<socket_sphere>/contactgeometryset/s5_l</socket_sphere>
+					<!--Path to a Component that satisfies the Socket 'half_space' of type ContactHalfSpace (description: The half-space participating in this contact.).-->
+					<socket_half_space>/contactgeometryset/floor</socket_half_space>
+					<!--The stiffness constant (i.e., plain strain modulus), default is 1 (N/m^2)-->
+					<stiffness>1000000</stiffness>
+					<!--The dissipation coefficient, default is 0 (s/m).-->
+					<dissipation>2</dissipation>
+					<!--The coefficient of static friction, default is 0.-->
+					<static_friction>0.80000000000000004</static_friction>
+					<!--The coefficient of dynamic friction, default is 0.-->
+					<dynamic_friction>0.80000000000000004</dynamic_friction>
+					<!--The coefficient of viscous friction, default is 0.-->
+					<viscous_friction>0.5</viscous_friction>
+					<!--The transition velocity, default is 0.01 (m/s).-->
+					<transition_velocity>0.20000000000000001</transition_velocity>
+				</SmoothSphereHalfSpaceForce>
+				<SmoothSphereHalfSpaceForce name="SmoothSphereHalfSpaceForce_s6_l">
+					<!--Path to a Component that satisfies the Socket 'sphere' of type ContactSphere (description: The sphere participating in this contact.).-->
+					<socket_sphere>/contactgeometryset/s6_l</socket_sphere>
+					<!--Path to a Component that satisfies the Socket 'half_space' of type ContactHalfSpace (description: The half-space participating in this contact.).-->
+					<socket_half_space>/contactgeometryset/floor</socket_half_space>
+					<!--The stiffness constant (i.e., plain strain modulus), default is 1 (N/m^2)-->
+					<stiffness>1000000</stiffness>
+					<!--The dissipation coefficient, default is 0 (s/m).-->
+					<dissipation>2</dissipation>
+					<!--The coefficient of static friction, default is 0.-->
+					<static_friction>0.80000000000000004</static_friction>
+					<!--The coefficient of dynamic friction, default is 0.-->
+					<dynamic_friction>0.80000000000000004</dynamic_friction>
+					<!--The coefficient of viscous friction, default is 0.-->
+					<viscous_friction>0.5</viscous_friction>
+					<!--The transition velocity, default is 0.01 (m/s).-->
+					<transition_velocity>0.20000000000000001</transition_velocity>
+				</SmoothSphereHalfSpaceForce>
+			</objects>
 			<groups />
 		</ForceSet>
 		<!--Markers in the model.-->

@@ -1016,9 +1016,17 @@ This can be either done fully automatically within Pose2Sim, or manually within 
 ### Within Pose2Sim
 > *Scaling and inverse kinematics are performed in a fully automatic way for each trc file.*\
 > ***No need for a static trial!***
-
+> 
+> ​
+> 
 > Model scaling is done according to the mean of the segment lengths, across a subset of frames. We remove the frames where the average knee and hip flexion angles are above 90° (pose estimation is not precise when the person is crouching) and the 50% most extreme segment values (potential outliers).\
 > Note: If the participant is mostly crouching or sitting, manually scale on a standing trial (see [next section](#within-opensim-gui)).
+> 
+> ​
+> 
+> The Pose2Sim OpenSim model is adapted from the Lifting Full-Body model with flexible spine by [Beaucage-Gauvreau (2019)](https://pubmed.ncbi.nlm.nih.gov/30714401/), including knee constraints by [Rajagopal (2016)](https://pubmed.ncbi.nlm.nih.gov/27392337/). 6 contact spheres per foot were added, a ball joint between the head and the torso was included, and joint limits were relaxed to allow for more extreme postures.\
+> The optional simple model is identical, but computation is made much faster by using a rigid spine, no patella, and no muscles.
+
 
 > [!TIP]
 > In your Config.toml file:
@@ -1501,9 +1509,6 @@ Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different ma
   <summary><b>Other trc tools</b> (CLICK TO SHOW)</summary>
     <pre>
 
-[trc_from_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_easymocap.py) 
-Convert EasyMocap results keypoints3d .json files to .trc.
-
 [c3d_to_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/c3d_to_trc.py)
 Converts 3D point data from a .c3d file to a .trc file compatible with OpenSim. No analog data (force plates, emg) nor computed data (angles, powers, etc.) are retrieved.
 
@@ -1537,8 +1542,14 @@ Build a trc file from a .mot motion file and a .osim model file.
 [bodykin_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/bodykin_from_mot_osim.py)
 Converts a mot file to a .csv file with rotation and orientation of all segments.
 
+[osim_to_bvh.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/osim_to_bvh.py)
+Exports OpenSim .osim models and .mot animations to rigged animations in the BVH MoCap format.
+
 [reproj_from_trc_calib.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/reproj_from_trc_calib.py)
 Reprojects 3D coordinates of a trc file to the image planes defined by a calibration file. Output in OpenPose or DeepLabCut format.
+
+[trc_from_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_easymocap.py) 
+Convert EasyMocap results keypoints3d .json files to .trc.
 
    </pre>
 </details>
