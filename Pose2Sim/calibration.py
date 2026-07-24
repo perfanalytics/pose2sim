@@ -137,7 +137,7 @@ def read_qca(qca_path, binning_factor):
     for i, tag in enumerate(root.findall('cameras/camera')):
         ret += [float(tag.attrib.get('avg-residual'))]
         C += [tag.attrib.get('serial')]
-        if any(model in tag.attrib.get('model', '').lower() for model in ["video", "none"]):
+        if any(model in tag.attrib.get('model', '').lower() for model in ["video", "hybrid", "none"]):
             vid_id += [i]
     
     # Image size
