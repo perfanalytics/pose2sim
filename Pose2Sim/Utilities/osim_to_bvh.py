@@ -121,9 +121,6 @@ def get_body_global_transform_matrix(model, state, body_name):
             matrix[i, j] = rotation.get(i, j)
         matrix[i, 3] = translation.get(i)
 
-    # Convert from meters to centimeters (BVH standard)
-    matrix[0:3, 3] *= 100.0
-
     return matrix
 
 
@@ -152,14 +149,13 @@ def calculate_end_site_from_geometry(body, body_transform):
                 half_height = cylinder.get_half_height()
 
                 # End site at cylinder tip (2 * half_height along Y axis in body frame)
-                # Convert from meters to centimeters
-                end_site = np.array([0.0, half_height * 2.0 * 100.0, 0.0])
+                end_site = np.array([0.0, half_height * 2.0, 0.0])
                 return end_site
     except:
         pass
 
     # Default: 10cm along Y axis if no geometry found
-    return np.array([0.0, 10.0, 0.0])
+    return np.array([0.0, 0.1, 0.0])
 
 
 def create_bvh_hierarchy(skeleton_tree, model, root_body_name, num_frames, framerate):
@@ -383,7 +379,7 @@ def set_frame_from_state(animation, model, state, frame_idx):
 
         # For root: set global translation
         if joint.parent is None:
-            joint.translation[frame_idx] = global_position - joint.offset
+            joint.translation[frame_idx] = global_position
             if body_name in debug_joints and frame_idx in debug_frames:
                 print(f"Root translation: {joint.translation[frame_idx]}")
                 print(f"Root offset: {joint.offset}")
