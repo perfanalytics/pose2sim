@@ -155,6 +155,7 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("pose").update({"save_video":'none'})
         config_dict.get('synchronization').update({'keypoints_to_consider':['RWrist']})
         config_dict.get('kinematics').update({'use_simple_model':True})
+        config_dict.get('kinematics').update({'make_bvh':False})
         Pose2Sim.runAll(config_dict)
         
 
@@ -183,6 +184,7 @@ class TestWorkflow(unittest.TestCase):
         config_dict.get("filtering").update({"display_figures":False})
         config_dict.get("filtering").update({"save_filt_plots":False})
         config_dict.get('kinematics').update({'use_simple_model':True})
+        config_dict.get('kinematics').update({'make_bvh':False})
         
         # 1. Run step by step
         Pose2Sim.calibration(config_dict)

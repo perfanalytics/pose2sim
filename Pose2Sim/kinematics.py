@@ -48,6 +48,7 @@ from Pose2Sim.common import natural_sort_key, euclidean_distance, read_trc, writ
                             trimmed_mean, compute_height, get_max_workers
 from Pose2Sim.filtering import filter_all
 from Pose2Sim.skeletons import *
+from Pose2Sim.Utilities.osim_to_bvh import export_to_bvh
 
 import locale 
 locale.setlocale(locale.LC_NUMERIC, 'C')
@@ -614,6 +615,7 @@ def kinematics_all(config_dict):
     use_augmentation = config_dict.get('kinematics', {}).get('use_augmentation', True)
     use_simple_model = config_dict.get('kinematics', {}).get('use_simple_model', False)
     filter_ik = config_dict.get('kinematics', {}).get('filter_ik', False)
+    make_bvh = config_dict.get('kinematics', {}).get('make_bvh', True)
     multi_person = config_dict.get('project', {}).get('multi_person', False)
     parallel_workers = config_dict.get('kinematics', {}).get('parallel_workers_kinematics', 'auto')
     right_left_symmetry = config_dict.get('kinematics', {}).get('right_left_symmetry', True)
@@ -754,3 +756,13 @@ def kinematics_all(config_dict):
         config_dict['filtering']['type'] = config_dict.get('kinematics', {}).get('ik_filter_type', 'acc_minimizing')
         
         filter_all(config_dict)
+
+    if make_bvh:
+        logging.info(f"\nExporting OpenSim results to BVH files...")
+        for trc_file in trc_files:
+            osim_path = (kinematics_dir / (trc_file.stem + '.osim')).resolve()
+            mot_path = Path(kinematics_dir, trc_file.stem + '.mot').resolve()
+            bvh_path = Path(kinematics_dir, trc_file.stem + '_ik.bvh').resolve()
+            export_to_bvh(
+                model_path=osim_path, output_path=bvh_path, motion_path=mot_path)
+

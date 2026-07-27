@@ -302,6 +302,7 @@
 # filter_ik = false # true or false # Useful for force estimations if results are noisy 
 # ik_filter_type = 'acc_minimizing' # butterworth, acc_minimizing, kalman, one_euro, gcv_spline, gaussian, LOESS, median, butterworth_on_speed
 #                                # see and edit the filtering parameters in the [filtering] section
+# make_bvh = true # save kinematics in bvh format in addition to osim and mot (for motion capture software) 
 
 # right_left_symmetry = true # true or false (lowercase) # Set to false only if you have good reasons to think the participant is not symmetrical (e.g. prosthetic limb)
 # default_height = 1.7 # meters # If automatic height calculation did not work, this value is used to scale the model
