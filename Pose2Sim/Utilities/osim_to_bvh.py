@@ -7,9 +7,10 @@
     ## OpenSim to BVH Exporter                      ##
     ##################################################
     
-    Exports OpenSim .osim models and .mot animations to rigged animations in the BVH MoCap format.
+    Exports OpenSim .osim models and .mot or .sto animations 
+    to rigged animations in the BVH MoCap format.
 
-    Heavily inspired by a script by Harri Kaimio:
+    Inspired by a script by Harri Kaimio:
     https://github.com/hkaimio/mocap-helpers/blob/main/opensim-to-bvh/opensim_to_bvh.py
 
     Usage:
@@ -18,6 +19,7 @@
 
         # Export animation
         python osim_to_bvh.py --model model.osim --motion motion.mot
+        python osim_to_bvh.py --model model.osim --motion motion.sto
 
         # With optional parameters
         python osim_to_bvh.py --model model.osim --motion motion.mot -o output.bvh
@@ -43,7 +45,6 @@ __email__ = "contact@david-pagnon.com"
 __status__ = "Development"
 
 
-
 ## FUNCTIONS
 def build_skeleton_tree(model):
     '''
@@ -60,6 +61,7 @@ def build_skeleton_tree(model):
             'joint': OpenSim Joint object connecting to parent
         }
     '''
+
     skeleton_tree = {}
 
     # Get all bodies
@@ -108,6 +110,7 @@ def get_body_global_transform_matrix(model, state, body_name):
     OUPUTS:
         4x4 numpy array [R | t; 0 0 0 1] where R is rotation, t is translation
     '''
+
     body = model.getBodySet().get(body_name)
     transform_osim = body.getTransformInGround(state)
 
@@ -135,6 +138,7 @@ def calculate_end_site_from_geometry(body, body_transform):
     OUPUTS:
         3D offset vector in body's local frame (in centimeters)
     '''
+
     # Try to get cylinder geometry
     try:
         geometry_list = body.get_attached_geometry()
@@ -172,6 +176,7 @@ def create_bvh_hierarchy(skeleton_tree, model, root_body_name, num_frames, frame
     OUPUTS:
         anim.Animation object
     '''
+
     # Initialize state at default pose
     state = model.initSystem()
     model.realizePosition(state)
@@ -209,6 +214,7 @@ def create_joint_recursive(body_name, skeleton_tree, parent, depth, model, state
     OUPUTS:
         anim.Joints object
     '''
+
     node = skeleton_tree[body_name]
 
     # Create joint with OpenSim body name
@@ -264,12 +270,8 @@ def set_frame_from_state(animation, model, state, frame_idx):
         state: OpenSim State object
         frame_idx: Frame index to set
     '''
+    
     joints_list = animation.getlistofjoints()
-
-    # Debug: Focus on specific joints
-    debug_joints = ["spine", "shin.R"]
-    debug_frames = [0, 1, 2]  # Only print first few frames
-
     for joint in joints_list:
         body_name = joint.name
         # Initialize arrays if needed (for first frame)
@@ -284,105 +286,16 @@ def set_frame_from_state(animation, model, state, frame_idx):
         global_rotation = global_transform[0:3, 0:3]
         global_position = global_transform[0:3, 3]
 
-        # Debug output for specific joints
-        if body_name in debug_joints and frame_idx in debug_frames:
-            print(f"\n=== Frame {frame_idx}, Joint: {body_name} ===")
-
-            # Print OpenSim generalized coordinates for this body's joint
-            try:
-                # Find the joint that has this body as child
-                joint_set = model.getJointSet()
-                for i in range(joint_set.getSize()):
-                    joint_obj = joint_set.get(i)
-                    if joint_obj.getChildFrame().findBaseFrame().getName() == body_name:
-                        print(f"OpenSim Joint: {joint_obj.getName()}")
-                        num_coords = joint_obj.numCoordinates()
-                        coord_values = []
-                        for j in range(num_coords):
-                            coord = joint_obj.get_coordinates(j)
-                            coord_name = coord.getName()
-                            coord_value = coord.getValue(state)
-                            coord_values.append(f"{coord_name}={coord_value:.4f}")
-                        print(f"  Generalized coordinates: {', '.join(coord_values)}")
-
-                        # Check for orientation offsets in the joint frames
-                        try:
-                            parent_frame = joint_obj.getParentFrame()
-                            child_frame = joint_obj.getChildFrame()
-
-                            # Get the transform from parent body to parent frame
-                            parent_transform = parent_frame.findTransformInBaseFrame()
-                            parent_rot_in_body = parent_transform.R()
-
-                            # Get the transform from child body to child frame
-                            child_transform = child_frame.findTransformInBaseFrame()
-                            child_rot_in_body = child_transform.R()
-
-                            print(f"  Parent frame orientation in parent body:")
-                            parent_rot_matrix = np.eye(3)
-                            for ii in range(3):
-                                for jj in range(3):
-                                    parent_rot_matrix[ii, jj] = parent_rot_in_body.get(ii, jj)
-                            print(f"    {parent_rot_matrix}")
-
-                            print(f"  Child frame orientation in child body:")
-                            child_rot_matrix = np.eye(3)
-                            for ii in range(3):
-                                for jj in range(3):
-                                    child_rot_matrix[ii, jj] = child_rot_in_body.get(ii, jj)
-                            print(f"    {child_rot_matrix}")
-                        except Exception as e:
-                            print(f"    Could not get frame orientations: {e}")
-
-                        break
-            except Exception as e:
-                print(f"  Could not get coordinates: {e}")
-
-            print(f"Global transform from OpenSim:")
-            print(global_transform)
-            print(f"Global rotation matrix:")
-            print(global_rotation)
-            print(f"Global position: {global_position}")
-
         # Convert global rotation matrix to Euler ZXY (returns degrees)
         global_euler_deg, warning = mathutils.eulerFromMatrix(global_rotation, 'ZXY')
-
-        # Debug: print global Euler before bvhsdk processes it
-        if body_name in debug_joints and frame_idx in debug_frames:
-            print(f"Global Euler (degrees): {global_euler_deg}")
 
         # Use bvhsdk's setGlobalRotation to automatically compute local rotation
         # setGlobalRotation expects degrees (bvhsdk operates in degrees)
         joint.setGlobalRotation(global_euler_deg, frame_idx)
 
-        # Debug: print what bvhsdk computed as local rotation
-        if body_name in debug_joints and frame_idx in debug_frames:
-            print(f"Local rotation computed by bvhsdk (degrees): {joint.rotation[frame_idx]}")
-
-            # Get bvhsdk's global rotation to verify
-            if joint.parent:
-                print(f"Parent joint: {joint.parent.name}")
-            else:
-                print(f"Root joint (no parent)")
-
-            # Get what bvhsdk thinks the global rotation is
-            # getGlobalRotation may return (euler, warning) tuple like eulerFromMatrix
-            result = joint.getGlobalRotation(frame_idx)
-            if isinstance(result, tuple):
-                bvhsdk_global_euler_deg = result[0]
-            else:
-                bvhsdk_global_euler_deg = result
-
-            print(f"Global Euler we passed to setGlobalRotation (degrees): {global_euler_deg}")
-            print(f"Global Euler from bvhsdk's getGlobalRotation (degrees): {bvhsdk_global_euler_deg}")
-            print(f"Difference in global Euler: {bvhsdk_global_euler_deg - global_euler_deg}")
-
         # For root: set global translation
         if joint.parent is None:
             joint.translation[frame_idx] = global_position
-            if body_name in debug_joints and frame_idx in debug_frames:
-                print(f"Root translation: {joint.translation[frame_idx]}")
-                print(f"Root offset: {joint.offset}")
 
 
 def populate_animation_from_motion(animation, model, motion_table,
@@ -397,6 +310,7 @@ def populate_animation_from_motion(animation, model, motion_table,
         start_frame: First frame to export
         end_frame: Last frame to export (inclusive)
     '''
+
     # Initialize state ONCE before the loop (matching YAML script approach)
     state = model.initSystem()
     coordinate_set = model.getCoordinateSet()
@@ -413,23 +327,17 @@ def populate_animation_from_motion(animation, model, motion_table,
             pass
 
     for frame_idx in range(start_frame, end_frame + 1):
-        # Reset coordinate counter for this frame
-        coords_changed = 0
-        # Python tuple - iterate directly
         for i, coord_name in enumerate(coordinate_names):
             try:
                 coord = coordinate_set.get(coord_name)
                 value = motion_data_np[frame_idx, i]
                 coord.setValue(state, value, enforceConstraints=False)
-                coords_changed += 1
             except Exception as e:
                 # Coordinate might not exist in model
                 if frame_idx == start_frame:
                     print(f"    Warning: Could not set {coord_name}: {e}")
                 pass
 
-        if frame_idx == start_frame:
-            print(f"  Set {coords_changed} coordinates for frame {frame_idx}")
 
         # Realize position to update body transforms
         model.realizePosition(state)
@@ -450,12 +358,13 @@ def export_to_bvh(model_path, output_path, motion_path=None, framerate=30.0,
     INPUTS:
         model_path: Path to OpenSim model file
         output_path: Path to output BVH file
-        motion_path: Path to motion file (optional)
+        motion_path: Path to .mot or .sto motion file (optional)
         framerate: Output framerate
         start_frame: First frame to export
         end_frame: Last frame to export (None = all)
         root_body: Name of root body
     '''
+    
     print(f"Loading OpenSim model: {model_path}")
     model = osim.Model(str(model_path))
 
@@ -465,19 +374,20 @@ def export_to_bvh(model_path, output_path, motion_path=None, framerate=30.0,
 
     # Determine number of frames
     if motion_path:
-        print(f"Loading motion data: {motion_path}")
-        motion_table = osim.TimeSeriesTable(str(motion_path))
-        
-        times = motion_table.getIndependentColumn()
-        framerate = int((len(times) - 1) / (times[-1] - times[0]))
+        motion_path = Path(motion_path)
+        ext = motion_path.suffix.lower()
+        if ext in ('.mot', '.sto'):
+            print(f"Loading motion data: {motion_path}")
+            motion_table = osim.TimeSeriesTable(str(motion_path))
+            times = motion_table.getIndependentColumn()
+            total_frames = motion_table.getNumRows()
 
-        total_frames = motion_table.getNumRows()
-        if end_frame is None:
-            end_frame = total_frames - 1
+            framerate = int((len(times) - 1) / (times[-1] - times[0]))
+            end_frame = (total_frames - 1) if end_frame is None else min(end_frame, total_frames - 1)
+            num_output_frames = end_frame - start_frame + 2  # +1 for rest pose at frame 0
+            print(f"  Exporting frames {start_frame} to {end_frame}")
         else:
-            end_frame = min(end_frame, total_frames - 1)
-        num_output_frames = end_frame - start_frame + 2  # +1 for rest pose at frame 0
-        print(f"  Exporting frames {start_frame} to {end_frame}")
+            raise ValueError(f"Unsupported motion file extension: {ext}. Supported: .mot, .sto")
 
     else:
         print("No motion data - exporting rest pose only")
@@ -496,6 +406,7 @@ def export_to_bvh(model_path, output_path, motion_path=None, framerate=30.0,
         print(f"Populating animation frames...")
         populate_animation_from_motion(animation, model, motion_table, start_frame, end_frame)
 
+    output_path = Path(output_path)
     bvh.WriteBVH(
         animation=animation,
         path=str(output_path.parent),
@@ -510,7 +421,6 @@ def export_to_bvh(model_path, output_path, motion_path=None, framerate=30.0,
 
 
 def parse_arguments():
-    '''Parse command line arguments.'''
     parser = argparse.ArgumentParser(
         description='Export OpenSim model and animation to BVH format',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -522,8 +432,7 @@ def parse_arguments():
     parser.add_argument('-o', '--output', required=False, type=Path,
                         help='Output BVH file path')
     parser.add_argument('--motion', type=Path,
-                        help='Motion file (.mot, .sto) - if omitted, exports rest pose only')
-
+                        help='Motion file (.mot, .sto). If omitted, exports rest pose only')
     args = parser.parse_args()
 
     # Validate inputs
@@ -541,9 +450,7 @@ def parse_arguments():
 
 
 def main():
-    '''Main entry point.'''
     args = parse_arguments()
-
     try:
         export_to_bvh(
             model_path=args.model,
