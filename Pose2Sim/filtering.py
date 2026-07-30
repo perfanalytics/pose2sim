@@ -918,8 +918,10 @@ def filter_all(config_dict):
         if reject_outliers:
             Q_coords = Q_coords.apply(hampel_filter, axis=0)  # Hampel filter for outlier rejection
         
-        if do_filter:
+        if do_filter or filter_ik:
             Q_filt = Q_coords.apply(filter1d, axis=0, args = [config_dict, filter_type, frame_rate])
+        else:
+            Q_filt = Q_coords.copy()
 
         if not do_filter and not reject_outliers:
             logging.warning(f'Reject_outliers and filter have been set to false. No further processing done on {file_path_in}.\n')
