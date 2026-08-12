@@ -942,7 +942,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
                         # Calculate reprojection error
                         imgp = np.array(imgp).reshape(-1, 2)
                         imgp_to_objreproj_dist = [euclidean_distance(proj_obj[n], imgp[n]) for n in range(len(proj_obj))]
-                        rms_px = np.sqrt(np.sum([d**2 for d in imgp_to_objreproj_dist]))
+                        rms_px = np.sqrt(np.sum([d**2 for d in imgp_to_objreproj_dist]) / len(imgp_to_objreproj_dist))
                         ret.append(rms_px)
                         R.append(r)
                         T.append(t)
@@ -990,7 +990,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
 
             # Calculate reprojection error
             imgp_to_objreproj_dist = [euclidean_distance(proj_obj[n], imgp[n]) for n in range(len(proj_obj))]
-            rms_px = np.sqrt(np.sum([d**2 for d in imgp_to_objreproj_dist]))
+            rms_px = np.sqrt(np.sum([d**2 for d in imgp_to_objreproj_dist]) / len(imgp_to_objreproj_dist))
             ret.append(rms_px)
             R.append(r)
             T.append(t)
