@@ -767,12 +767,12 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
             if show_detection_intrinsics == True:
                 # If previously labeled points exist, check if they are satisfying
                 if 'image_points' in locals():
-                    imgp = next((entry['image_points_2d'] for entry in image_points if entry["cam_name"] == cam_name), [])
-                    objp = next((entry['object_points_3d'] for entry in image_points if entry["cam_name"] == cam_name), [])
-                    if len(imgp) > 0 and len(objp) > 0:
+                    cached_imgp = next((entry['image_points_2d'] for entry in image_points if entry["cam_name"] == cam_name), [])
+                    cached_objp = next((entry['object_points_3d'] for entry in image_points if entry["cam_name"] == cam_name), [])
+                    if len(cached_imgp) > 0 and len(cached_objp) > 0:
                         # recalculate reprojected points
-                        imgp = np.array(imgp).reshape(-1, 2)
-                        objp = np.array(objp).reshape(-1, 3)
+                        imgp = np.array(cached_imgp).reshape(-1, 2)
+                        objp = np.array(cached_objp).reshape(-1, 3)
                         saved_img_path = create_image_labels(img_path, imgp, calib_dir, 'int', reprojected_points=None, show=True, save=save_debug_images)
                         # Are you satisfied? If so, add to imgpoints and continue; else, redo detection
                         satisfied = show_qt_message_box(
@@ -1448,7 +1448,7 @@ def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False
     - extracted frames in folder
     '''
     
-    if not Path(Path(video_path).exists().stem + '_00000.png') or overwrite_extraction:
+    if not list(Path(video_path).parent.glob(f'{Path(video_path).stem}_*.png')) or overwrite_extraction:
         cap = cv2.VideoCapture(str(video_path))
         if cap.isOpened():
             fps = round(cap.get(cv2.CAP_PROP_FPS))
@@ -1458,7 +1458,7 @@ def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False
                 ret, frame = cap.read()
                 if ret == True:
                     if frame_nb % (fps*extract_every_N_sec) == 0:
-                        img_path = (Path(video_path).stem + '_' +str(frame_nb).zfill(5)+'.png')
+                        img_path = Path(video_path).parent / (Path(video_path).stem + '_' +str(frame_nb).zfill(5)+'.png')
                         cv2.imwrite(str(img_path), frame)
                     frame_nb+=1
                 else:

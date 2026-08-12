@@ -89,7 +89,8 @@ def augment_markers_all(config_dict):
     frame_range = config_dict.get('project', {}).get('frame_range', 'auto')
     subject_height = config_dict.get('project', {}).get('participant_height', 'auto')
     subject_mass = config_dict.get('project', {}).get('participant_mass', 70.0)
-    
+    multi_person = config_dict.get('project', {}).get('multi_person', False)
+
     large_hip_knee_angles = config_dict.get('kinematics', {}).get('large_hip_knee_angles', 90)
     trimmed_extrema_percent = config_dict.get('kinematics', {}).get('trimmed_extrema_percent', 50)
     default_height = config_dict.get('kinematics', {}).get('default_height', 1.7)
@@ -111,6 +112,12 @@ def augment_markers_all(config_dict):
     else:
         trc_files = trc_no_filtering
     sorted(trc_files, key=natural_sort_key)
+
+    if not multi_person and len(trc_files) > 1:
+        most_recent_trc_file = max(trc_files, key=lambda f: f.stat().st_mtime)
+        ignored_trc_files = [f.name for f in trc_files if f != most_recent_trc_file]
+        logging.warning(f"multi_person is set to false in Config.toml but {len(trc_files)} trc files were found in {pose_3d_dir}. Using the most recently modified one ({most_recent_trc_file.name}) and ignoring {ignored_trc_files}.")
+        trc_files = [most_recent_trc_file]
 
     # Add missing markers if needed
     for trc_file in trc_files:
@@ -160,9 +167,15 @@ def augment_markers_all(config_dict):
             subject_height.append(height)
     elif not type(subject_height) == list: # int or float
         subject_height = [subject_height]
-    if len(subject_height) < len(trc_files):
-        logging.warning(f"Number of subject heights does not match number of TRC files. Missing heights are set to {default_height}m.")
-        subject_height += [default_height] * (len(trc_files) - len(subject_height))
+    if len(subject_height) != len(trc_files):
+        if not multi_person:
+            raise ValueError(f"Multi_person is set to false in Config.toml but participant_height has {len(subject_height)} value(s) while {len(trc_files)} trc file(s) were found. Expected exactly one matching value.")
+        elif len(subject_height) < len(trc_files):
+            logging.warning(f"Number of subject heights does not match number of TRC files. Missing heights are set to {default_height}m.")
+            subject_height += [default_height] * (len(trc_files) - len(subject_height))
+        else:
+            logging.warning("Number of subject heights does not match number of TRC files. Extra heights are ignored.")
+            subject_height = subject_height[:len(trc_files)]
 
     # Get subject masses
     if subject_mass is None or subject_mass == 0:
@@ -170,12 +183,18 @@ def augment_markers_all(config_dict):
         logging.warning("No subject mass found in Config.toml. Using default mass of 70kg.")
     elif not type(subject_mass) == list:
         subject_mass = [subject_mass]
-    if len(subject_mass) < len(trc_files):
-        logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.")
-        subject_mass += [70] * (len(trc_files) - len(subject_mass))
+    if len(subject_mass) != len(trc_files):
+        if not multi_person:
+            raise ValueError(f"Multi_person is set to false in Config.toml but participant_mass has {len(subject_mass)} value(s) while {len(trc_files)} trc file(s) were found. Expected exactly one matching value.")
+        elif len(subject_mass) < len(trc_files):
+            logging.warning("Number of subject masses does not match number of TRC files. Missing masses are set to 70kg.")
+            subject_mass += [70] * (len(trc_files) - len(subject_mass))
+        else:
+            logging.warning("Number of subject masses does not match number of TRC files. Extra masses are ignored.")
+            subject_mass = subject_mass[:len(trc_files)]
 
     # Run marker augmentation
-    for p in range(len(subject_mass)):
+    for p in range(len(trc_files)):
         trc_file = trc_files[p]
         trc_file_out = Path(trc_file).stem + f'_{augmenterModelName}.trc'
         
