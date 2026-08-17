@@ -47,8 +47,8 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 > [!NOTE]
 > **Features:**
 > 
+> - 🎯 Research-Grade Accuracy (2-6° joint angle error, validated by peer-reviewed studies)
 > - 📹 Any Cameras (phones, webcams, GoPros...)
-> - 🎯 Research-Grade Accuracy (validated by peer-reviewed studies)
 > - 👥 Multi-Person Support  (track multiple people simultaneously)
 > - 🤸 Full 3D kinematics (complete OpenSim skeletal analysis with joint angles)
 > 
@@ -475,7 +475,7 @@ Film your participant(s) from at least 2 points of view.
 > [!TIP]
 > #### Camera placement:
 > 
-> - **With 2 cameras, one person:** Best results are achieved when one camera is in front of the person, the other at 45° to the side, both at hip level (according to [Samani et al, 2026](https://link.springer.com/article/10.1186/s13104-026-07886-4)). Acceptable results are achieved with one camera in front and one on the side at 90°; or two cameras in front, one at hip level and the other at eye level.\
+> - **With 2 cameras, one person:** According to [Samani et al, 2026](https://link.springer.com/article/10.1186/s13104-026-07886-4), best results are achieved when one camera is in front of the person, the other at 45° to the side, both at hip level. Acceptable results are achieved with one camera in front and one on the side at 90°; or two cameras in front, one at hip level and the other at eye level. [Zhao et al, 2026](https://pmc.ncbi.nlm.nih.gov/articles/PMC13402369/) recommend front or back configurations, especially for frontal- and tranverse-plane angle measurements.\
 > **With 2 cameras, multiple people**: Try to place cameras in a way that minimizes occlusions.
 > - **With multiple cameras:** Make sure the cameras see the subjects from as many different angles as possible and with minimal occlusions. HowNote that top views right above the subjects do not yield good results.
 > - **In difficult settings with limited space and obstacles:** consider using the [Lab Camera Optimizer](https://github.com/flodelaplace/lab-camera-optimizer).
@@ -778,18 +778,20 @@ For the sake of practicality, there are voluntarily few board images for intrins
 
 > [!TIP]
 > - The intrinsic parameters usually need to be calculated only once in their lifetime. In theory, cameras with the same model and settings will have identical intrinsic parameters, so they can be copied from one Calib.toml file to another. In practice, small variations can occur. 
+> - **Warning:** This does not hold true if you zoom in or out. In this case, you will need to recalculate intrinsic parameters.
 > - If you already calculated intrinsic parameters earlier, you can skip this step by setting `overwrite_intrinsics` to false.
 
 > [!TIP]
-> Checkerboard requirements:
-> 
+> Checkerboard requirements:\
+> **Generate checkerboard at [calib.io](https://calib.io/pages/camera-calibration-pattern-generator).** 
+>
+> - Format: A4 or US letter should be good enough, but larger is generally better
 > - Flat: Board must be completely flat
 > - Asymmetric: Rows ≠ Columns (or rows odd if columns even)
 > - Border: Wide white border around pattern
 > - Focus: Sharp, in-focus images
 > - Coverage: Film from multiple angles covering most of frame
 > - No glare: Avoid reflections
-> Generate checkerboard at [calib.io](https://calib.io/pages/camera-calibration-pattern-generator)
 
 > [!IMPORTANT]
 > Common errors:
