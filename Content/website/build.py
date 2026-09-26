@@ -384,7 +384,7 @@ HTML_TEMPLATE = """\
         <!-- Footer -->
         <footer class="footer">
             <div class="footer-content">
-                <p><a href="https://github.com/perfanalytics/pose2sim" target="_blank">Pose2Sim GitHub</a> (⭐please leave a star!⭐) &bull;
+                <p><a href="https://github.com/perfanalytics/pose2sim" target="_blank">Pose2Sim GitHub</a> (⭐Star it⭐ or ❤️<a href="https://github.com/sponsors/davidpagnon" target="_blank">Sponsor it!</a>❤️) &bull;
                    <a href="#how-to-cite">Cite Pose2Sim</a>
                 </p>
                 <p>Open-source markerless motion capture &bull; BSD-3-Clause License</p>
