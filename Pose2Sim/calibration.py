@@ -30,7 +30,7 @@ OUTPUTS:
 
 ## INIT
 from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclidean_distance, natural_sort_key, zup2yup, \
-                            set_always_on_top, show_qt_message_box
+                            set_always_on_top, show_qt_message_box, is_video_file, is_image_file
 
 import os
 import logging
@@ -486,8 +486,8 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
 
     INPUTS:
     - calib_dir: directory containing intrinsic and extrinsic folders, each populated with camera directories
-    - intrinsics_config_dict: dictionary of intrinsics parameters (overwrite_intrinsics, show_detection_intrinsics, intrinsics_extension, extract_every_N_sec, intrinsics_corners_nb, intrinsics_square_size, intrinsics_marker_size, intrinsics_aruco_dict)
-    - extrinsics_config_dict: dictionary of extrinsics parameters (calculate_extrinsics, show_detection_extrinsics, extrinsics_extension, extrinsics_corners_nb, extrinsics_square_size, extrinsics_marker_size, extrinsics_aruco_dict, object_coords_3d)
+    - intrinsics_config_dict: dictionary of intrinsics parameters
+    - extrinsics_config_dict: dictionary of extrinsics parameters
 
     OUTPUTS:
     - ret: residual reprojection error in _px_: list of floats
@@ -708,7 +708,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
 
     INPUTS:
     - calib_dir: directory containing intrinsic and extrinsic folders, each populated with camera directories
-    - intrinsics_config_dict: dictionary of intrinsics parameters (overwrite_intrinsics, show_detection_intrinsics, intrinsics_extension, extract_every_N_sec, intrinsics_corners_nb, intrinsics_square_size, intrinsics_marker_size, intrinsics_aruco_dict)
+    - intrinsics_config_dict: dictionary of intrinsics parameters
 
     OUTPUTS:
     - D: distorsion: list of arrays of floats
@@ -720,7 +720,6 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
     except StopIteration:
         logging.exception(f'Error: No {Path(calib_dir) / "intrinsics"} folder found.')
         raise Exception(f'Error: No {Path(calib_dir) / "intrinsics"} folder found.')
-    intrinsics_extension = intrinsics_config_dict.get('intrinsics_extension', 'jpg')
     extract_every_N_sec = intrinsics_config_dict.get('extract_every_N_sec', 1)
     overwrite_extraction = False
     show_detection_intrinsics = intrinsics_config_dict.get('show_detection_intrinsics', True)
@@ -747,10 +746,12 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
         imgpoints = [] # 2d points in image plane
 
         logging.info(f'\nCamera {cam}:')
-        img_vid_files = list((Path(calib_dir) / 'intrinsics' / cam).glob(f'*.{intrinsics_extension}'))
+        img_vid_files = sorted([f for f in (Path(calib_dir) / 'intrinsics' / cam).glob('*') 
+                                if is_image_file(f) or is_video_file(f)],
+                                key=natural_sort_key)
         if len(img_vid_files) == 0:
-            logging.exception(f'The folder {Path(calib_dir) / "intrinsics" / cam} does not exist or does not contain any files with extension .{intrinsics_extension}.')
-            raise ValueError(f'The folder {Path(calib_dir) / "intrinsics" / cam} does not exist or does not contain any files with extension .{intrinsics_extension}.')
+            logging.exception(f'No images or videos found in the folder {Path(calib_dir) / "intrinsics" / cam}.')
+            raise ValueError(f'No images or videos found in the folder {Path(calib_dir) / "intrinsics" / cam}.')
         img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c.name)]) #sorting paths with numbers
         
         # extract frames from video if video
@@ -843,7 +844,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
 
     INPUTS:
     - calib_dir: directory containing intrinsic and extrinsic folders, each populated with camera directories
-    - extrinsics_config_dict: dictionary of extrinsics parameters (extrinsics_method, calculate_extrinsics, show_detection_extrinsics, extrinsics_extension, extrinsics_corners_nb, extrinsics_square_size, extrinsics_marker_size, extrinsics_aruco_dict, object_coords_3d)
+    - extrinsics_config_dict: dictionary of extrinsics parameters
 
     OUTPUTS:
     - R: extrinsic rotation: list of arrays of floats (Rodrigues)
@@ -851,7 +852,6 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
     '''
 
     extrinsics_method = extrinsics_config_dict.get('extrinsics_method', 'scene')
-    extrinsics_extension = extrinsics_config_dict.get('extrinsics_extension', 'png')
     show_reprojection_error = extrinsics_config_dict.get('show_reprojection_error', True)
 
     extrinsics_scene = extrinsics_config_dict.get('scene', {})
@@ -859,16 +859,19 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
     extrinsics_charuco = extrinsics_config_dict.get('charuco', {})
     extrinsics_keypoints = extrinsics_config_dict.get('keypoints', {})
 
-    try:
-        img_vid_files = sorted((Path(calib_dir) / 'extrinsics').glob(f'*/*.{extrinsics_extension}'))
-        if len(img_vid_files) == 0:
-            img_vid_files = sorted((Path(calib_dir) / 'extrinsics').glob(f'*.{extrinsics_extension}'))
-        if len(img_vid_files) == 0:
-            raise FileNotFoundError(f'The folder {Path(calib_dir) / "extrinsics"} does not exist or does not contain any files with extension .{extrinsics_extension}.')
-        img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c.name)]) #sorting paths with numbers
-    except FileNotFoundError:
-        logging.exception(f'Error: The {Path(calib_dir) / "extrinsics"} folder does not exist or does not contain any files with extension .{extrinsics_extension}.')
-        raise
+    # Detect images or videos in the extrinsics folder, sorted by camera name
+    img_vid_files = sorted(
+        [f for f in (Path(calib_dir) / 'extrinsics').glob('*/*') if f.is_file() and (is_image_file(f) or is_video_file(f))],
+        key=lambda c: [int(n) for n in re.findall(r'\d+', c.name)],
+    )
+    if not img_vid_files:
+        img_vid_files = sorted(
+            [f for f in (Path(calib_dir) / 'extrinsics').glob('*') if f.is_file() and (is_image_file(f) or is_video_file(f))],
+            key=lambda c: [int(n) for n in re.findall(r'\d+', c.name)],
+        )
+    if not img_vid_files:
+        logging.exception(f'No images or videos found in the folder {Path(calib_dir) / "extrinsics"}.')
+        raise FileNotFoundError(f'No images or videos found in the folder {Path(calib_dir) / "extrinsics"}.')
 
     # Load clicked image points if exist
     img_pts_path = Path(calib_dir) / f'Image_points.json'

@@ -157,7 +157,6 @@ calibration_type = 'convert' # 'convert' or 'calculate'
       show_detection_intrinsics = true # true or false (lowercase)
       overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
       extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
-      intrinsics_extension = 'jpg' # any video or image extension
 
       [calibration.calculate.extrinsics]
       # Camera placements, need to be done before every session
@@ -166,7 +165,6 @@ calibration_type = 'convert' # 'convert' or 'calculate'
       show_reprojection_error = true # true or false (lowercase)
       calculate_extrinsics = true # true or false (lowercase) 
       moving_cameras = false # Not implemented yet
-      extrinsics_extension = 'png' # any video or image extension
 
          [calibration.calculate.extrinsics.scene]
          # Manually click on any point of know coordinates in the scene. Usually more accurate if points are spread out.
