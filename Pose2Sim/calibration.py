@@ -1020,6 +1020,49 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
     return ret, C, S, D, K, R, T
 
 
+def draw_charuco_corners_like_chessboard(img, charuco_corners, charuco_ids, board, radius=8, thickness=1):
+    '''
+    Draws charuco corners styled like cv2.drawChessboardCorners:
+    - one color per row, cycling through OpenCV's exact 7-color BGR palette
+    - each corner marked with a circle + an X (45°-rotated cross)
+    - no squares, no IDs, no connecting lines
+    '''
+
+    _LINE_COLORS_BGR = [
+        (0, 0, 255),      # red
+        (0, 128, 255),    # orange
+        (0, 200, 200),    # yellow
+        (0, 255, 0),      # green
+        (200, 200, 0),    # cyan-ish
+        (255, 0, 0),      # blue
+        (255, 0, 255),    # magenta
+    ]
+
+    if charuco_corners is None or charuco_ids is None:
+        return img
+
+    out = img.copy()
+    board_size = board.getChessboardSize()   # (squaresX, squaresY)
+    n_cols = board_size[0] - 1               # inner-corner columns
+
+    for corner, cid in zip(charuco_corners, charuco_ids.flatten()):
+        row = int(cid) // n_cols
+        color = _LINE_COLORS_BGR[row % len(_LINE_COLORS_BGR)]
+
+        x, y = corner.ravel()
+        cx, cy = int(round(x)), int(round(y))
+
+        # Circle
+        cv2.circle(out, (cx, cy), radius, color, thickness, cv2.LINE_AA)
+
+        # 45°-rotated cross (an "X"), sized to fit inside the circle
+        d = int(round(radius * 0.7071))  # radius / sqrt(2)
+        cv2.line(out, (cx - d, cy - d), (cx + d, cy + d), color, thickness, cv2.LINE_AA)
+        cv2.line(out, (cx - d, cy + d), (cx + d, cy - d), color, thickness, cv2.LINE_AA)
+
+    return out
+
+
 def findCorners(img_path, corner_nb, objp=[], show=True, board_type='charuco', aruco_square_size=0.06, aruco_marker_size=0.04, aruco_marker_resolution=4):
     '''
     Find corners in the photo of a checkerboard or CharUco board.
@@ -1087,14 +1130,22 @@ def findCorners(img_path, corner_nb, objp=[], show=True, board_type='charuco', a
             if show:
                 # Draw detected CharUco corners
                 charuco_corners, charuco_ids = charuco_corners.reshape(-1, 1, 2), charuco_ids.reshape(-1, 1)
-                cv2.aruco.drawDetectedCornersCharuco(img, charuco_corners, None)
+                img = draw_charuco_corners_like_chessboard(img, charuco_corners, charuco_ids, board)
+
                 # Add corner index
-                for i, corner in enumerate(charuco_corners):
-                    if i in [0, len(charuco_corners)-1]:
-                        x, y = corner.ravel()
-                        for dx, dy in outline_offsets:
-                            cv2.putText(img, str(charuco_ids[i][0]+1), (int(x)-5+dx, int(y)-5+dy), cv2.FONT_HERSHEY_SIMPLEX, .8, (255, 255, 255), 1, lineType=cv2.LINE_AA)
-                        cv2.putText(img, str(charuco_ids[i][0]+1), (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .8, (0,0,0), 1, lineType=cv2.LINE_AA)
+                ids_flat = charuco_ids.flatten()
+                rows = ids_flat // corner_nb[1]
+                first_row_idx = np.where(rows == rows.min())[0]
+                last_row_idx  = np.where(rows == rows.max())[0]
+                first_row_idx = first_row_idx[np.argsort(ids_flat[first_row_idx])]
+                last_row_idx  = last_row_idx[np.argsort(ids_flat[last_row_idx])]
+                targets = [first_row_idx[0], first_row_idx[-1], last_row_idx[0], last_row_idx[-1]]
+                for i in targets:
+                    x, y = charuco_corners[i].ravel()
+                    label = str(ids_flat[i] + 1)
+                    for dx, dy in outline_offsets:
+                        cv2.putText(img, label, (int(x)-5+dx, int(y)-5+dy), cv2.FONT_HERSHEY_SIMPLEX, .8, (255, 255, 255), 1, lineType=cv2.LINE_AA)
+                    cv2.putText(img, label, (int(x)-5, int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, .8, (0, 0, 0), 1, lineType=cv2.LINE_AA)
 
                 # Visualizer and key press event handler
                 for var_to_delete in ['imgp_confirmed', 'objp_confirmed']:
