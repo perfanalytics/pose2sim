@@ -144,35 +144,32 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 
    [calibration.calculate] 
       save_debug_images = true       # Save images with clicked points (and their reprojections for extrinsic calibration)
-      # Camera properties, theoretically need to be calculated only once in a camera lifetime
+
       [calibration.calculate.intrinsics]
-      overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
-      intrinsics_extension = 'jpg' # any video or image extension
-      extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
-      intrinsics_corners_nb = [4,7] 
-      intrinsics_square_size = 60 # mm
+      # Camera properties, theoretically need to be calculated only once in a camera lifetime
+      # Recommendations: 20 corners/markers minimum, but the board can be as small as A4/US-letter
+      board_type = 'charuco' # 'charuco' or 'chess' # charuco is more robust but very slightly less accurate (expect 0.5 px error instead of 0.2)
+      corners_nb = [4,7] # /!\ internal corners rather, ie [rows-1, cols-1]
+      square_size = 60 # mm
+      marker_size = 40 # mm # charuco only: ArUco marker size
+      marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
+
       show_detection_intrinsics = true # true or false (lowercase)
+      overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
+      extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
+      intrinsics_extension = 'jpg' # any video or image extension
 
-      # Camera placements, need to be done before every session
       [calibration.calculate.extrinsics]
-      calculate_extrinsics = true # true or false (lowercase) 
-      extrinsics_method = 'scene' # 'board', 'scene', 'keypoints'
-      extrinsics_extension = 'png' # any video or image extension
-      # 'board' should be large enough to be detected when laid on the floor. Not recommended.
-      # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out.
-      # 'keypoints' uses automatic pose estimation of a person freely walking and waving arms in the scene. Slighlty less accurate, requires synchronized cameras.
+      # Camera placements, need to be done before every session
+      extrinsics_method = 'scene' # 'scene' OR 'chess_static' OR 'charuco_static' -> Single-image calibration
+                                  # OR 'charuco' OR 'keypoints' -> Multi-image calibration, requires synchronized cameras
       show_reprojection_error = true # true or false (lowercase)
+      calculate_extrinsics = true # true or false (lowercase) 
       moving_cameras = false # Not implemented yet
-
-         [calibration.calculate.extrinsics.board]
-         board_position = 'vertical' # 'vertical' or 'horizontal'
-         extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
-         extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
+      extrinsics_extension = 'png' # any video or image extension
 
          [calibration.calculate.extrinsics.scene]
-         # list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
-         # in m -> unlike for intrinsics, NOT in mm!
-         # [X,Y,Z], which becomes [Z,X,Y] in the TRC reference frame, and [-Y,X,Z] in the Blender one
+         # Manually click on any point of know coordinates in the scene. Usually more accurate if points are spread out.
          object_coords_3d =   [[-2.0,  0.3,  0.0], 
                               [-2.0 , 0.0,  0.0], 
                               [-2.0, 0.0,  0.05], 
@@ -181,9 +178,28 @@ calibration_type = 'convert' # 'convert' or 'calculate'
                               [0.0, 0.0,  0.0], 
                               [0.0, 0.0,  0.05], 
                               [0.0, -0.3,  0.0]]
-        
-         [calibration.calculate.extrinsics.keypoints]
-         # Coming soon!
+         # object_coords_3d: list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
+         # in m -> unlike for intrinsics, NOT in mm!
+         # [X,Y,Z], which becomes [Z,X,Y] in the TRC reference frame, and [-Y,X,Z] in the Blender one
+
+         [calibration.calculate.extrinsics.static] # 'chess_static' OR 'charuco_static'
+         # Recommendations: Not recommended. The board needs to be seen by all cameras: if 'vertical', cameras can't circle around the scene; if 'horizontal', they need to be high enough to detect it. 
+         board_position = 'vertical' # 'vertical' or 'horizontal'
+         corners_nb = [4,7] # [H,W] rather than [w,h]
+         square_size = 60 # mm # [h,w] if square is actually a rectangle
+         marker_size = 40 # mm # charuco only: ArUco marker size
+         marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
+      
+         [calibration.calculate.extrinsics.charuco] # Coming soon!
+         # Requires synchronized camera. Uses a moving charuco board. 
+         # Recommendations: The markers need to be large, but don't need to be numerous. Even one works.
+         corners_nb = [4,7] # [H,W] rather than [w,h]
+         square_size = 60 # mm # [h,w] if square is actually a rectangle
+         marker_size = 40 # mm # charuco only: ArUco marker size
+         marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
+      
+         [calibration.calculate.extrinsics.keypoints] # Coming soon!
+         # Requires synchronized cameras. Uses pose estimation of a person freely walking and waving arms in the scene.
 
 
 [personAssociation]
@@ -328,6 +344,11 @@ use_custom_logging = false # if integrated in an API that already has logging
 # You can create as many custom skeletons as you want, just add them further down and rename them.
 # 
 # Check your model hierarchy with:  
+# import rtoml
+# from pathlib import Path
+# from anytree.importer import DictImporter
+# model_dict = rtoml.load(Path('Config.toml'))['pose']['CUSTOM'][0]
+# model = DictImporter().import_(model_dict)
 # from anytree import Node, RenderTree
 # for pre, _, node in RenderTree(model): 
 #     print(f'{pre}{node.name} id={node.id}')

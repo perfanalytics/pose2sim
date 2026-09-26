@@ -303,7 +303,9 @@ class Pose2SimPipeline:
         from Pose2Sim.filtering import filter_all
         for config_dict in self.config_dicts:
             self._log_step_header("Filtering 3D coordinates", config_dict)
+            start = time.time()
             filter_all(config_dict)
+            elapsed = time.time() - start
             logging.info('\n')
 
     def markerAugmentation(self):

@@ -24,6 +24,7 @@ Please visit the website! (after leaving a **⭐star⭐**! 😇)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 \
 [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
+[![Sponsor](https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86)](https://github.com/sponsors/davidpagnon)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/perfanalytics/pose2sim)
 
 
@@ -65,8 +66,8 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 <br>
 
 > [!IMPORTANT]
-> If you like it, ⭐ please leave a star ⭐ on the [Pose2Sim GitHub repository](https://github.com/perfanalytics/pose2sim)!\
-> This project is completely free: this is your chance to support the project and make it more visible to the community.
+> This project is completely free and open-source: it you like it and find it useful, please consider supporting it!\
+> You can help make it more visible and sustainable by ⭐ [Giving us a star](https://github.com/perfanalytics/pose2sim) ⭐ or ❤️ [Becoming a sponsor](https://github.com/sponsors/davidpagnon). ❤️
 
 > [!IMPORTANT]
 > If you want to contribute to Sports2D or Pose2Sim, please see [How to contribute](#how-to-contribute-and-to-do-list) or join the Discord community! [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
@@ -499,7 +500,7 @@ Film your participant(s) from at least 2 points of view.
 > The main drawback of working with videos is the size of the files. Here are some example settings (inspired by [Hardy et al, 2026](https://cvbw2026.github.io/assets/papers/4.pdf)) to significantly reduce storage use with little impact on accuracy:
 > 
 > - **Compress videos:** Increasing crf from 20 to 30 has virtually no impact on accuracy, and *decreases storage use by up to 10 times*.
-> - **Decrease resolution:** Decreasing from HD (1080 x 1920) to SD (720 x 1280) has little impact, and *decreases storage use by about 8 times*.
+> - **Decrease resolution:** Decreasing from HD (1080 x 1920) to SD (720 x 1280) or even further has little impact, and *decreases storage use by about 8 times*.
 > - **Audio does not matter:** Audio tracks take between 1 and (rarely) 10% of the file size.
 > - **Camera number:** 6 is generally a good camera number. Of course, complex motions and occlusions require more cameras, and gait requires fewer.
 > - **Face blurring:** Preserves privacy with little impact on accuracy. Use this [Utility script](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/face_blurring.py).
