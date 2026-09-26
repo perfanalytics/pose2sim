@@ -344,6 +344,11 @@ use_custom_logging = false # if integrated in an API that already has logging
 # You can create as many custom skeletons as you want, just add them further down and rename them.
 # 
 # Check your model hierarchy with:  
+# import rtoml
+# from pathlib import Path
+# from anytree.importer import DictImporter
+# model_dict = rtoml.load(Path('Config.toml'))['pose']['CUSTOM'][0]
+# model = DictImporter().import_(model_dict)
 # from anytree import Node, RenderTree
 # for pre, _, node in RenderTree(model): 
 #     print(f'{pre}{node.name} id={node.id}')

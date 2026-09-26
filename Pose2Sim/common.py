@@ -938,6 +938,9 @@ def create_c3d_file(c3d_path, marker_names, trc_data_np):
     times = trc_data_np[:,0]
     frame_rate = round((len(times)-1) / (times[-1] - times[0]))
 
+    # Axes permutation to convert from OpenSim (Y-up) to Visual3D (Z-up) # XYZ -> ZXY
+    trc_data_np = trc_data_np[:, [0] + [i for j in range(1, len(marker_names)*3, 3) for i in [j+2, j, j+1]]]
+
     # write c3d file
     writer = c3d.Writer(point_rate=frame_rate, analog_rate=0, point_scale=1.0, point_units='mm', gen_scale=-1.0)
     writer.set_point_labels(marker_names)
@@ -1172,7 +1175,7 @@ def best_coords_for_measurements(Q_coords, large_hip_knee_angles=90):
             Q_coords_low_angles = Q_coords.iloc[pd.Series(ang_mean).nsmallest(50).index]
     except:
         Q_coords_low_angles = Q_coords
-        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}° as a fallback.")
+        logging.warning(f"At least one among the Hip, RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}° as a fallback.")
 
     if Q_coords_low_angles.empty:
         logging.warning('The selected person might not move, or is crouching for the whole sequence, or is not well detected. Taking all available data instead of filtering them as a fallback.')

@@ -691,7 +691,7 @@ def triangulate_all(config_dict):
     try:
         calib_dir = [c for c in Path(session_dir).iterdir() if c.is_dir() and 'calib' in c.name.lower()][0]
     except:
-        raise Exception(f'No .toml calibration directory found.')
+        raise Exception(f'No .toml calibration directory found. If there is one and it still fails, try moving your project folder into another empty folder.')
 
     try:
         calib_files = list(Path(calib_dir).glob('*.toml'))
@@ -721,7 +721,7 @@ def triangulate_all(config_dict):
         model = eval(pose_model)
     except:
         try: # from Config.toml
-            model = DictImporter().import_(config_dict.get('pose').get(pose_model))
+            model = DictImporter().import_(config_dict.get('pose').get(pose_model)[0])
             if model.id == 'None':
                 model.id = None
         except:
@@ -786,7 +786,7 @@ def triangulate_all(config_dict):
     id_excluded_cams = [[] for n in range(nb_persons_to_detect)]
     Q_tot, error_tot, nb_cams_excluded_tot, cam_excluded_count, id_excluded_cams_tot = [], [], [], [], []
     interp_frames, non_interp_frames, f_range_trimmed = [], [], []
-    trc_paths, c3d_paths = [], []
+    trc_paths = []
     frames_since_last_seen = None
     for f in tqdm(range(*f_range)):
         # print(f'\nFrame {f}:')        
@@ -961,7 +961,7 @@ def triangulate_all(config_dict):
         # Create TRC file
         trc_paths.append(make_trc(config_dict, Q_tot[n], keypoints_names, id_person=n))
         if make_c3d:
-            c3d_paths.append(convert_to_c3d(t) for t in trc_paths)
+            c3d_paths = [convert_to_c3d(t) for t in trc_paths]
 
         # IDs of excluded cameras
         frame_count = len(Q_tot[n])

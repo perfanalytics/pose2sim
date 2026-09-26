@@ -679,7 +679,7 @@ def associate_all(config_dict):
     try:
         calib_dir = [Path(session_dir) / c for c in os.listdir(session_dir) if (Path(session_dir) / c).is_dir() and 'calib' in c.lower()][0]
     except:
-        raise Exception(f'No .toml calibration directory found.')
+        raise Exception(f'No .toml calibration directory found. If there is one and it still fails, try moving your project folder into another empty folder.')
     try:
         calib_files = list(Path(calib_dir).glob('*.toml'))
         calib_file = max(calib_files, key=lambda f: f.stat().st_ctime) # lastly created calibration file
@@ -707,7 +707,7 @@ def associate_all(config_dict):
         model = eval(pose_model)
     except:
         try: # from Config.toml
-            model = DictImporter().import_(config_dict.get('pose').get(pose_model))
+            model = DictImporter().import_(config_dict.get('pose').get(pose_model))[0]
             if model.id == 'None':
                 model.id = None
         except:

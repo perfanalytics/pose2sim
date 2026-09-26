@@ -844,7 +844,7 @@ BLAZEPOSE = Node("Hip", id=None, children=[
         ]),
     ]),
     Node("LHip", id=23, children=[
-        Node("Lknee", id=25, children=[
+        Node("LKnee", id=25, children=[
             Node("LAnkle", id=27, children=[
                 Node("LHeel", id=29),
                 Node("LBigToe", id=31),
