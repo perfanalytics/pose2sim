@@ -939,7 +939,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 > [!TIP]
 > - Usually slightly more accurate ***BUT*** requires synchronized cameras.
-> - Only ChArUco boards are supported (not chess boards)
+> - Only ChArUco boards are supported (not chessboards)
 
 </br>
 
@@ -1231,14 +1231,14 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 <details>
    <summary><b>Project</b> (CLICK TO SHOW)</summary>
 
-    | Parameter | Default | Description |
-    |-----------|---------|-------------|
-    | `multi_person` | `false` | If `true`, all persons in the scene are analyzed. If `false`, only the person with the lowest reprojection error is kept. |
-    | `participant_height` | `'auto'` | Height of the participant(s) in meters. `'auto'`, a float (e.g. `1.72`), or a list of floats (e.g. `[1.72, 1.40]`). Only used for marker augmentation. |
-    | `participant_mass` | `70.0` | Mass of the participant(s) in kg. A float or a list of floats. Only used for marker augmentation and scaling; no impact on results unless you need to compute forces. |
-    | `frame_rate` | `'auto'` | Frame rate in fps. `'auto'` reads from video metadata, or defaults to 60 fps when working with images. |
-    | `frame_range` | `'auto'` | `'auto'`, `'all'`, or a range like `[10, 300]`. `'auto'` trims around frames with low reprojection error. If cameras are not synchronized, designates the frame range of the camera with the shortest recording. |
-    | `exclude_from_batch` | `[]` | List of trial paths to exclude from batch analysis, e.g. `['S00_P00_Participant/S00_P00_T00_StaticTrial']`. |
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `multi_person` | `false` | If `true`, all persons in the scene are analyzed. If `false`, only the person with the lowest reprojection error is kept. |
+| `participant_height` | `'auto'` | Height of the participant(s) in meters. `'auto'`, a float (e.g. `1.72`), or a list of floats (e.g. `[1.72, 1.40]`). Only used for marker augmentation. |
+| `participant_mass` | `70.0` | Mass of the participant(s) in kg. A float or a list of floats. Only used for marker augmentation and scaling; no impact on results unless you need to compute forces. |
+| `frame_rate` | `'auto'` | Frame rate in fps. `'auto'` reads from video metadata, or defaults to 60 fps when working with images. |
+| `frame_range` | `'auto'` | `'auto'`, `'all'`, or a range like `[10, 300]`. `'auto'` trims around frames with low reprojection error. If cameras are not synchronized, designates the frame range of the camera with the shortest recording. |
+| `exclude_from_batch` | `[]` | List of trial paths to exclude from batch analysis, e.g. `['S00_P00_Participant/S00_P00_T00_StaticTrial']`. |
 
 </details>
 
@@ -1248,10 +1248,15 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 <details>
    <summary><b>Pose</b> (CLICK TO SHOW)</summary>
 
+Pose estimation parameters.
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `pose_model` | `'Body_with_feet'` | Skeleton model to use.<br>**With RTMLib:**<br> - `'Body_with_feet'` (HALPE_26, default), <br>- `'Whole_body_wrist'` (COCO_133_WRIST: body+feet+ 2 hand keypoints), <br>- `'Whole_body'` (COCO_133), <br>- `'Lower_body'` (Effectively runs HALPE_26. Later Pose2Sim stages ignore upper-body keypoints, recreate shoulder points: Hip + 0.53 m (Y direction) + 0.1 m (Hip-to-Hip direction), <br>- `'Body'` (COCO_17, Marker augmentation won't work, Kinematic analysis will), <br>- `'Hand'` (Hand_21), <br>- `'Face'` (FACE_106), <br>- `'Animal'` (ANIMAL2D_17). <br>⚠️ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the output files if needed<br>⚠️ For Face and Animal, use mode="""{dictionary}""", and find the corresponding .onnx model there https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose<br><br>**With MMPose:** `HALPE_26`, `COCO_133`, `COCO_17`, `CUSTOM`. See CUSTOM example at the end of the Config.toml file. <br>**With OpenPose:** `BODY_25B`, `BODY_25`, `BODY_135`, `COCO`, `MPII`. <br>**With MediaPipe:** `BLAZEPOSE`. <br>**With AlphaPose:** `HALPE_26`, `HALPE_68`, `HALPE_136`, `COCO_133`. <br>**With DeepLabCut:** `CUSTOM`. |
 | `mode` | `'balanced'` | `'lightweight'`, `'balanced'`, or `'performance'`.<br>Can also be a `"""{dictionary}"""` to manually select detection and pose models (see [rtmlib](https://github.com/Tau-J/rtmlib)). Models can be local paths or URLs. Make sure `input_sizes` are within square brackets and in the **opposite order** from the model path (e.g. `[192,256]` for a `256x192` model). If your `pose_model` is not in `skeletons.py`, you may need to create your own.<br><br>**Examples:**<br>*Equivalent to `mode='balanced'`:*<br>`` """{'det_class':'YOLOX', 'det_model':'https://…/yolox_m_8xb8-300e_humanart-c2c7a14a.zip', 'det_input_size':[640,640], 'pose_class':'RTMPose', 'pose_model':'https://…/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip', 'pose_input_size':[192,256]}""" ``<br><br>*One-stage RTMO (requires `pose_model = 'Body'`):*<br>`` """{'pose_class':'RTMO', 'pose_model':'https://…/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.zip', 'pose_input_size':[640,640]}""" ``<br><br>*Animal pose estimation (marker augmentation won't work; custom OpenSim skeleton needed for IK):*<br>`` """{'pose_class':'RTMPose', 'pose_model':'https://…/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.zip', 'pose_input_size':[256,256]}""" `` |
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `det_frequency` | `4` | Run person detection only every N frames; bounding boxes are tracked in between. Higher values are faster but may miss detections. Can be as high as you want in simple uncrowded scenes, must be ≥ 1. |
 | `device` | `'auto'` | Inference device: `'auto'`, `'CPU'`, `'CUDA'`, `'MPS'`, or `'ROCM'`. |
 | `backend` | `'auto'` | Inference backend: `'auto'`, `'openvino'`, `'onnxruntime'`, or `'opencv'`. |
@@ -1261,6 +1266,9 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `save_video` | `'to_video'` | `'to_video'`, `'to_images'`, `'none'`, or `['to_video', 'to_images']`. |
 | `output_format` | `'openpose'` | `'openpose'`, `'mmpose'`, `'deeplabcut'`, `'none'`, or a list. Only `'openpose'` is fully supported downstream. |
 | `average_likelihood_threshold` | `0.5` | Detections are dropped when their average keypoint likelihood is below this threshold. |
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `tracking_mode` | `'sports2d'` | Person tracker used between frames: `'sports2d'` (fast, recommended) or `'deepsort'` (slower, harder to parametrize). |
 | `predict_displacement` | `false` | If `true`, predicts each person's next position by linear extrapolation. Use for sustained straight-line motion (sprinting, cycling) or long occlusions. Avoid for sudden direction changes (basketball, hopping). |
 | `match_by` | `'keypoints'` | How persons are matched across frames: `'keypoints'` (mean per-keypoint distance), `'centroid'` (distance between keypoint centroids), or `'bbox'` (1 − IoU of bounding boxes).<br>- Favor `'keypoints'` when people pass close to each other with distinct limb positions and limited frame-to-frame motion.<br>- Favor `'centroid'` in crowded scenes where people are very small (< 40 px).<br>- Favor `'bbox'` with `predict_displacement=true` for people of different sizes moving in a straight line with fast limb motion and large occlusions. |
@@ -1310,28 +1318,69 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `convert.convert_from` | `'qualisys'` | Source format: `'caliscope'`, `'qualisys'`, `'optitrack'`, `'vicon'`, `'opencap'`, `'easymocap'`, `'biocv'`, `'anipose'`, or `'freemocap'`. |
 | `binning_factor` *(qualisys only)* | `1` | Usually `1`; set to `2` when filming at 540p with Qualisys. |
 
-**[calibration.calculate.intrinsics]**
+**[calibration.calculate]**
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `overwrite_intrinsics` | `false` | If `false`, skips intrinsic calculation when results already exist. |
-| `extract_every_N_sec` | `1` | If a video is provided, extract one frame every N seconds (can be < 1). |
-| `intrinsics_corners_nb` | `[4, 7]` | `[rows, cols]` of *internal* corners on the checkerboard (one less per side than the printed square count). |
-| `intrinsics_square_size` | `60` | Size of one checkerboard square in mm. |
+| `save_debug_images` | `true` | Save images with clicked points (and their reprojections for extrinsic calibration). |
+
+**[calibration.calculate.intrinsics]**
+
+Camera properties, theoretically need to be calculated only once in a camera lifetime. Recommendations: 20 corners/markers minimum, but the board can be as small as A4/US-letter
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `board_type` | `'charuco'` | `'charuco'` or `'chess'`. Charuco is more robust to occlusions but very slightly less accurate (expect 0.5 px error instead of 0.2). |
+| `corners_nb` | `[4, 7]` | `[rows-1, cols-1]` of *internal* corners on the checkerboard. |
+| `square_size` | `60` | Size of one checkerboard square in mm. |
+| `marker_resolution` *(charuco only)* | `5` | Resolution of the aruco marker (e.g. 4 for `'DICT_5X5_50'`, `'DICT_5X5_100'`, ...). |
 | `show_detection_intrinsics` | `true` | Display detected corners during intrinsic calibration. |
+| `overwrite_intrinsics` | `true` | If `false`, skips intrinsic calculation when results already exist. |
+| `extract_every_N_sec` | `1` | If a video is provided, extract one frame every N seconds (can be < 1). |
 
 **[calibration.calculate.extrinsics]**
 
+Camera placements, need to be done before every session
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `calculate_extrinsics` | `true` | Set to `false` to skip extrinsic calculation. |
-| `extrinsics_method` | `'scene'` | `'board'` (checkerboard on floor), `'scene'` (manually clicked points of known 3D coordinates), or `'keypoints'` (coming soon). |
+| `extrinsics_method` | `'scene'` | `'scene'` OR `'chess_static'` OR `'charuco_static'` → Single-image calibration. OR `'charuco'` OR `'keypoints'` → Multi-image calibration, requires synchronized cameras. |
 | `show_reprojection_error` | `true` | Display reprojection error after extrinsic calibration. |
+| `calculate_extrinsics` | `true` | Set to `false` to skip extrinsic calculation. |
 | `moving_cameras` | `false` | Not implemented yet. |
-| `board_position` *(board only)* | `'vertical'` | `'horizontal'` or `'vertical'`. |
-| `extrinsics_corners_nb` *(board only)* | `[4, 7]` | `[rows, cols]` of internal corners on the extrinsic checkerboard. |
-| `extrinsics_square_size` *(board only)* | `60` | Square size in mm (can be `[h, w]` for rectangles). |
-| `object_coords_3d` *(scene only)* | `[[...], ...]` | List of `[X, Y, Z]` 3D coordinates (in **metres**) of the points you will click on each camera image. Spread points as widely as possible for best accuracy. |
+
+**[calibration.calculate.extrinsics.scene]**
+
+Manually click on any point of know coordinates in the scene. Usually more accurate if points are spread out.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `object_coords_3d` | `[[-2.0, 0.3, 0.0], [-2.0, 0.0, 0.0], [-2.0, 0.0, 0.05], [-2.0, -0.3, 0.0], [0.0, 0.3, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.05], [0.0, -0.3, 0.0]]` | List of `[X, Y, Z]` 3D coordinates (in **metres**, unlike intrinsics which are in mm!) of the points you will click on each camera image. Spread points as widely as possible for best accuracy. `[X,Y,Z]` becomes `[Z,X,Y]` in the TRC reference frame, and `[-Y,X,Z]` in the Blender one. |
+
+**[calibration.calculate.extrinsics.static]** *(for `'chess_static'` OR `'charuco_static'`)*
+
+Recommendations: Not recommended. The board needs to be seen by all cameras: if 'vertical', cameras can't circle around the scene; if 'horizontal', they need to be high enough to detect it. 
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `board_position` | `'vertical'` | `'vertical'` or `'horizontal'`. Not recommended: the board needs to be seen by all cameras; if `'vertical'`, cameras can't circle around the scene; if `'horizontal'`, they need to be high enough to detect it. |
+| `corners_nb` | `[4, 7]` | `[H,W]` rather than `[w,h]`. |
+| `square_size` | `60` | mm. `[h,w]` if square is actually a rectangle. |
+| `marker_resolution` *(charuco only)* | `5` | Resolution of the aruco marker (e.g. 4 for `'DICT_5X5_50'`, `'DICT_5X5_100'`, ...). |
+
+**[calibration.calculate.extrinsics.charuco]** *(Coming soon!)*
+
+Requires synchronized camera. Uses a moving charuco board. Recommendations: The markers need to be large, but don't need to be numerous. Even a single one works.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `corners_nb` | `[4, 7]` | `[H,W]` rather than `[w,h]`. |
+| `square_size` | `60` | mm. `[h,w]` if square is actually a rectangle. |
+| `marker_resolution` | `5` | Resolution of the aruco marker (e.g. 4 for `'DICT_5X5_50'`, `'DICT_5X5_100'`, ...). |
+
+**[calibration.calculate.extrinsics.keypoints]** *(Coming soon!)*
+
+Requires synchronized cameras. Uses pose estimation of a person freely walking and waving arms in the scene.
 
 </details>
 
@@ -1350,6 +1399,9 @@ Take heart, calibration is not that complicated once you get the hang of it!
 
 **Multi person**
 
+If reconstruction_error_threshold too low or min_affinity too high: no correspondences will be found.\n
+If reconstruction_error_threshold too high or min_affinity too low: wrong correspondences will be found. If one person is associated to several ones on a different view, only the first is kept
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `reconstruction_error_threshold` | `0.1` | metres. Maximum 3D reconstruction error for two detections to be considered the same person across cameras. |
@@ -1362,21 +1414,32 @@ Take heart, calibration is not that complicated once you get the hang of it!
 <details>
    <summary><b>Triangulation</b> (CLICK TO SHOW)</summary>
 
+For each frame, each keypoint: if results are not good, we remove a camera and try again
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `reproj_error_threshold_triangulation` | `15` | px. Triangulated points with reprojection error above this threshold are rejected and a camera is removed for retry. |
 | `likelihood_threshold_triangulation` | `0.3` | 2D detections with likelihood below this value are ignored for triangulation. |
 | `min_cameras_for_triangulation` | `2` | Minimum number of cameras required to attempt triangulation. Triangulation is skipped for a given frame/keypoint if fewer cameras remain after filtering. |
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `predict_displacement` | `false` | If `true`, predicts each person's next 3D position by linear extrapolation before matching. Use for sustained straight-line motion or long occlusions; avoid for sudden direction changes. |
 | `match_by` | `'keypoints'` | How persons are matched across frames in 3D: `'keypoints'` (mean per-keypoint distance) or `'centroid'` (distance between keypoint centroids).<br>- Favor `'keypoints'` when depth is reliable (multiview triangulation) and people may be close together.<br>- Favor `'centroid'` when depth is unreliable (monocular 3D, not yet supported in Pose2Sim). |
 | `max_distance_m` | `1.0` | metres. Maximum distance a person can move between frames before being considered a new individual. |
 | `max_unseen_frames` | `100` | Maximum number of consecutive frames a person can be absent before the next detection is assigned a new ID. |
 | `interp_if_gap_smaller_than` | `20` | frames. Gaps smaller than this are interpolated; larger gaps are left as-is (or filled with `fill_large_gaps_with`). |
 | `interpolation` | `'linear'` | Interpolation method for missing points: `'linear'`, `'slinear'`, `'quadratic'`, `'cubic'`, or `'none'`. |
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `remove_incomplete_frames` | `false` | If `true`, a frame is only kept when *all* keypoints have been successfully triangulated. |
 | `sections_to_keep` | `'all'` | Which valid sections to retain: `'all'`, `'largest'`, `'first'`, or `'last'`. |
 | `min_chunk_size` | `10` | frames. Minimum length of a consecutive valid section for it to be retained. |
 | `fill_large_gaps_with` | `'last_value'` | How to fill gaps larger than `interp_if_gap_smaller_than`: `'last_value'`, `'nan'`, or `'zeros'`. |
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `show_interp_indices` | `true` | Print the frame indices that were interpolated for each keypoint. |
 | `make_c3d` | `true` | Also save triangulated data as a `.c3d` file alongside the `.trc` file. |
 
@@ -1396,21 +1459,27 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `save_filt_plots` | `true` | Save filtering plots to disk. |
 | `make_c3d` | `true` | Also save filtered data as a `.c3d` file. |
 
-**[filtering.butterworth]** — most intuitive, standard biomechanics filter
+**[filtering.butterworth]** 
+
+Most intuitive, standard biomechanics filter
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `cut_off_frequency` | `6` | 3-6 Hz: Walking, slow movements; 6-15 Hz: Running, fast movements; 15+ Hz: Very fast and impulsive movements |
 | `order` | `4` | Filter order. |
 
-**[filtering.kalman]** — Used in countless applications, especially real-time. This simplified Kalman filter assumes constant acceleration with Gaussian process noise
+**[filtering.kalman]** 
+
+Used in countless applications, especially real-time. This simplified Kalman filter assumes constant acceleration with Gaussian process noise
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `trust_ratio` | `500` | Ratio of measurement trust to process trust (≈ process noise / measurement noise). Higher values follow the data more closely. |
 | `smooth` | `true` | Apply Kalman smoother (non-causal). Set to `false` for true real-time filtering. |
 
-**[filtering.one_euro]** — Simpler and even faster alternative to Kalman filter for real-time, but tends to blunt RoM. Analog to a 1st order Butterworth but with adaptive cut-off frequency. This one is zero-phase
+**[filtering.one_euro]** 
+
+Simpler and even faster alternative to Kalman filter for real-time, but tends to blunt RoM. Analog to a 1st order Butterworth but with adaptive cut-off frequency. This one is zero-phase
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1418,26 +1487,34 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `beta` | `1.5` | Velocity adaptation coefficient: `f_c = cut_off_frequency + beta × velocity`. |
 | `d_cut_off_frequency` | `1.0` | Hz. Cut-off frequency for the derivative signal. |
 
-**[filtering.gcv_spline]** — Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips)
+**[filtering.gcv_spline]** 
+
+Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips)
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `cut_off_frequency` | `'auto'` | `'auto'` or an integer (behaves like Butterworth). `'auto'` is usually better unless the signal is too short or you got a triangular wave + drift (eg pelvis Y coordinates of a subject walking uphill) |
 | `smoothing_factor` | `1.0` | ≥ 0. Values > 1 produce more smoothing; values < 1 follow the data more closely. Ignored when `cut_off_frequency != 'auto'`. |
 
-**[filtering.acc_minimizing]** — Whittaker-Henderson filter (acceleration-minimizing), produces smooth velocities and accelerations, which is important for force estimations but blunts the peaks; recommended for IK output
+**[filtering.acc_minimizing]** 
+
+Whittaker-Henderson filter (acceleration-minimizing), produces smooth velocities and accelerations, which is important for force estimations but blunts the peaks; recommended for IK output
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `cut_off_frequency` | `6` | Hz. |
 
-**[filtering.loess]** — Local low-degree polynomial smoothing
+**[filtering.loess]** 
+
+Local low-degree polynomial smoothing
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `nb_values_used` | `5` | Number of neighbouring frames used in the local regression. |
 
-**[filtering.gaussian]** — Weighted moving average, with more weight on central points
+**[filtering.gaussian]** 
+
+Weighted moving average, with more weight on central points
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1449,7 +1526,9 @@ Take heart, calibration is not that complicated once you get the hang of it!
 |-----------|---------|-------------|
 | `kernel_size` | `3` | Size of the median filter window in frames (must be odd). |
 
-**[filtering.butterworth_on_speed]** — Signal is differenciated, filtered, then integrated back. Preserves sharp movements, but can introduce an offset in the original signal
+**[filtering.butterworth_on_speed]** 
+
+Signal is differenciated, filtered, then integrated back. Preserves sharp movements, but can introduce an offset in the original signal
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1477,16 +1556,27 @@ Take heart, calibration is not that complicated once you get the hang of it!
 <details>
    <summary><b>Kinematics</b> (CLICK TO SHOW)</summary>
 
+Run OpenSim scaling and inverse kinematics
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `use_augmentation` | `true` | If `true`, uses the model with augmented markers. Set to `false` if augmentation did not improve results. |
 | `use_simple_model` | `false` | If `true`, uses a simplified OpenSim model (no muscles, no constraints). More than 10× faster; stiff spine and ball-joint shoulders, suitable for most gait tasks. |
 | `filter_ik` | `false` | If `true`, filters joint angle results after IK using the method defined in `[filtering]`. Recommended when force estimation is intended. |
 | `ik_filter_type` | `'acc_minimizing'` | Filter type for IK output. Any type from `[filtering]` is accepted. |
+| `make_bvh` | `true` | Save kinematics in bvh format in addition to osim and mot (for motion capture software). |
+
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `right_left_symmetry` | `true` | Set to `false` if the participant is not bilaterally symmetrical (e.g. if they wear a prosthetic limb). |
 | `default_height` | `1.7` | metres. Fallback height used for model scaling if automatic height estimation fails. |
 | `parallel_workers_kinematics` | `'auto'` | `'auto'`, an integer, or `false`. One worker per person (CPU only). Available in multi-person mode only. |
 | `remove_individual_scaling_setup` | `true` | If `true`, per-person scaling setup XML files are deleted after use to avoid clutter. |
+
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `remove_individual_ik_setup` | `true` | If `true`, per-person IK setup XML files are deleted after use to avoid clutter. |
 | `large_hip_knee_angles` | `90` | degrees. Hip and knee angles above this value are considered unreliable and excluded from scaling. |
 | `trimmed_extrema_percent` | `50` | Percentage of the most extreme segment-length values removed before computing the mean for scaling. |
