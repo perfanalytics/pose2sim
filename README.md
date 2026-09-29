@@ -98,10 +98,12 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
       4. [With OpenPose (legacy)](#with-openpose-legacy)
       5. [With Mediapipe BlazePose (legacy)](#with-mediapipe-blazepose-legacy)
       6. [With AlphaPose (legacy)](#with-alphapose-legacy)
-   4. [Calibrate your cameras](#calibrate-your-cameras)
+   4. [Synchronize your cameras](#synchronize-your-cameras)
+   5. [Calibrate your cameras](#calibrate-your-cameras)
       1. [Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-caliscope-anipose-freemocap-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
-   5. [Synchronize your cameras](#synchronize-your-cameras)
+         1. [Calculate intrinsic parameters with a board](#calculate-intrinsic-parameters-with-a-board)
+         2. [Calculate extrinsic parameters with scene landmarks, a static or a moving board, or pose estimation keypoints](#calculate-extrinsic-parameters-with-scene-landmarks-a-static-or-a-moving-board-or-pose-estimation-keypoints)
    6. [Associate persons across cameras](#associate-persons-across-cameras)
    7. [Triangulate keypoints](#triangulate-keypoints)
    8. [Filter 3D coordinates](#filter-3d-coordinates)
@@ -487,7 +489,7 @@ Film your participant(s) from at least 2 points of view.
 > - **Synchronization:** If your cameras are not natively synchronized, you will need one of the participants to do a sharp vertical movement.\
 > More on it in the [Synchronization](#synchronize-your-cameras) section.
 > 
-> - **Calibration:** If your cameras are not natively calibrated, you will need to film a checkerboard (once in the camera's lifetime) and to retrieve the coordinates of some object in the scene (everytime you move the camera).\
+> - **Calibration:** If your cameras are not natively calibrated, you will need to film a chessboard or a charucoboard (once in the camera's lifetime) and to retrieve the coordinates of some object in the scene (everytime you move the camera).\
 > More on it in the [Calibration](#calibrate-your-cameras) section.
 
 > [!NOTE]
@@ -693,156 +695,6 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
 
 </br>
 
-## Calibrate your cameras
-> _**Calculate camera intrinsic properties (lens characteristics) and extrinsic parameters (positions and orientations).\
-> Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_
-
-Open a terminal in your project folder, [activate your environment](#activate-your-environment), and run `ipython`:
-
-```python
-from Pose2Sim import Pose2Sim
-Pose2Sim.calibration()
-```
-
-
-<img src="Content/P2S_calibration.png" width="760">
-
-</br>
-Output file:
-
-<img src="Content/CalibFile.png" width="760">
-
-</br>
-
-### Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
-
-If you already have a calibration file, set `calibration_type` type to `convert` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
-
-> [!TIP]
-> If you want to use a calibration method that requires synchronized cameras, you can switch the steps and first run pose estimation and synchronization.\
-> ***Note:*** This suggestion is only valid if there is a fast motion of a body keypoint that allows you to synchronize on. Set "create synchronized videos = true" to do so, and then run calibration. <!-- Make sure calibration runs on the synchronized videos, not the original ones -->
-
-> [!NOTE]
-> If the original calibration file does not provide any residual errors, they will be logged as NaN. This is not an error and can be ignored.
-
-- **From [Caliscope](https://mprib.github.io/caliscope/)** (recommended *if your cameras are synchronized*), **[Dynamic Extrinsic Camera Calibrator](https://github.com/flodelaplace/lab-camera-dynamic-calibrator)** (based on keypoints: not checkerboard! But *requires synchronized videos, does not estimate intrinsics, and not commercially available*), **[AniPose](https://github.com/lambdaloop/anipose)**, or **[FreeMocap](https://github.com/freemocap/freemocap):**  
-  - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
-  - Calibration can be skipped since these formats are natively supported by Pose2Sim.
-  - **Note:** It seems like the FreeMoCap calibration is in millimeters rather than in meters. Just open your calibration.toml file and multiply all the translation values by 1000.
-- **From [Qualisys](https://www.qualisys.com):**
-  - Export calibration to `.qca.txt` within QTM (see [there](https://github.com/perfanalytics/pose2sim/issues/56#issuecomment-1855933754)).
-  - Copy it in the `Calibration` Pose2Sim folder.
-  - set `convert_from` to 'qualisys' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
-  - If you set your cameras vertically and the videos are rendered sideways, you need to rotate them and the calibration file before running pose estimation. [Use this script](https://github.com/perfanalytics/pose2sim/issues/136#issuecomment-2398110061).
-- **From [Optitrack](https://optitrack.com/):** Exporting calibration will be available in Motive 3.2. In the meantime:
-  - Calculate intrinsics with a board (see next section).
-  - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28).
-  - Use the `Calib.toml` file as is and do not run Pose2Sim.calibration()
-- **From [Vicon](http://www.vicon.com/Software/Nexus):**  
-  - Copy your `.xcp` Vicon calibration file to the Pose2Sim `Calibration` folder.
-  - set `convert_from` to 'vicon' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
-- **From [OpenCap](https://www.opencap.ai/):**  
-  - Copy your `.pickle` OpenCap calibration files to the Pose2Sim `Calibration` folder.
-  - set `convert_from` to 'opencap' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
-- **From [EasyMocap](https://github.com/zju3dv/EasyMocap/):**  
-  - Copy your `intri.yml` and `extri.yml` files to the Pose2Sim `Calibration` folder.
-  - set `convert_from` to 'easymocap' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
-- **From [bioCV](https://github.com/camera-mc-dev/.github/blob/main/profile/mocapPipe.md):**  
-  - Copy your bioCV calibration files (no extension) to the Pose2Sim `Calibration` folder.
-  - set `convert_from` to 'biocv' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
-
-
-</br>
-
-### Calculate from scratch
-
-> _**Calculate calibration parameters with a checkerboard, with measurements on the scene, or automatically with detected keypoints.**_\
-> Take heart, it is not that complicated once you get the hang of it!
-
-> [!TIP]
-> Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).\
-For the sake of practicality, there are voluntarily few board images for intrinsic calibration in our Demo, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm#:~:text=Angle%20results%20were,Table%203).
-
-<br> 
-
-#### 1. Calculate intrinsic parameters with a checkerboard
-
-> [!NOTE]
-> _Intrinsic parameters:_ camera properties (focal length, optical center, distortion).\
-> They are stored in a Calib.toml file: focal length in matrix[0,0] and matrix[1,1], optical center in matrix[0,2] and matrix[1,2], distortion in the distortions array. 
-
-- For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
-- Create a folder for each camera in your `Calibration\intrinsics` folder and copy your images or videos in them.
-- Adjust `intrinsics_corners_nb` and `intrinsic_square_size` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
-
-<img src="Content/Calib_int.png" width="600">
-
-> [!TIP]
-> - The intrinsic parameters usually need to be calculated only once in their lifetime. In theory, cameras with the same model and settings will have identical intrinsic parameters, so they can be copied from one Calib.toml file to another. In practice, small variations can occur. 
-> - **Warning:** This does not hold true if you zoom in or out. In this case, you will need to recalculate intrinsic parameters.
-> - If you already calculated intrinsic parameters earlier, you can skip this step by setting `overwrite_intrinsics` to false.
-
-> [!TIP]
-> Checkerboard requirements:\
-> **Generate checkerboard at [calib.io](https://calib.io/pages/camera-calibration-pattern-generator).** 
->
-> - Format: A4 or US letter should be good enough, but larger is generally better
-> - Flat: Board must be completely flat
-> - Asymmetric: Rows ≠ Columns (or rows odd if columns even)
-> - Border: Wide white border around pattern
-> - Focus: Sharp, in-focus images
-> - Coverage: Film from multiple angles covering most of frame
-> - No glare: Avoid reflections
-
-> [!IMPORTANT]
-> Common errors:
-> 
-> - Specifying the external, instead of the internal number of corners (one less than the count from calib.io). This may be one less than you would intuitively think.
-> - Taking photos from the scene instead of extracting frames from a video. The photo image format is often different from the video one, which skews intrinsic calibration.
-
-> [!IMPORTANT]
-> Intrinsic calibration error should be below 0.5 px.
-
-<br>
-
-#### 2.Calculate extrinsic parameters
-
-> [!NOTE]
-> _Extrinsic parameters:_ camera positions and orientations in space, need to be recalculated whenever a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates (**not just their dimensions!**).\
-> They are stored in a Calib.toml file, in the `translation` and `rotation` arrays.
-
-- 3 available methods:
-  - **With scene coordinates**  (`extrinsics_method = 'scene'`):\
-    Manually measure the 3D coordinates of 10 or more points in the scene (tiles, wall lines, boxes, treadmill dimensions...). These points should be as spread out as possible. Replace `object_coords_3d` by your coordinates.\
-    Then you will be prompted to click on the corresponding image points for each view.
-  - **With a checkerboard** (`extrinsics_method = 'static_board'`):\
-    Make sure that it is seen by all cameras so that it can be automatically detected. \
-    Can be set horizontally (default) or vertically (`board_position = 'vertical'`).\
-    It should preferably be rather large, as results will not be very accurate out of the covered zone.\
-    Adjust `extrinsics_corners_nb` and `extrinsic_square_size`.
-  - **With keypoints** (`extrinsics_method = 'keypoints'`):\
-    For a more automatic calibration, you can calibrate your cameras just by walking and waving your armsaround the scene.\
-    **COMING SOON!**
-- Once your cameras are in place, make a quick recording of the checkerboard laid on the floor or of the raw scene (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format). \
-  You can remove the checkerboard or the calibration object for the actual capture of your participants.
-- Copy your files in the `extrinsics` folder.
-- Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
-
-<img src="Content/Calib_ext.png" width="920">
-
-> [!TIP]
-> `extrinsics_method = 'scene'` is recommended.
-> 
-> - Works even on unsynchronized cameras
-> - Very accurate if the landmark coordinates are sufficiently spread out
-> - If there is no measurable item in the scene, you can temporarily bring something in (a table, for example), perform calibration, and then remove it before starting to capture motion
-> - Providing that scene coordinates can be retrieved later on, it can be used on old, forgotten video files
-
-> [!IMPORTANT]
-> Extrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.
-
-</br>
-
 ## Synchronize your cameras
 
 > _**2D points can be triangulated only if they represent the same body position across all cameras: therefore, views need to be synchronized. This module helps you do it.**_\
@@ -881,6 +733,233 @@ You can choose the keypoints to synchronize on, the reference person, and the ti
 
 > [!TIP]
 > GoPro cameras can also be synchronized [with a timecode](https://community.gopro.com/s/article/HERO12-Black-Timecode-Sync?language=en_US) or [by GPS](https://gopro.github.io/labs/control/gpssync/) (outdoors).
+
+</br>
+
+## Calibrate your cameras
+> _**Calculate camera intrinsic properties (lens characteristics) and extrinsic parameters (positions and orientations).\
+> Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_
+
+Open a terminal in your project folder, [activate your environment](#activate-your-environment), and run `ipython`:
+
+```python
+from Pose2Sim import Pose2Sim
+Pose2Sim.calibration()
+```
+
+
+<img src="Content/P2S_calibration.png" width="760">
+
+</br>
+Output file:
+
+<img src="Content/CalibFile.png" width="760">
+
+</br>
+
+---
+
+### Table of Contents
+1. [Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-caliscope-anipose-freemocap-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
+2. [Calculate from scratch](#calculate-from-scratch)
+   1. [Calculate intrinsic parameters with a board](#calculate-intrinsic-parameters-with-a-board)
+   2. [Calculate extrinsic parameters with scene landmarks, a static or a moving board, or pose estimation keypoints](#calculate-extrinsic-parameters-with-scene-landmarks-a-static-or-a-moving-board-or-pose-estimation-keypoints)
+
+---
+
+</br>
+
+### Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
+
+If you already have a calibration file, set `calibration_type` type to `convert` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file, follow the instructions below for your specific calibration type, and run `Pose2Sim.calibration()`.
+
+> [!NOTE]
+> If the original calibration file does not provide any residual errors, they will be logged as NaN. This is not an error and can be ignored.
+
+- **From [Caliscope](https://mprib.github.io/caliscope/)** (recommended *if your cameras are synchronized*), **[Dynamic Extrinsic Camera Calibrator](https://github.com/flodelaplace/lab-camera-dynamic-calibrator)** (based on keypoints, not a board! But *requires synchronized videos, does not estimate intrinsics, and not commercially available*), **[AniPose](https://github.com/lambdaloop/anipose)**, or **[FreeMocap](https://github.com/freemocap/freemocap):**  
+  - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
+  - Calibration can be skipped since these formats are natively supported by Pose2Sim.
+  - **Note:** It seems like the FreeMoCap calibration is in millimeters rather than in meters. Just open your calibration.toml file and multiply all the translation values by 1000.
+- **From [Qualisys](https://www.qualisys.com):**
+  - Export calibration to `.qca.txt` within QTM (see [there](https://github.com/perfanalytics/pose2sim/issues/56#issuecomment-1855933754)).
+  - Copy it in the `Calibration` Pose2Sim folder.
+  - set `convert_from` to 'qualisys' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
+  - If you set your cameras vertically and the videos are rendered sideways, you need to rotate them and the calibration file before running pose estimation. [Use this script](https://github.com/perfanalytics/pose2sim/issues/136#issuecomment-2398110061).
+- **From [Optitrack](https://optitrack.com/):** Exporting calibration will be available in Motive 3.2. In the meantime:
+  - Calculate intrinsics with a board (see next section).
+  - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28).
+  - Use the `Calib.toml` file as is and do not run Pose2Sim.calibration()
+- **From [Vicon](http://www.vicon.com/Software/Nexus):**  
+  - Copy your `.xcp` Vicon calibration file to the Pose2Sim `Calibration` folder.
+  - set `convert_from` to 'vicon' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
+- **From [OpenCap](https://www.opencap.ai/):**  
+  - Copy your `.pickle` OpenCap calibration files to the Pose2Sim `Calibration` folder.
+  - set `convert_from` to 'opencap' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
+- **From [EasyMocap](https://github.com/zju3dv/EasyMocap/):**  
+  - Copy your `intri.yml` and `extri.yml` files to the Pose2Sim `Calibration` folder.
+  - set `convert_from` to 'easymocap' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
+- **From [bioCV](https://github.com/camera-mc-dev/.github/blob/main/profile/mocapPipe.md):**  
+  - Copy your bioCV calibration files (no extension) to the Pose2Sim `Calibration` folder.
+  - set `convert_from` to 'biocv' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
+
+---
+
+</br>
+
+### Calculate from scratch
+
+> _**Calculate calibration parameters with a chessboard or a charucoboard, with measurements on the scene, or automatically with pose estimation keypoints.**_\
+> Take heart, it is not that complicated once you get the hang of it!
+
+> [!TIP]
+> - Try the calibration tool on the Demo data by changing `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+> - Then try again after changing `[calibration.calculate.extrinsics.extrinsics_method]` to `charuco`, then `keypoints`.
+> 
+> For the sake of practicality, there are voluntarily few board images for intrinsic calibration in our Demo, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm#:~:text=Angle%20results%20were,Table%203).
+
+---
+
+</br>
+
+#### Calculate intrinsic parameters with a board
+
+> [!NOTE]
+> #### Intrinsic parameters:
+> 
+> Camera properties (focal length, optical center, distortion), stored in the matrix and distortion arrays of a Calib.toml file.
+> 
+> They usually need to be calculated only once in their lifetime. In theory, cameras with the same model and settings will have identical intrinsic parameters, so they can be copied from one Calib.toml file to another. In practice, small variations can occur.\
+> **Warning:** This does not hold true if you zoom in or out. In this case, you will need to recalculate intrinsic parameters.
+
+- For each camera, film a chessboard or a charucoboard. You can either move the board in front of the camera, or move the camera around the board.\
+  ***N.B.:*** Make sure you film from multiple angles and cover most of frame.
+- Create a folder for each camera in your `Calibration\intrinsics` directory and copy your images or videos in them.
+- Adjust `corners_nb`, `square_size`, and `marker_resolution` in the `[calibration.calculate.intrinsics]` section of [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+- Run `Pose2Sim.calibration()`. 
+  - For each image, if you are satisfied with the detection, press `Y`.
+  - If you want to dismiss a specific image, press `N`.
+  - If you want to improve the detection by clicking the points, press `C`. Right click to undo a click, and `H` to label a point as hidden. Use the mouse whell to zoom and pan.
+
+<img src="Content/Calib_int.png" width="600">
+
+> [!TIP]
+> If you are confident in your detections, you can set `show_detection_intrinsics` to false. If you already calculated intrinsic parameters earlier, you can skip this step altogether by setting `overwrite_intrinsics` to false. 
+
+> [!TIP]
+> #### Chess or ChArUco board requirements:
+> 
+> Generate a chess or charuco board at [calib.io](https://calib.io/pages/camera-calibration-pattern-generator). 
+> A ChArUco board is more robust to occlusions or orientation ambiguities than a chessboard.
+>
+> - ***Intrinsics:*** Many corners, e.g. [5x8 corners on A4/US-letter format](Content/intrinsic_charuco_5_8_25.pdf)\
+>   ***Extrinsics (static):*** Large squares with several corners, e.g. [3x6 on A0 format](Content/extrinsic_charuco_3_6_150.pdf)\
+>   ***Extrinsics (dynamic):*** Large squares, e.g. [1x2 corners on A3/US-ledger format](Content/extrinsic_charuco_1_2_125.pdf),
+> - Asymmetric: Rows ≠ Columns (or rows should be odd if columns is even)
+> - Border: Wide white border around the pattern
+> - Flat: The board must be completely flat
+> - Focus: Sharp, in-focus images
+> - No glare: Avoid reflections
+>
+> <img src="Content/charuco_help.png" width="760">
+
+> [!IMPORTANT]
+> Common errors:
+> 
+> - Specifying the external, instead of the internal number of corners. Specifically, `corners_nb = rows-1, cols-1` (compare with [calib.io](https://calib.io/pages/camera-calibration-pattern-generator)). 
+> - Taking photos from the scene instead of extracting frames from a video. The photo image format is often different from the video one, which skews intrinsic calibration.
+
+> [!IMPORTANT]
+> Intrinsic calibration error should be close to or below 0.5 px.
+
+---
+
+<br>
+
+#### Calculate extrinsic parameters with scene landmarks, a static or a moving board, or pose estimation keypoints
+
+> [!NOTE]
+> #### Extrinsic parameters:
+> 
+> Camera positions and orientations in space, stored in the rotation and translation arrays of a Calib.toml file.
+>
+> They need to be recalculated every time a camera is moved. Several methods are available, using known scene coordinates, a static board or a moving board, or pose estimation keypoints.
+
+> [!IMPORTANT]
+> Extrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.
+
+</br>
+
+##### With scene coordinates
+
+- Manually measure the 3D coordinates of 10 or more points in the scene (tiles, wall lines, boxes, treadmill dimensions...). These points should be as spread out as possible.
+- Set `extrinsics_method = 'scene'` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+- Replace `object_coords_3d` by your coordinates in the `[calibration.calculate.extrinsics.scene]` section. 
+- Once your cameras are in place, make a quick recording of the raw scene with all cameras. Only one frame is needed, but do not just take a photo unless you are sure it does not change the image format. 
+- Copy your videos into the `calibration/extrinsics` folder.
+- Run `Pose2Sim.calibration()`. You will be prompted to click on the corresponding image points for each view.
+
+<img src="Content/Calib_ext.png" width="920">
+
+> [!TIP]
+> - Works even on unsynchronized cameras
+> - Very accurate if the landmark coordinates are sufficiently spread out
+> - If there is no measurable item in the scene, you can temporarily bring something in (a table, for example), perform calibration, and then remove it before starting to capture motion
+> - Providing that scene coordinates can be retrieved later on, it can be used on old, forgotten video files
+
+</br>
+
+##### With a static board
+
+- Put a large chess or charuco board in the field of view. See [board requirements here](#chess-or-charuco-board-requirements).
+  - If laid horizontally on the ground: The cameras must be high enough to correctly detect the board.
+  - If laid vertically (`board_position = 'vertical'`): The cameras can only be on one side of the board.
+- Set `extrinsics_method = 'charuco_static'` or `'chess_static'` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+- Adjust `corners_nb`, `square_size`, and `marker_resolution` in the `[calibration.calculate.extrinsics.static]` section.
+- Once your cameras are in place, make a quick recording of the raw scene with all cameras. Only one frame is needed, but do not just take a photo unless you are sure it does not change the image format. 
+- Copy your videos into the `calibration/extrinsics` folder.
+- Run `Pose2Sim.calibration()`. Once it is done, you can remove the board from the scene.
+
+> [!TIP]
+> - Works even on unsynchronized cameras
+> - Simpler but not recommended since it is the least accurate method
+
+</br>
+
+##### With a moving board
+
+**COMING SOON!**
+
+- Generate and print a ChArUco board. See [board requirements here](#chess-or-charuco-board-requirements).
+- Set `extrinsics_method = 'charuco'` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+- Adjust `corners_nb`, `square_size`, and `marker_resolution` in the `[calibration.calculate.extrinsics.charuco]` section.
+- Once your cameras are in place, start recording and wave the board across the scene, making sure it is visible to at least 2 cameras at the same time. Finally, lay it horizontally or vertically on the ground, making sure it is still visible.
+- If your cameras are not natively synchronized, [synchronize them](#synchronize-your-cameras).
+- Copy your videos into the `calibration/extrinsics` folder.
+- Run `Pose2Sim.calibration()`. Once it is done, you can remove the board from the scene.
+
+> [!TIP]
+> - Usually slightly more accurate ***BUT*** requires synchronized cameras.
+> - Only ChArUco boards are supported (not chess boards)
+
+</br>
+
+##### With keypoints
+
+**COMING SOON!**
+
+For a more automatic calibration, you can calibrate your cameras just by walking and waving your arms around the scene.
+
+- Set `extrinsics_method = 'keypoints'` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+- Once your cameras are in place, start recording and walk across the scene, waving your arms and making sure your are visible to at least 2 cameras at the same time. Finally, stay immobile in a T-pose for one second at the center of the scene.
+- If your cameras are not natively synchronized, [synchronize them](#synchronize-your-cameras).
+- Copy your videos into the `calibration/extrinsics` folder.
+- Run `Pose2Sim.calibration()`.
+
+> [!TIP]
+> - Much simpler than any of the other methods, but
+> - Requires synchronized cameras
+> - Commercial use is uncertain
+
 
 </br>
 
@@ -1236,7 +1315,6 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `overwrite_intrinsics` | `false` | If `false`, skips intrinsic calculation when results already exist. |
-| `intrinsics_extension` | `'jpg'` | File extension of the calibration images or video. |
 | `extract_every_N_sec` | `1` | If a video is provided, extract one frame every N seconds (can be < 1). |
 | `intrinsics_corners_nb` | `[4, 7]` | `[rows, cols]` of *internal* corners on the checkerboard (one less per side than the printed square count). |
 | `intrinsics_square_size` | `60` | Size of one checkerboard square in mm. |
@@ -1248,7 +1326,6 @@ Take heart, calibration is not that complicated once you get the hang of it!
 |-----------|---------|-------------|
 | `calculate_extrinsics` | `true` | Set to `false` to skip extrinsic calculation. |
 | `extrinsics_method` | `'scene'` | `'board'` (checkerboard on floor), `'scene'` (manually clicked points of known 3D coordinates), or `'keypoints'` (coming soon). |
-| `extrinsics_extension` | `'png'` | File extension of the extrinsic calibration image or video. |
 | `show_reprojection_error` | `true` | Display reprojection error after extrinsic calibration. |
 | `moving_cameras` | `false` | Not implemented yet. |
 | `board_position` *(board only)* | `'vertical'` | `'horizontal'` or `'vertical'`. |
