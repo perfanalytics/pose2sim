@@ -20,7 +20,7 @@
 [project]
 project_dir = '.' # '.' if Config.toml is in the root of the project, path to the project root otherwise
 multi_person = false # true for trials with multiple participants. If false, only the person with lowest reprojection error is analyzed
-participant_height = 'auto' # 'auto', float (eg 1.72), or list of floats (eg [1.72, 1.40])  # meters  # Only used for marker augmentation 
+participant_height = 'auto' # 'auto', float (eg 1.72), or list of floats (eg [1.72, 1.40])  # meters  # Only used for marker augmentation and calibration (if extrinsics_method = 'keypoints')
 participant_mass = 70.0             # float (eg 70.0), or list of floats (eg [70.0, 63.5])  # kg      # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces
 
 frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
@@ -175,7 +175,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
                               [0.0, 0.0,  0.0], 
                               [0.0, 0.0,  0.05], 
                               [0.0, -0.3,  0.0]]
-         # object_coords_3d: list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
+         # List of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
          # in m -> unlike for intrinsics, NOT in mm!
          # [X,Y,Z], which becomes [Z,X,Y] in the TRC reference frame, and [-Y,X,Z] in the Blender one
 
@@ -188,7 +188,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
       
          [calibration.calculate.extrinsics.charuco] # Coming soon!
          # Requires synchronized camera. Uses a moving charuco board. 
-         # Recommendations: The markers need to be large, but don't need to be numerous. Even one works.
+         # Recommendations: The markers need to be large, but don't need to be numerous. Even a single one works.
          corners_nb = [4,7] # [H,W] rather than [w,h]
          square_size = 60 # mm # [h,w] if square is actually a rectangle
          marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
@@ -202,7 +202,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
    likelihood_threshold_association = 0.3 
    reproj_error_threshold_association = 20 # px
    tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
-               # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' or 'RShoulder')
+               # and choose a stable point for tracking the person of interest (e.g. 'RShoulder')
    
    [personAssociation.multi_person]
    reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
@@ -305,6 +305,7 @@ make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
 [kinematics]
+# Run OpenSim scaling and inverse kinematics
 use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
 use_simple_model = false # true or false # >10 times faster IK if true. No muscles, no constraints (eg stiff spine and shoulders, no patella)
 filter_ik = false # true or false # Useful for force estimations if results are noisy 

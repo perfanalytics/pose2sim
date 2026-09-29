@@ -726,7 +726,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
     board_type = intrinsics_config_dict.get('board_type', 'charuco')
     corners_nb = intrinsics_config_dict.get('corners_nb', [4, 7])
     square_size = intrinsics_config_dict.get('square_size', 60) / 1000 # convert to meters
-    marker_size = intrinsics_config_dict.get('marker_size', 40) / 1000 # convert to meters
+    marker_size = square_size * 0.75 # as in calib.io. detectBoard is very tolerant, and work with marker_size = square_size * 0.15 to -0.9
     marker_resolution = str(intrinsics_config_dict.get('marker_resolution', 5)) # resolution of the aruco marker
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
 
@@ -885,7 +885,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
         board_position = extrinsics_static.get('board_position', 'vertical')
         corners_nb = extrinsics_static.get('corners_nb', [4, 7])
         square_size = extrinsics_static.get('square_size', 60) / 1000 # convert to meters
-        marker_size = extrinsics_static.get('marker_size', 40) / 1000 # convert to meters
+        marker_size = square_size * 0.75 # as in calib.io. detectBoard is very tolerant, and work with marker_size = square_size * 0.15 to -0.9
         marker_resolution = str(extrinsics_static.get('marker_resolution', 5)) # resolution of the aruco marker
 
         # Define 3D object points
@@ -1066,7 +1066,7 @@ def draw_charuco_corners_like_chessboard(img, charuco_corners, charuco_ids, boar
     return out
 
 
-def findCorners(img_path, corner_nb, objp=[], show=True, board_type='charuco', aruco_square_size=0.06, aruco_marker_size=0.04, aruco_marker_resolution=4):
+def findCorners(img_path, corner_nb, objp=[], show=True, board_type='charuco', aruco_square_size=0.06, aruco_marker_size=0.045, aruco_marker_resolution=4):
     '''
     Find corners in the photo of a checkerboard or CharUco board.
     Press 'Y' to accept detection, 'N' to dismiss this image, 'C' to click points by hand.
@@ -1086,7 +1086,6 @@ def findCorners(img_path, corner_nb, objp=[], show=True, board_type='charuco', a
     - optional: show: choose whether to show corner detections
     - optional: board_type: 'chess' or 'charuco'
     - optional for charuco: aruco_square_size: square size in mm
-    - optional for charuco: aruco_marker_size: marker size in mm
     - optional for charuco: aruco_marker_resolution: resolution of the marker (e.g. 4 for 'DICT_4X4_50', 'DICT_4X4_100', ...)
 
     OUTPUTS:
@@ -1574,7 +1573,7 @@ def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False
     - extracted frames in folder
     '''
     
-    if not Path(Path(video_path).exists().stem + '_00000.png') or overwrite_extraction:
+    if not list(Path(video_path).parent.glob(f'{Path(video_path).stem}_*.png')) or overwrite_extraction:
         cap = cv2.VideoCapture(str(video_path))
         if cap.isOpened():
             fps = round(cap.get(cv2.CAP_PROP_FPS))
@@ -1584,7 +1583,7 @@ def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False
                 ret, frame = cap.read()
                 if ret == True:
                     if frame_nb % (fps*extract_every_N_sec) == 0:
-                        img_path = (Path(video_path).stem + '_' +str(frame_nb).zfill(5)+'.png')
+                        img_path = Path(video_path).parent / (Path(video_path).stem + '_' + str(frame_nb).zfill(5) + '.png')
                         cv2.imwrite(str(img_path), frame)
                     frame_nb+=1
                 else:

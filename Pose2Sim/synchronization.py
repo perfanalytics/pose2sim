@@ -1490,7 +1490,7 @@ def synchronize_cams_all(config_dict):
     nb_frames_per_cam = [len(fnmatch.filter(os.listdir(json_dir), '*.json')) for json_dir in json_dirs]
     cam_nb = len(json_dirs)
     cam_list = list(range(cam_nb))
-    cam_names = [Path(j_dir).name.split('_')[0] for j_dir in json_dirs]
+    cam_names = [re.sub(r'_json$', '', Path(j_dir).name) for j_dir in json_dirs]
     
     # frame range selection
     f_range = [[0, min([len(j) for j in json_files_names])] if frame_range in ('all', 'auto', []) else frame_range][0]
