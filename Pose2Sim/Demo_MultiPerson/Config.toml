@@ -153,7 +153,6 @@ calibration_type = 'convert' # 'convert' or 'calculate'
       board_type = 'charuco' # 'charuco' or 'chess' # charuco is more robust but very slightly less accurate (expect 0.5 px error instead of 0.2)
       corners_nb = [4,7] # /!\ internal corners rather, ie [rows-1, cols-1]
       square_size = 60 # mm
-      marker_size = 40 # mm # charuco only: ArUco marker size
       marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
 
       show_detection_intrinsics = true # true or false (lowercase)
@@ -187,7 +186,6 @@ calibration_type = 'convert' # 'convert' or 'calculate'
          board_position = 'vertical' # 'vertical' or 'horizontal'
          corners_nb = [4,7] # [H,W] rather than [w,h]
          square_size = 60 # mm # [h,w] if square is actually a rectangle
-         marker_size = 40 # mm # charuco only: ArUco marker size
          marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
       
          [calibration.calculate.extrinsics.charuco] # Coming soon!
@@ -195,7 +193,6 @@ calibration_type = 'convert' # 'convert' or 'calculate'
          # Recommendations: The markers need to be large, but don't need to be numerous. Even one works.
          corners_nb = [4,7] # [H,W] rather than [w,h]
          square_size = 60 # mm # [h,w] if square is actually a rectangle
-         marker_size = 40 # mm # charuco only: ArUco marker size
          marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
       
          [calibration.calculate.extrinsics.keypoints] # Coming soon!
