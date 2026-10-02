@@ -48,6 +48,7 @@ import threading
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, Animal, draw_skeleton
 from rtmlib.tools.object_detection.post_processings import nms
+from rtmlib.tools.base import RTMLIB_SETTINGS
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort,\
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel, bbox_xyxy_compute, \
                         get_screen_size, calculate_display_size, is_video_file, is_image_file, get_max_workers
@@ -263,8 +264,8 @@ def setup_backend_device(backend='auto', device='auto'):
     4. CPU with OpenVINO backend (default fallback)
     '''
 
-    valid_backends = ['onnxruntime', 'openvino']
-    valid_devices = ['cpu', 'cuda', 'rocm', 'mps']
+    valid_backends = [b for b in RTMLIB_SETTINGS]
+    valid_devices = set().union(*(RTMLIB_SETTINGS[b] for b in valid_backends))
 
     # Backend and device validation
     if backend != 'auto':
@@ -278,6 +279,11 @@ def setup_backend_device(backend='auto', device='auto'):
         if device not in valid_devices:
             logging.warning(f"Device '{device}' not recognized. Falling back to auto-detection.")
             device = 'auto'
+
+    if backend != 'auto' and device != 'auto' and device not in RTMLIB_SETTINGS[backend]:
+        logging.warning(f"Device '{device}' is not available with backend '{backend}' "
+                        f"(valid: {list(RTMLIB_SETTINGS[backend])}). Falling back to auto-detection.")
+        backend, device = 'auto', 'auto'
 
     if backend == 'auto' and device != 'auto':
         logging.warning(f"Backend is set to 'auto' but device is not. Both will be determined automatically.")
@@ -428,9 +434,9 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
     kpt_id_max = max(keypoints_ids)+1
 
     use_prediction, match_by, max_distance_px, max_unseen_frames = sports2d_tracking_params
+    frames_since_last_seen = None
     with tqdm(iterable=range(*f_range), desc=f'Processing {Path(video_path).name}') as pbar:
         while cap.isOpened():
-            frames_since_last_seen = None
             if frame_idx in range(*f_range):
                 # print('\nFrame ', frame_idx)
                 success, frame = cap.read()
@@ -464,7 +470,7 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
 
                     # Track poses across frames
                     if tracking_mode == 'deepsort':
-                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count)
+                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame)
                     if tracking_mode == 'sports2d': 
                         if 'prev_keypoints' not in locals(): # Initialization
                             prev_keypoints = keypoints
@@ -813,9 +819,6 @@ def estimate_pose_all(config_dict):
         else:
             if display_detection:
                 logging.warning(f'Cannot run pose estimation in parallel with display_detection=true. Set it to false for faster pose estimation.')
-                parallel_pose = 1
-            elif device not in {'cpu', 'cuda', 'mps', 'rocm'}:
-                logging.warning(f'Parallel pose estimation is not supported for device "{device.upper()}": falling back to sequential.')
                 parallel_pose = 1
             else:
                 max_workers_calc = get_max_workers(device)

@@ -207,7 +207,7 @@ def get_max_workers(device='cpu'):
     Determine the number of parallel workers for pose estimation.
     
     INPUTS:
-        device: 'cpu', 'cuda', 'mps', 'rocm'
+        device: 'cpu', 'cuda', 'mps', 'rocm', 'gpu', 'npu'
     
     OUTPUTS:
         max_workers: Number of workers (>= 1)
