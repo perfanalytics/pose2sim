@@ -960,10 +960,10 @@ For a more automatic calibration, you can calibrate your cameras just by walking
   conda create -n humancalib-metrabs -c conda-forge python=3.10 cudatoolkit=11.8 cudnn=8.9
   conda run -n humancalib-metrabs pip install "humancalib[gpu]"
   ```
-  Then, in your Pose2Sim environment:
+  Then, in your Pose2Sim environment, install HumanCalib and point it to that environment's Python (`conda env list` shows where it is):
   ``` cmd
   pip install humancalib
-  set HUMANCALIB_METRABS_PYTHON=conda run --no-capture-output -n humancalib-metrabs python -u
+  set HUMANCALIB_METRABS_PYTHON=C:\Users\<you>\miniconda3\envs\humancalib-metrabs\python.exe -u
   ```
   `pose_engine = 'rtmpose'` needs no second environment: `pip install "humancalib[rtmpose]"` in the Pose2Sim environment.
   </details>
