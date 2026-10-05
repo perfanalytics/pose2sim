@@ -1032,7 +1032,7 @@ def calibrate_extrinsics_keypoints(calib_dir, vid_files, extrinsics_config_dict,
     heels).
 
     INPUTS:
-    - calib_dir: calibration directory; HumanCalib works in calib_dir/extrinsics/humancalib
+    - calib_dir: calibration directory; HumanCalib works in calib_dir/humancalib
     - vid_files: one synchronized video per camera, in the order of C
     - extrinsics_config_dict: extrinsics parameters, with the 'keypoints' section, and the
       'project' and 'pose' sections of Config.toml added by calibrate_cams_all
@@ -1080,8 +1080,9 @@ def calibrate_extrinsics_keypoints(calib_dir, vid_files, extrinsics_config_dict,
     elif extract_fps is False:
         extract_fps = None
 
-    # HumanCalib's inputs: videos named after the cameras, and their intrinsics in Pose2Sim format
-    work_dir = Path(calib_dir) / 'extrinsics' / 'humancalib'
+    # HumanCalib's inputs: videos named after the cameras, and their intrinsics in Pose2Sim format.
+    # Outside calibration/extrinsics, where every folder is counted as a camera.
+    work_dir = Path(calib_dir) / 'humancalib'
     videos_dir = work_dir / 'videos'
     shutil.rmtree(videos_dir, ignore_errors=True)
     videos_dir.mkdir(parents=True)
