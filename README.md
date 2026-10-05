@@ -776,7 +776,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 > [!NOTE]
 > If the original calibration file does not provide any residual errors, they will be logged as NaN. This is not an error and can be ignored.
 
-- **From [Caliscope](https://mprib.github.io/caliscope/)** (recommended *if your cameras are synchronized*), **[Dynamic Extrinsic Camera Calibrator](https://github.com/flodelaplace/lab-camera-dynamic-calibrator)** (based on keypoints, not a board! But *requires synchronized videos, does not estimate intrinsics, and not commercially available*), **[AniPose](https://github.com/lambdaloop/anipose)**, or **[FreeMocap](https://github.com/freemocap/freemocap):**  
+- **From [Caliscope](https://mprib.github.io/caliscope/)** (recommended *if your cameras are synchronized*), **[HumanCalib](https://github.com/flodelaplace/HumanCalib)** (based on keypoints, not a board! Also available directly as `extrinsics_method = 'keypoints'`, [see below](#with-keypoints)), **[AniPose](https://github.com/lambdaloop/anipose)**, or **[FreeMocap](https://github.com/freemocap/freemocap):**  
   - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
   - Calibration can be skipped since these formats are natively supported by Pose2Sim.
   - **Note:** It seems like the FreeMoCap calibration is in millimeters rather than in meters. Just open your calibration.toml file and multiply all the translation values by 1000.
@@ -945,20 +945,25 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 ##### With keypoints
 
-**COMING SOON!**
+For a more automatic calibration, you can calibrate your cameras just by walking across the scene: no board, no measurements. This uses [HumanCalib](https://github.com/flodelaplace/HumanCalib), which estimates the pose of the walking person in every view, calibrates the cameras from it, and recovers the metric scale from the participant's height and the vertical from the walk.
 
-For a more automatic calibration, you can calibrate your cameras just by walking and waving your arms around the scene.
-
-- Set `extrinsics_method = 'keypoints'` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
-- Once your cameras are in place, start recording and walk across the scene, waving your arms and making sure your are visible to at least 2 cameras at the same time. Finally, stay immobile in a T-pose for one second at the center of the scene.
+- Install HumanCalib in your Pose2Sim environment:
+  ``` cmd
+  pip install "humancalib[gpu]"
+  ```
+  On native Windows, the GPU needs CUDA 11.8 and Python 3.10 in its own environment: see the [HumanCalib installation](https://github.com/flodelaplace/HumanCalib#installation). The pose model (~700 MB) is downloaded on the first calibration.
+- Set `extrinsics_method = 'keypoints'` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), and `participant_height` to the height of the walking person, in meters (e.g. `1.72`, not `'auto'`).
+- Once your cameras are in place, start recording and walk across the whole capture volume, a few passes, making sure you are visible to every camera for a good part of the walk.
 - If your cameras are not natively synchronized, [synchronize them](#synchronize-your-cameras).
-- Copy your videos into the `calibration/extrinsics` folder.
+- Copy your videos into the `calibration/extrinsics` folder, one per camera (as for the other methods: in one subfolder per camera, or directly in the folder).
 - Run `Pose2Sim.calibration()`.
+
+The calibration is in meters, gravity-aligned (Z up), with its origin on the floor under the participant. In `[calibration.calculate.extrinsics.keypoints]`, `pose_engine = 'rtmpose'` uses the RTMPose models already installed with Pose2Sim instead (`pip install "humancalib[rtmpose]"`), but it fails more often. Evaluated against the laboratory calibrations of five public datasets (77 trials): median relative rotation error between cameras of 0.95°, no failed calibration, and joint angles from the Pose2Sim chain within about half a degree of those obtained with the laboratory calibration.
 
 > [!TIP]
 > - Much simpler than any of the other methods, but
-> - Requires synchronized cameras
-> - Commercial use is uncertain
+> - Requires synchronized cameras, and known intrinsic parameters
+> - The pose models are for non-commercial use only
 
 
 </br>

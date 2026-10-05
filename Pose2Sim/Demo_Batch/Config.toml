@@ -196,8 +196,15 @@ calibration_type = 'convert' # 'convert' or 'calculate'
          square_size = 60 # mm # [h,w] if square is actually a rectangle
          marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
       
-         [calibration.calculate.extrinsics.keypoints] # Coming soon!
-         # Requires synchronized cameras. Uses pose estimation of a person freely walking and waving arms in the scene.
+         [calibration.calculate.extrinsics.keypoints]
+         # Requires synchronized cameras. One person walks across the whole capture volume, a few passes,
+         # filmed by every camera (one video per camera in calibration/extrinsics/). Uses HumanCalib:
+         # pip install "humancalib[gpu]" (MeTRAbs), or "humancalib[rtmpose]" for pose_engine = 'rtmpose'.
+         # The metric scale comes from [project] participant_height, which must be a number here (e.g. 1.72).
+         # The calibration is gravity-aligned: Z up, origin on the floor under the participant's heels.
+         pose_engine = 'metrabs' # 'metrabs' (recommended: no failure on 77 evaluation trials) or 'rtmpose' (no extra model, less robust)
+         frame_budget = 100 # about how many frames the calibration uses; 30 to 60 already give the full accuracy
+         extract_fps = 'auto' # 'auto': pose estimation at ~25 Hz on videos faster than 50 Hz (same accuracy, faster), a number, or false
 
 
 [personAssociation]
