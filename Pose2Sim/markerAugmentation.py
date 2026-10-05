@@ -280,8 +280,7 @@ def augment_markers_all(config_dict):
             markers += response_markers
             
             header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
-            response_markers_str = '\t\t\t'.join(response_markers)
-            header[3] = header[3].rstrip('\n') + '\t' + response_markers_str + '\t\t\n'
+            header[3] = 'Frame#\tTime\t' + '\t\t\t'.join(markers) + '\t\t\n'
             header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
             
         # %% Extract minimum y-position across response markers. This is used
