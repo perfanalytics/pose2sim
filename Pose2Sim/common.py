@@ -390,7 +390,7 @@ def add_shoulder_data(trc_data, markers, header):
 
         # Update header
         header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
-        header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{"RShoulder"}\t\t\t{"LShoulder"}\t\t\t\n')
+        header[3] = header[3].rstrip('\n') + '\tRShoulder\t\t\tLShoulder\t\t\n'
         header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
 
         # update trc_data
@@ -417,22 +417,75 @@ def add_neck_hip_data(trc_data, markers, header):
         'Hip': ['RHip', 'LHip']}
 
     for mk_name, r_l_markers in midpoints.items():
-        if mk_name not in markers:
-            try:
-                # Add marker name
-                markers.append(mk_name)
+        if mk_name in markers:
+            continue
+        
+        try:
+            r_l_data = [trc_data[m] for m in r_l_markers]
+        except KeyError as e:
+            logging.warning(f"Cannot add {mk_name}: missing {e}")
+            continue
 
-                # Update header
-                header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
-                header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{mk_name}\t\t\t\n')
-                header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
+        # Add marker name
+        markers.append(mk_name)
+        
+        # Update header
+        header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
+        header[3] = header[3].rstrip('\n') + f'\t{mk_name}\t\t\n'
+        header[4] = '\t\t' + '\t'.join(f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))) + '\t\n'
 
-                # update trc_data
-                r_l_data = [trc_data[marker] for marker in r_l_markers]
-                mid_data = pd.DataFrame(sum([data.values for data in r_l_data])/2, columns=[mk_name]*3)
-                trc_data = pd.concat([trc_data, mid_data], axis=1)
-            except Exception as e:
-                logging.warning(f"Failed to add {mk_name} marker. Error: {e}")
+        # Update trc_data
+        mid_values = np.mean(np.stack([d.values for d in r_l_data], axis=0), axis=0)
+        mid_data = pd.DataFrame(mid_values, columns=[mk_name] * 3)
+        trc_data = pd.concat([trc_data, mid_data], axis=1)
+
+    return trc_data, markers, header
+
+
+def add_smalltoe_data(trc_data, markers, header):
+    '''
+    Add small toe data to trc_data if not present.
+    Defined as the BigToe point + 0.5*length(BigToe to Heel) in the Hip to Hip direction - 0.2*length(BigToe to Heel) in the BigToe to Heel direction.
+    Also update header and markers.
+    '''
+
+    if 'RSmallToe' not in markers and 'LSmallToe' not in markers:
+        markers.append('RSmallToe')
+        markers.append('LSmallToe')
+
+        # Update header
+        header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
+        header[3] = header[3].rstrip('\n') + '\tRSmallToe\t\t\tLSmallToe\t\t\n'
+        header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
+
+        # update trc_data
+        rbigtoe_data, lbigtoe_data = trc_data['RBigToe'], trc_data['LBigToe']
+        rheel_data, lheel_data = trc_data['RHeel'], trc_data['LHeel']
+        rhip_data, lhip_data = trc_data['RHip'], trc_data['LHip']
+
+        rbigtoe_to_heel_direction = rbigtoe_data.values - rheel_data.values
+        rbigtoe_to_heel_direction = rbigtoe_to_heel_direction / np.linalg.norm(rbigtoe_to_heel_direction, axis=1)[:, None]
+        lbigtoe_to_heel_direction = lbigtoe_data.values - lheel_data.values
+        lbigtoe_to_heel_direction = lbigtoe_to_heel_direction / np.linalg.norm(lbigtoe_to_heel_direction, axis=1)[:, None]
+        rbigtoe_to_heel_length = np.linalg.norm(rbigtoe_data.values - rheel_data.values, axis=1)[:, None]
+        lbigtoe_to_heel_length = np.linalg.norm(lbigtoe_data.values - lheel_data.values, axis=1)[:, None]
+
+        rlhip_direction = rhip_data.values - lhip_data.values
+        rlhip_direction = rlhip_direction / np.linalg.norm(rlhip_direction, axis=1)[:, None]
+
+        rsmalltoe_data = pd.DataFrame(
+            rbigtoe_data.values
+            + 0.5 * rbigtoe_to_heel_length * rlhip_direction
+            - 0.2 * rbigtoe_to_heel_length * rbigtoe_to_heel_direction,
+            columns=['RSmallToe'] * 3
+        )
+        lsmalltoe_data = pd.DataFrame(
+            lbigtoe_data.values
+            - 0.5 * lbigtoe_to_heel_length * rlhip_direction
+            - 0.2 * lbigtoe_to_heel_length * lbigtoe_to_heel_direction,
+            columns=['LSmallToe'] * 3
+        )
+        trc_data = pd.concat([trc_data, rsmalltoe_data, lsmalltoe_data], axis=1)
 
     return trc_data, markers, header
 

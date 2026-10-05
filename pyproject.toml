@@ -67,7 +67,7 @@ packages = {find = {}}
 
 [project.scripts]
 AlphaPose_to_OpenPose = "Pose2Sim.Utilities.AlphaPose_to_OpenPose:main"
-Blazepose_runsave = "Pose2Sim.Utilities.Blazepose_runsave:main"
+Mediapipe_to_pose_or_trc = "Pose2Sim.Utilities.Mediapipe_to_pose_or_trc:main"
 bodykin_from_mot_osim = "Pose2Sim.Utilities.bodykin_from_mot_osim:main"
 c3d_to_trc = "Pose2Sim.Utilities.c3d_to_trc:main"
 calib_easymocap_to_toml = "Pose2Sim.Utilities.calib_easymocap_to_toml:main"
