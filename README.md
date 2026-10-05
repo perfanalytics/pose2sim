@@ -951,7 +951,22 @@ For a more automatic calibration, you can calibrate your cameras just by walking
   ``` cmd
   pip install "humancalib[gpu]"
   ```
-  On native Windows, the GPU needs CUDA 11.8 and Python 3.10 in its own environment: see the [HumanCalib installation](https://github.com/flodelaplace/HumanCalib#installation). The pose model (~700 MB) is downloaded on the first calibration.
+  The pose model (~700 MB) is downloaded on the first calibration.
+
+  <details><summary>On native Windows</summary>
+
+  MeTRAbs runs on the GPU with TensorFlow 2.10, the last version with native Windows GPU support, which needs Python 3.10 while Pose2Sim needs 3.11 or later. Give it its own environment, and tell HumanCalib where it is:
+  ``` cmd
+  conda create -n humancalib-metrabs -c conda-forge python=3.10 cudatoolkit=11.8 cudnn=8.9
+  conda run -n humancalib-metrabs pip install "humancalib[gpu]"
+  ```
+  Then, in your Pose2Sim environment:
+  ``` cmd
+  pip install humancalib
+  set HUMANCALIB_METRABS_PYTHON=conda run --no-capture-output -n humancalib-metrabs python -u
+  ```
+  `pose_engine = 'rtmpose'` needs no second environment: `pip install "humancalib[rtmpose]"` in the Pose2Sim environment.
+  </details>
 - Set `extrinsics_method = 'keypoints'` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), and `participant_height` to the height of the walking person, in meters (e.g. `1.72`, not `'auto'`).
 - Once your cameras are in place, start recording and walk across the whole capture volume, a few passes, making sure you are visible to every camera for a good part of the walk.
 - If your cameras are not natively synchronized, [synchronize them](#synchronize-your-cameras).
