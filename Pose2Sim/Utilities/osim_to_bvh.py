@@ -417,7 +417,7 @@ def export_to_bvh(model_path, output_path, motion_path=None, framerate=30.0,
         precision=6
     )
 
-    print("✓ Export complete!")
+    print("Export complete!")
 
 
 def parse_arguments():
