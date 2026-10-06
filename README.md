@@ -965,7 +965,12 @@ For a more automatic calibration, you can calibrate your cameras just by walking
   pip install humancalib
   set HUMANCALIB_METRABS_PYTHON=C:\Users\<you>\miniconda3\envs\humancalib-metrabs\python.exe -u
   ```
-  `pose_engine = 'rtmpose'` needs no second environment: `pip install "humancalib[rtmpose]"` in the Pose2Sim environment.
+  `pose_engine = 'rtmpose'` needs no second environment: `pip install "humancalib[rtmpose]"` in the Pose2Sim environment. To run it on the GPU without PyTorch's CUDA libraries:
+  ``` cmd
+  pip uninstall -y onnxruntime
+  pip install "onnxruntime-gpu[cuda,cudnn]<1.27" "nvidia-cudnn-cu12==9.10.*"
+  ```
+  (with the latest cuDNN, 9.27, onnxruntime-gpu 1.26 falls back to the CPU).
   </details>
 - Set `extrinsics_method = 'keypoints'` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), and `participant_height` to the height of the walking person, in meters (e.g. `1.72`, not `'auto'`).
 - Once your cameras are in place, start recording and walk across the whole capture volume, a few passes, making sure you are visible to every camera for a good part of the walk.
