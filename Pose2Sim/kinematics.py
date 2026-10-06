@@ -767,7 +767,8 @@ def kinematics_all(config_dict):
         logging.info(f"\nExporting OpenSim results to BVH files...")
         for trc_file in trc_files:
             osim_path = (kinematics_dir / (trc_file.stem + '.osim')).resolve()
-            mot_path = Path(kinematics_dir, trc_file.stem + '.mot').resolve()
-            bvh_path = Path(kinematics_dir, trc_file.stem + '_ik.bvh').resolve()
-            export_to_bvh(model_path=osim_path, output_path=bvh_path, motion_path=mot_path)
+            mot_paths = kinematics_dir.glob(trc_file.stem + '*.mot')
+            for mot_path in mot_paths:
+                bvh_path = mot_path.with_suffix('.bvh')
+                export_to_bvh(model_path=osim_path, output_path=bvh_path, motion_path=mot_path)
 

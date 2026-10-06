@@ -251,13 +251,13 @@ def read_mot(mot_path):
     with open(mot_path, 'r') as f:
         lines = f.readlines()
     
-    # Find the end of the header (line with "endheader")
+    # Find the end of the header (line after "endheader")
     for i, line in enumerate(lines):
         if line.strip().lower() == 'endheader':
             header_end_line = i
             break
         
-    header_lines = lines[:header_end_line + 1]
+    header_lines = lines[:header_end_line + 2]
     
     # Read the data portion
     data = pd.read_csv(mot_path, sep='\t', skiprows=header_end_line + 1)
