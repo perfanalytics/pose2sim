@@ -449,43 +449,47 @@ def add_smalltoe_data(trc_data, markers, header):
     Also update header and markers.
     '''
 
-    if 'RSmallToe' not in markers and 'LSmallToe' not in markers:
-        markers.append('RSmallToe')
-        markers.append('LSmallToe')
+    if all(col in trc_data.columns for col in ['RBigToe', 'LBigToe', 'RHeel', 'LHeel', 'RHip', 'LHip']):
+        if 'RSmallToe' not in markers and 'LSmallToe' not in markers:
+            markers.append('RSmallToe')
+            markers.append('LSmallToe')
 
-        # Update header
-        header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
-        header[3] = header[3].rstrip('\n') + '\tRSmallToe\t\t\tLSmallToe\t\t\n'
-        header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
+            # Update header
+            header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
+            header[3] = header[3].rstrip('\n') + '\tRSmallToe\t\t\tLSmallToe\t\t\n'
+            header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
 
-        # update trc_data
-        rbigtoe_data, lbigtoe_data = trc_data['RBigToe'], trc_data['LBigToe']
-        rheel_data, lheel_data = trc_data['RHeel'], trc_data['LHeel']
-        rhip_data, lhip_data = trc_data['RHip'], trc_data['LHip']
+            # update trc_data
+            rbigtoe_data, lbigtoe_data = trc_data['RBigToe'], trc_data['LBigToe']
+            rheel_data, lheel_data = trc_data['RHeel'], trc_data['LHeel']
+            rhip_data, lhip_data = trc_data['RHip'], trc_data['LHip']
 
-        rbigtoe_to_heel_direction = rbigtoe_data.values - rheel_data.values
-        rbigtoe_to_heel_direction = rbigtoe_to_heel_direction / np.linalg.norm(rbigtoe_to_heel_direction, axis=1)[:, None]
-        lbigtoe_to_heel_direction = lbigtoe_data.values - lheel_data.values
-        lbigtoe_to_heel_direction = lbigtoe_to_heel_direction / np.linalg.norm(lbigtoe_to_heel_direction, axis=1)[:, None]
-        rbigtoe_to_heel_length = np.linalg.norm(rbigtoe_data.values - rheel_data.values, axis=1)[:, None]
-        lbigtoe_to_heel_length = np.linalg.norm(lbigtoe_data.values - lheel_data.values, axis=1)[:, None]
+            rbigtoe_to_heel_direction = rbigtoe_data.values - rheel_data.values
+            rbigtoe_to_heel_direction = rbigtoe_to_heel_direction / np.linalg.norm(rbigtoe_to_heel_direction, axis=1)[:, None]
+            lbigtoe_to_heel_direction = lbigtoe_data.values - lheel_data.values
+            lbigtoe_to_heel_direction = lbigtoe_to_heel_direction / np.linalg.norm(lbigtoe_to_heel_direction, axis=1)[:, None]
+            rbigtoe_to_heel_length = np.linalg.norm(rbigtoe_data.values - rheel_data.values, axis=1)[:, None]
+            lbigtoe_to_heel_length = np.linalg.norm(lbigtoe_data.values - lheel_data.values, axis=1)[:, None]
 
-        rlhip_direction = rhip_data.values - lhip_data.values
-        rlhip_direction = rlhip_direction / np.linalg.norm(rlhip_direction, axis=1)[:, None]
+            rlhip_direction = rhip_data.values - lhip_data.values
+            rlhip_direction = rlhip_direction / np.linalg.norm(rlhip_direction, axis=1)[:, None]
 
-        rsmalltoe_data = pd.DataFrame(
-            rbigtoe_data.values
-            + 0.5 * rbigtoe_to_heel_length * rlhip_direction
-            - 0.2 * rbigtoe_to_heel_length * rbigtoe_to_heel_direction,
-            columns=['RSmallToe'] * 3
-        )
-        lsmalltoe_data = pd.DataFrame(
-            lbigtoe_data.values
-            - 0.5 * lbigtoe_to_heel_length * rlhip_direction
-            - 0.2 * lbigtoe_to_heel_length * lbigtoe_to_heel_direction,
-            columns=['LSmallToe'] * 3
-        )
-        trc_data = pd.concat([trc_data, rsmalltoe_data, lsmalltoe_data], axis=1)
+            rsmalltoe_data = pd.DataFrame(
+                rbigtoe_data.values
+                + 0.5 * rbigtoe_to_heel_length * rlhip_direction
+                - 0.2 * rbigtoe_to_heel_length * rbigtoe_to_heel_direction,
+                columns=['RSmallToe'] * 3
+            )
+            lsmalltoe_data = pd.DataFrame(
+                lbigtoe_data.values
+                - 0.5 * lbigtoe_to_heel_length * rlhip_direction
+                - 0.2 * lbigtoe_to_heel_length * lbigtoe_to_heel_direction,
+                columns=['LSmallToe'] * 3
+            )
+            trc_data = pd.concat([trc_data, rsmalltoe_data, lsmalltoe_data], axis=1)
+        
+    else:
+        logging.warning("Cannot add SmallToe data: some of the following markers are missing: RBigToe, LBigToe, RHeel, LHeel, RHip, LHip.")
 
     return trc_data, markers, header
 
