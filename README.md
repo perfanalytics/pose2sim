@@ -96,7 +96,7 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
       2. [With MMPose (coming soon)](#with-mmpose-coming-soon)
       3. [With DeepLabCut](#with-deeplabcut)
       4. [With OpenPose (legacy)](#with-openpose-legacy)
-      5. [With Mediapipe BlazePose (legacy)](#with-mediapipe-blazepose-legacy)
+      5. [With Mediapipe BlazePose](#with-mediapipe-blazepose)
       6. [With AlphaPose (legacy)](#with-alphapose-legacy)
    4. [Synchronize your cameras](#synchronize-your-cameras)
    5. [Calibrate your cameras](#calibrate-your-cameras)
@@ -602,7 +602,7 @@ This will run pose estimation on your videos and save the results in the `pose` 
 > ```
 
 > [!WARNING]
-> Note that it does not currently work well for acrobatic movements where the person is upside down. We are working on a solution but in the meantime, you can try MediaPipe BlazePose (see [here](#with-mediapipe-blazepose-legacy)).
+> Note that it does not currently work well for acrobatic movements where the person is upside down. We are working on a solution but in the meantime, you can try MediaPipe BlazePose (see [here](#with-mediapipe-blazepose)).
 
 </br>
 
@@ -662,19 +662,18 @@ Make sure you modify the [Config.toml](https://github.com/perfanalytics/pose2sim
 
 </br>
 
-### With MediaPipe BlazePose *(legacy)*:
+### With MediaPipe BlazePose:
 > [!WARNING]
-> RTMlib is faster, more accurate, and easier to install than BlazePose. This is also a legacy option.
+> RTMlib is more accurate than Mediapipe, except for acrobatic movements.
 
 [Mediapipe BlazePose](https://google.github.io/mediapipe/solutions/pose.html) is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 
-* Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
+* Use the script `Mediapipe_to_pose_or_trc.py` (see [Utilities](#utilities)) to run Mediapipe under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
   ```cmd
-  Blazepose_runsave -i input_file -dJs
+  Mediapipe_to_pose_or_trc -i input_file -dJs
   ```
-  Type in `Blazepose_runsave -h` for explanation on parameters.
-
+  Type in `Mediapipe_to_pose_or_trc -h` for explanation on parameters.
 * Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
 </br>
@@ -1646,8 +1645,8 @@ Open a terminal in your project folder, [activate your environment](#activate-yo
   <summary><b>Converting pose files</b> (CLICK TO SHOW)</summary>
     <pre>
 
-[Blazepose_runsave.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/Blazepose_runsave.py)
-Runs BlazePose on a video, and saves coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format.
+[Mediapipe_to_pose_or_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/Mediapipe_to_pose_or_trc.py)
+Runs Mediapipe BlazePose on a video, and saves coordinates in OpenPose (json), DeepLabCut (h5 or csv), or 3D trc format.
 
 [DLC_to_OpenPose.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/DLC_to_OpenPose.py)
 Converts a DeepLabCut (h5) 2D pose estimation file into OpenPose (json) files.

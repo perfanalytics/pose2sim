@@ -832,7 +832,7 @@ BODY_135 = Node("CHip", id=None, children=[
 ])
 
 
-'''BLAZEPOSE (full-body with simplified hand and foot, from mediapipe)
+'''BLAZEPOSE (full-body with simplified hand and foot, from Mediapipe)
 https://google.github.io/mediapipe/solutions/pose'''
 BLAZEPOSE = Node("Hip", id=None, children=[
     Node("RHip", id=24, children=[
