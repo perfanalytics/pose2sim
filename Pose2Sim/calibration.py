@@ -1015,12 +1015,104 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
         raise NotImplementedError('Calibration with a moving charuco board has not been integrated yet.')
 
     elif extrinsics_method == 'keypoints':
-        raise NotImplementedError('Calibration based on keypoints has not been integrated yet.')
+        ret, R, T = calibrate_extrinsics_keypoints(calib_dir, img_vid_files, extrinsics_config_dict, C, S, K, D)
     
     else:
         raise ValueError('Wrong value for extrinsics_method')
 
     return ret, C, S, D, K, R, T
+
+
+def calibrate_extrinsics_keypoints(calib_dir, vid_files, extrinsics_config_dict, C, S, K, D):
+    '''
+    Calibrates extrinsic parameters from synchronized videos of a person walking in the scene,
+    with HumanCalib (https://github.com/flodelaplace/HumanCalib): pose estimation in every view
+    (MeTRAbs, or RTMPose + VideoPose3D), linear initialisation, bundle adjustment, then metric
+    scale from the participant's height and gravity-aligned orientation (Z up, origin under the
+    heels).
+
+    INPUTS:
+    - calib_dir: calibration directory; HumanCalib works in calib_dir/humancalib
+    - vid_files: one synchronized video per camera, in the order of C
+    - extrinsics_config_dict: extrinsics parameters, with the 'keypoints' section, and the
+      'project' and 'pose' sections of Config.toml added by calibrate_cams_all
+    - C, S, K, D: camera names, image sizes, intrinsic matrices and distortions
+
+    OUTPUTS:
+    - ret: reprojection error per camera, in px
+    - R: extrinsic rotations (Rodrigues)
+    - T: extrinsic translations, in meters
+    '''
+
+    try:
+        import humancalib
+    except ImportError:
+        raise ImportError('extrinsics_method = "keypoints" needs HumanCalib: pip install "humancalib[gpu]" '
+                          '(MeTRAbs, recommended), or pip install "humancalib[rtmpose]" with pose_engine = "rtmpose". '
+                          'See https://github.com/flodelaplace/HumanCalib') from None
+    import shutil
+
+    keypoints_config = extrinsics_config_dict.get('keypoints', {})
+    pose_engine = keypoints_config.get('pose_engine', 'metrabs')
+    frame_budget = keypoints_config.get('frame_budget', 100)
+    extract_fps = keypoints_config.get('extract_fps', 'auto')
+
+    # Metric scale: the participant's height, which has to be known here
+    height = extrinsics_config_dict.get('project', {}).get('participant_height', 'auto')
+    if isinstance(height, (list, tuple)):
+        logging.info(f'participant_height is a list: calibrating with the first value, {height[0]} m. The calibration video should show this participant only.')
+        height = height[0]
+    if not isinstance(height, (int, float)):
+        raise ValueError('extrinsics_method = "keypoints" needs the participant\'s height for the metric scale: '
+                         'set [project] participant_height to a number in Config.toml (e.g. 1.72), not "auto".')
+
+    vid_files = [Path(f) for f in vid_files if is_video_file(f)]
+    if len(vid_files) != len(C):
+        raise ValueError(f'extrinsics_method = "keypoints" needs one video per camera in {Path(calib_dir) / "extrinsics"}: '
+                         f'found {len(vid_files)} video(s) for {len(C)} camera(s).')
+
+    device = keypoints_config.get('device', extrinsics_config_dict.get('pose', {}).get('device', 'auto'))
+    device = 'cpu' if str(device).lower() == 'cpu' else 'cuda'
+    if extract_fps == 'auto':   # decimate fast cameras to ~25 Hz: same accuracy, much faster (HumanCalib docs)
+        cap = cv2.VideoCapture(str(vid_files[0]))
+        extract_fps = 25 if cap.get(cv2.CAP_PROP_FPS) > 50 else None
+        cap.release()
+    elif extract_fps is False:
+        extract_fps = None
+
+    # HumanCalib's inputs: videos named after the cameras, and their intrinsics in Pose2Sim format.
+    # Outside calibration/extrinsics, where every folder is counted as a camera.
+    work_dir = Path(calib_dir) / 'humancalib'
+    videos_dir = work_dir / 'videos'
+    shutil.rmtree(videos_dir, ignore_errors=True)
+    videos_dir.mkdir(parents=True)
+    for cam_name, vid_file in zip(C, vid_files):
+        target = videos_dir / f'{cam_name}{vid_file.suffix}'
+        try:
+            os.link(vid_file, target)        # no copy where the file system allows it
+        except OSError:
+            shutil.copyfile(vid_file, target)
+    intrinsics_path = work_dir / 'Calib_intrinsics.toml'
+    toml_write(intrinsics_path, C, S, D, K, [[0.0, 0.0, 0.0]] * len(C), [[0.0, 0.0, 0.0]] * len(C))
+
+    logging.info(f'\nCalibrating extrinsics from a walking person with HumanCalib {humancalib.__version__} '
+                 f'({pose_engine}, participant height {height} m). This takes a few minutes per camera.')
+    output_dir = work_dir / 'output'
+    calib_path = humancalib.calibrate(videos_dir, intrinsics_path, output_dir, height,
+                                      pose_engine=pose_engine, device=device,
+                                      frame_budget=frame_budget, extract_fps=extract_fps)
+
+    # Back to Pose2Sim: rotations and translations in the order of C, reprojection error per camera
+    calib_data = rtoml.load(Path(calib_path))
+    R = [np.array(calib_data[cam_name]['rotation'], dtype=float) for cam_name in C]
+    T = [np.array(calib_data[cam_name]['translation'], dtype=float) for cam_name in C]
+    try:
+        with open(output_dir / 'results' / 'summary.json') as f:
+            errors = json.load(f).get('cameras_mre_px', {})
+        ret = [float(errors.get(cam_name, np.nan)) for cam_name in C]
+    except (OSError, ValueError):
+        ret = [np.nan] * len(C)
+    return ret, R, T
 
 
 def draw_charuco_corners_like_chessboard(img, charuco_corners, charuco_ids, board, radius=8, thickness=1):
@@ -1754,6 +1846,10 @@ def calibrate_cams_all(config_dict):
     elif calib_type=='calculate':
         intrinsics_config_dict = config_dict.get('calibration', {}).get('calculate', {}).get('intrinsics', {})
         extrinsics_config_dict = config_dict.get('calibration', {}).get('calculate', {}).get('extrinsics', {})
+        if extrinsics_config_dict.get('extrinsics_method') == 'keypoints':
+            # HumanCalib needs the participant's height and the pose device
+            extrinsics_config_dict = dict(extrinsics_config_dict, project=config_dict.get('project', {}),
+                                          pose=config_dict.get('pose', {}))
         save_debug_images = config_dict.get('calibration', {}).get('calculate', {}).get('save_debug_images', True)
         extrinsics_method = extrinsics_config_dict.get('extrinsics_method', 'scene')
 
