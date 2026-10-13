@@ -505,7 +505,7 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
     # retrieve intrinsics if calib_file found and if overwrite_intrinsics=False
     try:
         calib_files = list(Path(calib_dir).glob('*.toml'))
-        calib_file = max(calib_files, key=lambda f: f.stat().st_ctime) # lastly created calibration file
+        calib_file = max(calib_files, key=lambda f: f.stat().st_birthtime) # lastly created calibration file
     except:
         pass
     if not overwrite_intrinsics and 'calib_file' in locals():
@@ -548,7 +548,10 @@ def calib_calc_fun(calib_dir, intrinsics_config_dict, extrinsics_config_dict, sa
     if calculate_extrinsics:
         logging.info(f'\nCalculating extrinsic parameters...')
         # check that the number of cameras is consistent
-        nb_cams_extrinsics = [max(len(fold),len(files)) for path, fold, files in os.walk(Path(calib_dir) / 'extrinsics')][0]
+        extrinsics_dir = Path(calib_dir) / 'extrinsics'
+        fold = [p for p in extrinsics_dir.iterdir() if p.is_dir()]
+        media_files = [p for p in extrinsics_dir.iterdir() if is_video_file(p)]
+        nb_cams_extrinsics = max(len(fold), len(media_files))
         if nb_cams_intrinsics != nb_cams_extrinsics:
             raise Exception(f'Error: The number of cameras is not consistent:\
                     Found {nb_cams_intrinsics} cameras based on the number of intrinsic folders or on calibration file data,\
@@ -715,11 +718,14 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
     - K: intrinsic parameters: list of 3x3 arrays of floats
     '''
 
+    intrinsics_dir = Path(calib_dir) / 'intrinsics'
     try:
-        intrinsics_cam_listdirs_names = sorted(next(os.walk(Path(calib_dir) / 'intrinsics'))[1])
+        root, fold, files = next(os.walk(intrinsics_dir))
+        intrinsics_cam_listdirs_names = sorted(fold or [f for f in files if is_video_file(os.path.join(root, f))],
+                                                key=natural_sort_key)
     except StopIteration:
-        logging.exception(f'Error: No {Path(calib_dir) / "intrinsics"} folder found.')
-        raise Exception(f'Error: No {Path(calib_dir) / "intrinsics"} folder found.')
+        logging.exception(f'Error: No {intrinsics_dir} folder found.')
+        raise Exception(f'Error: No {intrinsics_dir} folder found.')
     extract_every_N_sec = intrinsics_config_dict.get('extract_every_N_sec', 1)
     overwrite_extraction = False
     show_detection_intrinsics = intrinsics_config_dict.get('show_detection_intrinsics', True)
@@ -729,7 +735,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
     marker_size = square_size * 0.75 # as in calib.io. detectBoard is very tolerant, and work with marker_size = square_size * 0.15 to -0.9
     marker_resolution = str(intrinsics_config_dict.get('marker_resolution', 5)) # resolution of the aruco marker
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
-
+    
     # Load clicked image points if exist
     img_pts_path = Path(calib_dir) / f'Image_points.json'
     if Path(img_pts_path).exists():
@@ -738,6 +744,10 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
         image_points = imgp_data['intrinsics']
 
     for cam in intrinsics_cam_listdirs_names:
+        cam_dir_or_vid = intrinsics_dir / cam
+        cam_name = Path(cam).stem
+        cam_dir = intrinsics_dir / cam_name
+
         # Prepare object points
         objp = np.zeros((corners_nb[0]*corners_nb[1],3), np.float32) 
         objp[:,:2] = np.mgrid[0:corners_nb[0],0:corners_nb[1]].T.reshape(-1,2)
@@ -746,29 +756,27 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
         imgpoints = [] # 2d points in image plane
 
         logging.info(f'\nCamera {cam}:')
-        img_vid_files = sorted([f for f in (Path(calib_dir) / 'intrinsics' / cam).glob('*') 
-                                if is_image_file(f) or is_video_file(f)],
-                                key=natural_sort_key)
-        if len(img_vid_files) == 0:
-            logging.exception(f'No images or videos found in the folder {Path(calib_dir) / "intrinsics" / cam}.')
-            raise ValueError(f'No images or videos found in the folder {Path(calib_dir) / "intrinsics" / cam}.')
-        img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c.name)]) #sorting paths with numbers
+        if is_video_file(cam_dir_or_vid):
+            extract_frames(cam_dir_or_vid, extract_every_N_sec, overwrite_extraction, cam_dir)
+            img_vid_files = sorted(cam_dir.glob('*.png'), key=natural_sort_key)
         
-        # extract frames from video if video
-        try:
-            cap = cv2.VideoCapture(img_vid_files[0])
-            cap.read()
-            if cap.read()[0] == False:
-                raise
-            extract_frames(img_vid_files[0], extract_every_N_sec, overwrite_extraction)
-            img_vid_files = list((Path(calib_dir) / 'intrinsics' / cam).glob('*.png'))
-            img_vid_files = sorted(img_vid_files, key=lambda c: [int(n) for n in re.findall(r'\d+', c.name)])
-        except:
-            pass
+        elif cam_dir_or_vid.is_dir():
+            img_vid_files = sorted([f for f in (cam_dir_or_vid).glob('*') 
+                                    if is_image_file(f) or is_video_file(f)],
+                                    key=natural_sort_key)
+            if not img_vid_files:
+                logging.exception(f'No images or videos in {cam_dir_or_vid}')
+                raise ValueError(f'No images or videos in {cam_dir_or_vid}')
+            if is_video_file(img_vid_files[0]):
+                extract_frames(img_vid_files[0], extract_every_N_sec, overwrite_extraction)
+                img_vid_files = sorted(cam_dir_or_vid.glob('*.png'), key=natural_sort_key)
+
+        else:
+            logging.exception(f'{cam_dir_or_vid} is neither a file nor a folder.')
+            raise FileNotFoundError(f'{cam_dir_or_vid} is neither a file nor a folder.')
 
         # find corners
         for img_path in img_vid_files:
-            cam_name = Path(img_path).name
             if show_detection_intrinsics == True:
                 # If previously labeled points exist, check if they are satisfying
                 if 'image_points' in locals():
@@ -860,18 +868,19 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
     extrinsics_keypoints = extrinsics_config_dict.get('keypoints', {})
 
     # Detect images or videos in the extrinsics folder, sorted by camera name
+    extrinsics_dir = Path(calib_dir) / 'extrinsics'
     img_vid_files = sorted(
-        [f for f in (Path(calib_dir) / 'extrinsics').glob('*/*') if f.is_file() and (is_image_file(f) or is_video_file(f))],
+        [f for f in (extrinsics_dir).glob('*/*') if f.is_file() and (is_image_file(f) or is_video_file(f))],
         key=lambda c: [int(n) for n in re.findall(r'\d+', c.name)],
     )
     if not img_vid_files:
         img_vid_files = sorted(
-            [f for f in (Path(calib_dir) / 'extrinsics').glob('*') if f.is_file() and (is_image_file(f) or is_video_file(f))],
+            [f for f in (extrinsics_dir).glob('*') if f.is_file() and (is_image_file(f) or is_video_file(f))],
             key=lambda c: [int(n) for n in re.findall(r'\d+', c.name)],
         )
     if not img_vid_files:
-        logging.exception(f'No images or videos found in the folder {Path(calib_dir) / "extrinsics"}.')
-        raise FileNotFoundError(f'No images or videos found in the folder {Path(calib_dir) / "extrinsics"}.')
+        logging.exception(f'No images or videos found in the folder {extrinsics_dir}.')
+        raise FileNotFoundError(f'No images or videos found in the folder {extrinsics_dir}.')
 
     # Load clicked image points if exist
     img_pts_path = Path(calib_dir) / f'Image_points.json'
@@ -905,12 +914,12 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
                 object_coords_3d[:, [0,2]] = object_coords_3d[:, [0,2]] * square_size + square_size
                 
         # Save reference 3D coordinates as trc
-        obj_pts_path = Path(calib_dir) / f'Object_points.trc'
+        obj_pts_path = Path(calib_dir) / f'Calibration_points.trc'
         trc_write(object_coords_3d, obj_pts_path)
 
         # Create or update clicked image points file
         for i, img_vid_file in enumerate(img_vid_files):
-            cam_name = Path(img_vid_file).name
+            cam_name = Path(img_vid_file).stem
             logging.info(f'Camera {cam_name}:')
            
             # extract frames from image, or from video if imread is None
@@ -1559,7 +1568,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
         return
 
 
-def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False):
+def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False, output_dir=None):
     '''
     Extract frames from video 
     if has not been done yet or if overwrite==True
@@ -1568,22 +1577,27 @@ def extract_frames(video_path, extract_every_N_sec=1, overwrite_extraction=False
     - video_path: path to video whose frames need to be extracted
     - extract_every_N_sec: extract one frame every N seconds (can be <1)
     - overwrite_extraction: if True, overwrite even if frames have already been extracted
-    
+    - output_dir: directory where extracted frames will be saved (if None, same directory as the video)
+
     OUTPUT:
     - extracted frames in folder
     '''
     
-    if not list(Path(video_path).parent.glob(f'{Path(video_path).stem}_*.png')) or overwrite_extraction:
+    video_path = Path(video_path)
+    output_dir = Path(output_dir) if output_dir is not None else video_path.parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if not list(output_dir.glob(f'{video_path.stem}_*.png')) or overwrite_extraction:
         cap = cv2.VideoCapture(str(video_path))
         if cap.isOpened():
             fps = round(cap.get(cv2.CAP_PROP_FPS))
             frame_nb = 0
-            logging.info(f'Extracting frames...')
+            logging.info(f'Extracting frames from {video_path} to {output_dir}...')
             while cap.isOpened():
                 ret, frame = cap.read()
                 if ret == True:
                     if frame_nb % (fps*extract_every_N_sec) == 0:
-                        img_path = Path(video_path).parent / (Path(video_path).stem + '_' + str(frame_nb).zfill(5) + '.png')
+                        img_path = output_dir / f'{video_path.stem}_{str(frame_nb).zfill(5)}.png'
                         cv2.imwrite(str(img_path), frame)
                     frame_nb+=1
                 else:
@@ -1670,7 +1684,7 @@ def recap_calibrate(ret, calib_path, calib_full_type):
     '''
     
     calib = rtoml.load(Path(calib_path))
-    
+
     ret_m, ret_px = [], []
     for c, cam in enumerate(calib.keys()):
         if cam != 'metadata':
