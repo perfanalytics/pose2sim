@@ -95,7 +95,7 @@ def face_blurring_func(**args):
 
     # Setup basic logging
     if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        logging.basicConfig(level=logging.INFO, format='%(asmtime)s - %(levelname)s - %(message)s')
 
     # Determine input videos
     if input_dir_path:
