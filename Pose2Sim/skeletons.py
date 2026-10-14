@@ -671,6 +671,120 @@ FACE_106 = Node("root", id=None, children=[
     ]),
 ])
 
+
+'''SUPERANIMAL_QUADRUPED_39 (full-body animal)
+https://github.com/AdaptiveMotorControlLab/modelzoo-figures'''
+SUPERANIMAL_QUADRUPED_39 = Node("Hip", id=22, children=[ # Tail_base
+    Node("TailEnd", id=23),
+    Node("RHip", id=32, children=[                      # Back_right_thigh
+        Node("RKnee", id=34, children=[                 # Back_right_knee
+            Node("RAnkle", id=35),                      # Back_right_paw
+        ]),
+    ]),
+    Node("LHip", id=31, children=[                      # Back_left_thigh
+        Node("LKnee", id=33, children=[                 # Back_left_knee
+            Node("LAnkle", id=30),                      # Back_left_paw
+        ]),
+    ]),
+    Node("BackEnd", id=20, children=[                   # Back_end
+        Node("BackMiddle", id=21, children=[            # Back_middle
+            Node("RBodyMiddle", id=37),                 # Body_middle_right
+            Node("LBodyMiddle", id=38),                 # Body_middle_left
+            Node("BellyBottom", id=36),                 # Back_base
+            Node("Neck", id=19, children=[              # Back_base
+                Node("RShoulder", id=27, children=[     # Front_right_thigh
+                    Node("RElbow", id=28, children=[    # Front_right_knee
+                        Node("RWrist", id=29),          # Front_right_paw
+                    ]),
+                ]),
+                Node("LShoulder", id=24, children=[      # Front_left_thigh
+                    Node("LElbow", id=25, children=[     # Front_left_knee
+                        Node("LWrist", id=26),           # Front_left_paw
+                    ]),
+                ]),
+                Node("NeckEnd", id=16, children=[
+                    Node("NeckBase", id=15, children=[
+                        Node("ThroatEnd", id=18, children=[
+                            Node("ThroatBase", id=17),
+                        ]),
+                        Node("Nose", id=0, children=[
+                            Node("UpperJaw", id=1, children=[
+                                Node("LowerJaw", id=2, children=[
+                                    Node("MouthEndRight", id=3),
+                                    Node("MouthEndLeft", id=4),
+                                ]),
+                            ]),
+                            Node("REye", id=5, children=[           # Right_eye
+                                Node("REarBase", id=6, children=[
+                                    Node("REarEnd", id=7),
+                                ]),
+                            ]),
+                            Node("LEye", id=10, children=[           # Left_eye
+                                Node("LEarBase", id=11, children=[
+                                    Node("LEarEnd", id=12),
+                                ]),
+                            ]),
+                            Node("RAntlerBase", id=8, children=[   # Right_antler_base
+                                Node("RAntlerEnd", id=9),          # Right_antler_end
+                            ]),
+                            Node("LAntlerBase", id=13, children=[   # Left_antler_base
+                                Node("LAntlerEnd", id=14),          # Left_antler_end
+                            ]),
+                        ]),
+                    ]),
+                ]),
+            ]),
+        ]),
+    ]),
+])
+
+
+'''SUPERANIMAL_TOPVIEWMOUSE_27 (full-body animal)
+https://github.com/AdaptiveMotorControlLab/modelzoo-figures'''
+SUPERANIMAL_TOPVIEWMOUSE_27 = Node("Hip", id=13, children=[     # Tail_base
+    Node("RHip", id=24),    
+    Node("LHip", id=21),    
+    Node("Tail1", id=14, children=[ 
+        Node("Tail2", id=15, children=[ 
+            Node("Tail3", id=16, children=[ 
+                Node("Tail4", id=17, children=[ 
+                    Node("Tail5", id=18, children=[ 
+                        Node("TailEnd", id=25),                 # Tail_end
+                    ]), 
+                ]), 
+            ]), 
+        ]), 
+    ]), 
+    Node("MidBackend3", id=12, children=[                       # Mid_back_end_3 
+        Node("MidBackend2", id=11, children=[                   # Mid_back_end_2
+            Node("MidBackend", id=10, children=[                # Mid_back_end
+                Node("MouseCenter", id=9, children=[            # Mouse_center
+                    Node("RMidSide", id=23),                    # Right_midside
+                    Node("LMidSide", id=20),                    # Left_midside
+                    Node("MidBack", id=8, children=[            # Mid_back
+                        Node("Neck", id=7, children=[
+                            Node("Head", id=26, children=[      # Head_Midpoint
+                                Node("Nose", id=0),
+                                Node("REye", id=6),             # Right_eye
+                                Node("LEye", id=5),             # Left_eye
+                                Node("REar", id=2, children=[   # Right_ear
+                                    Node("REarTip", id=4),     # Right_ear_tip
+                                ]),
+                                Node("LEar", id=1, children=[   # Left_ear
+                                    Node("LEarTip", id=3),     # Left_ear_tip
+                                ]),
+                            ]),
+                            Node("RShoulder", id=22),
+                            Node("LShoulder", id=19),
+                        ]),
+                    ]),
+                ]),
+            ]),
+        ]),
+    ]),
+])
+
+
 '''ANIMAL2D_17 (full-body animal)
 https://github.com/AlexTheBad/AP-10K/'''
 ANIMAL2D_17 = Node("Hip", id=4, children=[
