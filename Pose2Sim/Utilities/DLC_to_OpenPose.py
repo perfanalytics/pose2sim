@@ -61,7 +61,8 @@ def DLC_to_OpenPose_func(*args):
     try:
         h5_file_path = Path(args[0]['input']).resolve() # invoked with argparse
         if args[0]['output'] == None:
-            json_folder_path = Path(h5_file_path).stem
+            h5_dir = Path(h5_file_path)
+            json_folder_path = h5_dir.with_name(h5_dir.stem + '_json')
         else:
             json_folder_path = Path(args[0]['output']).resolve()
     except:
@@ -69,7 +70,8 @@ def DLC_to_OpenPose_func(*args):
         try:
             json_folder_path = Path(args[1]).resolve()
         except:
-            json_folder_path = Path(h5_file_path).stem
+            h5_dir = Path(h5_file_path)
+            json_folder_path = h5_dir.with_name(h5_dir.stem + '_json')
         
     if not Path(json_folder_path).exists():    
         os.mkdir(json_folder_path)
@@ -87,6 +89,7 @@ def DLC_to_OpenPose_func(*args):
                     'hand_right_keypoints_3d':[]}]
     
     # h5 reader
+    print(f'Converting DeepLabCut h5 file {h5_file_path} to OpenPose json files in {json_folder_path}...')
     h5_file = pd.read_hdf(h5_file_path).fillna(0)
     kpt_nb = int(len(h5_file.columns)//3)
     

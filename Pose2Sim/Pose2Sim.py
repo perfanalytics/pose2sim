@@ -233,7 +233,7 @@ class Pose2SimPipeline:
         logging.info("\n---------------------------------------------------------------------")
         logging.info(f"{step_name} for {seq_name}, for {frames}.")
         logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info(f"Project directory: {project_dir}")
+        logging.info(f"Project directory: {project_dir.resolve()}")
         logging.info("---------------------------------------------------------------------\n")
 
     def calibration(self):
@@ -332,7 +332,7 @@ class Pose2SimPipeline:
         logging.info("\n\n=====================================================================")
         logging.info(f"RUNNING ALL.")
         logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info(f"Project directory: {self.session_dir}\n")
+        logging.info(f"Project directory: {self.session_dir.resolve()}\n")
         logging.info("=====================================================================\n")
 
         overall_start = time.time()

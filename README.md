@@ -567,7 +567,8 @@ This will run pose estimation on your videos and save the results in the `pose` 
 
 > [!TIP]
 > #### Other available models
-> - **Whole body:** Use 'Whole_body' `pose_model` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) to track 133 keypoints on the body, face, and hands. Note that it is slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints.
+> - **Whole body:** Use 'Whole_body' `pose_model` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) to track 133 keypoints on the body, face, and hands. Note that it is slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints.\
+  **IMPORTANT:** This model is retricted to non-commercial use only, due to one of its training datasets.
 > - **Wrist motion:** Use 'Whole_body_wrist' `pose_model`. *Effectively runs the 'whole_body' model but ignores all face and finger keypoints, except 2 per hand.*
 > - **Lower body:** Use 'Lower_body' `pose_model`. *Effectively runs the 'body_with_feet' model but ignores all upper body keypoints.* 
 > - **Others:** You can also use the `Hand`, `Face`, `Animal`, or any other RTMlib model (see next tip).
@@ -580,23 +581,23 @@ This will run pose estimation on your videos and save the results in the `pose` 
 > ```
 > # Equivalent to mode='balanced', with body_with_feet pose model
 > mode = """{'det_class':'YOLOX',
->        'det_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/yolox_m_8xb8-300e_humanart-c2c7a14a.onnx',
->        'det_input_size':[640, 640],
->        'pose_class':'RTMPose',
->        'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.onnx',
->        'pose_input_size':[192,256]}"""
+> 'det_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/yolox_m_8xb8-300e_humanart-c2c7a14a.onnx',
+> 'det_input_size':[640, 640],
+> 'pose_class':'RTMPose',
+> 'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.onnx',
+> 'pose_input_size':[192,256]}"""
 >
 > # With one-stage RTMO model 
 > # Requires pose_model = 'Body'. Marker augmentation won't work, Kimatic analysis will
 > mode = """{'pose_class':'RTMO', 
->        'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.onnx', 
->        'pose_input_size':[640, 640]}"""
+> 'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.onnx', 
+> 'pose_input_size':[640, 640]}"""
 > 
 > # With animal pose estimation:
 > # Marker augmentation won't work, and you will need to create your owOpenSim skeleton for kinematic analysis.
 > mode = """{'pose_class':'RTMPose',
->        'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.onnx',
->        'pose_input_size':[256,256]}"""
+> 'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.onnx',
+> 'pose_input_size':[256,256]}"""
 > 
 > # Same approach for hand or face pose estimation, check the RTMLib domentation for more information.
 > ```
@@ -622,14 +623,17 @@ DLC_to_OpenPose -i input_h5_file
 ```
 
 3. Edit `pose.CUSTOM` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), and edit the node IDs so that they correspond to the column numbers of the 2D pose file, starting from zero. Make sure you also changed the `pose_model` and the `tracked_keypoint`.\
-  You can visualize your skeleton's hierarchy by changing pose_model to CUSTOM and writing these lines: 
+  N.B.: You can rename CUSTOM or create as many custom skeletons as you want.\
+  You can visualize your skeleton's hierarchy by changing pose_model to `CUSTOM` and writing these lines: 
 
   ```python
   config_path = r'path_to_Config.toml'
-  import toml, anytree
-  config = toml.load(config_path)
+  import rtoml, anytree
+  from pathlib import Path
+  from anytree.importer import DictImporter
+  config = rtoml.load(Path(config_path))
   pose_model = config.get('pose').get('pose_model')
-  model = anytree.importer.DictImporter().import_(config.get('pose').get(pose_model))
+  model = DictImporter().import_(config.get('pose').get(pose_model)[0])
   for pre, _, node in anytree.RenderTree(model): 
       print(f'{pre}{node.name} id={node.id}')
   ```
@@ -783,7 +787,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
   - Export calibration to `.qca.txt` within QTM (see [there](https://github.com/perfanalytics/pose2sim/issues/56#issuecomment-1855933754)).
   - Copy it in the `Calibration` Pose2Sim folder.
   - set `convert_from` to 'qualisys' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
-  - If you set your cameras vertically and the videos are rendered sideways, you need to rotate them and the calibration file before running pose estimation. [Use this script](https://github.com/perfanalytics/pose2sim/issues/136#issuecomment-2398110061).
+  - If you set your cameras vertically and the videos are rendered sideways, you need to rotate them and the calibration file before running pose estimation. [Use this script](https://github.com/perfanalytics/pose2sim/issues/235#issuecomment-60365568651).
 - **From [Optitrack](https://optitrack.com/):** Exporting calibration will be available in Motive 3.2. In the meantime:
   - Calculate intrinsics with a board (see next section).
   - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28).
@@ -1621,7 +1625,7 @@ Open a terminal in your project folder, [activate your environment](#activate-yo
     <pre>
 
 [Mediapipe_to_pose_or_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/Mediapipe_to_pose_or_trc.py)
-Runs Mediapipe BlazePose on a video, and saves coordinates in OpenPose (json), DeepLabCut (h5 or csv), or 3D trc format.
+Runs Mediapipe BlazePose on a video or a webcam stream, and saves coordinates in OpenPose (json), DeepLabCut (h5 or csv), or 3D trc format.
 
 [DLC_to_OpenPose.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/DLC_to_OpenPose.py)
 Converts a DeepLabCut (h5) 2D pose estimation file into OpenPose (json) files.
