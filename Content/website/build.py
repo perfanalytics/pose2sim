@@ -60,18 +60,35 @@ ADMON_ICON = {"NOTE": "📝 Note", "TIP": "💡 Tip",
               "WARNING": "⚠️ Warning", "IMPORTANT": "❗ Important"}
 
 
+def add_heading_ids(md: str) -> str:
+    """Turn ### / #### headings into <hN id=...> with a clickable # anchor."""
+    def repl(m: re.Match) -> str:
+        hashes = m.group(1)
+        title  = m.group(2).strip()
+        slug   = slugify(title)
+        lvl    = len(hashes)
+        t      = clean_title(title)
+        return (f'<h{lvl} id="{slug}">{t}'
+                f'<a href="#{slug}" class="heading-anchor" aria-label="Link to section">#</a>'
+                f'</h{lvl}>')
+    return re.sub(r"^(#{3,4}) +(.+)$", repl, md, flags=re.MULTILINE)
+
+
 def _replace_admonition(m: re.Match) -> str:
-    atype   = m.group(1).upper()
-    raw     = m.group(2)
-    # Strip leading '> ' from each continuation line (handle both '> ' and '>')
-    body    = re.sub(r"^>[ \t]?", "", raw, flags=re.MULTILINE).strip()
-    css     = ADMON_CSS.get(atype, "info-box")
-    label   = ADMON_ICON.get(atype, atype.capitalize())
-    # Use markdown="1" so inner markdown is still processed by md_in_html
+    atype = m.group(1).upper()
+    raw   = m.group(2)
+    body  = re.sub(r"^>[ \t]?", "", raw, flags=re.MULTILINE).strip()
+    css   = ADMON_CSS.get(atype, "info-box")
+    label = ADMON_ICON.get(atype, atype.capitalize())
+
+    body = add_heading_ids(body)          # <-- new: give headings ids/anchors first
+    body_html = markdown.markdown(body, extensions=MD_EXTENSIONS, tab_length=2)
+
     return (
-        f'\n<div class="{css}" markdown="1">\n\n'
-        f'**{label}:**\n\n{body}\n\n'
-        f"</div>\n"
+        f'\n<div class="{css}">\n'
+        f'<h4>{label}:</h4>\n'
+        f'{body_html}\n'
+        f'</div>\n'
     )
 
 
@@ -255,18 +272,8 @@ def section_to_html(sec: dict) -> str:
     md = preprocess(md)
 
     # Add id anchors to h3/h4 sub-headings so sidebar sub-items can jump to them
-    def add_heading_id(m: re.Match) -> str:
-        hashes = m.group(1)
-        title  = m.group(2).strip()
-        slug   = slugify(title)
-        lvl    = len(hashes)
-        t      = clean_title(title)
-        return (f'<h{lvl} id="{slug}">{t}'
-                f'<a href="#{slug}" class="heading-anchor" aria-label="Link to section">#</a>'
-                f'</h{lvl}>')
-
-    md = re.sub(r"^(#{3,4}) +(.+)$", add_heading_id, md, flags=re.MULTILINE)
-
+    md = add_heading_ids(md)
+    
     # Convert to HTML
     body = markdown.markdown(md, extensions=MD_EXTENSIONS, output_format="html", tab_length=2)
 
