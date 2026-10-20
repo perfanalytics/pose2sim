@@ -568,7 +568,7 @@ This will run pose estimation on your videos and save the results in the `pose` 
 > [!TIP]
 > #### Other available models
 > - **Whole body:** Use 'Whole_body' `pose_model` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) to track 133 keypoints on the body, face, and hands. Note that it is slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints.\
-  **IMPORTANT:** This model is retricted to non-commercial use only, due to one of its training datasets.
+**IMPORTANT:** This model is retricted to non-commercial use only, due to one of its training datasets.
 > - **Wrist motion:** Use 'Whole_body_wrist' `pose_model`. *Effectively runs the 'whole_body' model but ignores all face and finger keypoints, except 2 per hand.*
 > - **Lower body:** Use 'Lower_body' `pose_model`. *Effectively runs the 'body_with_feet' model but ignores all upper body keypoints.* 
 > - **Others:** You can also use the `Hand`, `Face`, `Animal`, or any other RTMlib model (see next tip).
