@@ -1114,11 +1114,13 @@ def findCorners(img_path, corner_nb, objp=[], show=True, board_type='charuco', a
     # Find corners
     if board_type == 'charuco':
         # Test all available dictionaries with the given resolution until one works
-        for code_nb in [50, 100, 250, 1000]:
+        for code_nb, legacy_pattern in [(c, l) for l in [False, True] for c in [50, 100, 250, 1000]]:
             try:
                 aruco_dict_name = f'DICT_{aruco_marker_resolution}X{aruco_marker_resolution}_{code_nb}'
                 aruco_dict = cv2.aruco.getPredefinedDictionary(getattr(cv2.aruco, aruco_dict_name))
                 board = cv2.aruco.CharucoBoard((corner_nb[1]+1, corner_nb[0]+1), aruco_square_size, aruco_marker_size, aruco_dict)
+                if hasattr(board, 'setLegacyPattern'): # OpenCV >= 4.8
+                    board.setLegacyPattern(legacy_pattern)
                 detector_params = cv2.aruco.DetectorParameters()
                 detector_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
                 detector = cv2.aruco.CharucoDetector(board, detectorParams=detector_params)
