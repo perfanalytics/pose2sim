@@ -8,14 +8,12 @@
     "email": "contact@david-pagnon.com",
     "phone": "",
     "description": "I'm a research engineer from France., creator and maintainer of Pose2Sim and Sports2D, which are open-source, peer-reviewed markerless motion capture pipelines for biomechanics, sports science, and 3D animation.",
-    "webpageUrl": {
-      "url": "https://github.com/davidpagnon"
-    }
+    "webpageUrl": {"url": "https://github.com/davidpagnon"}
   },
   "projects": [
     {
       "guid": "pose2sim",
-      "name": "Pose2Sim & Sports2D",
+      "name": "Pose2Sim",
       "description": "Open-source Python pipeline for markerless 3D motion capture and kinematics from multiple cameras: calibration, 2D pose estimation, synchronization, person association, triangulation, filtering and OpenSim inverse kinematics. Used for biomechanics, sports science, clinical research and 3D animation.\n\nEvidence of impact: published in the Journal of Open Source Software and in peer-reviewed validation papers; used in academic research (see Google Scholar citations); active Discord community of about 200 members who help each other and share their work. All processing runs locally, which makes it compatible with GDPR constraints that cloud-based alternatives struggle with.\n\nUsers: researchers, clinicians, sports coaches and, increasingly, 3D animation artists.",
       "webpageUrl": {"url": "https://perfanalytics.github.io/pose2sim/"},
       "repositoryUrl": {"url": "https://github.com/perfanalytics/Pose2Sim"},
@@ -71,7 +69,7 @@
         "guid": "developer-time-monthly",
         "status": "active",
         "name": "Developer monthly compensation",
-        "description": "This will cover one month of part-time working on Pose2Sim and related projects: reviewing pull requests, handling issues and feature requests, running the Discord community, keeping dependencies and pose-estimation models up to date, documentation, and academic collaboration. Also covers a small budget for test hardware (Raspberry Pi, network cameras, GoPro) and for the compute needed to train pose estimation models, and time to co-author related academic papers.",
+        "description": "This will cover one month of part-time working on Pose2Sim and related projects.",
         "amount": 3500,
         "currency": "EUR",
         "frequency": "monthly",
