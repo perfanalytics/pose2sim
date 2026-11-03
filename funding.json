@@ -1,0 +1,108 @@
+{
+  "$schema": "https://floss.fund/schema/v1.0.0/funding.schema.json#",
+  "version": "v1.0.0",
+  "entity": {
+    "type": "individual",
+    "role": "maintainer",
+    "name": "David Pagnon",
+    "email": "contact@david-pagnon.com",
+    "phone": "",
+    "description": "I'm a research engineer from France., creator and maintainer of Pose2Sim and Sports2D, which are open-source, peer-reviewed markerless motion capture pipelines for biomechanics, sports science, and 3D animation.",
+    "webpageUrl": {
+      "url": "https://github.com/davidpagnon"
+    }
+  },
+  "projects": [
+    {
+      "guid": "pose2sim",
+      "name": "Pose2Sim & Sports2D",
+      "description": "Open-source Python pipeline for markerless 3D motion capture and kinematics from multiple cameras: calibration, 2D pose estimation, synchronization, person association, triangulation, filtering and OpenSim inverse kinematics. Used for biomechanics, sports science, clinical research and 3D animation.\n\nEvidence of impact: published in the Journal of Open Source Software and in peer-reviewed validation papers; used in academic research (see Google Scholar citations); active Discord community of about 200 members who help each other and share their work. All processing runs locally, which makes it compatible with GDPR constraints that cloud-based alternatives struggle with.\n\nUsers: researchers, clinicians, sports coaches and, increasingly, 3D animation artists.",
+      "webpageUrl": {"url": "https://perfanalytics.github.io/pose2sim/"},
+      "repositoryUrl": {"url": "https://github.com/perfanalytics/Pose2Sim"},
+      "licenses": ["spdx:BSD-3-Clause"],
+      "tags": ["biomechanics", "mocap", "motion-capture", "sports", "computer-vision", "cross-platform"]
+    },
+    {
+      "guid": "sports2d",
+      "name": "Sports2D",
+      "description": "Open-source Python pipeline for markerless 2D motion capture and kinematics from a single camera or webcam: 2D pose estimation, clean-up, pixel to meter conversion, and OpenSim inverse kinematics. Used for biomechanics, sports science, and clinical research.\n\nEvidence of impact: published in the Journal of Open Source Software and in peer-reviewed validation papers; used in academic research (see Google Scholar citations); active Discord community of about 200 members who help each other and share their work. All processing runs locally, which makes it compatible with GDPR constraints that cloud-based alternatives struggle with.\n\nUsers: researchers, clinicians, sports coaches.",
+      "webpageUrl": {"url": "https://davidpagnon.github.io/Sports2D/"},
+      "repositoryUrl": {"url": "https://github.com/davidpagnon/Sports2D"},
+      "licenses": ["spdx:BSD-3-Clause"],
+      "tags": ["biomechanics", "mocap", "motion-capture", "sports", "computer-vision", "cross-platform"]
+    }, 
+    {
+      "guid": "pose2sim-blender",
+      "name": "Pose2Sim_Blender",
+      "description": "Blender add-on to visualize Pose2Sim results (calibrated cameras, 3D motion, and other tools) and to use them in 3D animation workflows.",
+      "webpageUrl": {"url": "https://davidpagnon.github.io/Pose2Sim_Blender/"},
+      "repositoryUrl": {"url": "https://github.com/davidpagnon/Pose2Sim_Blender"},
+      "licenses": ["spdx:BSD-3-Clause"],
+      "tags": ["blender","biomechanics", "mocap", "motion-capture", "animation", "python", "cross-platform"]
+    } 
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "github-sponsors",
+        "type": "payment-provider",
+        "address": "https://github.com/sponsors/davidpagnon/",
+        "description": "Recurring or one-time donations by card."
+      },
+      {
+        "guid": "mybank",
+        "type": "bank",
+        "address": "",
+        "description": "Will accept direct bank transfers. Please e-mail me for details."
+      }
+    ],
+    "plans": [
+      {
+        "guid": "developer-time-yearly",
+        "status": "active",
+        "name": "Developer yearly compensation",
+        "description": "This will cover one year of part-time working on Pose2Sim and related projects: reviewing pull requests, handling issues and feature requests, running the Discord community, keeping dependencies and pose-estimation models up to date, documentation, and academic collaboration. Also covers a small budget for test hardware (Raspberry Pi, network cameras, GoPro) and for the compute needed to train pose estimation models, and time to co-author related academic papers.",
+        "amount": 42000,
+        "currency": "EUR",
+        "frequency": "yearly",
+        "channels": ["mybank"]
+      },
+      {
+        "guid": "developer-time-monthly",
+        "status": "active",
+        "name": "Developer monthly compensation",
+        "description": "This will cover one month of part-time working on Pose2Sim and related projects: reviewing pull requests, handling issues and feature requests, running the Discord community, keeping dependencies and pose-estimation models up to date, documentation, and academic collaboration. Also covers a small budget for test hardware (Raspberry Pi, network cameras, GoPro) and for the compute needed to train pose estimation models, and time to co-author related academic papers.",
+        "amount": 3500,
+        "currency": "EUR",
+        "frequency": "monthly",
+        "channels": ["mybank"]
+      },
+      {
+        "guid": "angel-plan",
+        "status": "active",
+        "name": "Goodwill plan",
+        "description": "Pay anything you wish to show your goodwill for the project.",
+        "amount": 0,
+        "currency": "EUR",
+        "frequency": "one-time",
+        "channels": ["mybank"]
+      }
+    ],
+    "history": [],
+    "use_of_funds": [
+      "Maintainer time: PR review, feature requests, Discord community management",
+      "Academic collaboration: co-author related academic papers",
+      "Hardware: Raspberry Pi, network cameras, GoPro for testing and documentation",
+      "Compute: training pose estimation models"
+    ]
+  },
+  "impact": {
+    "evidence": [
+      "Published in Journal of Open Source Software (Pose2Sim: 10.21105/joss.04362; Sports2D: 10.21105/joss.06849)",
+      "Used in academic research (search on Google Scholar for 'Pose2Sim')",
+      "Active Discord community with ~200 members providing peer support and sharing their work",
+      "Supports GDPR-compliant local processing, unlike cloud-based alternatives"
+    ],
+    "user_base": "Researchers, clinicians, sports coaches, and increasingly 3D animation artists."
+  }
+}
