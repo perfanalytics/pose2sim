@@ -33,17 +33,18 @@ from Pose2Sim.common import world_to_camera_persp, rotate_cam, quat2mat, euclide
                             set_always_on_top, show_qt_message_box, is_video_file, is_image_file
 
 import os
+import sys
 import logging
 import pickle
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
 os.environ["OPENCV_LOG_LEVEL"]="FATAL"
 import matplotlib as mpl
+headless = not (os.environ.get('DISPLAY') or sys.platform in ('win32', 'darwin'))
 try:
-    mpl.use('qtagg')
+    mpl.use('Agg' if headless else 'qtagg')
     import matplotlib.pyplot as plt
-    fig = plt.figure()
-    plt.close(fig)
+    fig = plt.figure(); plt.close(fig)
 except Exception as e:
     logging.warning(f"GUI not available ({e}), falling back to 'Agg' backend.")
     mpl.use('Agg')

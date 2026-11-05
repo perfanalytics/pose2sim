@@ -21,11 +21,11 @@ import sys
 import os
 import argparse
 import matplotlib as mpl
+headless = not (os.environ.get('DISPLAY') or sys.platform in ('win32', 'darwin'))
 try:
-    mpl.use('qtagg')
+    mpl.use('Agg' if headless else 'qtagg')
     import matplotlib.pyplot as plt
-    fig = plt.figure()
-    plt.close(fig)
+    fig = plt.figure(); plt.close(fig)
 except Exception as e:
     print(f"GUI not available ({e}), falling back to 'Agg' backend.")
     mpl.use('Agg')

@@ -12,13 +12,14 @@ Functions shared between modules, and other utilities
 
 ## INIT
 import os
+import sys
 import logging
 import matplotlib as mpl
+headless = not (os.environ.get('DISPLAY') or sys.platform in ('win32', 'darwin'))
 try:
-    mpl.use('qtagg')
+    mpl.use('Agg' if headless else 'qtagg')
     import matplotlib.pyplot as plt
-    fig = plt.figure()
-    plt.close(fig)
+    fig = plt.figure(); plt.close(fig)
 except Exception as e:
     logging.warning(f"GUI not available ({e}), falling back to 'Agg' backend.")
     mpl.use('Agg')
@@ -33,7 +34,6 @@ from scipy.optimize import linear_sum_assignment
 import re
 import cv2
 import c3d
-import sys
 import itertools as it
 from anytree import PreOrderIter
 from importlib.metadata import version
@@ -172,6 +172,18 @@ class plotWindow():
 
 
 ## FUNCTIONS
+def close_plots(pw):
+    '''
+    Close a plotWindow (show=True) or a list of (title, figure) tuples (show=False).
+    '''
+    
+    if isinstance(pw, list):
+        for _, f in pw:
+            plt.close(f)
+    else:
+        pw.close()
+
+
 def is_video_file(path):
     '''
     Check if the given path is a video file based on its extension.
@@ -198,7 +210,7 @@ def is_image_file(path):
     - bool: True if the path is an image file, False otherwise.
     '''
 
-    image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.webp'}
+    image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.webp', '.pdf'}
     return Path(path).is_file() and Path(path).suffix.lower() in image_extensions
 
 
