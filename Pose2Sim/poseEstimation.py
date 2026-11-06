@@ -329,6 +329,26 @@ def setup_backend_device(backend='auto', device='auto'):
     return 'openvino', 'cpu'
 
 
+def get_face_keypoint_ids(skeleton_model):
+    '''
+    Return the ids of the nose, eyes[, ears], or None if the model has no face keypoints.
+    '''
+
+    name_to_id = {node.name: node.id for _, _, node in RenderTree(skeleton_model) if node.id is not None}
+    if all(k in name_to_id for k in ['Nose', 'LEye', 'REye']):
+        # Eyes listed in the skeleton (e.g. COCO_133)
+        face_ids = [name_to_id[k] for k in ['Nose', 'LEye', 'REye']]
+        if 'LEar' in name_to_id and 'REar' in name_to_id:
+            face_ids += [name_to_id['LEar'], name_to_id['REar']]
+    elif name_to_id.get('Nose') == 0:
+        # COCO-style models (e.g. HALPE_26) output nose, eyes, ears as ids 0-4 even if not in the skeleton
+        face_ids = [0, 1, 2, 3, 4]
+    else:
+        logging.warning('No face keypoints in this pose model: faces will not be blurred.')
+        return None
+    return face_ids
+
+
 def save_to_openpose(json_file_path, keypoints, scores):
     '''
     Save the keypoints and scores to a JSON file in the OpenPose format
@@ -372,7 +392,7 @@ def save_to_openpose(json_file_path, keypoints, scores):
         json.dump(json_output, json_file)
 
 
-def process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, sports2d_tracking_params, deepsort_tracker, cancel_event=None):
+def process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, sports2d_tracking_params, deepsort_tracker, cancel_event=None, blur_faces=False):
     '''
     Estimate pose from a video file
     
@@ -386,6 +406,7 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
     - display_detection: bool. Whether to show real-time visualization
+    - blur_faces: bool. Whether to blur faces in the saved videos/images
     - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
     - sports2d_tracking_params: tuple. Parameters for sports2d tracking mode
     - deepsort_tracker: DeepSort tracker object or None
@@ -432,6 +453,11 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
     # Retrieve keypoint names from model
     keypoints_ids = [node.id for _, _, node in RenderTree(skeleton_model) if node.id!=None]
     kpt_id_max = max(keypoints_ids)+1
+
+    # Local import to avoid a circular import
+    face_ids = get_face_keypoint_ids(skeleton_model) if blur_faces and (save_video or save_images) else None
+    if face_ids is not None:
+        from Pose2Sim.Utilities.face_blurring import blur_faces_in_frame
 
     use_prediction, match_by, max_distance_px, max_unseen_frames = sports2d_tracking_params
     frames_since_last_seen = None
@@ -513,6 +539,8 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
                             valid_Y.append(person_Y)
                             valid_scores.append(person_scores)
                         img_show = frame.copy()
+                        if face_ids is not None:
+                            img_show = blur_faces_in_frame(img_show, keypoints, scores, face_ids)
                         img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                         img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
                         img_show = draw_skel(img_show, valid_X, valid_Y, skeleton_model)
@@ -548,7 +576,7 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
 def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
                          skeleton_model, frame_range, average_likelihood_threshold_pose,
                          output_format, save_video, save_images, display_detection, tracking_mode,
-                         sports2d_tracking_params, deepsort_params, init_lock, cancel_event):
+                         sports2d_tracking_params, deepsort_params, init_lock, cancel_event, blur_faces=False):
     '''
     Worker function for parallel pose estimation. Creates its own PoseTracker
     and optional DeepSort tracker, then processes one video independently.
@@ -564,10 +592,10 @@ def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, d
         deepsort_tracker = DeepSort(**deepsort_params)
     process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, 
                   output_format, save_video, save_images, display_detection,
-                  tracking_mode, sports2d_tracking_params, deepsort_tracker, cancel_event=cancel_event)
+                  tracking_mode, sports2d_tracking_params, deepsort_tracker, cancel_event=cancel_event, blur_faces=blur_faces)
 
 
-def process_images(image_folder_path, pose_tracker, skeleton_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, sports2d_tracking_params, deepsort_tracker):
+def process_images(image_folder_path, pose_tracker, skeleton_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, sports2d_tracking_params, deepsort_tracker, blur_faces=False):
     '''
     Estimate pose estimation from a folder of images
     
@@ -579,6 +607,7 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
     - display_detection: bool. Whether to show real-time visualization
+    - blur_faces: bool. Whether to blur faces in the saved videos/images
     - frame_range: list. Range of frames to process
     - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
     - sports2d_tracking_params: tuple. Parameters for Sports2D tracking
@@ -617,6 +646,11 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
     # Retrieve keypoint names from model
     keypoints_ids = [node.id for _, _, node in RenderTree(skeleton_model) if node.id!=None]
     kpt_id_max = max(keypoints_ids)+1
+
+    # Local import to avoid a circular import
+    face_ids = get_face_keypoint_ids(skeleton_model) if blur_faces and (save_video or save_images) else None
+    if face_ids is not None:
+        from Pose2Sim.Utilities.face_blurring import blur_faces_in_frame
     
     use_prediction, match_by, max_distance_px, max_unseen_frames = sports2d_tracking_params
     f_range = [[0,len(image_files)] if frame_range in ('all', 'auto', []) else frame_range][0]
@@ -665,6 +699,8 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
                 try:
                     # MMPose skeleton
                     img_show = frame.copy()
+                    if face_ids is not None:
+                        img_show = blur_faces_in_frame(img_show, keypoints, scores, face_ids)
                     img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
                 except:
                     # Sports2D skeleton
@@ -675,6 +711,8 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
                         valid_Y.append(person_Y)
                         valid_scores.append(person_scores)
                     img_show = frame.copy()
+                    if face_ids is not None:
+                        img_show = blur_faces_in_frame(img_show, keypoints, scores, face_ids)
                     img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                     img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
                     img_show = draw_skel(img_show, valid_X, valid_Y, skeleton_model)
@@ -746,6 +784,10 @@ def estimate_pose_all(config_dict):
     device = config_dict.get('pose', {}).get('device', 'auto')
     backend = config_dict.get('pose', {}).get('backend', 'auto')
     display_detection = config_dict.get('pose', {}).get('display_detection', True)
+    blur_faces = config_dict.get('pose', {}).get('blur_faces', False)
+    if blur_faces and not (save_video or save_images):
+        logging.warning("blur_faces is ignored because save_video is 'none'.")
+        blur_faces = False
     overwrite_pose = config_dict.get('pose', {}).get('overwrite_pose', False)
     average_likelihood_threshold_pose = config_dict.get('pose', {}).get('average_likelihood_threshold_pose', 0.5)
     
@@ -851,7 +893,7 @@ def estimate_pose_all(config_dict):
                             ModelClass, det_frequency, mode, backend, device,
                             skeleton_model, frame_range, average_likelihood_threshold_pose,
                             output_format, save_video, save_images, display_detection, tracking_mode,
-                            sports2d_tracking_params, deepsort_params, init_lock, cancel_event
+                            sports2d_tracking_params, deepsort_params, init_lock, cancel_event, blur_faces
                         ): video_path for video_path in video_files
                     }
                     try:
@@ -886,7 +928,7 @@ def estimate_pose_all(config_dict):
                     pose_tracker.reset()
                     if tracking_mode == 'deepsort':
                         deepsort_tracker.tracker.delete_all_tracks()
-                    process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, sports2d_tracking_params, deepsort_tracker)
+                    process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, sports2d_tracking_params, deepsort_tracker, blur_faces=blur_faces)
 
         else:
             # Process image folders

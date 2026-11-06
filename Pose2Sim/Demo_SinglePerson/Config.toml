@@ -85,6 +85,7 @@ parallel_workers_pose = 'auto' # 'auto', int, or false # One worker per video, u
 display_detection = true # Real-time display of the videos with pose estimation. Set to false for parallel processing.
 overwrite_pose = false # Set to false if you don't want to recalculate pose estimation when it has already been done
 save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
+blur_faces = false # Blur faces in saved videos/images (ignored if save_video is 'none')
 output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 handle_LR_swap = false # Not implemented yet. Might be useful if cameras film from the sagittal plane and the right and left sides are hard to differenciate to your eye.

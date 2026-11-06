@@ -86,6 +86,7 @@ participant_mass = [70.0, 63.5]     # float (eg 70.0), or list of floats (eg [70
 # display_detection = true # Real-time display of the videos with pose estimation
 # overwrite_pose = false # Set to false if you don't want to recalculate pose estimation when it has already been done
 # save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
+# blur_faces = false # Blur faces in saved videos/images (ignored if save_video is 'none')
 # output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 # handle_LR_swap = false # Not implemented yet. Might be useful if cameras film from the sagittal plane and the right and left sides are hard to differenciate to your eye.

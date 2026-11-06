@@ -209,71 +209,8 @@ def face_blurring_func(**args):
                     face_kpts = person_kpts[FACE_KEYPOINT_INDICES]
                     face_scores = person_scores[FACE_KEYPOINT_INDICES]
 
-                    # 4. Filter valid keypoints by confidence threshold
-                    valid_indices = np.where(face_scores >= conf_threshold)[0]
-                    valid_detected_kpts = face_kpts[valid_indices]
-                    # valid_detected_scores = face_scores[valid_indices] # Not used currently
-
-                    # --- Estimate Forehead and Chin Points --- 
-                    points_for_hull = valid_detected_kpts.copy().astype(int) # Start with valid detected points, ensure int
-
-                    # Check if we have enough points for estimation (at least eyes and nose)
-                    # Get indices relative to FACE_KEYPOINT_INDICES
-                    nose_idx_in_face = 0 
-                    leye_idx_in_face = 1
-                    reye_idx_in_face = 2
-
-                    # Check if these keypoints are valid based on their original indices in face_scores
-                    nose_valid = face_scores[nose_idx_in_face] >= conf_threshold
-                    leye_valid = face_scores[leye_idx_in_face] >= conf_threshold
-                    reye_valid = face_scores[reye_idx_in_face] >= conf_threshold
-
-                    if nose_valid and leye_valid and reye_valid:
-                        nose_pt = face_kpts[nose_idx_in_face]
-                        leye_pt = face_kpts[leye_idx_in_face]
-                        reye_pt = face_kpts[reye_idx_in_face]
-                        
-                        # Calculate center points and distance
-                        y_eye_avg = (leye_pt[1] + reye_pt[1]) / 2
-                        x_center = (leye_pt[0] + reye_pt[0]) / 2 # Use eye center for x
-                        y_nose = nose_pt[1]
-
-                        d_face = abs(y_nose - y_eye_avg) # Use abs for safety
-
-                        if d_face > 1: # Ensure the distance is meaningful (e.g., more than 1 pixel)
-                            
-                            # NOTE: Since we don't have full face keypoints, we used the distance between eyes and nose to estimate the forehead and chin points.
-                            # From my rule of thumb for 'polygon' blur_shape, the forehead is usually 2.5x and the chin is 3x the distance between eyes and nose.
-                            #                       for 'rectangle' blur_shape, the forehead is usually 2x and the chin is 2.5x the distance between eyes and nose.
-                            if blur_size == "small":
-                                factor_chin = 2.5 # Add some padding downwards
-                                factor_forehead = 2.0 # Add a bit more padding upwards
-                            elif blur_size == "medium":
-                                factor_chin = 3.0 # Add some padding downwards
-                                factor_forehead = 2.5 # Add a bit more padding upwards
-                            elif blur_size == "large":
-                                factor_chin = 4.0 # Add some padding downwards
-                                factor_forehead = 3.0 # Add a bit more padding upwards
-                            else: # Default to medium if unknown value
-                                logging.warning(f"Unknown blur_size '{blur_size}', please select from 'small', 'medium', 'large'. For now, blur_size is set to 'medium'.")
-                                factor_chin = 3.0 
-                                factor_forehead = 2.5
-
-                            # Estimate chin
-                            y_chin = y_nose + d_face * factor_chin
-                            chin_pt = np.array([[int(x_center), int(y_chin)]])
-
-                            # Estimate forehead top
-                            y_forehead = y_eye_avg - d_face * factor_forehead
-                            forehead_pt = np.array([[int(x_center), int(y_forehead)]])
-
-                            # Add estimated points to the list for hull calculation
-                            # Ensure points_for_hull is 2D before vstack if it was empty
-                            if points_for_hull.shape[0] > 0:
-                                points_for_hull = np.vstack([points_for_hull, chin_pt, forehead_pt])
-                            else: # Handle case where no initial points were valid
-                                points_for_hull = np.vstack([chin_pt, forehead_pt])
-                    # --- End Estimation ---
+                    # 4. Get face outline points
+                    points_for_hull = get_face_points(face_kpts, face_scores, conf_threshold, blur_size)
 
                     # 5. Apply blurring/black polygon using combined points if enough points exist
                     # Need at least 3 points (original or combined) to form a hull/ROI
@@ -322,6 +259,60 @@ def face_blurring_func(**args):
     logging.info("Face blurring process finished.")
     end_time_total = time.time()
     logging.info(f"Total processing finished in {end_time_total - start_time_total:.2f} seconds.")
+
+
+def get_face_points(face_kpts, face_scores, conf_threshold=DEFAULT_CONFIDENCE_THRESHOLD, blur_size=DEFAULT_BLUR_SIZE):
+    """Returns the points outlining a face: valid face keypoints plus estimated chin and forehead.
+    face_kpts are ordered as nose, left eye, right eye[, left ear, right ear]."""
+
+    face_kpts = np.asarray(face_kpts, dtype=float)
+    face_scores = np.asarray(face_scores, dtype=float)
+    valid = (face_scores >= conf_threshold) & ~np.isnan(face_kpts).any(axis=1)
+    points_for_hull = face_kpts[valid].astype(int)
+
+    # Nose and both eyes are needed to estimate chin and forehead
+    nose_idx_in_face, leye_idx_in_face, reye_idx_in_face = 0, 1, 2
+    if len(face_kpts) > 2 and valid[nose_idx_in_face] and valid[leye_idx_in_face] and valid[reye_idx_in_face]:
+        nose_pt = face_kpts[nose_idx_in_face]
+        leye_pt = face_kpts[leye_idx_in_face]
+        reye_pt = face_kpts[reye_idx_in_face]
+
+        y_eye_avg = (leye_pt[1] + reye_pt[1]) / 2
+        x_center = (leye_pt[0] + reye_pt[0]) / 2
+        y_nose = nose_pt[1]
+        d_face = abs(y_nose - y_eye_avg)
+
+        if d_face > 1:
+            # Chin and forehead distances as multiples of the eye-to-nose distance
+            if blur_size == "small":
+                factor_chin, factor_forehead = 2.5, 2.0
+            elif blur_size == "medium":
+                factor_chin, factor_forehead = 3.0, 2.5
+            elif blur_size == "large":
+                factor_chin, factor_forehead = 4.0, 3.0
+            else:
+                logging.warning(f"Unknown blur_size '{blur_size}', please select from 'small', 'medium', 'large'. For now, blur_size is set to 'medium'.")
+                factor_chin, factor_forehead = 3.0, 2.5
+
+            chin_pt = np.array([[int(x_center), int(y_nose + d_face * factor_chin)]])
+            forehead_pt = np.array([[int(x_center), int(y_eye_avg - d_face * factor_forehead)]])
+            if points_for_hull.shape[0] > 0:
+                points_for_hull = np.vstack([points_for_hull, chin_pt, forehead_pt])
+            else:
+                points_for_hull = np.vstack([chin_pt, forehead_pt])
+
+    return points_for_hull
+
+
+def blur_faces_in_frame(frame, keypoints, scores, face_ids, blur_type=DEFAULT_BLUR_TYPE, blur_shape=DEFAULT_BLUR_SHAPE,
+                        blur_intensity=DEFAULT_BLUR_INTENSITY, blur_size=DEFAULT_BLUR_SIZE, conf_threshold=DEFAULT_CONFIDENCE_THRESHOLD):
+    """Blurs the faces of all detected persons in a frame, using already-estimated keypoints."""
+
+    for person_kpts, person_scores in zip(keypoints, scores):
+        points_for_hull = get_face_points(person_kpts[face_ids], person_scores[face_ids], conf_threshold, blur_size)
+        if points_for_hull.shape[0] >= 3:
+            frame = apply_face_obscuration(frame, points_for_hull, blur_type, blur_shape, blur_intensity)
+    return frame
 
 
 def apply_face_obscuration(frame: np.ndarray, face_keypoints: np.ndarray, blur_type: str, blur_shape: str, blur_intensity: int) -> np.ndarray:

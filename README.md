@@ -1278,6 +1278,7 @@ Pose estimation parameters.
 | `display_detection` | `true` | Show real-time pose estimation overlay. Set to `false` for parallel processing. |
 | `overwrite_pose` | `false` | If `false`, skips pose estimation when results already exist. |
 | `save_video` | `'to_video'` | `'to_video'`, `'to_images'`, `'none'`, or `['to_video', 'to_images']`. |
+| `blur_faces` | `false` | Blur faces in saved videos/images. Ignored if `save_video` is `'none'`. |
 | `output_format` | `'openpose'` | `'openpose'`, `'mmpose'`, `'deeplabcut'`, `'none'`, or a list. Only `'openpose'` is fully supported downstream. |
 | `average_likelihood_threshold` | `0.5` | Detections are dropped when their average keypoint likelihood is below this threshold. |
 
