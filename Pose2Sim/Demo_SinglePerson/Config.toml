@@ -51,7 +51,7 @@ pose_model = 'Body_with_feet'  #With RTMLib:
                          #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
                          #With mediapipe: BLAZEPOSE
                          #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133
-                         #With deeplabcut: CUSTOM. See example at the end of the file
+                         #With deeplabcut: SUPERANIMAL_QUADRUPED_39, SUPERANIMAL_TOPVIEWMOUSE_27, CUSTOM. See example at the end of the file
 
 mode = 'balanced' # 'lightweight', 'balanced', 'performance', 
                   # or """{dictionary}""" (see below)
@@ -85,7 +85,7 @@ parallel_workers_pose = 'auto' # 'auto', int, or false # One worker per video, u
 display_detection = true # Real-time display of the videos with pose estimation. Set to false for parallel processing.
 overwrite_pose = false # Set to false if you don't want to recalculate pose estimation when it has already been done
 save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
-blur_faces = false # Blur faces in saved videos/images (ignored if save_video is 'none')
+blur_faces = true # Blur faces in saved videos/images (ignored if save_video is 'none')
 output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 handle_LR_swap = false # Not implemented yet. Might be useful if cameras film from the sagittal plane and the right and left sides are hard to differenciate to your eye.
@@ -149,7 +149,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
       [calibration.calculate.intrinsics]
       # Camera properties, theoretically need to be calculated only once in a camera lifetime
       # Recommendations: 20 corners/markers minimum, but the board can be as small as A4/US-letter
-      board_type = 'charuco' # 'charuco' or 'chess' # charuco is more robust to occlusions but very slightly less accurate (expect 0.5 px error instead of 0.2)
+      board_type = 'chess' # 'charuco' or 'chess' # charuco is more robust to occlusions but very slightly less accurate (expect 0.5 px error instead of 0.2)
       corners_nb = [4,7] # /!\ internal corners rather, ie [rows-1, cols-1]
       square_size = 60 # mm
       marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
@@ -341,13 +341,14 @@ use_custom_logging = false # if integrated in an API that already has logging
 # You can create as many custom skeletons as you want, just add them further down and rename them.
 # 
 # Check your model hierarchy with:  
-# import rtoml
+# config_path = r'path_to_Config.toml'
+# import rtoml, anytree
 # from pathlib import Path
 # from anytree.importer import DictImporter
-# model_dict = rtoml.load(Path('Config.toml'))['pose']['CUSTOM'][0]
-# model = DictImporter().import_(model_dict)
-# from anytree import Node, RenderTree
-# for pre, _, node in RenderTree(model): 
+# config = rtoml.load(Path(config_path))
+# pose_model = config.get('pose').get('pose_model')
+# model = DictImporter().import_(config.get('pose').get(pose_model)[0])
+# for pre, _, node in anytree.RenderTree(model): 
 #     print(f'{pre}{node.name} id={node.id}')
 [[pose.CUSTOM]]
 name = "Hip"

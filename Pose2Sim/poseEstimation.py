@@ -126,6 +126,14 @@ warnings.filterwarnings("ignore", message=".*Input.*has a dynamic shape.*but the
 # _patch_rtmlib_urls(hf_repo="DavidPagnon/rtmlib_models")
 
 
+## CONSTANTS
+DEFAULT_BLUR_TYPE = 'blur' # 'blur' or 'black'
+DEFAULT_BLUR_INTENSITY = "medium" # low, medium, high
+DEFAULT_BLUR_SHAPE = "rectangle" # 'polygon' or 'rectangle'
+DEFAULT_BLUR_SIZE = "small" # 'small', 'medium', 'large'
+DEFAULT_CONFIDENCE_THRESHOLD = 0.0 # Face keypoint confidence threshold (often low confidence).
+
+
 ## AUTHORSHIP INFORMATION
 __author__ = "HunMin Kim, David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
@@ -454,7 +462,6 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
     keypoints_ids = [node.id for _, _, node in RenderTree(skeleton_model) if node.id!=None]
     kpt_id_max = max(keypoints_ids)+1
 
-    # Local import to avoid a circular import
     face_ids = get_face_keypoint_ids(skeleton_model) if blur_faces and (save_video or save_images) else None
     if face_ids is not None:
         from Pose2Sim.Utilities.face_blurring import blur_faces_in_frame
@@ -540,7 +547,8 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
                             valid_scores.append(person_scores)
                         img_show = frame.copy()
                         if face_ids is not None:
-                            img_show = blur_faces_in_frame(img_show, keypoints, scores, face_ids)
+                            img_show = blur_faces_in_frame(img_show, keypoints, scores, face_ids, 
+                                                           blur_type=DEFAULT_BLUR_TYPE, blur_shape=DEFAULT_BLUR_SHAPE, blur_intensity=DEFAULT_BLUR_INTENSITY, blur_size=DEFAULT_BLUR_SIZE, conf_threshold=DEFAULT_CONFIDENCE_THRESHOLD)
                         img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                         img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
                         img_show = draw_skel(img_show, valid_X, valid_Y, skeleton_model)
@@ -700,7 +708,8 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
                     # MMPose skeleton
                     img_show = frame.copy()
                     if face_ids is not None:
-                        img_show = blur_faces_in_frame(img_show, keypoints, scores, face_ids)
+                        img_show = blur_faces_in_frame(img_show, keypoints, scores, face_ids, 
+                                                           blur_type=DEFAULT_BLUR_TYPE, blur_shape=DEFAULT_BLUR_SHAPE, blur_intensity=DEFAULT_BLUR_INTENSITY, blur_size=DEFAULT_BLUR_SIZE, conf_threshold=DEFAULT_CONFIDENCE_THRESHOLD)
                     img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
                 except:
                     # Sports2D skeleton
