@@ -603,7 +603,7 @@ def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, d
                   tracking_mode, sports2d_tracking_params, deepsort_tracker, cancel_event=cancel_event, blur_faces=blur_faces)
 
 
-def process_images(image_folder_path, pose_tracker, skeleton_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, sports2d_tracking_params, deepsort_tracker, blur_faces=False):
+def process_images(image_folder_path, pose_tracker, skeleton_model, average_likelihood_threshold_pose, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, sports2d_tracking_params, deepsort_tracker, blur_faces=False):
     '''
     Estimate pose estimation from a folder of images
     
@@ -611,7 +611,9 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
     - image_folder_path: str. Path to the input image folder
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
     - skeleton_model: Anytree node. The skeleton model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
+    - average_likelihood_threshold_pose: float. Drop detections whose average keypoint likelihood is below this value
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
+    - fps: int. Frame rate of the output video
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
     - display_detection: bool. Whether to show real-time visualization
@@ -637,13 +639,13 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
         raise NameError(f'No image files found in {image_folder_path}.')
 
     if save_video or display_detection:
-        first_frame = cv2.imread(image_files[0])
+        first_frame = cv2.imread(str(image_files[0]))
         H, W = first_frame.shape[:2]
 
     if save_video: # Set up video writer
-        logging.warning('Using default framerate of 60 fps.')
+        logging.info(f'Output video framerate: {fps} fps (set frame_rate in Config.toml to change it).')
         fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
-        out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
+        out = cv2.VideoWriter(str(output_video_path), fourcc, fps, (W, H)) # Create the output video file
 
     if display_detection:
         screen_width, screen_height = get_screen_size()
@@ -660,21 +662,36 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
         from Pose2Sim.Utilities.face_blurring import blur_faces_in_frame
     
     use_prediction, match_by, max_distance_px, max_unseen_frames = sports2d_tracking_params
+    frames_since_last_seen = None
     f_range = [[0,len(image_files)] if frame_range in ('all', 'auto', []) else frame_range][0]
     for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {Path(img_output_dir).name}')):
         if frame_idx in range(*f_range):
-            try:
-                frame = cv2.imread(image_file)
-            except:
-                raise NameError(f"{image_file} is not an image. Videos must be put in the video directory, not in subdirectories.")
+            frame = cv2.imread(str(image_file))
+            if frame is None:
+                raise NameError(f"{image_file} could not be read as an image. Videos must be put in the video directory, not in subdirectories.")
             
             try:
                 # Detect poses
                 keypoints, scores = pose_tracker(frame)
 
+                # Non maximum suppression (same as in process_video)
+                frame_shape = frame.shape
+                mask_scores = np.mean(scores, axis=1) > 0.2
+                likely_keypoints = np.where(mask_scores[:, np.newaxis, np.newaxis], keypoints, np.nan)
+                likely_scores = np.where(mask_scores[:, np.newaxis], scores, np.nan)
+                likely_bboxes = bbox_xyxy_compute(frame_shape, likely_keypoints, padding=0)
+                score_likely_bboxes = np.nanmean(np.where(np.isnan(likely_scores), 0, likely_scores), axis=1)
+                valid_indices = np.where(score_likely_bboxes > average_likelihood_threshold_pose)[0]
+                if len(valid_indices) > 0:
+                    keep_valid = nms(likely_bboxes[valid_indices], score_likely_bboxes[valid_indices], nms_thr=0.45)
+                    keep = valid_indices[keep_valid]
+                else:
+                    keep = []
+                keypoints, scores = likely_keypoints[keep], likely_scores[keep]
+
                 # Track poses across frames
                 if tracking_mode == 'deepsort':
-                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count)
+                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx)
                 if tracking_mode == 'sports2d': 
                     if 'prev_keypoints' not in locals(): # Initialization
                         prev_keypoints = keypoints
@@ -735,9 +752,10 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
 
             if save_images:
                 if not Path(img_output_dir).is_dir(): os.makedirs(img_output_dir)
-                cv2.imwrite(Path(img_output_dir) / f'{Path(image_file.stem)}_{frame_idx:06d}.png', img_show)
+                cv2.imwrite(str(Path(img_output_dir) / f'{Path(image_file.stem)}_{frame_idx:06d}.png'), img_show)
 
     if save_video:
+        out.release()
         logging.info(f"--> Output video saved to {output_video_path}.")
     if save_images:
         logging.info(f"--> Output images saved to {img_output_dir}.")
@@ -834,7 +852,10 @@ def estimate_pose_all(config_dict):
                 raise
             frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
-            logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
+            if len(video_files) == 0:
+                logging.info('Input is image folders: frame rate set to 30 fps. Set frame_rate in Config.toml if different.')
+            else:
+                logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
             frame_rate = 30  
 
     # Select the appropriate model based on the model_type
@@ -948,3 +969,13 @@ def estimate_pose_all(config_dict):
                 raise NameError(f'No video files and no image folders with recognized image extensions found in {video_dir}.')
             else:
                 logging.info(f'No video files found. Found {len(image_folders)} image folders in {video_dir}.')
+                try:
+                    pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+                except Exception as e:
+                    logging.error(f'Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid. {e}')
+                    raise ValueError(f'Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid. {e}')
+                for image_folder_path in image_folders:
+                    pose_tracker.reset()
+                    if tracking_mode == 'deepsort':
+                        deepsort_tracker.tracker.delete_all_tracks()
+                    process_images(image_folder_path, pose_tracker, skeleton_model, average_likelihood_threshold_pose, output_format, frame_rate, save_video, save_images, display_detection, frame_range, tracking_mode, sports2d_tracking_params, deepsort_tracker, blur_faces=blur_faces)
