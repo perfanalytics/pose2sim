@@ -655,7 +655,6 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
     keypoints_ids = [node.id for _, _, node in RenderTree(skeleton_model) if node.id!=None]
     kpt_id_max = max(keypoints_ids)+1
 
-    # Local import to avoid a circular import
     face_ids = get_face_keypoint_ids(skeleton_model) if blur_faces and (save_video or save_images) else None
     if face_ids is not None:
         from Pose2Sim.Utilities.face_blurring import blur_faces_in_frame
@@ -793,7 +792,7 @@ def estimate_pose_all(config_dict):
     device = config_dict.get('pose', {}).get('device', 'auto')
     backend = config_dict.get('pose', {}).get('backend', 'auto')
     display_detection = config_dict.get('pose', {}).get('display_detection', True)
-    blur_faces = config_dict.get('pose', {}).get('blur_faces', False)
+    blur_faces = config_dict.get('pose', {}).get('blur_faces', True)
     if blur_faces and not (save_video or save_images):
         logging.warning("blur_faces is ignored because save_video is 'none'.")
         blur_faces = False
