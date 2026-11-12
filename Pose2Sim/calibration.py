@@ -872,7 +872,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
     extrinsics_dir = Path(calib_dir) / 'extrinsics'
     img_vid_files = sorted(
         [f for f in (extrinsics_dir).glob('*/*') if f.is_file() and (is_image_file(f) or is_video_file(f))],
-        key=lambda c: [int(n) for n in re.findall(r'\d+', c.name)],
+        key=lambda c: (natural_sort_key(c.parent.name), natural_sort_key(c.name)),
     )
     if not img_vid_files:
         img_vid_files = sorted(
@@ -920,7 +920,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
 
         # Create or update clicked image points file
         for i, img_vid_file in enumerate(img_vid_files):
-            cam_name = Path(img_vid_file).stem
+            cam_name = img_vid_file.parent.name if img_vid_file.parent!=extrinsics_dir else Path(img_vid_file).stem
             logging.info(f'Camera {cam_name}:')
            
             # extract frames from image, or from video if imread is None
@@ -952,7 +952,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
                     proj_obj_all = np.squeeze(cv2.projectPoints(object_coords_3d,r,t,mtx,dist)[0]) # including the hidden ones
         
                     # Display image with labels and reprojected points
-                    saved_img_path = create_image_labels(img_vid_file, imgp, calib_dir, 'ext', reprojected_points=proj_obj_all, show=show_reprojection_error, save=save_debug_images)
+                    saved_img_path = create_image_labels(img_vid_file, imgp, calib_dir, f'ext_{cam_name}', reprojected_points=proj_obj_all, show=show_reprojection_error, save=save_debug_images)
 
                     # Are you satisfied? If so, add to imgpoints and continue; else, redo detection
                     satisfied = show_qt_message_box(
@@ -1007,7 +1007,7 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
             proj_obj_all = np.squeeze(cv2.projectPoints(object_coords_3d,r,t,mtx,dist)[0]) # including the hidden ones
 
             # Save detection image with reprojected points and image points in json file
-            saved_img_path = create_image_labels(img_vid_file, imgp, calib_dir, 'ext', reprojected_points=proj_obj_all, show=show_reprojection_error, save=save_debug_images)
+            saved_img_path = create_image_labels(img_vid_file, imgp, calib_dir, f'ext_{cam_name}', reprojected_points=proj_obj_all, show=show_reprojection_error, save=save_debug_images)
             fig = plt.gcf()
             fig.canvas.manager.set_window_title(f'Close {cam_name} to continue to the next image')
             plt.show(block=True)
