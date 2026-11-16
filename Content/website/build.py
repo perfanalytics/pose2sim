@@ -48,6 +48,16 @@ def clean_title(text: str) -> str:
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)  # [label](url) → label
     return text.strip()
 
+FENCE_RE = re.compile(
+    r"^[ \t]*(```|~~~)[^\n]*\n.*?^[ \t]*\1[ \t]*$",
+    re.MULTILINE | re.DOTALL,
+)
+
+def mask_code_fences(text: str) -> str:
+    """Blank out fenced code blocks (same length, newlines kept) so that
+    regexes searching for headings don't match '#' comments inside code."""
+    return FENCE_RE.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
+
 
 # ---------------------------------------------------------------------------
 # Preprocessing (applied to each section's markdown before conversion)
@@ -62,16 +72,20 @@ ADMON_ICON = {"NOTE": "📝 Note", "TIP": "💡 Tip",
 
 def add_heading_ids(md: str) -> str:
     """Turn ### / #### headings into <hN id=...> with a clickable # anchor."""
-    def repl(m: re.Match) -> str:
-        hashes = m.group(1)
-        title  = m.group(2).strip()
-        slug   = slugify(title)
-        lvl    = len(hashes)
-        t      = clean_title(title)
-        return (f'<h{lvl} id="{slug}">{t}'
-                f'<a href="#{slug}" class="heading-anchor" aria-label="Link to section">#</a>'
-                f'</h{lvl}>')
-    return re.sub(r"^(#{3,4}) +(.+)$", repl, md, flags=re.MULTILINE)
+    masked = mask_code_fences(md)
+    out, last = [], 0
+    for m in re.finditer(r"^(#{3,4}) +(.+)$", masked, flags=re.MULTILINE):
+        lvl   = len(m.group(1))
+        title = md[m.start(2):m.end(2)].strip()
+        slug  = slugify(title)
+        t     = clean_title(title)
+        out.append(md[last:m.start()])
+        out.append(f'<h{lvl} id="{slug}">{t}'
+                   f'<a href="#{slug}" class="heading-anchor" aria-label="Link to section">#</a>'
+                   f'</h{lvl}>')
+        last = m.end()
+    out.append(md[last:])
+    return "".join(out)
 
 
 def _replace_admonition(m: re.Match) -> str:
@@ -172,42 +186,49 @@ def split_sections(text: str) -> list[dict]:
     Returns list of dicts:
       level, title, slug, content (raw markdown), children (list of h3/h4 dicts)
     """
-    # Strip the "Visit the website!" preamble (everything up to and including <br>---<br>)
+    # Strip the "Visit the website!" preamble
     sep = re.search(r"<br>\s*\n\n---\n\n<br>", text)
     if sep:
         text = text[sep.end():].lstrip("\n")
 
+    masked = mask_code_fences(text)
+
     # Capture content before the first heading (badges etc.)
-    m = re.search(r"^# ", text, flags=re.MULTILINE)
+    m = re.search(r"^# ", masked, flags=re.MULTILINE)
     pre_h1 = text[:m.start()].strip() if m else ""
-    text = text[m.start():] if m else text
+    if m:
+        text, masked = text[m.start():], masked[m.start():]
 
     # Remove the "# Contents" section (auto-generated TOC)
-    m_cont = re.search(r"^# Contents\s*$", text, flags=re.MULTILINE)
+    m_cont = re.search(r"^# Contents\s*$", masked, flags=re.MULTILINE)
     if m_cont:
-        m_next = re.search(r"^# ", text[m_cont.start() + 1:], flags=re.MULTILINE)
+        m_next = re.search(r"^# ", masked[m_cont.start() + 1:], flags=re.MULTILINE)
         if m_next:
-            text = text[:m_cont.start()] + text[m_cont.start() + 1 + m_next.start():]
+            cut    = m_cont.start() + 1 + m_next.start()
+            text   = text[:m_cont.start()]   + text[cut:]
+            masked = masked[:m_cont.start()] + masked[cut:]
 
     heading_pat = re.compile(r"^(#{1,2}) +(.+)$", re.MULTILINE)
-    matches = list(heading_pat.finditer(text))
+    matches = list(heading_pat.finditer(masked))
 
     sections = []
     for i, m in enumerate(matches):
         level   = len(m.group(1))
-        title   = m.group(2).strip()
+        title   = text[m.start(2):m.end(2)].strip()
         start   = m.end()
         end     = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         content = text[start:end].strip()
 
-        # Collect h3/h4 sub-headings inside this section (for sidebar TOC)
+        # Collect h3/h4 sub-headings (for sidebar TOC), ignoring code fences
         children = []
-        for sh in re.finditer(r"^(#{3,4}) +(.+)$", content, re.MULTILINE):
+        cmasked = mask_code_fences(content)
+        for sh in re.finditer(r"^(#{3,4}) +(.+)$", cmasked, re.MULTILINE):
+            ctitle = content[sh.start(2):sh.end(2)].strip()
             children.append(
                 {
                     "level": len(sh.group(1)),
-                    "title": sh.group(2).strip(),
-                    "slug":  slugify(sh.group(2).strip()),
+                    "title": ctitle,
+                    "slug":  slugify(ctitle),
                 }
             )
 
