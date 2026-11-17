@@ -202,7 +202,8 @@ def setup_model_class_mode(pose_model, mode, config_dict={}):
     elif pose_model.upper() =='FACE':
         model_name = 'FACE_106'
         skeleton_name = 'FACE_106'
-        ModelClass = Face
+        if mode in ['lightweight', 'balanced', 'performance']:
+            raise ValueError('RTMLib has no built-in Face solution: set mode to a """{dictionary}""" pointing to a face model (see Config.toml).')
     elif pose_model.upper() =='ANIMAL':
         model_name = 'ANIMAL2D_17'
         skeleton_name = 'ANIMAL2D_17'
@@ -537,7 +538,7 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
 
                     # Track poses across frames
                     if tracking_mode == 'deepsort':
-                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame)
+                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx - f_range[0])
                     if tracking_mode == 'sports2d': 
                         if 'prev_keypoints' not in locals(): # Initialization
                             prev_keypoints = keypoints
@@ -730,7 +731,7 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, average_like
 
                 # Track poses across frames
                 if tracking_mode == 'deepsort':
-                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame)
+                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx - f_range[0])
                 if tracking_mode == 'sports2d': 
                     if 'prev_keypoints' not in locals(): # Initialization
                         prev_keypoints = keypoints
@@ -879,7 +880,7 @@ def estimate_pose_all(config_dict):
         logging.warning("blur_faces is ignored because save_video is 'none'.")
         blur_faces = False
     overwrite_pose = config_dict.get('pose', {}).get('overwrite_pose', False)
-    average_likelihood_threshold_pose = config_dict.get('pose', {}).get('average_likelihood_threshold_pose', 0.5)
+    average_likelihood_threshold_pose = config_dict.get('pose', {}).get('average_likelihood_threshold', 0.5)
     
     tracking_mode = config_dict.get('pose', {}).get('tracking_mode', 'sports2d')
     use_prediction = config_dict.get('pose', {}).get('predict_displacement', False)
