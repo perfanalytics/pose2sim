@@ -94,6 +94,7 @@ trc_to_c3d = "Pose2Sim.Utilities.trc_to_c3d:main"
 trc_Zup_to_Yup = "Pose2Sim.Utilities.trc_Zup_to_Yup:main"
 trc_rotate = "Pose2Sim.Utilities.trc_rotate:main"
 trc_scale = "Pose2Sim.Utilities.trc_scale:main"
+pose_correction = "Pose2Sim.Utilities.pose_correction:main"
 
 tests_pose2sim = "Pose2Sim.Utilities.tests:main"
 Pose2Sim = "GUI.main:main"
