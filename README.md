@@ -489,7 +489,7 @@ Film your participant(s) from at least 2 points of view.
 > 
 > - **With 2 cameras, one person:** According to [Samani et al, 2026](https://link.springer.com/article/10.1186/s13104-026-07886-4), best results are achieved when one camera is in front of the person, the other at 45° to the side, both at hip level. Acceptable results are achieved with one camera in front and one on the side at 90°; or two cameras in front, one at hip level and the other at eye level. [Zhao et al, 2026](https://pmc.ncbi.nlm.nih.gov/articles/PMC13402369/) recommend front or back configurations, especially for frontal- and tranverse-plane angle measurements.\
 > **With 2 cameras, multiple people**: Try to place cameras in a way that minimizes occlusions.
-> - **With multiple cameras:** Make sure the cameras see the subjects from as many different angles as possible and with minimal occlusions. HowNote that top views right above the subjects do not yield good results.
+> - **With multiple cameras:** Make sure the cameras see the subjects from as many different angles as possible and with minimal occlusions. Note that top views right above the subjects do not yield good results.
 > - **In difficult settings with limited space and obstacles:** consider using the [Lab Camera Optimizer](https://github.com/flodelaplace/lab-camera-optimizer).
 > 
 > <img src="Content/Lab_cam_optimizer.png" width="760">
