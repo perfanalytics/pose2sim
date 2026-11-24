@@ -33,6 +33,7 @@
 
 ## INIT
 import os
+import re
 import sys
 from pathlib import Path
 import numpy as np
@@ -135,6 +136,35 @@ def get_markers_path(pose_model, osim_setup_dir):
         raise ValueError(f"Pose model '{pose_model}' not supported yet.")
 
     return markers_path
+
+
+def mean_ik_errors(log_file, start_offset):
+    '''
+    Compute mean error stats over all IK frames from an OpenSim log file.
+
+    INPUT:
+    - log_file (Path): The path to the OpenSim log file
+    - start_offset (int): The number of lines to skip at the beginning of the log file
+
+    OUTPUT:
+    - None: Prints summary to log
+
+    '''
+
+    with open(log_file, 'r', errors='ignore') as f:
+        f.seek(start_offset)
+        txt = f.read()
+
+    totals, rmses, maxes = [], [], []
+    for m in re.finditer(
+        r'Frame \d+ .*?total squared error = ([\d.eE+-]+), '
+        r'marker error: RMS = ([\d.eE+-]+), max = ([\d.eE+-]+)', txt):
+        totals.append(float(m.group(1)))
+        rmses.append(float(m.group(2)))
+        maxes.append(float(m.group(3)))
+
+    if totals:
+        logging.info(f"\n\tMean RMS marker error over {len(totals)} frames: {np.mean(rmses):.6f} m")
 
 
 def get_scaling_setup(pose_model, osim_setup_dir):
@@ -508,6 +538,8 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_s
         ik_path_temp =  str(kinematics_dir / (trc_file.stem + '_ik_setup.xml'))
         scaled_model_path = (kinematics_dir / (trc_file.stem + '.osim')).resolve()
         output_motion_file = Path(kinematics_dir, trc_file.stem + '.mot').resolve()
+        opensim_logs_file = kinematics_dir / 'opensim_logs.txt'
+        start_offset = opensim_logs_file.stat().st_size if opensim_logs_file.exists() else 0
         if not trc_file.exists():
             raise FileNotFoundError(f"TRC file does not exist: {trc_file}")
         _, _, time_col, _, _ = read_trc(trc_file)
@@ -544,6 +576,9 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_s
 
         # Run IK
         opensim.InverseKinematicsTool(str(ik_path_temp)).run()
+
+        # Mean IK errors over all frames
+        mean_ik_errors(opensim_logs_file, start_offset)
 
         # Remove IK setup
         if remove_IK_setup:
