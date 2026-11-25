@@ -769,7 +769,7 @@ def kinematics_all(config_dict):
         logging.info(f"\tDone. Scaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
 
     # Inverse Kinematics
-    use_parallel_ik = multi_person and len(trc_files) > 1 and parallel_workers not in (False, 1)
+    use_parallel_ik = len(trc_files) > 1 and parallel_workers not in (False, 1)
     n_workers = min(get_max_workers(device='cpu') if parallel_workers == 'auto' else int(parallel_workers), len(trc_files)) if use_parallel_ik else 1
     logging.info(f"\nRunning inverse kinematics{f' in parallel on {n_workers} workers' if n_workers > 1 else ''}...")
 

@@ -822,7 +822,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 
 ### Calculate from scratch
 
-> _**Calculate calibration parameters with a chessboard or a charucoboard, with measurements on the scene, or automatically with pose estimation keypoints.**_\
+> _**Calculate calibration parameters with a chessboard or a charucoboard, with known scene coordinates, or automatically with pose estimation keypoints.**_\
 > Take heart, it is not that complicated once you get the hang of it!
 
 > [!TIP]
@@ -845,6 +845,9 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 > They usually need to be calculated only once in their lifetime. In theory, cameras with the same model and settings will have identical intrinsic parameters, so they can be copied from one Calib.toml file to another. In practice, small variations can occur.\
 > **Warning:** This does not hold true if you zoom in or out. In this case, you will need to recalculate intrinsic parameters.
 
+> [!TIP]
+> If you are working with historical videos and cannot film a board, you can still estimate the camera intrinsic parameters, assuming no distortion, a centered optical center, and squared and unskewed pixels. Camera distances may be slightly inaccurate, but this is generally compensated by the focal length and does not hurt triangulation.
+
 - For each camera, film a chessboard or a charucoboard. You can either move the board in front of the camera, or move the camera around the board.\
   ***N.B.:*** Make sure you film from multiple angles and cover most of frame.
 - Create a folder for each camera in your `Calibration\intrinsics` directory and copy your images or videos in them.
@@ -857,7 +860,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 <img src="Content/Calib_int.png" width="600">
 
 > [!TIP]
-> If you are confident in your detections, you can set `show_detection_intrinsics` to false. If you already calculated intrinsic parameters earlier, you can skip this step altogether by setting `overwrite_intrinsics` to false. 
+> If you are confident in your corner detections, you can set `show_detection_intrinsics` to false. If you already calculated intrinsic parameters earlier, you can skip this step altogether by setting `overwrite_intrinsics` to false. 
 
 > [!TIP]
 > #### Chess or ChArUco board requirements:
@@ -1650,6 +1653,9 @@ Converts AlphaPose single json file to OpenPose frame-by-frame files.
 <details>
   <summary><b>Converting calibration files</b> (CLICK TO SHOW)</summary>
     <pre>
+
+[calib_from_image.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_from_image.py)
+Calibrate from a single image with known scene coordinates. Intrinsic parameters are optional.
 
 [calib_toml_to_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_easymocap.py)
 Converts an OpenCV .toml calibration file to EasyMocap intrinsic and extrinsic .yml calibration files.

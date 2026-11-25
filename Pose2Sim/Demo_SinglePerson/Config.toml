@@ -148,14 +148,15 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 
       [calibration.calculate.intrinsics]
       # Camera properties, theoretically need to be calculated only once in a camera lifetime
-      # Recommendations: 20 corners/markers minimum, but the board can be as small as A4/US-letter
+      # If not provided, will be estimated in the next stage (assuming no distortion, a centered optical center, and squared and unskewed pixels)
+      # Recommended: 20 corners/markers minimum, but the board can be as small as A4/US-letter
       board_type = 'chess' # 'charuco' or 'chess' # charuco is more robust to occlusions but very slightly less accurate (expect 0.5 px error instead of 0.2)
       corners_nb = [4,7] # /!\ internal corners rather, ie [rows-1, cols-1]
       square_size = 60 # mm
       marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
 
       show_detection_intrinsics = true # true or false (lowercase)
-      overwrite_intrinsics = true # set to false if you don't want to recalculate intrinsic parameters
+      overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
       extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
 
       [calibration.calculate.extrinsics]
@@ -168,14 +169,14 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 
          [calibration.calculate.extrinsics.scene]
          # Manually click on any point of know coordinates in the scene. Usually more accurate if points are spread out.
-         object_coords_3d =   [[-2.0,  0.3,  0.0], 
-                              [-2.0 , 0.0,  0.0], 
-                              [-2.0, 0.0,  0.05], 
-                              [-2.0, -0.3 ,  0.0], 
-                              [0.0,  0.3,  0.0], 
-                              [0.0, 0.0,  0.0], 
-                              [0.0, 0.0,  0.05], 
-                              [0.0, -0.3,  0.0]]
+         object_coords_3d = [[-2.0,  0.3,  0.0], 
+                            [-2.0 , 0.0,  0.0], 
+                            [-2.0, 0.0,  0.05], 
+                            [-2.0, -0.3 ,  0.0], 
+                            [0.0,  0.3,  0.0], 
+                            [0.0, 0.0,  0.0], 
+                            [0.0, 0.0,  0.05], 
+                            [0.0, -0.3,  0.0]]
          # List of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
          # in m -> unlike for intrinsics, NOT in mm!
          # [X,Y,Z], which becomes [Z,X,Y] in the TRC reference frame, and [-Y,X,Z] in the Blender one

@@ -624,6 +624,48 @@ def bounding_boxes(js_file, margin_percent=0.1, around='extremities'):
     return bounding_boxes   
 
 
+def read_calib(calib_file):
+    '''
+    Retrieve intrinsic parameters from a Pose2Sim .toml calibration file.
+    K=D=None for cameras whose matrix or distortions are missing.
+
+    INPUTS:
+    - calib_file: path to .toml calibration file: string
+    
+    OUTPUTS:
+    - ret, C, S, D, K, R, T lists
+    '''
+
+    calib_data = rtoml.load(Path(calib_file))
+
+    # Flatten camera names
+    if "cameras" in calib_data:
+        calib_data = {f"cameras.{k}": v for k, v in calib_data["cameras"].items()}
+
+    # Retrieve data
+    ret, C, S, D, K, R, T = [], [], [], [], [], [], []
+    for cam, data in calib_data.items():
+        if cam == 'metadata':
+            continue
+        ret.append(0.0)
+        C.append(data.get('name', cam.replace('.', '_')))
+        S.append(data.get('size'))
+        try:
+            K_i = np.array(data['matrix'], dtype=float)
+            D_i = list(data['distortions'])
+            assert K_i.shape == (3, 3) and K_i[0, 0] > 0 and len(D_i) >= 4
+        except Exception:
+            K_i, D_i = None, None # to be estimated
+        K.append(K_i)
+        D.append(D_i)
+        R.append([0.0, 0.0, 0.0])
+        T.append([0.0, 0.0, 0.0])
+    if not C:
+        raise ValueError('No camera found in file.')
+
+    return ret, C, S, D, K, R, T
+
+
 def retrieve_calib_params(calib_file):
     '''
     Compute projection matrices from toml calibration file.
