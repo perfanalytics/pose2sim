@@ -62,6 +62,7 @@ jobs:
             # Mediapipe_to_pose_or_trc # requires pip install mediapipe
             bodykin_from_mot_osim
             c3d_to_trc
+            calib_from_image
             calib_easymocap_to_toml
             calib_from_checkerboard
             calib_qca_to_toml

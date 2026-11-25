@@ -191,6 +191,7 @@ def setup_model_class_mode(pose_model, mode, config_dict={}):
         model_name = 'COCO_133'
         skeleton_name = 'COCO_133_WRIST' if pose_model.upper()=='WHOLE_BODY_WRIST' else 'COCO_133'
         ModelClass = Wholebody
+        logging.warning('WHOLE_BODY AND WHOLE_BODY_WRIST ARE NOT AVAILABLE FOR COMMERCIAL PURPOSES.')
     elif pose_model.upper() in ('COCO_17', 'BODY'):
         model_name = 'COCO_17'
         skeleton_name = 'COCO_17'
