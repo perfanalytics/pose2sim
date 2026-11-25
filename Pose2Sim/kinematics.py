@@ -33,6 +33,7 @@
 
 ## INIT
 import os
+import re
 import sys
 from pathlib import Path
 import numpy as np
@@ -44,8 +45,8 @@ from anytree import PreOrderIter
 import opensim
 
 from Pose2Sim.common import natural_sort_key, euclidean_distance, read_trc, write_trc, \
-                            add_shoulder_data, best_coords_for_measurements, \
-                            trimmed_mean, compute_height, get_max_workers
+                            add_shoulder_data, add_neck_hip_data, add_smalltoe_data, \
+                            best_coords_for_measurements, trimmed_mean, compute_height, get_max_workers
 from Pose2Sim.filtering import filter_all
 from Pose2Sim.skeletons import *
 from Pose2Sim.Utilities.osim_to_bvh import export_to_bvh
@@ -135,6 +136,35 @@ def get_markers_path(pose_model, osim_setup_dir):
         raise ValueError(f"Pose model '{pose_model}' not supported yet.")
 
     return markers_path
+
+
+def mean_ik_errors(log_file, start_offset):
+    '''
+    Compute mean error stats over all IK frames from an OpenSim log file.
+
+    INPUT:
+    - log_file (Path): The path to the OpenSim log file
+    - start_offset (int): The number of lines to skip at the beginning of the log file
+
+    OUTPUT:
+    - None: Prints summary to log
+
+    '''
+
+    with open(log_file, 'r', errors='ignore') as f:
+        f.seek(start_offset)
+        txt = f.read()
+
+    totals, rmses, maxes = [], [], []
+    for m in re.finditer(
+        r'Frame \d+ .*?total squared error = ([\d.eE+-]+), '
+        r'marker error: RMS = ([\d.eE+-]+), max = ([\d.eE+-]+)', txt):
+        totals.append(float(m.group(1)))
+        rmses.append(float(m.group(2)))
+        maxes.append(float(m.group(3)))
+
+    if totals:
+        logging.info(f"\n\tMean RMS marker error over {len(totals)} frames: {np.mean(rmses):.6f} m")
 
 
 def get_scaling_setup(pose_model, osim_setup_dir):
@@ -508,6 +538,8 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_s
         ik_path_temp =  str(kinematics_dir / (trc_file.stem + '_ik_setup.xml'))
         scaled_model_path = (kinematics_dir / (trc_file.stem + '.osim')).resolve()
         output_motion_file = Path(kinematics_dir, trc_file.stem + '.mot').resolve()
+        opensim_logs_file = kinematics_dir / 'opensim_logs.txt'
+        start_offset = opensim_logs_file.stat().st_size if opensim_logs_file.exists() else 0
         if not trc_file.exists():
             raise FileNotFoundError(f"TRC file does not exist: {trc_file}")
         _, _, time_col, _, _ = read_trc(trc_file)
@@ -544,6 +576,9 @@ def perform_IK(trc_file, kinematics_dir, osim_setup_dir, pose_model, remove_IK_s
 
         # Run IK
         opensim.InverseKinematicsTool(str(ik_path_temp)).run()
+
+        # Mean IK errors over all frames
+        mean_ik_errors(opensim_logs_file, start_offset)
 
         # Remove IK setup
         if remove_IK_setup:
@@ -671,11 +706,17 @@ def kinematics_all(config_dict):
         # else:
         #     raise NameError('{pose_model} not found in skeletons.py nor in Config.toml')
     
-    # Add shoulder data if not in file and overwrite the file
+    # Calculate required markers if not in file and overwrite the file
     for trc_file in trc_files:
         trc_data, frames_col, time_col, markers, header = read_trc(trc_file)
-        if 'RShoulder' not in trc_data.columns or 'LShoulder' not in trc_data.columns:
+        if not all(col in trc_data.columns for col in ['RShoulder', 'LShoulder', 'Neck', 'Hip','RSmallToe', 'LSmallToe']):
+            # add shoulder data if not in file
             trc_data, markers, header = add_shoulder_data(trc_data, markers, header)
+            # add neck and midhip data if not in file
+            trc_data, markers, header = add_neck_hip_data(trc_data, markers, header)
+            # add small toe data if not in file
+            trc_data, markers, header = add_smalltoe_data(trc_data, markers, header)
+            # Overwrite TRC file
             write_trc(trc_file, trc_data, frames_col, time_col, header)
     
     # Calculate subject heights
@@ -728,7 +769,7 @@ def kinematics_all(config_dict):
         logging.info(f"\tDone. Scaled model saved to {(kinematics_dir / (trc_file.stem + '_scaled.osim')).resolve()}")
 
     # Inverse Kinematics
-    use_parallel_ik = multi_person and len(trc_files) > 1 and parallel_workers not in (False, 1)
+    use_parallel_ik = len(trc_files) > 1 and parallel_workers not in (False, 1)
     n_workers = min(get_max_workers(device='cpu') if parallel_workers == 'auto' else int(parallel_workers), len(trc_files)) if use_parallel_ik else 1
     logging.info(f"\nRunning inverse kinematics{f' in parallel on {n_workers} workers' if n_workers > 1 else ''}...")
 
@@ -761,7 +802,8 @@ def kinematics_all(config_dict):
         logging.info(f"\nExporting OpenSim results to BVH files...")
         for trc_file in trc_files:
             osim_path = (kinematics_dir / (trc_file.stem + '.osim')).resolve()
-            mot_path = Path(kinematics_dir, trc_file.stem + '.mot').resolve()
-            bvh_path = Path(kinematics_dir, trc_file.stem + '_ik.bvh').resolve()
-            export_to_bvh(model_path=osim_path, output_path=bvh_path, motion_path=mot_path)
+            mot_paths = kinematics_dir.glob(trc_file.stem + '*.mot')
+            for mot_path in mot_paths:
+                bvh_path = mot_path.with_suffix('.bvh')
+                export_to_bvh(model_path=osim_path, output_path=bvh_path, motion_path=mot_path)
 

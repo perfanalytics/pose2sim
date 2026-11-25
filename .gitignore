@@ -11,6 +11,7 @@ dist/
 **/*.sto
 **/*.c3d
 **/*.json
+!funding.json
 .DS_Store
 
 **/Calib_qualisys.toml
@@ -22,4 +23,4 @@ dist/
 **/debug_images/
 
 Content/website/index.html
-
+Content/website/v/

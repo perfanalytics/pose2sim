@@ -12,13 +12,14 @@ Functions shared between modules, and other utilities
 
 ## INIT
 import os
+import sys
 import logging
 import matplotlib as mpl
+headless = not (os.environ.get('DISPLAY') or sys.platform in ('win32', 'darwin'))
 try:
-    mpl.use('qtagg')
+    mpl.use('Agg' if headless else 'qtagg')
     import matplotlib.pyplot as plt
-    fig = plt.figure()
-    plt.close(fig)
+    fig = plt.figure(); plt.close(fig)
 except Exception as e:
     logging.warning(f"GUI not available ({e}), falling back to 'Agg' backend.")
     mpl.use('Agg')
@@ -33,7 +34,6 @@ from scipy.optimize import linear_sum_assignment
 import re
 import cv2
 import c3d
-import sys
 import itertools as it
 from anytree import PreOrderIter
 from importlib.metadata import version
@@ -172,6 +172,18 @@ class plotWindow():
 
 
 ## FUNCTIONS
+def close_plots(pw):
+    '''
+    Close a plotWindow (show=True) or a list of (title, figure) tuples (show=False).
+    '''
+    
+    if isinstance(pw, list):
+        for _, f in pw:
+            plt.close(f)
+    else:
+        pw.close()
+
+
 def is_video_file(path):
     '''
     Check if the given path is a video file based on its extension.
@@ -198,7 +210,7 @@ def is_image_file(path):
     - bool: True if the path is an image file, False otherwise.
     '''
 
-    image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.webp'}
+    image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.webp', '.pdf'}
     return Path(path).is_file() and Path(path).suffix.lower() in image_extensions
 
 
@@ -207,7 +219,7 @@ def get_max_workers(device='cpu'):
     Determine the number of parallel workers for pose estimation.
     
     INPUTS:
-        device: 'cpu', 'cuda', 'mps', 'rocm'
+        device: 'cpu', 'cuda', 'mps', 'rocm', 'gpu', 'npu'
     
     OUTPUTS:
         max_workers: Number of workers (>= 1)
@@ -251,13 +263,13 @@ def read_mot(mot_path):
     with open(mot_path, 'r') as f:
         lines = f.readlines()
     
-    # Find the end of the header (line with "endheader")
+    # Find the end of the header (line after "endheader")
     for i, line in enumerate(lines):
         if line.strip().lower() == 'endheader':
             header_end_line = i
             break
         
-    header_lines = lines[:header_end_line + 1]
+    header_lines = lines[:header_end_line + 2]
     
     # Read the data portion
     data = pd.read_csv(mot_path, sep='\t', skiprows=header_end_line + 1)
@@ -390,7 +402,7 @@ def add_shoulder_data(trc_data, markers, header):
 
         # Update header
         header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
-        header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{"RShoulder"}\t\t\t{"LShoulder"}\t\t\t\n')
+        header[3] = header[3].rstrip('\n') + '\tRShoulder\t\t\tLShoulder\t\t\n'
         header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
 
         # update trc_data
@@ -417,22 +429,79 @@ def add_neck_hip_data(trc_data, markers, header):
         'Hip': ['RHip', 'LHip']}
 
     for mk_name, r_l_markers in midpoints.items():
-        if mk_name not in markers:
-            try:
-                # Add marker name
-                markers.append(mk_name)
+        if mk_name in markers:
+            continue
+        
+        try:
+            r_l_data = [trc_data[m] for m in r_l_markers]
+        except KeyError as e:
+            logging.warning(f"Cannot add {mk_name}: missing {e}")
+            continue
 
-                # Update header
-                header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
-                header[3] = header[3].replace('\t\t\t\n', f'\t\t\t{mk_name}\t\t\t\n')
-                header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
+        # Add marker name
+        markers.append(mk_name)
+        
+        # Update header
+        header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
+        header[3] = header[3].rstrip('\n') + f'\t{mk_name}\t\t\n'
+        header[4] = '\t\t' + '\t'.join(f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))) + '\t\n'
 
-                # update trc_data
-                r_l_data = [trc_data[marker] for marker in r_l_markers]
-                mid_data = pd.DataFrame(sum([data.values for data in r_l_data])/2, columns=[mk_name]*3)
-                trc_data = pd.concat([trc_data, mid_data], axis=1)
-            except Exception as e:
-                logging.warning(f"Failed to add {mk_name} marker. Error: {e}")
+        # Update trc_data
+        mid_values = np.mean(np.stack([d.values for d in r_l_data], axis=0), axis=0)
+        mid_data = pd.DataFrame(mid_values, columns=[mk_name] * 3)
+        trc_data = pd.concat([trc_data, mid_data], axis=1)
+
+    return trc_data, markers, header
+
+
+def add_smalltoe_data(trc_data, markers, header):
+    '''
+    Add small toe data to trc_data if not present.
+    Defined as the BigToe point + 0.5*length(BigToe to Heel) in the Hip to Hip direction - 0.2*length(BigToe to Heel) in the BigToe to Heel direction.
+    Also update header and markers.
+    '''
+
+    if all(col in trc_data.columns for col in ['RBigToe', 'LBigToe', 'RHeel', 'LHeel', 'RHip', 'LHip']):
+        if 'RSmallToe' not in markers and 'LSmallToe' not in markers:
+            markers.append('RSmallToe')
+            markers.append('LSmallToe')
+
+            # Update header
+            header[2] = '\t'.join(part if i != 3 else str(len(markers)) for i, part in enumerate(header[2].split('\t')))
+            header[3] = header[3].rstrip('\n') + '\tRSmallToe\t\t\tLSmallToe\t\t\n'
+            header[4] = ['\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(markers))]) + '\t\n'][0]
+
+            # update trc_data
+            rbigtoe_data, lbigtoe_data = trc_data['RBigToe'], trc_data['LBigToe']
+            rheel_data, lheel_data = trc_data['RHeel'], trc_data['LHeel']
+            rhip_data, lhip_data = trc_data['RHip'], trc_data['LHip']
+
+            rbigtoe_to_heel_direction = rbigtoe_data.values - rheel_data.values
+            rbigtoe_to_heel_direction = rbigtoe_to_heel_direction / np.linalg.norm(rbigtoe_to_heel_direction, axis=1)[:, None]
+            lbigtoe_to_heel_direction = lbigtoe_data.values - lheel_data.values
+            lbigtoe_to_heel_direction = lbigtoe_to_heel_direction / np.linalg.norm(lbigtoe_to_heel_direction, axis=1)[:, None]
+            rbigtoe_to_heel_length = np.linalg.norm(rbigtoe_data.values - rheel_data.values, axis=1)[:, None]
+            lbigtoe_to_heel_length = np.linalg.norm(lbigtoe_data.values - lheel_data.values, axis=1)[:, None]
+
+            rlhip_direction = rhip_data.values - lhip_data.values
+            rlhip_direction = rlhip_direction / np.linalg.norm(rlhip_direction, axis=1)[:, None]
+
+            rsmalltoe_data = pd.DataFrame(
+                rbigtoe_data.values
+                + 0.5 * rbigtoe_to_heel_length * rlhip_direction
+                - 0.2 * rbigtoe_to_heel_length * rbigtoe_to_heel_direction,
+                columns=['RSmallToe'] * 3
+            )
+            lsmalltoe_data = pd.DataFrame(
+                lbigtoe_data.values
+                - 0.5 * lbigtoe_to_heel_length * rlhip_direction
+                - 0.2 * lbigtoe_to_heel_length * lbigtoe_to_heel_direction,
+                columns=['LSmallToe'] * 3
+            )
+            trc_data = pd.concat([trc_data, rsmalltoe_data, lsmalltoe_data], axis=1)
+        
+    else:
+        logging.warning("Cannot add SmallToe data: some of the following markers are missing: RBigToe, LBigToe, RHeel, LHeel, RHip, LHip.")
 
     return trc_data, markers, header
 
@@ -553,6 +622,48 @@ def bounding_boxes(js_file, margin_percent=0.1, around='extremities'):
                     bounding_boxes.append([x_mean - x_size/2, y_mean - y_size/2, x_mean + x_size/2, y_mean + y_size/2])
 
     return bounding_boxes   
+
+
+def read_calib(calib_file):
+    '''
+    Retrieve intrinsic parameters from a Pose2Sim .toml calibration file.
+    K=D=None for cameras whose matrix or distortions are missing.
+
+    INPUTS:
+    - calib_file: path to .toml calibration file: string
+    
+    OUTPUTS:
+    - ret, C, S, D, K, R, T lists
+    '''
+
+    calib_data = rtoml.load(Path(calib_file))
+
+    # Flatten camera names
+    if "cameras" in calib_data:
+        calib_data = {f"cameras.{k}": v for k, v in calib_data["cameras"].items()}
+
+    # Retrieve data
+    ret, C, S, D, K, R, T = [], [], [], [], [], [], []
+    for cam, data in calib_data.items():
+        if cam == 'metadata':
+            continue
+        ret.append(0.0)
+        C.append(data.get('name', cam.replace('.', '_')))
+        S.append(data.get('size'))
+        try:
+            K_i = np.array(data['matrix'], dtype=float)
+            D_i = list(data['distortions'])
+            assert K_i.shape == (3, 3) and K_i[0, 0] > 0 and len(D_i) >= 4
+        except Exception:
+            K_i, D_i = None, None # to be estimated
+        K.append(K_i)
+        D.append(D_i)
+        R.append([0.0, 0.0, 0.0])
+        T.append([0.0, 0.0, 0.0])
+    if not C:
+        raise ValueError('No camera found in file.')
+
+    return ret, C, S, D, K, R, T
 
 
 def retrieve_calib_params(calib_file):
@@ -938,6 +1049,9 @@ def create_c3d_file(c3d_path, marker_names, trc_data_np):
     times = trc_data_np[:,0]
     frame_rate = round((len(times)-1) / (times[-1] - times[0]))
 
+    # Axes permutation to convert from OpenSim (Y-up) to Visual3D (Z-up) # XYZ -> ZXY
+    trc_data_np = trc_data_np[:, [0] + [i for j in range(1, len(marker_names)*3, 3) for i in [j+2, j, j+1]]]
+
     # write c3d file
     writer = c3d.Writer(point_rate=frame_rate, analog_rate=0, point_scale=1.0, point_units='mm', gen_scale=-1.0)
     writer.set_point_labels(marker_names)
@@ -1172,7 +1286,7 @@ def best_coords_for_measurements(Q_coords, large_hip_knee_angles=90):
             Q_coords_low_angles = Q_coords.iloc[pd.Series(ang_mean).nsmallest(50).index]
     except:
         Q_coords_low_angles = Q_coords
-        logging.warning(f"At least one among the RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}° as a fallback.")
+        logging.warning(f"At least one among the Hip, RAnkle, RKnee, RHip, RShoulder, LAnkle, LKnee, LHip, LShoulder markers is missing for computing the knee and hip angles. Not restricting these angles to be below {large_hip_knee_angles}° as a fallback.")
 
     if Q_coords_low_angles.empty:
         logging.warning('The selected person might not move, or is crouching for the whole sequence, or is not well detected. Taking all available data instead of filtering them as a fallback.')
@@ -1540,7 +1654,7 @@ def sort_people_rtmlib(pose_tracker, keypoints, scores):
     return sorted_keypoints, sorted_scores
 
 
-def sort_people_deepsort(keypoints, scores, deepsort_tracker, frame,frame_count):
+def sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count):
     '''
     Associate persons across frames (DeepSort method)
 

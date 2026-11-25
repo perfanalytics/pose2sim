@@ -12,6 +12,10 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+  # Pick up new GitHub releases at an arbitrary time
+  schedule:
+    - cron: '17 3 * * *'
+
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
@@ -31,14 +35,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0      # full history + tags: needed to read the README of each release
+          fetch-tags: true
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.13'
       - name: Install markdown libraries
         run: pip install markdown pymdown-extensions
-      - name: Generate index.html from README.md
+      - name: Generate index.html (latest) and v/<tag>/index.html (releases) from README.md
         run: python Content/website/build.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # avoids GitHub API rate limits
       - name: Setup Pages
         uses: actions/configure-pages@v6.0.0
       - name: Build with Jekyll

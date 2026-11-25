@@ -178,7 +178,7 @@ def make_trc(config_dict, Q, keypoints_names, id_person=-1):
     header_trc = ['PathFileType\t4\t(X/Y/Z)\t' + trc_f, 
             'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames', 
             '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, Q.index[0], NumFrames])),
-            'Frame#\tTime\t' + '\t\t\t'.join(keypoints_names) + '\t\t\t',
+            'Frame#\tTime\t' + '\t\t\t'.join(keypoints_names) + '\t\t',
             '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(keypoints_names))]) + '\t']
     
     # Zup to Yup coordinate system
@@ -259,7 +259,7 @@ def recap_triangulate(config_dict, error, nb_cams_excluded, keypoints_names, cam
     session_dir = session_dir if 'Config.toml' in os.listdir(session_dir) else project_dir if 'Config.toml' in os.listdir(project_dir) else os.getcwd()
     calib_dir = [Path(session_dir) / c for c in os.listdir(session_dir) if (Path(session_dir) / c).is_dir() and 'calib' in c.lower()][0]
     calib_files = list(Path(calib_dir).glob('*.toml'))
-    calib_file = max(calib_files, key=lambda f: f.stat().st_ctime) # lastly created calibration file
+    calib_file = max(calib_files, key=lambda f: f.stat().st_mtime) # lastly created calibration file
     calib = rtoml.load(calib_file)
     cal_keys = [c for c in calib.keys() 
             if c not in ['metadata', 'capture_volume', 'charuco', 'checkerboard'] 
@@ -691,11 +691,11 @@ def triangulate_all(config_dict):
     try:
         calib_dir = [c for c in Path(session_dir).iterdir() if c.is_dir() and 'calib' in c.name.lower()][0]
     except:
-        raise Exception(f'No .toml calibration directory found.')
+        raise Exception(f'No .toml calibration directory found. If there is one and it still fails, try moving your project folder into another empty folder.')
 
     try:
         calib_files = list(Path(calib_dir).glob('*.toml'))
-        calib_file = max(calib_files, key=lambda p: p.stat().st_ctime)  # lastly created calibration file
+        calib_file = max(calib_files, key=lambda p: p.stat().st_mtime)  # lastly created calibration file
     except:
         raise Exception(f'No .toml calibration file found in the {calib_dir}.')
 
@@ -721,7 +721,7 @@ def triangulate_all(config_dict):
         model = eval(pose_model)
     except:
         try: # from Config.toml
-            model = DictImporter().import_(config_dict.get('pose').get(pose_model))
+            model = DictImporter().import_(config_dict.get('pose').get(pose_model)[0])
             if model.id == 'None':
                 model.id = None
         except:
@@ -786,7 +786,7 @@ def triangulate_all(config_dict):
     id_excluded_cams = [[] for n in range(nb_persons_to_detect)]
     Q_tot, error_tot, nb_cams_excluded_tot, cam_excluded_count, id_excluded_cams_tot = [], [], [], [], []
     interp_frames, non_interp_frames, f_range_trimmed = [], [], []
-    trc_paths, c3d_paths = [], []
+    trc_paths = []
     frames_since_last_seen = None
     for f in tqdm(range(*f_range)):
         # print(f'\nFrame {f}:')        
@@ -961,7 +961,7 @@ def triangulate_all(config_dict):
         # Create TRC file
         trc_paths.append(make_trc(config_dict, Q_tot[n], keypoints_names, id_person=n))
         if make_c3d:
-            c3d_paths.append(convert_to_c3d(t) for t in trc_paths)
+            c3d_paths = [convert_to_c3d(t) for t in trc_paths]
 
         # IDs of excluded cameras
         frame_count = len(Q_tot[n])

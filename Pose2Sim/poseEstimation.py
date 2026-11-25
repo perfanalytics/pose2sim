@@ -48,6 +48,7 @@ import threading
 
 from rtmlib import PoseTracker, BodyWithFeet, Wholebody, Body, Hand, Custom, Animal, draw_skeleton
 from rtmlib.tools.object_detection.post_processings import nms
+from rtmlib.tools.base import RTMLIB_SETTINGS
 from Pose2Sim.common import natural_sort_key, sort_people_sports2d, sort_people_deepsort,\
                         colors, thickness, draw_bounding_box, draw_keypts, draw_skel, bbox_xyxy_compute, \
                         get_screen_size, calculate_display_size, is_video_file, is_image_file, get_max_workers
@@ -125,6 +126,14 @@ warnings.filterwarnings("ignore", message=".*Input.*has a dynamic shape.*but the
 # _patch_rtmlib_urls(hf_repo="DavidPagnon/rtmlib_models")
 
 
+## CONSTANTS
+DEFAULT_BLUR_TYPE = 'blur' # 'blur' or 'black'
+DEFAULT_BLUR_INTENSITY = "medium" # low, medium, high
+DEFAULT_BLUR_SHAPE = "rectangle" # 'polygon' or 'rectangle'
+DEFAULT_BLUR_SIZE = "small" # 'small', 'medium', 'large'
+DEFAULT_CONFIDENCE_THRESHOLD = 0.0 # Face keypoint confidence threshold (often low confidence).
+
+
 ## AUTHORSHIP INFORMATION
 __author__ = "HunMin Kim, David Pagnon"
 __copyright__ = "Copyright 2021, Pose2Sim"
@@ -182,6 +191,7 @@ def setup_model_class_mode(pose_model, mode, config_dict={}):
         model_name = 'COCO_133'
         skeleton_name = 'COCO_133_WRIST' if pose_model.upper()=='WHOLE_BODY_WRIST' else 'COCO_133'
         ModelClass = Wholebody
+        logging.warning('WHOLE_BODY AND WHOLE_BODY_WRIST ARE NOT AVAILABLE FOR COMMERCIAL PURPOSES.')
     elif pose_model.upper() in ('COCO_17', 'BODY'):
         model_name = 'COCO_17'
         skeleton_name = 'COCO_17'
@@ -193,7 +203,8 @@ def setup_model_class_mode(pose_model, mode, config_dict={}):
     elif pose_model.upper() =='FACE':
         model_name = 'FACE_106'
         skeleton_name = 'FACE_106'
-        ModelClass = Face
+        if mode in ['lightweight', 'balanced', 'performance']:
+            raise ValueError('RTMLib has no built-in Face solution: set mode to a """{dictionary}""" pointing to a face model (see Config.toml).')
     elif pose_model.upper() =='ANIMAL':
         model_name = 'ANIMAL2D_17'
         skeleton_name = 'ANIMAL2D_17'
@@ -263,8 +274,8 @@ def setup_backend_device(backend='auto', device='auto'):
     4. CPU with OpenVINO backend (default fallback)
     '''
 
-    valid_backends = ['onnxruntime', 'openvino']
-    valid_devices = ['cpu', 'cuda', 'rocm', 'mps']
+    valid_backends = [b for b in RTMLIB_SETTINGS]
+    valid_devices = set().union(*(RTMLIB_SETTINGS[b] for b in valid_backends))
 
     # Backend and device validation
     if backend != 'auto':
@@ -278,6 +289,11 @@ def setup_backend_device(backend='auto', device='auto'):
         if device not in valid_devices:
             logging.warning(f"Device '{device}' not recognized. Falling back to auto-detection.")
             device = 'auto'
+
+    if backend != 'auto' and device != 'auto' and device not in RTMLIB_SETTINGS[backend]:
+        logging.warning(f"Device '{device}' is not available with backend '{backend}' "
+                        f"(valid: {list(RTMLIB_SETTINGS[backend])}). Falling back to auto-detection.")
+        backend, device = 'auto', 'auto'
 
     if backend == 'auto' and device != 'auto':
         logging.warning(f"Backend is set to 'auto' but device is not. Both will be determined automatically.")
@@ -323,6 +339,26 @@ def setup_backend_device(backend='auto', device='auto'):
     return 'openvino', 'cpu'
 
 
+def get_face_keypoint_ids(skeleton_model):
+    '''
+    Return the ids of the nose, eyes[, ears], or None if the model has no face keypoints.
+    '''
+
+    name_to_id = {node.name: node.id for _, _, node in RenderTree(skeleton_model) if node.id is not None}
+    if all(k in name_to_id for k in ['Nose', 'LEye', 'REye']):
+        # Eyes listed in the skeleton (e.g. COCO_133)
+        face_ids = [name_to_id[k] for k in ['Nose', 'LEye', 'REye']]
+        if 'LEar' in name_to_id and 'REar' in name_to_id:
+            face_ids += [name_to_id['LEar'], name_to_id['REar']]
+    elif name_to_id.get('Nose') == 0:
+        # COCO-style models (e.g. HALPE_26) output nose, eyes, ears as ids 0-4 even if not in the skeleton
+        face_ids = [0, 1, 2, 3, 4]
+    else:
+        logging.warning('No face keypoints in this pose model: faces will not be blurred.')
+        return None
+    return face_ids
+
+
 def save_to_openpose(json_file_path, keypoints, scores):
     '''
     Save the keypoints and scores to a JSON file in the OpenPose format
@@ -366,7 +402,41 @@ def save_to_openpose(json_file_path, keypoints, scores):
         json.dump(json_output, json_file)
 
 
-def process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, sports2d_tracking_params, deepsort_tracker, cancel_event=None):
+def run_parallel(worker_fn, items, max_workers):
+    '''
+    Run worker_fn(item, init_lock, cancel_event) for each item in a thread pool.
+    If one worker raises, the others are cancelled and the error is re-raised.
+    '''
+
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError
+    init_lock = threading.Lock()
+    cancel_event = threading.Event()
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(worker_fn, item, init_lock, cancel_event): item for item in items}
+        try:
+            remaining = set(futures.keys())
+            while remaining:
+                done = set()
+                for future in remaining:
+                    try:
+                        future.result(timeout=0.1)
+                        done.add(future)
+                    except TimeoutError:
+                        pass
+                    except Exception:
+                        cancel_event.set()
+                        for f in futures:
+                            f.cancel()
+                        raise
+                remaining -= done
+        except KeyboardInterrupt:
+            logging.warning('Pose estimation interrupted by user. Shutting down...')
+            cancel_event.set()
+            executor.shutdown(wait=True, cancel_futures=True)
+            raise KeyboardInterrupt('Pose estimation interrupted by user. Shutting down...')
+
+        
+def process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, sports2d_tracking_params, deepsort_tracker, cancel_event=None, blur_faces=False):
     '''
     Estimate pose from a video file
     
@@ -384,6 +454,7 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
     - sports2d_tracking_params: tuple. Parameters for sports2d tracking mode
     - deepsort_tracker: DeepSort tracker object or None
     - cancel_event: threading. Event object to signal cancellation of processing
+    - blur_faces: bool. Whether to blur faces in the saved videos/images (ignored if save_video is 'none')
 
     OUTPUTS:
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
@@ -427,10 +498,14 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
     keypoints_ids = [node.id for _, _, node in RenderTree(skeleton_model) if node.id!=None]
     kpt_id_max = max(keypoints_ids)+1
 
+    face_ids = get_face_keypoint_ids(skeleton_model) if blur_faces and (save_video or save_images) else None
+    if face_ids is not None:
+        from Pose2Sim.Utilities.face_blurring import blur_faces_in_frame
+
     use_prediction, match_by, max_distance_px, max_unseen_frames = sports2d_tracking_params
+    frames_since_last_seen = None
     with tqdm(iterable=range(*f_range), desc=f'Processing {Path(video_path).name}') as pbar:
         while cap.isOpened():
-            frames_since_last_seen = None
             if frame_idx in range(*f_range):
                 # print('\nFrame ', frame_idx)
                 success, frame = cap.read()
@@ -464,7 +539,7 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
 
                     # Track poses across frames
                     if tracking_mode == 'deepsort':
-                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count)
+                        keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx - f_range[0])
                     if tracking_mode == 'sports2d': 
                         if 'prev_keypoints' not in locals(): # Initialization
                             prev_keypoints = keypoints
@@ -483,7 +558,8 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
                     else:
                         pass
 
-                except:
+                except Exception as e:
+                    logging.debug(f'Frame {frame_idx}: detection/tracking failed, filling with NaN. {e}')
                     keypoints = np.full((1,kpt_id_max,2), fill_value=np.nan)
                     scores = np.full((1,kpt_id_max), fill_value=np.nan)
                     
@@ -507,6 +583,9 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
                             valid_Y.append(person_Y)
                             valid_scores.append(person_scores)
                         img_show = frame.copy()
+                        if face_ids is not None:
+                            img_show = blur_faces_in_frame(img_show, keypoints, scores, face_ids, 
+                                                           blur_type=DEFAULT_BLUR_TYPE, blur_shape=DEFAULT_BLUR_SHAPE, blur_intensity=DEFAULT_BLUR_INTENSITY, blur_size=DEFAULT_BLUR_SIZE, conf_threshold=DEFAULT_CONFIDENCE_THRESHOLD)
                         img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                         img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
                         img_show = draw_skel(img_show, valid_X, valid_Y, skeleton_model)
@@ -542,11 +621,12 @@ def process_video(video_path, pose_tracker, skeleton_model, frame_range, average
 def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, device,
                          skeleton_model, frame_range, average_likelihood_threshold_pose,
                          output_format, save_video, save_images, display_detection, tracking_mode,
-                         sports2d_tracking_params, deepsort_params, init_lock, cancel_event):
+                         sports2d_tracking_params, deepsort_params, init_lock, cancel_event, blur_faces=False):
     '''
     Worker function for parallel pose estimation. Creates its own PoseTracker
     and optional DeepSort tracker, then processes one video independently.
     '''
+
     if init_lock is not None:
         with init_lock:
             pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
@@ -558,10 +638,10 @@ def process_video_worker(video_path, ModelClass, det_frequency, mode, backend, d
         deepsort_tracker = DeepSort(**deepsort_params)
     process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, 
                   output_format, save_video, save_images, display_detection,
-                  tracking_mode, sports2d_tracking_params, deepsort_tracker, cancel_event=cancel_event)
+                  tracking_mode, sports2d_tracking_params, deepsort_tracker, cancel_event=cancel_event, blur_faces=blur_faces)
 
 
-def process_images(image_folder_path, pose_tracker, skeleton_model, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, sports2d_tracking_params, deepsort_tracker):
+def process_images(image_folder_path, pose_tracker, skeleton_model, average_likelihood_threshold_pose, output_format, fps, save_video, save_images, display_detection, frame_range, tracking_mode, sports2d_tracking_params, deepsort_tracker, cancel_event=None, blur_faces=False):
     '''
     Estimate pose estimation from a folder of images
     
@@ -569,7 +649,9 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
     - image_folder_path: str. Path to the input image folder
     - pose_tracker: PoseTracker. Initialized pose tracker object from RTMLib
     - skeleton_model: Anytree node. The skeleton model to use for pose estimation (HALPE_26, COCO_133, COCO_17)
+    - average_likelihood_threshold_pose: float. Drop detections whose average keypoint likelihood is below this value
     - output_format: str. Output format for the pose estimation results ('openpose', 'mmpose', 'deeplabcut')
+    - fps: int. Frame rate of the output video
     - save_video: bool. Whether to save the output video
     - save_images: bool. Whether to save the output images
     - display_detection: bool. Whether to show real-time visualization
@@ -577,6 +659,8 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
     - tracking_mode: str. The tracking mode to use for person tracking (deepsort, sports2d)
     - sports2d_tracking_params: tuple. Parameters for Sports2D tracking
     - deepsort_tracker: DeepSort tracker object or None
+    - cancel_event: threading. Event object to signal cancellation of processing
+    - blur_faces: bool. Whether to blur faces in the saved videos/images (ignored if save_video is 'none')
 
     OUTPUTS:
     - JSON files with the detected keypoints and confidence scores in the OpenPose format
@@ -594,11 +678,11 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
         raise NameError(f'No image files found in {image_folder_path}.')
 
     if save_video or display_detection:
-        first_frame = cv2.imread(image_files[0])
+        first_frame = cv2.imread(str(image_files[0]))
         H, W = first_frame.shape[:2]
 
     if save_video: # Set up video writer
-        logging.warning('Using default framerate of 60 fps.')
+        logging.info(f'Output video framerate: {fps} fps (set frame_rate in Config.toml to change it).')
         fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Codec for the output video
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (W, H)) # Create the output video file
 
@@ -611,23 +695,44 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
     # Retrieve keypoint names from model
     keypoints_ids = [node.id for _, _, node in RenderTree(skeleton_model) if node.id!=None]
     kpt_id_max = max(keypoints_ids)+1
+
+    face_ids = get_face_keypoint_ids(skeleton_model) if blur_faces and (save_video or save_images) else None
+    if face_ids is not None:
+        from Pose2Sim.Utilities.face_blurring import blur_faces_in_frame
     
     use_prediction, match_by, max_distance_px, max_unseen_frames = sports2d_tracking_params
+    frames_since_last_seen = None
     f_range = [[0,len(image_files)] if frame_range in ('all', 'auto', []) else frame_range][0]
-    for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'\nProcessing {Path(img_output_dir).name}')):
+    for frame_idx, image_file in enumerate(tqdm(image_files, desc=f'Processing {Path(img_output_dir).name}')):
+        if cancel_event and cancel_event.is_set():
+            break
         if frame_idx in range(*f_range):
-            try:
-                frame = cv2.imread(image_file)
-            except:
-                raise NameError(f"{image_file} is not an image. Videos must be put in the video directory, not in subdirectories.")
+            frame = cv2.imread(image_file)
+            if frame is None:
+                raise NameError(f"{image_file} could not be read as an image. Videos must be put in the video directory, not in subdirectories.")
             
             try:
                 # Detect poses
                 keypoints, scores = pose_tracker(frame)
 
+                # Non maximum suppression (same as in process_video)
+                frame_shape = frame.shape
+                mask_scores = np.mean(scores, axis=1) > 0.2
+                likely_keypoints = np.where(mask_scores[:, np.newaxis, np.newaxis], keypoints, np.nan)
+                likely_scores = np.where(mask_scores[:, np.newaxis], scores, np.nan)
+                likely_bboxes = bbox_xyxy_compute(frame_shape, likely_keypoints, padding=0)
+                score_likely_bboxes = np.nanmean(np.where(np.isnan(likely_scores), 0, likely_scores), axis=1)
+                valid_indices = np.where(score_likely_bboxes > average_likelihood_threshold_pose)[0]
+                if len(valid_indices) > 0:
+                    keep_valid = nms(likely_bboxes[valid_indices], score_likely_bboxes[valid_indices], nms_thr=0.45)
+                    keep = valid_indices[keep_valid]
+                else:
+                    keep = []
+                keypoints, scores = likely_keypoints[keep], likely_scores[keep]
+
                 # Track poses across frames
                 if tracking_mode == 'deepsort':
-                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_count)
+                    keypoints, scores = sort_people_deepsort(keypoints, scores, deepsort_tracker, frame, frame_idx - f_range[0])
                 if tracking_mode == 'sports2d': 
                     if 'prev_keypoints' not in locals(): # Initialization
                         prev_keypoints = keypoints
@@ -645,7 +750,8 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
                         prev_keypoints, keypoints, scores, frames_since_last_seen = ret
                 else:
                     pass
-            except:
+            except Exception as e:
+                logging.debug(f'Frame {frame_idx}: detection/tracking failed, filling with NaN. {e}')
                 keypoints = np.full((1,kpt_id_max,2), fill_value=np.nan)
                 scores = np.full((1,kpt_id_max), fill_value=np.nan)
 
@@ -659,6 +765,9 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
                 try:
                     # MMPose skeleton
                     img_show = frame.copy()
+                    if face_ids is not None:
+                        img_show = blur_faces_in_frame(img_show, keypoints, scores, face_ids, 
+                                                           blur_type=DEFAULT_BLUR_TYPE, blur_shape=DEFAULT_BLUR_SHAPE, blur_intensity=DEFAULT_BLUR_INTENSITY, blur_size=DEFAULT_BLUR_SIZE, conf_threshold=DEFAULT_CONFIDENCE_THRESHOLD)
                     img_show = draw_skeleton(img_show, keypoints, scores, kpt_thr=0.1) # maybe change this value if 0.1 is too low
                 except:
                     # Sports2D skeleton
@@ -669,6 +778,8 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
                         valid_Y.append(person_Y)
                         valid_scores.append(person_scores)
                     img_show = frame.copy()
+                    if face_ids is not None:
+                        img_show = blur_faces_in_frame(img_show, keypoints, scores, face_ids)
                     img_show = draw_bounding_box(img_show, valid_X, valid_Y, colors=colors, fontSize=2, thickness=thickness)
                     img_show = draw_keypts(img_show, valid_X, valid_Y, valid_scores, cmap_str='RdYlGn')
                     img_show = draw_skel(img_show, valid_X, valid_Y, skeleton_model)
@@ -686,6 +797,7 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
                 cv2.imwrite(Path(img_output_dir) / f'{Path(image_file.stem)}_{frame_idx:06d}.png', img_show)
 
     if save_video:
+        out.release()
         logging.info(f"--> Output video saved to {output_video_path}.")
     if save_images:
         logging.info(f"--> Output images saved to {img_output_dir}.")
@@ -693,6 +805,30 @@ def process_images(image_folder_path, pose_tracker, skeleton_model, output_forma
         cv2.destroyAllWindows()
 
 
+def process_images_worker(image_folder_path, ModelClass, det_frequency, mode, backend, device,
+                          skeleton_model, average_likelihood_threshold_pose, output_format, fps,
+                          save_video, save_images, display_detection, frame_range, tracking_mode,
+                          sports2d_tracking_params, deepsort_params, init_lock, cancel_event, blur_faces=False):
+    '''
+    Worker function for parallel pose estimation on image folders. Creates its own PoseTracker
+    and optional DeepSort tracker, then processes one image folder independently.
+    '''
+
+    if init_lock is not None:
+        with init_lock:
+            pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+    else:
+        pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+    deepsort_tracker = None
+    if tracking_mode == 'deepsort':
+        from deep_sort_realtime.deepsort_tracker import DeepSort
+        deepsort_tracker = DeepSort(**deepsort_params)
+    process_images(image_folder_path, pose_tracker, skeleton_model, average_likelihood_threshold_pose,
+                   output_format, fps, save_video, save_images, display_detection, frame_range,
+                   tracking_mode, sports2d_tracking_params, deepsort_tracker,
+                   cancel_event=cancel_event, blur_faces=blur_faces)
+
+    
 def estimate_pose_all(config_dict):
     '''
     Estimate pose from a video file or a folder of images and 
@@ -740,8 +876,12 @@ def estimate_pose_all(config_dict):
     device = config_dict.get('pose', {}).get('device', 'auto')
     backend = config_dict.get('pose', {}).get('backend', 'auto')
     display_detection = config_dict.get('pose', {}).get('display_detection', True)
+    blur_faces = config_dict.get('pose', {}).get('blur_faces', True)
+    if blur_faces and not (save_video or save_images):
+        logging.warning("blur_faces is ignored because save_video is 'none'.")
+        blur_faces = False
     overwrite_pose = config_dict.get('pose', {}).get('overwrite_pose', False)
-    average_likelihood_threshold_pose = config_dict.get('pose', {}).get('average_likelihood_threshold_pose', 0.5)
+    average_likelihood_threshold_pose = config_dict.get('pose', {}).get('average_likelihood_threshold', 0.5)
     
     tracking_mode = config_dict.get('pose', {}).get('tracking_mode', 'sports2d')
     use_prediction = config_dict.get('pose', {}).get('predict_displacement', False)
@@ -778,12 +918,14 @@ def estimate_pose_all(config_dict):
                 raise
             frame_rate = round(cap.get(cv2.CAP_PROP_FPS))
         except:
-            logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
+            if len(video_files) == 0:
+                logging.info('Input is image folders: frame rate set to 30 fps. Set frame_rate in Config.toml if different.')
+            else:
+                logging.warning(f'Cannot read video. Frame rate will be set to 30 fps.')
             frame_rate = 30  
 
     # Select the appropriate model based on the model_type
     logging.info('Estimating pose...\n')
-    pose_model_name = pose_model
     skeleton_model, ModelClass, mode = setup_model_class_mode(pose_model, mode, config_dict)
 
     # Estimate pose
@@ -800,7 +942,18 @@ def estimate_pose_all(config_dict):
         # Set up detection frequency
         low_likelihood_message = f'Detections are dropped if their average keypoint likelihood is below {average_likelihood_threshold_pose}.'
         logging.info(f'Persons detection is run every {det_frequency} frames (pose estimation is run for every frame). Tracking is done with {tracking_mode}: match_by {match_by}, predict_displacement {use_prediction}. {low_likelihood_message}')
-        
+
+        # Video files or image folders?
+        if len(video_files) > 0:
+            inputs = video_files
+        else:
+            inputs = sorted([Path(video_dir) / f for f in os.listdir(video_dir) if (Path(video_dir) / f).is_dir()])
+            inputs = [folder for folder in inputs
+                      if any(is_image_file(Path(folder) / f) for f in os.listdir(folder))]
+            if len(inputs) == 0:
+                raise NameError(f'No video files and no image folders found in {video_dir}.')
+        n_inputs = len(inputs)
+
         # Select device and backend
         backend, device = setup_backend_device(backend=backend, device=device)
         
@@ -814,13 +967,10 @@ def estimate_pose_all(config_dict):
             if display_detection:
                 logging.warning(f'Cannot run pose estimation in parallel with display_detection=true. Set it to false for faster pose estimation.')
                 parallel_pose = 1
-            elif device not in {'cpu', 'cuda', 'mps', 'rocm'}:
-                logging.warning(f'Parallel pose estimation is not supported for device "{device.upper()}": falling back to sequential.')
-                parallel_pose = 1
             else:
                 max_workers_calc = get_max_workers(device)
                 requested = max_workers_calc if max_workers_input == 'auto' else int(max_workers_input)
-                parallel_pose = min(requested, len(video_files))
+                parallel_pose = min(requested, n_inputs)
                 if requested > max_workers_calc:
                     logging.warning(f'Going with the requested {requested} workers, but the recommended limit with this hardware is {max_workers_calc}.')
                 else:
@@ -832,46 +982,19 @@ def estimate_pose_all(config_dict):
             tracking_mode = 'sports2d'
         logging.info(f'Tracking is performed with {tracking_mode}{"" if not tracking_mode=="deepsort" else f" with parameters: {deepsort_params}"}.\n')
 
-        if not len(video_files) == 0:
+        if len(video_files) > 0:
             # Process video files
             logging.info(f'Found {len(video_files)} video files in {video_dir}.')
 
             # In parallel
-            if parallel_pose != 1 and len(video_files) > 1:
-                init_lock = threading.Lock()
-                cancel_event = threading.Event()
-                from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
-                with ThreadPoolExecutor(max_workers=parallel_pose) as executor:
-                    futures = {
-                        executor.submit(
-                            process_video_worker, video_path,
-                            ModelClass, det_frequency, mode, backend, device,
-                            skeleton_model, frame_range, average_likelihood_threshold_pose,
-                            output_format, save_video, save_images, display_detection, tracking_mode,
-                            sports2d_tracking_params, deepsort_params, init_lock, cancel_event
-                        ): video_path for video_path in video_files
-                    }
-                    try:
-                        # Periodically checks that no cancel event has been set. If so, cancels everything and raises error
-                        remaining = set(futures.keys())
-                        while remaining:
-                            done = set()
-                            for future in remaining:
-                                try:
-                                    future.result(timeout=0.1)
-                                    done.add(future)
-                                except TimeoutError: # once timeout=0.1 is reached, we check cancel event
-                                    pass
-                                except Exception as e: 
-                                    cancel_event.set()
-                                    raise
-                            remaining -= done
-                    except KeyboardInterrupt:
-                        logging.warning('Pose estimation interrupted by user. Shutting down...')
-                        cancel_event.set()
-                        executor.shutdown(wait=True, cancel_futures=True)
-                        raise KeyboardInterrupt('Pose estimation interrupted by user. Shutting down...')
-    
+            if parallel_pose != 1 and n_inputs > 1:
+                worker = lambda v, lock, ev: process_video_worker(
+                    v, ModelClass, det_frequency, mode, backend, device,
+                    skeleton_model, frame_range, average_likelihood_threshold_pose,
+                    output_format, save_video, save_images, display_detection, tracking_mode,
+                    sports2d_tracking_params, deepsort_params, lock, ev, blur_faces)
+                run_parallel(worker, video_files, parallel_pose)
+
             # Sequentially
             else:
                 try:
@@ -883,15 +1006,30 @@ def estimate_pose_all(config_dict):
                     pose_tracker.reset()
                     if tracking_mode == 'deepsort':
                         deepsort_tracker.tracker.delete_all_tracks()
-                    process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, sports2d_tracking_params, deepsort_tracker)
+                    process_video(video_path, pose_tracker, skeleton_model, frame_range, average_likelihood_threshold_pose, output_format, save_video, save_images, display_detection, tracking_mode, sports2d_tracking_params, deepsort_tracker, blur_faces=blur_faces)
 
         else:
-            # Process image folders
-            image_folders = sorted([Path(video_dir) / f for f in os.listdir(video_dir) if (Path(video_dir) / f).is_dir()])
-            # Keep only folders that contain at least one image file
-            image_folders = [folder for folder in image_folders 
-                            if any(is_image_file(Path(folder) / f) for f in os.listdir(folder))]
-            if len(image_folders) == 0:
-                raise NameError(f'No video files and no image folders with recognized image extensions found in {video_dir}.')
+            image_folders = inputs
+            logging.info(f'No video files found. Found {len(image_folders)} image folders in {video_dir}.')
+
+            # In parallel
+            if parallel_pose != 1 and n_inputs > 1:
+                worker = lambda f, lock, ev: process_images_worker(
+                    f, ModelClass, det_frequency, mode, backend, device,
+                    skeleton_model, average_likelihood_threshold_pose, output_format, frame_rate,
+                    save_video, save_images, display_detection, frame_range, tracking_mode,
+                    sports2d_tracking_params, deepsort_params, lock, ev, blur_faces)
+                run_parallel(worker, image_folders, parallel_pose)
+
+            # Sequentially
             else:
-                logging.info(f'No video files found. Found {len(image_folders)} image folders in {video_dir}.')
+                try:
+                    pose_tracker = setup_pose_tracker(ModelClass, det_frequency, mode, False, backend, device)
+                except Exception as e:
+                    logging.error(f'Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid. {e}')
+                    raise ValueError(f'Error: Pose estimation failed. Check in Config.toml that pose_model and mode are valid. {e}')
+                for image_folder_path in image_folders:
+                    pose_tracker.reset()
+                    if tracking_mode == 'deepsort':
+                        deepsort_tracker.tracker.delete_all_tracks()
+                    process_images(image_folder_path, pose_tracker, skeleton_model, average_likelihood_threshold_pose, output_format, frame_rate, save_video, save_images, display_detection, frame_range, tracking_mode, sports2d_tracking_params, deepsort_tracker, blur_faces=blur_faces)

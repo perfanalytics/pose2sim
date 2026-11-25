@@ -233,7 +233,7 @@ class Pose2SimPipeline:
         logging.info("\n---------------------------------------------------------------------")
         logging.info(f"{step_name} for {seq_name}, for {frames}.")
         logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info(f"Project directory: {project_dir}")
+        logging.info(f"Project directory: {project_dir.resolve()}")
         logging.info("---------------------------------------------------------------------\n")
 
     def calibration(self):
@@ -303,7 +303,9 @@ class Pose2SimPipeline:
         from Pose2Sim.filtering import filter_all
         for config_dict in self.config_dicts:
             self._log_step_header("Filtering 3D coordinates", config_dict)
+            start = time.time()
             filter_all(config_dict)
+            elapsed = time.time() - start
             logging.info('\n')
 
     def markerAugmentation(self):
@@ -330,7 +332,7 @@ class Pose2SimPipeline:
         logging.info("\n\n=====================================================================")
         logging.info(f"RUNNING ALL.")
         logging.info(f"On {datetime.now().strftime('%A %d. %B %Y, %H:%M:%S')}")
-        logging.info(f"Project directory: {self.session_dir}\n")
+        logging.info(f"Project directory: {self.session_dir.resolve()}\n")
         logging.info("=====================================================================\n")
 
         overall_start = time.time()

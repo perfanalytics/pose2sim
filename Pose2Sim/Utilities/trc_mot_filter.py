@@ -43,12 +43,12 @@
 
 ## INIT
 import os
+import sys
 from pathlib import Path
 import math
 import numpy as np
 np.set_printoptions(legacy='1.21')
 import pandas as pd
-import sys
 from scipy import signal
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
@@ -61,11 +61,11 @@ from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 import argparse
 import matplotlib as mpl
+headless = not (os.environ.get('DISPLAY') or sys.platform in ('win32', 'darwin'))
 try:
-    mpl.use('qtagg')
+    mpl.use('Agg' if headless else 'qtagg')
     import matplotlib.pyplot as plt
-    fig = plt.figure()
-    plt.close(fig)
+    fig = plt.figure(); plt.close(fig)
 except Exception as e:
     print(f"GUI not available ({e}), falling back to 'Agg' backend.")
     mpl.use('Agg')

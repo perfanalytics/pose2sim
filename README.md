@@ -24,6 +24,7 @@ Please visit the website! (after leaving a **⭐star⭐**! 😇)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 \
 [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
+[![Sponsor](https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86)](https://github.com/sponsors/davidpagnon)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/perfanalytics/pose2sim)
 
 
@@ -65,8 +66,8 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
 <br>
 
 > [!IMPORTANT]
-> If you like it, ⭐ please leave a star ⭐ on the [Pose2Sim GitHub repository](https://github.com/perfanalytics/pose2sim)!\
-> This project is completely free: this is your chance to support the project and make it more visible to the community.
+> This project is completely free and open-source: it you like it and find it useful, please consider supporting it!\
+> You can help make it more visible and sustainable by ⭐ [Giving us a star](https://github.com/perfanalytics/pose2sim) ⭐ or ❤️ [Becoming a sponsor](https://github.com/sponsors/davidpagnon). ❤️
 
 > [!IMPORTANT]
 > If you want to contribute to Sports2D or Pose2Sim, please see [How to contribute](#how-to-contribute-and-to-do-list) or join the Discord community! [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
@@ -95,12 +96,14 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
       2. [With MMPose (coming soon)](#with-mmpose-coming-soon)
       3. [With DeepLabCut](#with-deeplabcut)
       4. [With OpenPose (legacy)](#with-openpose-legacy)
-      5. [With Mediapipe BlazePose (legacy)](#with-mediapipe-blazepose-legacy)
+      5. [With Mediapipe BlazePose](#with-mediapipe-blazepose)
       6. [With AlphaPose (legacy)](#with-alphapose-legacy)
-   4. [Calibrate your cameras](#calibrate-your-cameras)
+   4. [Synchronize your cameras](#synchronize-your-cameras)
+   5. [Calibrate your cameras](#calibrate-your-cameras)
       1. [Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-caliscope-anipose-freemocap-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
       2. [Calculate from scratch](#calculate-from-scratch)
-   5. [Synchronize your cameras](#synchronize-your-cameras)
+         1. [Calculate intrinsic parameters with a board](#calculate-intrinsic-parameters-with-a-board)
+         2. [Calculate extrinsic parameters with scene landmarks, a static or a moving board, or pose estimation keypoints](#calculate-extrinsic-parameters-with-scene-landmarks-a-static-or-a-moving-board-or-pose-estimation-keypoints)
    6. [Associate persons across cameras](#associate-persons-across-cameras)
    7. [Triangulate keypoints](#triangulate-keypoints)
    8. [Filter 3D coordinates](#filter-3d-coordinates)
@@ -135,12 +138,12 @@ Open a terminal (conda, powershell, bash, or zsh).
 *On Windows:*
 
 ```powershell
-  # Install uv
-  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-  # Create uv environment
-  uv venv "$env:USERPROFILE\.venv\pose2sim" --python 3.13 # or 3.11, or 3.12 
-  # Activate the uv environment
-  & "$env:USERPROFILE\.venv\pose2sim\Scripts\Activate.ps1"
+# Install uv
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+# Create uv environment
+uv venv "$env:USERPROFILE\.venv\pose2sim" --python 3.13 # or 3.11, or 3.12 
+# Activate the uv environment
+. "$HOME\.venv\pose2sim\Scripts\Activate.ps1"
 ```
 
 <br>
@@ -148,17 +151,26 @@ Open a terminal (conda, powershell, bash, or zsh).
 *On Linux or MacOS:*
 
 ```bash
-  # Install uv
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-  # Create uv environment
-  uv venv ~/.venv/pose2sim --python 3.13 # or 3.11, or 3.12 
-  # Activate the uv environment
-  source ~/.venv/pose2sim/bin/activate
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Create uv environment
+uv venv ~/.venv/pose2sim --python 3.13 # or 3.11, or 3.12 
+# Activate the uv environment
+source ~/.venv/pose2sim/bin/activate
 ```
 
 > [!TIP]
 > #### Activate your environment
 > Remembering the command for activating the uv environment can be a pain. Just type **Ctrl+R** in your terminal and start typing `activate` to find it.
+> 
+> Alternatively, if you want the environment to be activated by default:\
+> *On Windows:*\
+> `ni $PROFILE -Force; ac $PROFILE -Value '. "$HOME\.venv\pose2sim\Scripts\Activate.ps1"'`\
+> *On Linux:*\
+> `echo 'source ~/.venv/pose2sim/bin/activate' >> ~/.bashrc`\
+> *On MacOS:*\
+> `echo 'source ~/.venv/pose2sim/bin/activate' >> ~/.zshrc`\
+> --> And restart your terminal.
 
 <br>
 
@@ -170,15 +182,15 @@ Open a terminal (*conda, powershell, bash, or zsh*).\
 - OPTION 1: **Latest stable version:** 
 
   ```cmd
-    uv pip install pose2sim --upgrade
+  uv pip install pose2sim --upgrade
   ```
 
 - OPTION 2: **For developers who want to test and edit the bleeding edge version:**
 
   ```cmd
-    git clone --depth 1 https://github.com/perfanalytics/pose2sim.git
-    cd pose2sim
-    uv pip install -e .
+  git clone --depth 1 https://github.com/perfanalytics/pose2sim.git
+  cd pose2sim
+  uv pip install -e .
   ```
 
 <br>
@@ -192,22 +204,22 @@ Open a terminal, [activate your environment](#activate-your-environment), and ru
 Then go to the [ONNXruntime requirement page](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements), note the latest compatible CUDA and cuDNN requirements. Next, go to the [pyTorch website](https://pytorch.org/get-started/previous-versions/) and install the latest version that satisfies these requirements (beware that torch 2.4 ships with cuDNN 9, while torch 2.3 installs cuDNN 8). For example:
 
 ```cmd
-  uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 ```
 
 Finally, install ONNX Runtime with GPU support:
 
 ```cmd
-  uv pip uninstall onnxruntime
-  uv pip install onnxruntime-gpu
+uv pip uninstall onnxruntime
+uv pip install onnxruntime-gpu
 ```
 
 Check that everything went well within Python with these commands:
 
 ```python
-  import torch; import onnxruntime as ort
-  print(torch.cuda.is_available(), ort.get_available_providers())
-  # Should print "True ['CUDAExecutionProvider', ...]"
+import torch; import onnxruntime as ort
+print(torch.cuda.is_available(), ort.get_available_providers())
+# Should print "True ['CUDAExecutionProvider', ...]"
 ```  
 
 <!-- print(f'torch version: {torch.__version__}, cuda version: {torch.version.cuda}, cudnn version: {torch.backends.cudnn.version()}, onnxruntime version: {ort.__version__}') -->
@@ -244,15 +256,15 @@ Check that everything went well within Python with these commands:
 - Try the following code:
 
   ```python
-    from Pose2Sim import Pose2Sim
-    Pose2Sim.calibration()
-    Pose2Sim.poseEstimation()
-    Pose2Sim.synchronization()
-    Pose2Sim.personAssociation()
-    Pose2Sim.triangulation()
-    Pose2Sim.filtering()
-    Pose2Sim.markerAugmentation()
-    Pose2Sim.kinematics()
+  from Pose2Sim import Pose2Sim
+  Pose2Sim.calibration()
+  Pose2Sim.poseEstimation()
+  Pose2Sim.synchronization()
+  Pose2Sim.personAssociation()
+  Pose2Sim.triangulation()
+  Pose2Sim.filtering()
+  Pose2Sim.markerAugmentation()
+  Pose2Sim.kinematics()
   ```
 
 > [!NOTE]
@@ -314,10 +326,10 @@ Open a terminal (*conda, powershell, bash, or zsh*) and [activate your environme
 Similarly to [Part-1](#demonstration-part-1-end-to-end-video-to-3d-joint-angle-computation), find the Multi-Person Demo folder under `<pose2sim_path>\Pose2Sim\Demo_MultiPerson`, and move it and rename it if you like. Make sure you set `multi_person = true` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_MultiPerson/Config.toml) file. Go to the <Demo_MultiPerson> folder and start python:
 
 ```python
-  cd <Demo_MultiPerson_path>
-  ipython
-  from Pose2Sim import Pose2Sim
-  Pose2Sim.runAll()
+cd <Demo_MultiPerson_path>
+ipython
+from Pose2Sim import Pose2Sim
+Pose2Sim.runAll()
 ```
 
 <br>
@@ -477,7 +489,7 @@ Film your participant(s) from at least 2 points of view.
 > 
 > - **With 2 cameras, one person:** According to [Samani et al, 2026](https://link.springer.com/article/10.1186/s13104-026-07886-4), best results are achieved when one camera is in front of the person, the other at 45° to the side, both at hip level. Acceptable results are achieved with one camera in front and one on the side at 90°; or two cameras in front, one at hip level and the other at eye level. [Zhao et al, 2026](https://pmc.ncbi.nlm.nih.gov/articles/PMC13402369/) recommend front or back configurations, especially for frontal- and tranverse-plane angle measurements.\
 > **With 2 cameras, multiple people**: Try to place cameras in a way that minimizes occlusions.
-> - **With multiple cameras:** Make sure the cameras see the subjects from as many different angles as possible and with minimal occlusions. HowNote that top views right above the subjects do not yield good results.
+> - **With multiple cameras:** Make sure the cameras see the subjects from as many different angles as possible and with minimal occlusions. Note that top views right above the subjects do not yield good results.
 > - **In difficult settings with limited space and obstacles:** consider using the [Lab Camera Optimizer](https://github.com/flodelaplace/lab-camera-optimizer).
 > 
 > <img src="Content/Lab_cam_optimizer.png" width="760">
@@ -486,7 +498,7 @@ Film your participant(s) from at least 2 points of view.
 > - **Synchronization:** If your cameras are not natively synchronized, you will need one of the participants to do a sharp vertical movement.\
 > More on it in the [Synchronization](#synchronize-your-cameras) section.
 > 
-> - **Calibration:** If your cameras are not natively calibrated, you will need to film a checkerboard (once in the camera's lifetime) and to retrieve the coordinates of some object in the scene (everytime you move the camera).\
+> - **Calibration:** If your cameras are not natively calibrated, you will need to film a chessboard or a charucoboard (once in the camera's lifetime) and to retrieve the coordinates of some object in the scene (everytime you move the camera).\
 > More on it in the [Calibration](#calibrate-your-cameras) section.
 
 > [!NOTE]
@@ -499,7 +511,7 @@ Film your participant(s) from at least 2 points of view.
 > The main drawback of working with videos is the size of the files. Here are some example settings (inspired by [Hardy et al, 2026](https://cvbw2026.github.io/assets/papers/4.pdf)) to significantly reduce storage use with little impact on accuracy:
 > 
 > - **Compress videos:** Increasing crf from 20 to 30 has virtually no impact on accuracy, and *decreases storage use by up to 10 times*.
-> - **Decrease resolution:** Decreasing from HD (1080 x 1920) to SD (720 x 1280) has little impact, and *decreases storage use by about 8 times*.
+> - **Decrease resolution:** Decreasing from HD (1080 x 1920) to SD (720 x 1280) or even further has little impact, and *decreases storage use by about 8 times*.
 > - **Audio does not matter:** Audio tracks take between 1 and (rarely) 10% of the file size.
 > - **Camera number:** 6 is generally a good camera number. Of course, complex motions and occlusions require more cameras, and gait requires fewer.
 > - **Face blurring:** Preserves privacy with little impact on accuracy. Use this [Utility script](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/face_blurring.py).
@@ -564,9 +576,12 @@ This will run pose estimation on your videos and save the results in the `pose` 
 
 > [!TIP]
 > #### Other available models
-> - **Whole body:** Use 'Whole_body' `pose_model` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) to track 133 keypoints on the body, face, and hands. Note that it is slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints.
-> - **Wrist motion:** Use 'Whole_body_wrist' `pose_model`. *Effectively runs the 'whole_body' model but ignores all face and finger keypoints, except 2 per hand.*
-> - **Lower body:** Use 'Lower_body' `pose_model`. *Effectively runs the 'body_with_feet' model but ignores all upper body keypoints.* 
+> - **Whole body:** Use 'Whole_body' `pose_model` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) to track 133 keypoints on the body, face, and hands. Note that it is slower and slightly less accurate than the default 'Body_with_feet' model on body keypoints.\
+> **IMPORTANT:** *This model is retricted to non-commercial use only, due to one of its training datasets.*
+> - **Wrist motion:** Use 'Whole_body_wrist' `pose_model`.\
+> *Effectively runs the 'whole_body' model but ignores all face and finger keypoints, except 2 per hand.*
+> - **Lower body:** Use 'Lower_body' `pose_model`.\
+> *Effectively runs the 'body_with_feet' model but ignores all upper body keypoints.* 
 > - **Others:** You can also use the `Hand`, `Face`, `Animal`, or any other RTMlib model (see next tip).
 
 > [!TIP]
@@ -577,29 +592,29 @@ This will run pose estimation on your videos and save the results in the `pose` 
 > ```
 > # Equivalent to mode='balanced', with body_with_feet pose model
 > mode = """{'det_class':'YOLOX',
->        'det_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/yolox_m_8xb8-300e_humanart-c2c7a14a.onnx',
->        'det_input_size':[640, 640],
->        'pose_class':'RTMPose',
->        'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.onnx',
->        'pose_input_size':[192,256]}"""
+> 'det_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/yolox_m_8xb8-300e_humanart-c2c7a14a.onnx',
+> 'det_input_size':[640, 640],
+> 'pose_class':'RTMPose',
+> 'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.onnx',
+> 'pose_input_size':[192,256]}"""
 >
 > # With one-stage RTMO model 
 > # Requires pose_model = 'Body'. Marker augmentation won't work, Kimatic analysis will
 > mode = """{'pose_class':'RTMO', 
->        'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.onnx', 
->        'pose_input_size':[640, 640]}"""
+> 'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmo/onnx_sdk/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.onnx', 
+> 'pose_input_size':[640, 640]}"""
 > 
 > # With animal pose estimation:
 > # Marker augmentation won't work, and you will need to create your owOpenSim skeleton for kinematic analysis.
 > mode = """{'pose_class':'RTMPose',
->        'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.onnx',
->        'pose_input_size':[256,256]}"""
+> 'pose_model':'https://huggingface.co/datasets/DavidPagnon/rtmlib_models/resolve/main/mmpose/rtmposev1/onnx_sdk/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.onnx',
+> 'pose_input_size':[256,256]}"""
 > 
 > # Same approach for hand or face pose estimation, check the RTMLib domentation for more information.
 > ```
 
 > [!WARNING]
-> Note that it does not currently work well for acrobatic movements where the person is upside down. We are working on a solution but in the meantime, you can try MediaPipe BlazePose (see [here](#with-mediapipe-blazepose-legacy)).
+> Note that it does not currently work well for acrobatic movements where the person is upside down. We are working on a solution but in the meantime, you can try MediaPipe BlazePose (see [here](#with-mediapipe-blazepose)).
 
 </br>
 
@@ -619,14 +634,17 @@ DLC_to_OpenPose -i input_h5_file
 ```
 
 3. Edit `pose.CUSTOM` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml), and edit the node IDs so that they correspond to the column numbers of the 2D pose file, starting from zero. Make sure you also changed the `pose_model` and the `tracked_keypoint`.\
-  You can visualize your skeleton's hierarchy by changing pose_model to CUSTOM and writing these lines: 
+  N.B.: You can rename CUSTOM or create as many custom skeletons as you want.\
+  You can visualize your skeleton's hierarchy by changing pose_model to `CUSTOM` and writing these lines: 
 
   ```python
   config_path = r'path_to_Config.toml'
-  import toml, anytree
-  config = toml.load(config_path)
+  import rtoml, anytree
+  from pathlib import Path
+  from anytree.importer import DictImporter
+  config = rtoml.load(Path(config_path))
   pose_model = config.get('pose').get('pose_model')
-  model = anytree.importer.DictImporter().import_(config.get('pose').get(pose_model))
+  model = DictImporter().import_(config.get('pose').get(pose_model)[0])
   for pre, _, node in anytree.RenderTree(model): 
       print(f'{pre}{node.name} id={node.id}')
   ```
@@ -659,19 +677,18 @@ Make sure you modify the [Config.toml](https://github.com/perfanalytics/pose2sim
 
 </br>
 
-### With MediaPipe BlazePose *(legacy)*:
+### With MediaPipe BlazePose:
 > [!WARNING]
-> RTMlib is faster, more accurate, and easier to install than BlazePose. This is also a legacy option.
+> RTMlib is more accurate than Mediapipe, except for acrobatic movements.
 
 [Mediapipe BlazePose](https://google.github.io/mediapipe/solutions/pose.html) is very fast, fully runs under Python, handles upside-down postures and wrist movements (but no subtalar ankle angles). \
 However, it is less robust and accurate than OpenPose, and can only detect a single person.
 
-* Use the script `Blazepose_runsave.py` (see [Utilities](#utilities)) to run BlazePose under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
+* Use the script `Mediapipe_to_pose_or_trc.py` (see [Utilities](#utilities)) to run Mediapipe under Python, and store the detected coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format: 
   ```cmd
-  Blazepose_runsave -i input_file -dJs
+  Mediapipe_to_pose_or_trc -i input_file -dJs
   ```
-  Type in `Blazepose_runsave -h` for explanation on parameters.
-
+  Type in `Mediapipe_to_pose_or_trc -h` for explanation on parameters.
 * Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
 
 </br>
@@ -689,156 +706,6 @@ All AlphaPose models are supported (HALPE_26, HALPE_68, HALPE_136, COCO_133, COC
    AlphaPose_to_OpenPose -i input_alphapose_json_file
    ```
 * Make sure you changed the `pose_model` and the `tracked_keypoint` in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
-
-</br>
-
-## Calibrate your cameras
-> _**Calculate camera intrinsic properties (lens characteristics) and extrinsic parameters (positions and orientations).\
-> Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_
-
-Open a terminal in your project folder, [activate your environment](#activate-your-environment), and run `ipython`:
-
-```python
-from Pose2Sim import Pose2Sim
-Pose2Sim.calibration()
-```
-
-
-<img src="Content/P2S_calibration.png" width="760">
-
-</br>
-Output file:
-
-<img src="Content/CalibFile.png" width="760">
-
-</br>
-
-### Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
-
-If you already have a calibration file, set `calibration_type` type to `convert` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
-
-> [!TIP]
-> If you want to use a calibration method that requires synchronized cameras, you can switch the steps and first run pose estimation and synchronization.\
-> ***Note:*** This suggestion is only valid if there is a fast motion of a body keypoint that allows you to synchronize on. Set "create synchronized videos = true" to do so, and then run calibration. <!-- Make sure calibration runs on the synchronized videos, not the original ones -->
-
-> [!NOTE]
-> If the original calibration file does not provide any residual errors, they will be logged as NaN. This is not an error and can be ignored.
-
-- **From [Caliscope](https://mprib.github.io/caliscope/)** (recommended *if your cameras are synchronized*), **[Dynamic Extrinsic Camera Calibrator](https://github.com/flodelaplace/lab-camera-dynamic-calibrator)** (based on keypoints: not checkerboard! But *requires synchronized videos, does not estimate intrinsics, and not commercially available*), **[AniPose](https://github.com/lambdaloop/anipose)**, or **[FreeMocap](https://github.com/freemocap/freemocap):**  
-  - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
-  - Calibration can be skipped since these formats are natively supported by Pose2Sim.
-  - **Note:** It seems like the FreeMoCap calibration is in millimeters rather than in meters. Just open your calibration.toml file and multiply all the translation values by 1000.
-- **From [Qualisys](https://www.qualisys.com):**
-  - Export calibration to `.qca.txt` within QTM (see [there](https://github.com/perfanalytics/pose2sim/issues/56#issuecomment-1855933754)).
-  - Copy it in the `Calibration` Pose2Sim folder.
-  - set `convert_from` to 'qualisys' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
-  - If you set your cameras vertically and the videos are rendered sideways, you need to rotate them and the calibration file before running pose estimation. [Use this script](https://github.com/perfanalytics/pose2sim/issues/136#issuecomment-2398110061).
-- **From [Optitrack](https://optitrack.com/):** Exporting calibration will be available in Motive 3.2. In the meantime:
-  - Calculate intrinsics with a board (see next section).
-  - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28).
-  - Use the `Calib.toml` file as is and do not run Pose2Sim.calibration()
-- **From [Vicon](http://www.vicon.com/Software/Nexus):**  
-  - Copy your `.xcp` Vicon calibration file to the Pose2Sim `Calibration` folder.
-  - set `convert_from` to 'vicon' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
-- **From [OpenCap](https://www.opencap.ai/):**  
-  - Copy your `.pickle` OpenCap calibration files to the Pose2Sim `Calibration` folder.
-  - set `convert_from` to 'opencap' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
-- **From [EasyMocap](https://github.com/zju3dv/EasyMocap/):**  
-  - Copy your `intri.yml` and `extri.yml` files to the Pose2Sim `Calibration` folder.
-  - set `convert_from` to 'easymocap' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
-- **From [bioCV](https://github.com/camera-mc-dev/.github/blob/main/profile/mocapPipe.md):**  
-  - Copy your bioCV calibration files (no extension) to the Pose2Sim `Calibration` folder.
-  - set `convert_from` to 'biocv' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
-
-
-</br>
-
-### Calculate from scratch
-
-> _**Calculate calibration parameters with a checkerboard, with measurements on the scene, or automatically with detected keypoints.**_\
-> Take heart, it is not that complicated once you get the hang of it!
-
-> [!TIP]
-> Try the calibration tool on the Demo by changing `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).\
-For the sake of practicality, there are voluntarily few board images for intrinsic calibration in our Demo, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm#:~:text=Angle%20results%20were,Table%203).
-
-<br> 
-
-#### 1. Calculate intrinsic parameters with a checkerboard
-
-> [!NOTE]
-> _Intrinsic parameters:_ camera properties (focal length, optical center, distortion).\
-> They are stored in a Calib.toml file: focal length in matrix[0,0] and matrix[1,1], optical center in matrix[0,2] and matrix[1,2], distortion in the distortions array. 
-
-- For each camera, film a checkerboard or a charucoboard. Either the board or the camera can be moved.
-- Create a folder for each camera in your `Calibration\intrinsics` folder and copy your images or videos in them.
-- Adjust `intrinsics_corners_nb` and `intrinsic_square_size` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
-
-<img src="Content/Calib_int.png" width="600">
-
-> [!TIP]
-> - The intrinsic parameters usually need to be calculated only once in their lifetime. In theory, cameras with the same model and settings will have identical intrinsic parameters, so they can be copied from one Calib.toml file to another. In practice, small variations can occur. 
-> - **Warning:** This does not hold true if you zoom in or out. In this case, you will need to recalculate intrinsic parameters.
-> - If you already calculated intrinsic parameters earlier, you can skip this step by setting `overwrite_intrinsics` to false.
-
-> [!TIP]
-> Checkerboard requirements:\
-> **Generate checkerboard at [calib.io](https://calib.io/pages/camera-calibration-pattern-generator).** 
->
-> - Format: A4 or US letter should be good enough, but larger is generally better
-> - Flat: Board must be completely flat
-> - Asymmetric: Rows ≠ Columns (or rows odd if columns even)
-> - Border: Wide white border around pattern
-> - Focus: Sharp, in-focus images
-> - Coverage: Film from multiple angles covering most of frame
-> - No glare: Avoid reflections
-
-> [!IMPORTANT]
-> Common errors:
-> 
-> - Specifying the external, instead of the internal number of corners (one less than the count from calib.io). This may be one less than you would intuitively think.
-> - Taking photos from the scene instead of extracting frames from a video. The photo image format is often different from the video one, which skews intrinsic calibration.
-
-> [!IMPORTANT]
-> Intrinsic calibration error should be below 0.5 px.
-
-<br>
-
-#### 2.Calculate extrinsic parameters
-
-> [!NOTE]
-> _Extrinsic parameters:_ camera positions and orientations in space, need to be recalculated whenever a camera is moved. Can be calculated from a board, or from points in the scene with known coordinates (**not just their dimensions!**).\
-> They are stored in a Calib.toml file, in the `translation` and `rotation` arrays.
-
-- 3 available methods:
-  - **With scene coordinates**  (`extrinsics_method = 'scene'`):\
-    Manually measure the 3D coordinates of 10 or more points in the scene (tiles, wall lines, boxes, treadmill dimensions...). These points should be as spread out as possible. Replace `object_coords_3d` by your coordinates.\
-    Then you will be prompted to click on the corresponding image points for each view.
-  - **With a checkerboard** (`extrinsics_method = 'static_board'`):\
-    Make sure that it is seen by all cameras so that it can be automatically detected. \
-    Can be set horizontally (default) or vertically (`board_position = 'vertical'`).\
-    It should preferably be rather large, as results will not be very accurate out of the covered zone.\
-    Adjust `extrinsics_corners_nb` and `extrinsic_square_size`.
-  - **With keypoints** (`extrinsics_method = 'keypoints'`):\
-    For a more automatic calibration, you can calibrate your cameras just by walking and waving your armsaround the scene.\
-    **COMING SOON!**
-- Once your cameras are in place, make a quick recording of the checkerboard laid on the floor or of the raw scene (only one frame is needed, but do not just take a photo unless you are sure it does not change the image format). \
-  You can remove the checkerboard or the calibration object for the actual capture of your participants.
-- Copy your files in the `extrinsics` folder.
-- Adjust parameters in the [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file.
-
-<img src="Content/Calib_ext.png" width="920">
-
-> [!TIP]
-> `extrinsics_method = 'scene'` is recommended.
-> 
-> - Works even on unsynchronized cameras
-> - Very accurate if the landmark coordinates are sufficiently spread out
-> - If there is no measurable item in the scene, you can temporarily bring something in (a table, for example), perform calibration, and then remove it before starting to capture motion
-> - Providing that scene coordinates can be retrieved later on, it can be used on old, forgotten video files
-
-> [!IMPORTANT]
-> Extrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.
 
 </br>
 
@@ -880,6 +747,236 @@ You can choose the keypoints to synchronize on, the reference person, and the ti
 
 > [!TIP]
 > GoPro cameras can also be synchronized [with a timecode](https://community.gopro.com/s/article/HERO12-Black-Timecode-Sync?language=en_US) or [by GPS](https://gopro.github.io/labs/control/gpssync/) (outdoors).
+
+</br>
+
+## Calibrate your cameras
+> _**Calculate camera intrinsic properties (lens characteristics) and extrinsic parameters (positions and orientations).\
+> Convert a preexisting calibration file, or calculate intrinsic and extrinsic parameters from scratch.**_
+
+Open a terminal in your project folder, [activate your environment](#activate-your-environment), and run `ipython`:
+
+```python
+from Pose2Sim import Pose2Sim
+Pose2Sim.calibration()
+```
+
+
+<img src="Content/P2S_calibration.png" width="760">
+
+</br>
+Output file:
+
+<img src="Content/CalibFile.png" width="760">
+
+</br>
+
+---
+
+### Table of Contents
+1. [Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV](#convert-from-caliscope-anipose-freemocap-qualisys-optitrack-vicon-opencap-easymocap-or-biocv)
+2. [Calculate from scratch](#calculate-from-scratch)
+   1. [Calculate intrinsic parameters with a board](#calculate-intrinsic-parameters-with-a-board)
+   2. [Calculate extrinsic parameters with scene landmarks, a static or a moving board, or pose estimation keypoints](#calculate-extrinsic-parameters-with-scene-landmarks-a-static-or-a-moving-board-or-pose-estimation-keypoints)
+
+---
+
+</br>
+
+### Convert from Caliscope, AniPose, FreeMocap, Qualisys, Optitrack, Vicon, OpenCap, EasyMocap, or bioCV
+
+If you already have a calibration file, set `calibration_type` type to `convert` in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file, follow the instructions below for your specific calibration type, and run `Pose2Sim.calibration()`.
+
+> [!NOTE]
+> If the original calibration file does not provide any residual errors, they will be logged as NaN. This is not an error and can be ignored.
+
+- **From [Caliscope](https://mprib.github.io/caliscope/)** (recommended *if your cameras are synchronized*), **[Dynamic Extrinsic Camera Calibrator](https://github.com/flodelaplace/lab-camera-dynamic-calibrator)** (based on keypoints, not a board! But *requires synchronized videos, does not estimate intrinsics, and not commercially available*), **[AniPose](https://github.com/lambdaloop/anipose)**, or **[FreeMocap](https://github.com/freemocap/freemocap):**  
+  - Copy your `.toml` calibration file to the Pose2Sim `Calibration` folder.
+  - Calibration can be skipped since these formats are natively supported by Pose2Sim.
+  - **Note:** It seems like the FreeMoCap calibration is in millimeters rather than in meters. Just open your calibration.toml file and multiply all the translation values by 1000.
+- **From [Qualisys](https://www.qualisys.com):**
+  - Export calibration to `.qca.txt` within QTM (see [there](https://github.com/perfanalytics/pose2sim/issues/56#issuecomment-1855933754)).
+  - Copy it in the `Calibration` Pose2Sim folder.
+  - set `convert_from` to 'qualisys' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. Change `binning_factor` to 2 if you film in 540p.
+  - If you set your cameras vertically and the videos are rendered sideways, you need to rotate them and the calibration file before running pose estimation. [Use this script](https://github.com/perfanalytics/pose2sim/issues/235#issuecomment-60365568651).
+- **From [Optitrack](https://optitrack.com/):** Exporting calibration will be available in Motive 3.2. In the meantime:
+  - Calculate intrinsics with a board (see next section).
+  - Use their C++ API [to retrieve extrinsic properties](https://docs.optitrack.com/developer-tools/motive-api/motive-api-function-reference#tt_cameraxlocation). Translation can be copied as is in your `Calib.toml` file, but TT_CameraOrientationMatrix first needs to be [converted to a Rodrigues vector](https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga61585db663d9da06b68e70cfbf6a1eac) with OpenCV. See instructions [here](https://github.com/perfanalytics/pose2sim/issues/28).
+  - Use the `Calib.toml` file as is and do not run Pose2Sim.calibration()
+- **From [Vicon](http://www.vicon.com/Software/Nexus):**  
+  - Copy your `.xcp` Vicon calibration file to the Pose2Sim `Calibration` folder.
+  - set `convert_from` to 'vicon' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
+- **From [OpenCap](https://www.opencap.ai/):**  
+  - Copy your `.pickle` OpenCap calibration files to the Pose2Sim `Calibration` folder.
+  - set `convert_from` to 'opencap' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
+- **From [EasyMocap](https://github.com/zju3dv/EasyMocap/):**  
+  - Copy your `intri.yml` and `extri.yml` files to the Pose2Sim `Calibration` folder.
+  - set `convert_from` to 'easymocap' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
+- **From [bioCV](https://github.com/camera-mc-dev/.github/blob/main/profile/mocapPipe.md):**  
+  - Copy your bioCV calibration files (no extension) to the Pose2Sim `Calibration` folder.
+  - set `convert_from` to 'biocv' in your [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml) file. No other setting is needed.
+
+---
+
+</br>
+
+### Calculate from scratch
+
+> _**Calculate calibration parameters with a chessboard or a charucoboard, with known scene coordinates, or automatically with pose estimation keypoints.**_\
+> Take heart, it is not that complicated once you get the hang of it!
+
+> [!TIP]
+> - Try the calibration tool on the Demo data by changing `calibration_type` to `calculate` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+> - Then try again after changing `[calibration.calculate.extrinsics.extrinsics_method]` to `charuco`, then `keypoints`.
+> 
+> For the sake of practicality, there are voluntarily few board images for intrinsic calibration in our Demo, and few points to click for extrinsic calibration. In spite of this, your reprojection error should be under 1-2 cm, which [does not hinder the quality of kinematic results in practice](https://www.mdpi.com/1424-8220/21/19/6530/htm#:~:text=Angle%20results%20were,Table%203).
+
+---
+
+</br>
+
+#### Calculate intrinsic parameters with a board
+
+> [!NOTE]
+> #### Intrinsic parameters:
+> 
+> Camera properties (focal length, optical center, distortion), stored in the matrix and distortion arrays of a Calib.toml file.
+> 
+> They usually need to be calculated only once in their lifetime. In theory, cameras with the same model and settings will have identical intrinsic parameters, so they can be copied from one Calib.toml file to another. In practice, small variations can occur.\
+> **Warning:** This does not hold true if you zoom in or out. In this case, you will need to recalculate intrinsic parameters.
+
+> [!TIP]
+> If you are working with historical videos and cannot film a board, you can still estimate the camera intrinsic parameters, assuming no distortion, a centered optical center, and squared and unskewed pixels. Camera distances may be slightly inaccurate, but this is generally compensated by the focal length and does not hurt triangulation.
+
+- For each camera, film a chessboard or a charucoboard. You can either move the board in front of the camera, or move the camera around the board.\
+  ***N.B.:*** Make sure you film from multiple angles and cover most of frame.
+- Create a folder for each camera in your `Calibration\intrinsics` directory and copy your images or videos in them.
+- Adjust `corners_nb`, `square_size`, and `marker_resolution` in the `[calibration.calculate.intrinsics]` section of [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+- Run `Pose2Sim.calibration()`. 
+  - For each image, if you are satisfied with the detection, press `Y`.
+  - If you want to dismiss a specific image, press `N`.
+  - If you want to improve the detection by clicking the points, press `C`. Right click to undo a click, and `H` to label a point as hidden. Use the mouse whell to zoom and pan.
+
+<img src="Content/Calib_int.png" width="600">
+
+> [!TIP]
+> If you are confident in your corner detections, you can set `show_detection_intrinsics` to false. If you already calculated intrinsic parameters earlier, you can skip this step altogether by setting `overwrite_intrinsics` to false. 
+
+> [!TIP]
+> #### Chess or ChArUco board requirements:
+> 
+> Generate a chess or charuco board at [calib.io](https://calib.io/pages/camera-calibration-pattern-generator). 
+> A ChArUco board is more robust to occlusions or orientation ambiguities than a chessboard.
+>
+> - ***Intrinsics:*** Many corners, e.g. [5x8 corners on A4/US-letter format](Content/intrinsic_charuco_5_8_25.pdf)\
+>   ***Extrinsics (static):*** Large squares with several corners, e.g. [3x6 on A0 format](Content/extrinsic_charuco_3_6_150.pdf)\
+>   ***Extrinsics (dynamic):*** Large squares, e.g. [1x2 corners on A3/US-ledger format](Content/extrinsic_charuco_1_2_125.pdf),
+> - Asymmetric: Rows ≠ Columns (or rows should be odd if columns is even)
+> - Border: Wide white border around the pattern
+> - Flat: The board must be completely flat
+> - Focus: Sharp, in-focus images
+> - No glare: Avoid reflections
+>
+> <img src="Content/charuco_help.png" width="760">
+
+> [!IMPORTANT]
+> Common errors:
+> 
+> - Specifying the external, instead of the internal number of corners. Specifically, `corners_nb = rows-1, cols-1` (compare with [calib.io](https://calib.io/pages/camera-calibration-pattern-generator)). 
+> - Taking photos from the scene instead of extracting frames from a video. The photo image format is often different from the video one, which skews intrinsic calibration.
+
+> [!IMPORTANT]
+> Intrinsic calibration error should be close to or below 0.5 px.
+
+---
+
+<br>
+
+#### Calculate extrinsic parameters with scene landmarks, a static or a moving board, or pose estimation keypoints
+
+> [!NOTE]
+> #### Extrinsic parameters:
+> 
+> Camera positions and orientations in space, stored in the rotation and translation arrays of a Calib.toml file.
+>
+> They need to be recalculated every time a camera is moved. Several methods are available, using known scene coordinates, a static board or a moving board, or pose estimation keypoints.
+
+> [!IMPORTANT]
+> Extrinsic calibration error should be below 1 cm, but depending on your application, results will still be potentially acceptable up to 2.5 cm.
+
+</br>
+
+##### With scene coordinates
+
+- Manually measure the 3D coordinates of 10 or more points in the scene (tiles, wall lines, boxes, treadmill dimensions...). These points should be as spread out as possible.
+- Set `extrinsics_method = 'scene'` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+- Replace `object_coords_3d` by your coordinates in the `[calibration.calculate.extrinsics.scene]` section. 
+- Once your cameras are in place, make a quick recording of the raw scene with all cameras. Only one frame is needed, but do not just take a photo unless you are sure it does not change the image format. 
+- Copy your videos into the `calibration/extrinsics` folder.
+- Run `Pose2Sim.calibration()`. You will be prompted to click on the corresponding image points for each view.
+
+<img src="Content/Calib_ext.png" width="920">
+
+> [!TIP]
+> - Works even on unsynchronized cameras
+> - Very accurate if the landmark coordinates are sufficiently spread out
+> - If there is no measurable item in the scene, you can temporarily bring something in (a table, for example), perform calibration, and then remove it before starting to capture motion
+> - Providing that scene coordinates can be retrieved later on, it can be used on old, forgotten video files
+
+</br>
+
+##### With a static board
+
+- Put a large chess or charuco board in the field of view. See [board requirements here](#chess-or-charuco-board-requirements).
+  - If laid horizontally on the ground: The cameras must be high enough to correctly detect the board.
+  - If laid vertically (`board_position = 'vertical'`): The cameras can only be on one side of the board.
+- Set `extrinsics_method = 'charuco_static'` or `'chess_static'` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+- Adjust `corners_nb`, `square_size`, and `marker_resolution` in the `[calibration.calculate.extrinsics.static]` section.
+- Once your cameras are in place, make a quick recording of the raw scene with all cameras. Only one frame is needed, but do not just take a photo unless you are sure it does not change the image format. 
+- Copy your videos into the `calibration/extrinsics` folder.
+- Run `Pose2Sim.calibration()`. Once it is done, you can remove the board from the scene.
+
+> [!TIP]
+> - Works even on unsynchronized cameras
+> - Simpler but not recommended since it is the least accurate method
+
+</br>
+
+##### With a moving board
+
+**COMING SOON!**
+
+- Generate and print a ChArUco board. See [board requirements here](#chess-or-charuco-board-requirements).
+- Set `extrinsics_method = 'charuco'` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+- Adjust `corners_nb`, `square_size`, and `marker_resolution` in the `[calibration.calculate.extrinsics.charuco]` section.
+- Once your cameras are in place, start recording and wave the board across the scene, making sure it is visible to at least 2 cameras at the same time. Finally, lay it horizontally or vertically on the ground, making sure it is still visible.
+- If your cameras are not natively synchronized, [synchronize them](#synchronize-your-cameras).
+- Copy your videos into the `calibration/extrinsics` folder.
+- Run `Pose2Sim.calibration()`. Once it is done, you can remove the board from the scene.
+
+> [!TIP]
+> - Usually slightly more accurate ***BUT*** requires synchronized cameras.
+> - Only ChArUco boards are supported (not chessboards)
+
+</br>
+
+##### With keypoints
+
+**COMING SOON!**
+
+For a more automatic calibration, you can calibrate your cameras just by walking and waving your arms around the scene.
+
+- Set `extrinsics_method = 'keypoints'` in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
+- Once your cameras are in place, start recording and walk across the scene, waving your arms and making sure your are visible to at least 2 cameras at the same time. Finally, stay immobile in a T-pose for one second at the center of the scene.
+- If your cameras are not natively synchronized, [synchronize them](#synchronize-your-cameras).
+- Copy your videos into the `calibration/extrinsics` folder.
+- Run `Pose2Sim.calibration()`.
+
+> [!TIP]
+> - Much simpler than any of the other methods, but
+> - Requires synchronized cameras
+> - Commercial use is uncertain
+
 
 </br>
 
@@ -1151,14 +1248,14 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 <details>
    <summary><b>Project</b> (CLICK TO SHOW)</summary>
 
-    | Parameter | Default | Description |
-    |-----------|---------|-------------|
-    | `multi_person` | `false` | If `true`, all persons in the scene are analyzed. If `false`, only the person with the lowest reprojection error is kept. |
-    | `participant_height` | `'auto'` | Height of the participant(s) in meters. `'auto'`, a float (e.g. `1.72`), or a list of floats (e.g. `[1.72, 1.40]`). Only used for marker augmentation. |
-    | `participant_mass` | `70.0` | Mass of the participant(s) in kg. A float or a list of floats. Only used for marker augmentation and scaling; no impact on results unless you need to compute forces. |
-    | `frame_rate` | `'auto'` | Frame rate in fps. `'auto'` reads from video metadata, or defaults to 60 fps when working with images. |
-    | `frame_range` | `'auto'` | `'auto'`, `'all'`, or a range like `[10, 300]`. `'auto'` trims around frames with low reprojection error. If cameras are not synchronized, designates the frame range of the camera with the shortest recording. |
-    | `exclude_from_batch` | `[]` | List of trial paths to exclude from batch analysis, e.g. `['S00_P00_Participant/S00_P00_T00_StaticTrial']`. |
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `multi_person` | `false` | If `true`, all persons in the scene are analyzed. If `false`, only the person with the lowest reprojection error is kept. |
+| `participant_height` | `'auto'` | Height of the participant(s) in meters. `'auto'`, a float (e.g. `1.72`), or a list of floats (e.g. `[1.72, 1.40]`). Only used for marker augmentation. |
+| `participant_mass` | `70.0` | Mass of the participant(s) in kg. A float or a list of floats. Only used for marker augmentation and scaling; no impact on results unless you need to compute forces. |
+| `frame_rate` | `'auto'` | Frame rate in fps. `'auto'` reads from video metadata, or defaults to 60 fps when working with images. |
+| `frame_range` | `'auto'` | `'auto'`, `'all'`, or a range like `[10, 300]`. `'auto'` trims around frames with low reprojection error. If cameras are not synchronized, designates the frame range of the camera with the shortest recording. |
+| `exclude_from_batch` | `[]` | List of trial paths to exclude from batch analysis, e.g. `['S00_P00_Participant/S00_P00_T00_StaticTrial']`. |
 
 </details>
 
@@ -1168,10 +1265,15 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 <details>
    <summary><b>Pose</b> (CLICK TO SHOW)</summary>
 
+Pose estimation parameters.
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `pose_model` | `'Body_with_feet'` | Skeleton model to use.<br>**With RTMLib:**<br> - `'Body_with_feet'` (HALPE_26, default), <br>- `'Whole_body_wrist'` (COCO_133_WRIST: body+feet+ 2 hand keypoints), <br>- `'Whole_body'` (COCO_133), <br>- `'Lower_body'` (Effectively runs HALPE_26. Later Pose2Sim stages ignore upper-body keypoints, recreate shoulder points: Hip + 0.53 m (Y direction) + 0.1 m (Hip-to-Hip direction), <br>- `'Body'` (COCO_17, Marker augmentation won't work, Kinematic analysis will), <br>- `'Hand'` (Hand_21), <br>- `'Face'` (FACE_106), <br>- `'Animal'` (ANIMAL2D_17). <br>⚠️ Only RTMPose is natively embeded in Pose2Sim. For all other pose estimation methods, you will have to run them yourself, and then refer to the documentation to convert the output files if needed<br>⚠️ For Face and Animal, use mode="""{dictionary}""", and find the corresponding .onnx model there https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose<br><br>**With MMPose:** `HALPE_26`, `COCO_133`, `COCO_17`, `CUSTOM`. See CUSTOM example at the end of the Config.toml file. <br>**With OpenPose:** `BODY_25B`, `BODY_25`, `BODY_135`, `COCO`, `MPII`. <br>**With MediaPipe:** `BLAZEPOSE`. <br>**With AlphaPose:** `HALPE_26`, `HALPE_68`, `HALPE_136`, `COCO_133`. <br>**With DeepLabCut:** `CUSTOM`. |
 | `mode` | `'balanced'` | `'lightweight'`, `'balanced'`, or `'performance'`.<br>Can also be a `"""{dictionary}"""` to manually select detection and pose models (see [rtmlib](https://github.com/Tau-J/rtmlib)). Models can be local paths or URLs. Make sure `input_sizes` are within square brackets and in the **opposite order** from the model path (e.g. `[192,256]` for a `256x192` model). If your `pose_model` is not in `skeletons.py`, you may need to create your own.<br><br>**Examples:**<br>*Equivalent to `mode='balanced'`:*<br>`` """{'det_class':'YOLOX', 'det_model':'https://…/yolox_m_8xb8-300e_humanart-c2c7a14a.zip', 'det_input_size':[640,640], 'pose_class':'RTMPose', 'pose_model':'https://…/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip', 'pose_input_size':[192,256]}""" ``<br><br>*One-stage RTMO (requires `pose_model = 'Body'`):*<br>`` """{'pose_class':'RTMO', 'pose_model':'https://…/rtmo-m_16xb16-600e_body7-640x640-39e78cc4_20231211.zip', 'pose_input_size':[640,640]}""" ``<br><br>*Animal pose estimation (marker augmentation won't work; custom OpenSim skeleton needed for IK):*<br>`` """{'pose_class':'RTMPose', 'pose_model':'https://…/rtmpose-m_simcc-ap10k_pt-aic-coco_210e-256x256-7a041aa1_20230206.zip', 'pose_input_size':[256,256]}""" `` |
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `det_frequency` | `4` | Run person detection only every N frames; bounding boxes are tracked in between. Higher values are faster but may miss detections. Can be as high as you want in simple uncrowded scenes, must be ≥ 1. |
 | `device` | `'auto'` | Inference device: `'auto'`, `'CPU'`, `'CUDA'`, `'MPS'`, or `'ROCM'`. |
 | `backend` | `'auto'` | Inference backend: `'auto'`, `'openvino'`, `'onnxruntime'`, or `'opencv'`. |
@@ -1179,8 +1281,12 @@ You can also run other API commands. See [there](https://simtk-confluence.stanfo
 | `display_detection` | `true` | Show real-time pose estimation overlay. Set to `false` for parallel processing. |
 | `overwrite_pose` | `false` | If `false`, skips pose estimation when results already exist. |
 | `save_video` | `'to_video'` | `'to_video'`, `'to_images'`, `'none'`, or `['to_video', 'to_images']`. |
+| `blur_faces` | `false` | Blur faces in saved videos/images. Ignored if `save_video` is `'none'`. |
 | `output_format` | `'openpose'` | `'openpose'`, `'mmpose'`, `'deeplabcut'`, `'none'`, or a list. Only `'openpose'` is fully supported downstream. |
 | `average_likelihood_threshold` | `0.5` | Detections are dropped when their average keypoint likelihood is below this threshold. |
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `tracking_mode` | `'sports2d'` | Person tracker used between frames: `'sports2d'` (fast, recommended) or `'deepsort'` (slower, harder to parametrize). |
 | `predict_displacement` | `false` | If `true`, predicts each person's next position by linear extrapolation. Use for sustained straight-line motion (sprinting, cycling) or long occlusions. Avoid for sudden direction changes (basketball, hopping). |
 | `match_by` | `'keypoints'` | How persons are matched across frames: `'keypoints'` (mean per-keypoint distance), `'centroid'` (distance between keypoint centroids), or `'bbox'` (1 − IoU of bounding boxes).<br>- Favor `'keypoints'` when people pass close to each other with distinct limb positions and limited frame-to-frame motion.<br>- Favor `'centroid'` in crowded scenes where people are very small (< 40 px).<br>- Favor `'bbox'` with `predict_displacement=true` for people of different sizes moving in a straight line with fast limb motion and large occlusions. |
@@ -1230,30 +1336,69 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `convert.convert_from` | `'qualisys'` | Source format: `'caliscope'`, `'qualisys'`, `'optitrack'`, `'vicon'`, `'opencap'`, `'easymocap'`, `'biocv'`, `'anipose'`, or `'freemocap'`. |
 | `binning_factor` *(qualisys only)* | `1` | Usually `1`; set to `2` when filming at 540p with Qualisys. |
 
-**[calibration.calculate.intrinsics]**
+**[calibration.calculate]**
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `overwrite_intrinsics` | `false` | If `false`, skips intrinsic calculation when results already exist. |
-| `intrinsics_extension` | `'jpg'` | File extension of the calibration images or video. |
-| `extract_every_N_sec` | `1` | If a video is provided, extract one frame every N seconds (can be < 1). |
-| `intrinsics_corners_nb` | `[4, 7]` | `[rows, cols]` of *internal* corners on the checkerboard (one less per side than the printed square count). |
-| `intrinsics_square_size` | `60` | Size of one checkerboard square in mm. |
+| `save_debug_images` | `true` | Save images with clicked points (and their reprojections for extrinsic calibration). |
+
+**[calibration.calculate.intrinsics]**
+
+Camera properties, theoretically need to be calculated only once in a camera lifetime. Recommendations: 20 corners/markers minimum, but the board can be as small as A4/US-letter
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `board_type` | `'charuco'` | `'charuco'` or `'chess'`. Charuco is more robust to occlusions but very slightly less accurate (expect 0.5 px error instead of 0.2). |
+| `corners_nb` | `[4, 7]` | `[rows-1, cols-1]` of *internal* corners on the checkerboard. |
+| `square_size` | `60` | Size of one checkerboard square in mm. |
+| `marker_resolution` *(charuco only)* | `5` | Resolution of the aruco marker (e.g. 4 for `'DICT_5X5_50'`, `'DICT_5X5_100'`, ...). |
 | `show_detection_intrinsics` | `true` | Display detected corners during intrinsic calibration. |
+| `overwrite_intrinsics` | `true` | If `false`, skips intrinsic calculation when results already exist. |
+| `extract_every_N_sec` | `1` | If a video is provided, extract one frame every N seconds (can be < 1). |
 
 **[calibration.calculate.extrinsics]**
 
+Camera placements, need to be done before every session
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `calculate_extrinsics` | `true` | Set to `false` to skip extrinsic calculation. |
-| `extrinsics_method` | `'scene'` | `'board'` (checkerboard on floor), `'scene'` (manually clicked points of known 3D coordinates), or `'keypoints'` (coming soon). |
-| `extrinsics_extension` | `'png'` | File extension of the extrinsic calibration image or video. |
+| `extrinsics_method` | `'scene'` | `'scene'` OR `'chess_static'` OR `'charuco_static'` → Single-image calibration. OR `'charuco'` OR `'keypoints'` → Multi-image calibration, requires synchronized cameras. |
 | `show_reprojection_error` | `true` | Display reprojection error after extrinsic calibration. |
+| `calculate_extrinsics` | `true` | Set to `false` to skip extrinsic calculation. |
 | `moving_cameras` | `false` | Not implemented yet. |
-| `board_position` *(board only)* | `'vertical'` | `'horizontal'` or `'vertical'`. |
-| `extrinsics_corners_nb` *(board only)* | `[4, 7]` | `[rows, cols]` of internal corners on the extrinsic checkerboard. |
-| `extrinsics_square_size` *(board only)* | `60` | Square size in mm (can be `[h, w]` for rectangles). |
-| `object_coords_3d` *(scene only)* | `[[...], ...]` | List of `[X, Y, Z]` 3D coordinates (in **metres**) of the points you will click on each camera image. Spread points as widely as possible for best accuracy. |
+
+**[calibration.calculate.extrinsics.scene]**
+
+Manually click on any point of know coordinates in the scene. Usually more accurate if points are spread out.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `object_coords_3d` | `[[-2.0, 0.3, 0.0], [-2.0, 0.0, 0.0], [-2.0, 0.0, 0.05], [-2.0, -0.3, 0.0], [0.0, 0.3, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.05], [0.0, -0.3, 0.0]]` | List of `[X, Y, Z]` 3D coordinates (in **metres**, unlike intrinsics which are in mm!) of the points you will click on each camera image. Spread points as widely as possible for best accuracy. `[X,Y,Z]` becomes `[Z,X,Y]` in the TRC reference frame, and `[-Y,X,Z]` in the Blender one. |
+
+**[calibration.calculate.extrinsics.static]** *(for `'chess_static'` OR `'charuco_static'`)*
+
+Recommendations: Not recommended. The board needs to be seen by all cameras: if 'vertical', cameras can't circle around the scene; if 'horizontal', they need to be high enough to detect it. 
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `board_position` | `'vertical'` | `'vertical'` or `'horizontal'`. Not recommended: the board needs to be seen by all cameras; if `'vertical'`, cameras can't circle around the scene; if `'horizontal'`, they need to be high enough to detect it. |
+| `corners_nb` | `[4, 7]` | `[H,W]` rather than `[w,h]`. |
+| `square_size` | `60` | mm. `[h,w]` if square is actually a rectangle. |
+| `marker_resolution` *(charuco only)* | `5` | Resolution of the aruco marker (e.g. 4 for `'DICT_5X5_50'`, `'DICT_5X5_100'`, ...). |
+
+**[calibration.calculate.extrinsics.charuco]** *(Coming soon!)*
+
+Requires synchronized camera. Uses a moving charuco board. Recommendations: The markers need to be large, but don't need to be numerous. Even a single one works.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `corners_nb` | `[4, 7]` | `[H,W]` rather than `[w,h]`. |
+| `square_size` | `60` | mm. `[h,w]` if square is actually a rectangle. |
+| `marker_resolution` | `5` | Resolution of the aruco marker (e.g. 4 for `'DICT_5X5_50'`, `'DICT_5X5_100'`, ...). |
+
+**[calibration.calculate.extrinsics.keypoints]** *(Coming soon!)*
+
+Requires synchronized cameras. Uses pose estimation of a person freely walking and waving arms in the scene.
 
 </details>
 
@@ -1272,6 +1417,9 @@ Take heart, calibration is not that complicated once you get the hang of it!
 
 **Multi person**
 
+If reconstruction_error_threshold too low or min_affinity too high: no correspondences will be found.\n
+If reconstruction_error_threshold too high or min_affinity too low: wrong correspondences will be found. If one person is associated to several ones on a different view, only the first is kept
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `reconstruction_error_threshold` | `0.1` | metres. Maximum 3D reconstruction error for two detections to be considered the same person across cameras. |
@@ -1284,21 +1432,32 @@ Take heart, calibration is not that complicated once you get the hang of it!
 <details>
    <summary><b>Triangulation</b> (CLICK TO SHOW)</summary>
 
+For each frame, each keypoint: if results are not good, we remove a camera and try again
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `reproj_error_threshold_triangulation` | `15` | px. Triangulated points with reprojection error above this threshold are rejected and a camera is removed for retry. |
 | `likelihood_threshold_triangulation` | `0.3` | 2D detections with likelihood below this value are ignored for triangulation. |
 | `min_cameras_for_triangulation` | `2` | Minimum number of cameras required to attempt triangulation. Triangulation is skipped for a given frame/keypoint if fewer cameras remain after filtering. |
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `predict_displacement` | `false` | If `true`, predicts each person's next 3D position by linear extrapolation before matching. Use for sustained straight-line motion or long occlusions; avoid for sudden direction changes. |
 | `match_by` | `'keypoints'` | How persons are matched across frames in 3D: `'keypoints'` (mean per-keypoint distance) or `'centroid'` (distance between keypoint centroids).<br>- Favor `'keypoints'` when depth is reliable (multiview triangulation) and people may be close together.<br>- Favor `'centroid'` when depth is unreliable (monocular 3D, not yet supported in Pose2Sim). |
 | `max_distance_m` | `1.0` | metres. Maximum distance a person can move between frames before being considered a new individual. |
 | `max_unseen_frames` | `100` | Maximum number of consecutive frames a person can be absent before the next detection is assigned a new ID. |
 | `interp_if_gap_smaller_than` | `20` | frames. Gaps smaller than this are interpolated; larger gaps are left as-is (or filled with `fill_large_gaps_with`). |
 | `interpolation` | `'linear'` | Interpolation method for missing points: `'linear'`, `'slinear'`, `'quadratic'`, `'cubic'`, or `'none'`. |
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `remove_incomplete_frames` | `false` | If `true`, a frame is only kept when *all* keypoints have been successfully triangulated. |
 | `sections_to_keep` | `'all'` | Which valid sections to retain: `'all'`, `'largest'`, `'first'`, or `'last'`. |
 | `min_chunk_size` | `10` | frames. Minimum length of a consecutive valid section for it to be retained. |
 | `fill_large_gaps_with` | `'last_value'` | How to fill gaps larger than `interp_if_gap_smaller_than`: `'last_value'`, `'nan'`, or `'zeros'`. |
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `show_interp_indices` | `true` | Print the frame indices that were interpolated for each keypoint. |
 | `make_c3d` | `true` | Also save triangulated data as a `.c3d` file alongside the `.trc` file. |
 
@@ -1318,21 +1477,27 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `save_filt_plots` | `true` | Save filtering plots to disk. |
 | `make_c3d` | `true` | Also save filtered data as a `.c3d` file. |
 
-**[filtering.butterworth]** — most intuitive, standard biomechanics filter
+**[filtering.butterworth]** 
+
+Most intuitive, standard biomechanics filter
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `cut_off_frequency` | `6` | 3-6 Hz: Walking, slow movements; 6-15 Hz: Running, fast movements; 15+ Hz: Very fast and impulsive movements |
 | `order` | `4` | Filter order. |
 
-**[filtering.kalman]** — Used in countless applications, especially real-time. This simplified Kalman filter assumes constant acceleration with Gaussian process noise
+**[filtering.kalman]** 
+
+Used in countless applications, especially real-time. This simplified Kalman filter assumes constant acceleration with Gaussian process noise
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `trust_ratio` | `500` | Ratio of measurement trust to process trust (≈ process noise / measurement noise). Higher values follow the data more closely. |
 | `smooth` | `true` | Apply Kalman smoother (non-causal). Set to `false` for true real-time filtering. |
 
-**[filtering.one_euro]** — Simpler and even faster alternative to Kalman filter for real-time, but tends to blunt RoM. Analog to a 1st order Butterworth but with adaptive cut-off frequency. This one is zero-phase
+**[filtering.one_euro]** 
+
+Simpler and even faster alternative to Kalman filter for real-time, but tends to blunt RoM. Analog to a 1st order Butterworth but with adaptive cut-off frequency. This one is zero-phase
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1340,26 +1505,34 @@ Take heart, calibration is not that complicated once you get the hang of it!
 | `beta` | `1.5` | Velocity adaptation coefficient: `f_c = cut_off_frequency + beta × velocity`. |
 | `d_cut_off_frequency` | `1.0` | Hz. Cut-off frequency for the derivative signal. |
 
-**[filtering.gcv_spline]** — Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips)
+**[filtering.gcv_spline]** 
+
+Automatically determines optimal parameters for each point, which is good when some move faster than others (eg fingers vs hips)
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `cut_off_frequency` | `'auto'` | `'auto'` or an integer (behaves like Butterworth). `'auto'` is usually better unless the signal is too short or you got a triangular wave + drift (eg pelvis Y coordinates of a subject walking uphill) |
 | `smoothing_factor` | `1.0` | ≥ 0. Values > 1 produce more smoothing; values < 1 follow the data more closely. Ignored when `cut_off_frequency != 'auto'`. |
 
-**[filtering.acc_minimizing]** — Whittaker-Henderson filter (acceleration-minimizing), produces smooth velocities and accelerations, which is important for force estimations but blunts the peaks; recommended for IK output
+**[filtering.acc_minimizing]** 
+
+Whittaker-Henderson filter (acceleration-minimizing), produces smooth velocities and accelerations, which is important for force estimations but blunts the peaks; recommended for IK output
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `cut_off_frequency` | `6` | Hz. |
 
-**[filtering.loess]** — Local low-degree polynomial smoothing
+**[filtering.loess]** 
+
+Local low-degree polynomial smoothing
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `nb_values_used` | `5` | Number of neighbouring frames used in the local regression. |
 
-**[filtering.gaussian]** — Weighted moving average, with more weight on central points
+**[filtering.gaussian]** 
+
+Weighted moving average, with more weight on central points
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1371,7 +1544,9 @@ Take heart, calibration is not that complicated once you get the hang of it!
 |-----------|---------|-------------|
 | `kernel_size` | `3` | Size of the median filter window in frames (must be odd). |
 
-**[filtering.butterworth_on_speed]** — Signal is differenciated, filtered, then integrated back. Preserves sharp movements, but can introduce an offset in the original signal
+**[filtering.butterworth_on_speed]** 
+
+Signal is differenciated, filtered, then integrated back. Preserves sharp movements, but can introduce an offset in the original signal
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1399,16 +1574,27 @@ Take heart, calibration is not that complicated once you get the hang of it!
 <details>
    <summary><b>Kinematics</b> (CLICK TO SHOW)</summary>
 
+Run OpenSim scaling and inverse kinematics
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `use_augmentation` | `true` | If `true`, uses the model with augmented markers. Set to `false` if augmentation did not improve results. |
 | `use_simple_model` | `false` | If `true`, uses a simplified OpenSim model (no muscles, no constraints). More than 10× faster; stiff spine and ball-joint shoulders, suitable for most gait tasks. |
 | `filter_ik` | `false` | If `true`, filters joint angle results after IK using the method defined in `[filtering]`. Recommended when force estimation is intended. |
 | `ik_filter_type` | `'acc_minimizing'` | Filter type for IK output. Any type from `[filtering]` is accepted. |
+| `make_bvh` | `true` | Save kinematics in bvh format in addition to osim and mot (for motion capture software). |
+
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `right_left_symmetry` | `true` | Set to `false` if the participant is not bilaterally symmetrical (e.g. if they wear a prosthetic limb). |
 | `default_height` | `1.7` | metres. Fallback height used for model scaling if automatic height estimation fails. |
 | `parallel_workers_kinematics` | `'auto'` | `'auto'`, an integer, or `false`. One worker per person (CPU only). Available in multi-person mode only. |
 | `remove_individual_scaling_setup` | `true` | If `true`, per-person scaling setup XML files are deleted after use to avoid clutter. |
+
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
 | `remove_individual_ik_setup` | `true` | If `true`, per-person IK setup XML files are deleted after use to avoid clutter. |
 | `large_hip_knee_angles` | `90` | degrees. Hip and knee angles above this value are considered unreliable and excluded from scaling. |
 | `trimmed_extrema_percent` | `50` | Percentage of the most extreme segment-length values removed before computing the mean for scaling. |
@@ -1453,8 +1639,8 @@ Open a terminal in your project folder, [activate your environment](#activate-yo
   <summary><b>Converting pose files</b> (CLICK TO SHOW)</summary>
     <pre>
 
-[Blazepose_runsave.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/Blazepose_runsave.py)
-Runs BlazePose on a video, and saves coordinates in OpenPose (json) or DeepLabCut (h5 or csv) format.
+[Mediapipe_to_pose_or_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/Mediapipe_to_pose_or_trc.py)
+Runs Mediapipe BlazePose on a video or a webcam stream, and saves coordinates in OpenPose (json), DeepLabCut (h5 or csv), or 3D trc format.
 
 [DLC_to_OpenPose.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/DLC_to_OpenPose.py)
 Converts a DeepLabCut (h5) 2D pose estimation file into OpenPose (json) files.
@@ -1467,6 +1653,9 @@ Converts AlphaPose single json file to OpenPose frame-by-frame files.
 <details>
   <summary><b>Converting calibration files</b> (CLICK TO SHOW)</summary>
     <pre>
+
+[calib_from_image.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_from_image.py)
+Calibrate from a single image with known scene coordinates. Intrinsic parameters are optional.
 
 [calib_toml_to_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_easymocap.py)
 Converts an OpenCV .toml calibration file to EasyMocap intrinsic and extrinsic .yml calibration files.

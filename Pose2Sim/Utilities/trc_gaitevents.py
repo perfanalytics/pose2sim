@@ -68,6 +68,7 @@
 
 ## INIT
 import os
+import sys
 from importlib.metadata import version
 from pathlib import Path
 import argparse
@@ -76,11 +77,11 @@ import numpy as np
 from scipy import signal
 from scipy.ndimage import gaussian_filter1d
 import matplotlib as mpl
+headless = not (os.environ.get('DISPLAY') or sys.platform in ('win32', 'darwin'))
 try:
-    mpl.use('qtagg')
+    mpl.use('Agg' if headless else 'qtagg')
     import matplotlib.pyplot as plt
-    fig = plt.figure()
-    plt.close(fig)
+    fig = plt.figure(); plt.close(fig)
 except Exception as e:
     print(f"GUI not available ({e}), falling back to 'Agg' backend.")
     mpl.use('Agg')

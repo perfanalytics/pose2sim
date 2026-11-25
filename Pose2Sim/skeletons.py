@@ -194,6 +194,136 @@ COCO_133 = Node("Hip", id=None, children=[
             Node("LEye", id=1),
             Node("REar", id=4),
             Node("LEar", id=3),
+            Node("Jaw1", id=23, children=[
+                Node("Jaw2", id=24, children=[
+                    Node("Jaw3", id=25, children=[
+                        Node("Jaw4", id=26, children=[
+                            Node("Jaw5", id=27, children=[
+                                Node("Jaw6", id=28, children=[
+                                    Node("Jaw7", id=29, children=[
+                                        Node("Jaw8", id=30, children=[
+                                            Node("Jaw9", id=31, children=[
+                                                Node("Jaw10", id=32, children=[
+                                                    Node("Jaw11", id=33, children=[
+                                                        Node("Jaw12", id=34, children=[
+                                                            Node("Jaw13", id=35, children=[
+                                                                Node("Jaw14", id=36, children=[
+                                                                    Node("Jaw15", id=37, children=[
+                                                                        Node("Jaw16", id=38, children=[
+                                                                            Node("Jaw17", id=39),
+                                                                        ]),
+                                                                    ]),
+                                                                ]),
+                                                            ]),
+                                                        ]),
+                                                    ]),
+                                                ]),
+                                            ]),
+                                        ]),
+                                    ]),
+                                ]),
+                            ]),
+                        ]),
+                    ]),
+                ]),
+            ]),
+            Node("EyebrowR1", id=40, children=[
+                Node("EyebrowR2", id=41, children=[
+                    Node("EyebrowR3", id=42, children=[
+                        Node("EyebrowR4", id=43, children=[
+                            Node("EyebrowR5", id=44, children=[
+                                Node("EyebrowL1", id=45, children=[
+                                    Node("EyebrowL2", id=46, children=[
+                                        Node("EyebrowL3", id=47, children=[
+                                            Node("EyebrowL4", id=48, children=[
+                                                Node("EyebrowL5", id=49)
+                                            ]),
+                                        ]),
+                                    ]),
+                                ]),
+                            ]),
+                        ]),
+                    ]),
+                ]),
+            ]),
+            Node("Nose1", id=50, children=[
+                Node("Nose2", id=51, children=[
+                    Node("Nose3", id=52, children=[
+                        Node("Nose4", id=53, children=[
+                            Node("Nose5", id=54, children=[
+                                Node("Nose6", id=55, children=[
+                                    Node("Nose7", id=56, children=[
+                                        Node("Nose8", id=57, children=[
+                                            Node("Nose9", id=58)
+                                        ]),
+                                    ]),
+                                ]),
+                            ]),
+                        ]),
+                    ]),
+                ]),
+            ]),
+            Node("REye1", id=59, children=[
+                Node("REye2", id=60, children=[
+                    Node("REye3", id=61, children=[
+                        Node("REye4", id=62, children=[
+                            Node("REye5", id=63, children=[
+                                Node("REye6", id=64)
+                            ]),
+                        ]),
+                    ]),
+                ]),
+            ]),
+            Node("LEye1", id=65, children=[
+                Node("LEye2", id=66, children=[
+                    Node("LEye3", id=67, children=[
+                        Node("LEye4", id=68, children=[
+                            Node("LEye5", id=69, children=[
+                                Node("LEye6", id=70)
+                            ]),
+                        ]),
+                    ]),
+                ]),
+            ]),
+            Node("Mouth1", id=71, children=[
+                        Node("Mouth2", id=72, children=[
+                            Node("Mouth3", id=73, children=[
+                                Node("Mouth4", id=74, children=[
+                                    Node("Mouth5", id=75, children=[
+                                        Node("Mouth6", id=76, children=[
+                                            Node("Mouth7", id=77, children=[
+                                                Node("Mouth8", id=78, children=[
+                                                    Node("Mouth9", id=79, children=[
+                                                        Node("Mouth10", id=80, children=[
+                                                            Node("Mouth11", id=81, children=[
+                                                                Node("Mouth12", id=82, children=[
+                                                                    Node("Mouth13", id=83, children=[
+                                                                        Node("Mouth14", id=84, children=[
+                                                                            Node("Mouth15", id=85, children=[
+                                                                                Node("Mouth16", id=86, children=[
+                                                                                    Node("Mouth17", id=87, children=[
+                                                                                        Node("Mouth18", id=88, children=[
+                                                                                            Node("Mouth19", id=89, children=[
+                                                                                                Node("Mouth20", id=90)
+                                                                                            ]),
+                                                                                        ]),
+                                                                                    ]),
+                                                                                ]),
+                                                                            ]),
+                                                                        ]),
+                                                                    ]),
+                                                                ]),
+                                                            ]),
+                                                        ]),
+                                                    ]),
+                                                ]),
+                                            ]),
+                                        ]),
+                                    ]),
+                                ]),
+                            ]),
+                        ]),
+                    ]),
         ]),
         Node("RShoulder", id=6, children=[
             Node("RElbow", id=8, children=[
@@ -275,136 +405,6 @@ COCO_133 = Node("Hip", id=None, children=[
                         ]),
                     ]),
                 ])
-            ]),
-        ]),
-        Node("Jaw1", id=23, children=[
-            Node("Jaw2", id=24, children=[
-                Node("Jaw3", id=25, children=[
-                    Node("Jaw4", id=26, children=[
-                        Node("Jaw5", id=27, children=[
-                            Node("Jaw6", id=28, children=[
-                                Node("Jaw7", id=29, children=[
-                                    Node("Jaw8", id=30, children=[
-                                        Node("Jaw9", id=31, children=[
-                                            Node("Jaw10", id=32, children=[
-                                                Node("Jaw11", id=33, children=[
-                                                    Node("Jaw12", id=34, children=[
-                                                        Node("Jaw13", id=35, children=[
-                                                            Node("Jaw14", id=36, children=[
-                                                                Node("Jaw15", id=37, children=[
-                                                                    Node("Jaw16", id=38, children=[
-                                                                        Node("Jaw17", id=39),
-                                                                    ]),
-                                                                ]),
-                                                            ]),
-                                                        ]),
-                                                    ]),
-                                                ]),
-                                            ]),
-                                        ]),
-                                    ]),
-                                ]),
-                            ]),
-                        ]),
-                    ]),
-                ]),
-            ]),
-        ]),
-        Node("EyebrowR1", id=40, children=[
-            Node("EyebrowR2", id=41, children=[
-                Node("EyebrowR3", id=42, children=[
-                    Node("EyebrowR4", id=43, children=[
-                        Node("EyebrowR5", id=44, children=[
-                            Node("EyebrowL1", id=45, children=[
-                                Node("EyebrowL2", id=46, children=[
-                                    Node("EyebrowL3", id=47, children=[
-                                        Node("EyebrowL4", id=48, children=[
-                                            Node("EyebrowL5", id=49)
-                                        ]),
-                                    ]),
-                                ]),
-                            ]),
-                        ]),
-                    ]),
-                ]),
-            ]),
-        ]),
-        Node("Nose1", id=50, children=[
-            Node("Nose2", id=51, children=[
-                Node("Nose3", id=52, children=[
-                    Node("Nose4", id=53, children=[
-                        Node("Nose5", id=54, children=[
-                            Node("Nose6", id=55, children=[
-                                Node("Nose7", id=56, children=[
-                                    Node("Nose8", id=57, children=[
-                                        Node("Nose9", id=58)
-                                    ]),
-                                ]),
-                            ]),
-                        ]),
-                    ]),
-                ]),
-            ]),
-        ]),
-        Node("REye1", id=59, children=[
-            Node("REye2", id=60, children=[
-                Node("REye3", id=61, children=[
-                    Node("REye4", id=62, children=[
-                        Node("REye5", id=63, children=[
-                            Node("REye6", id=64)
-                        ]),
-                    ]),
-                ]),
-            ]),
-        ]),
-        Node("LEye1", id=65, children=[
-            Node("LEye2", id=66, children=[
-                Node("LEye3", id=67, children=[
-                    Node("LEye4", id=68, children=[
-                        Node("LEye5", id=69, children=[
-                            Node("LEye6", id=70)
-                        ]),
-                    ]),
-                ]),
-            ]),
-        ]),
-        Node("Mouth1", id=71, children=[
-            Node("Mouth2", id=72, children=[
-                Node("Mouth3", id=73, children=[
-                    Node("Mouth4", id=74, children=[
-                        Node("Mouth5", id=75, children=[
-                            Node("Mouth6", id=76, children=[
-                                Node("Mouth7", id=77, children=[
-                                     Node("Mouth8", id=78, children=[
-                                        Node("Mouth9", id=79, children=[
-                                            Node("Mouth10", id=80, children=[
-                                                Node("Mouth11", id=81, children=[
-                                                    Node("Mouth12", id=82, children=[
-                                                        Node("Mouth13", id=83, children=[
-                                                            Node("Mouth14", id=84, children=[
-                                                                Node("Mouth15", id=85, children=[
-                                                                    Node("Mouth16", id=86, children=[
-                                                                        Node("Mouth17", id=87, children=[
-                                                                            Node("Mouth18", id=88, children=[
-                                                                                Node("Mouth19", id=89, children=[
-                                                                                    Node("Mouth20", id=90)
-                                                                                ]),
-                                                                            ]),
-                                                                        ]),
-                                                                    ]),
-                                                                ]),
-                                                            ]),
-                                                        ]),
-                                                    ]),
-                                                ]),
-                                            ]),
-                                        ]),
-                                    ]),
-                                ]),
-                            ]),
-                        ]),
-                    ]),
-                ]),
             ]),
         ]),
     ]),
@@ -582,6 +582,7 @@ FACE_106 = Node("root", id=None, children=[
                 ]),
             ]),
         ]),
+    ]),
     Node("Nose1", id=51, children=[
         Node("Nose2", id=52, children=[
             Node("Nose3", id=53, children=[
@@ -629,27 +630,26 @@ FACE_106 = Node("root", id=None, children=[
             ]),
         ]),
     ]),
-        Node("Mouth1", id=76, children=[
-            Node("Mouth2", id=77, children=[
-                Node("Mouth3", id=78, children=[
-                    Node("Mouth4", id=79, children=[
-                        Node("Mouth5", id=80, children=[
-                            Node("Mouth6", id=81, children=[
-                                Node("Mouth7", id=82, children=[
-                                        Node("Mouth8", id=83, children=[
-                                        Node("Mouth9", id=84, children=[
-                                            Node("Mouth10", id=85, children=[
-                                                Node("Mouth11", id=86, children=[
-                                                    Node("Mouth12", id=87, children=[
-                                                        Node("Mouth13", id=88, children=[
-                                                            Node("Mouth14", id=89, children=[
-                                                                Node("Mouth15", id=90, children=[
-                                                                    Node("Mouth16", id=91, children=[
-                                                                        Node("Mouth17", id=92, children=[
-                                                                            Node("Mouth18", id=93, children=[
-                                                                                    Node("Mouth19", id=94, children=[
-                                                                                    Node("Mouth20", id=95)
-                                                                                ]),
+    Node("Mouth1", id=76, children=[
+        Node("Mouth2", id=77, children=[
+            Node("Mouth3", id=78, children=[
+                Node("Mouth4", id=79, children=[
+                    Node("Mouth5", id=80, children=[
+                        Node("Mouth6", id=81, children=[
+                            Node("Mouth7", id=82, children=[
+                                    Node("Mouth8", id=83, children=[
+                                    Node("Mouth9", id=84, children=[
+                                        Node("Mouth10", id=85, children=[
+                                            Node("Mouth11", id=86, children=[
+                                                Node("Mouth12", id=87, children=[
+                                                    Node("Mouth13", id=88, children=[
+                                                        Node("Mouth14", id=89, children=[
+                                                            Node("Mouth15", id=90, children=[
+                                                                Node("Mouth16", id=91, children=[
+                                                                    Node("Mouth17", id=92, children=[
+                                                                        Node("Mouth18", id=93, children=[
+                                                                                Node("Mouth19", id=94, children=[
+                                                                                Node("Mouth20", id=95)
                                                                             ]),
                                                                         ]),
                                                                     ]),
@@ -670,6 +670,120 @@ FACE_106 = Node("root", id=None, children=[
         ]),
     ]),
 ])
+
+
+'''SUPERANIMAL_QUADRUPED_39 (full-body animal)
+https://github.com/AdaptiveMotorControlLab/modelzoo-figures'''
+SUPERANIMAL_QUADRUPED_39 = Node("Hip", id=22, children=[ # Tail_base
+    Node("TailEnd", id=23),
+    Node("RHip", id=32, children=[                      # Back_right_thigh
+        Node("RKnee", id=34, children=[                 # Back_right_knee
+            Node("RAnkle", id=35),                      # Back_right_paw
+        ]),
+    ]),
+    Node("LHip", id=31, children=[                      # Back_left_thigh
+        Node("LKnee", id=33, children=[                 # Back_left_knee
+            Node("LAnkle", id=30),                      # Back_left_paw
+        ]),
+    ]),
+    Node("BackEnd", id=20, children=[                   # Back_end
+        Node("BackMiddle", id=21, children=[            # Back_middle
+            Node("RBodyMiddle", id=37),                 # Body_middle_right
+            Node("LBodyMiddle", id=38),                 # Body_middle_left
+            Node("BellyBottom", id=36),                 # Back_base
+            Node("Neck", id=19, children=[              # Back_base
+                Node("RShoulder", id=27, children=[     # Front_right_thigh
+                    Node("RElbow", id=28, children=[    # Front_right_knee
+                        Node("RWrist", id=29),          # Front_right_paw
+                    ]),
+                ]),
+                Node("LShoulder", id=24, children=[      # Front_left_thigh
+                    Node("LElbow", id=25, children=[     # Front_left_knee
+                        Node("LWrist", id=26),           # Front_left_paw
+                    ]),
+                ]),
+                Node("NeckEnd", id=16, children=[
+                    Node("NeckBase", id=15, children=[
+                        Node("ThroatEnd", id=18, children=[
+                            Node("ThroatBase", id=17),
+                        ]),
+                        Node("Nose", id=0, children=[
+                            Node("UpperJaw", id=1, children=[
+                                Node("LowerJaw", id=2, children=[
+                                    Node("MouthEndRight", id=3),
+                                    Node("MouthEndLeft", id=4),
+                                ]),
+                            ]),
+                            Node("REye", id=5, children=[           # Right_eye
+                                Node("REarBase", id=6, children=[
+                                    Node("REarEnd", id=7),
+                                ]),
+                            ]),
+                            Node("LEye", id=10, children=[           # Left_eye
+                                Node("LEarBase", id=11, children=[
+                                    Node("LEarEnd", id=12),
+                                ]),
+                            ]),
+                            Node("RAntlerBase", id=8, children=[   # Right_antler_base
+                                Node("RAntlerEnd", id=9),          # Right_antler_end
+                            ]),
+                            Node("LAntlerBase", id=13, children=[   # Left_antler_base
+                                Node("LAntlerEnd", id=14),          # Left_antler_end
+                            ]),
+                        ]),
+                    ]),
+                ]),
+            ]),
+        ]),
+    ]),
+])
+
+
+'''SUPERANIMAL_TOPVIEWMOUSE_27 (full-body animal)
+https://github.com/AdaptiveMotorControlLab/modelzoo-figures'''
+SUPERANIMAL_TOPVIEWMOUSE_27 = Node("Hip", id=13, children=[     # Tail_base
+    Node("RHip", id=24),    
+    Node("LHip", id=21),    
+    Node("Tail1", id=14, children=[ 
+        Node("Tail2", id=15, children=[ 
+            Node("Tail3", id=16, children=[ 
+                Node("Tail4", id=17, children=[ 
+                    Node("Tail5", id=18, children=[ 
+                        Node("TailEnd", id=25),                 # Tail_end
+                    ]), 
+                ]), 
+            ]), 
+        ]), 
+    ]), 
+    Node("MidBackend3", id=12, children=[                       # Mid_back_end_3 
+        Node("MidBackend2", id=11, children=[                   # Mid_back_end_2
+            Node("MidBackend", id=10, children=[                # Mid_back_end
+                Node("MouseCenter", id=9, children=[            # Mouse_center
+                    Node("RMidSide", id=23),                    # Right_midside
+                    Node("LMidSide", id=20),                    # Left_midside
+                    Node("MidBack", id=8, children=[            # Mid_back
+                        Node("Neck", id=7, children=[
+                            Node("Head", id=26, children=[      # Head_Midpoint
+                                Node("Nose", id=0),
+                                Node("REye", id=6),             # Right_eye
+                                Node("LEye", id=5),             # Left_eye
+                                Node("REar", id=2, children=[   # Right_ear
+                                    Node("REarTip", id=4),     # Right_ear_tip
+                                ]),
+                                Node("LEar", id=1, children=[   # Left_ear
+                                    Node("LEarTip", id=3),     # Left_ear_tip
+                                ]),
+                            ]),
+                            Node("RShoulder", id=22),
+                            Node("LShoulder", id=19),
+                        ]),
+                    ]),
+                ]),
+            ]),
+        ]),
+    ]),
+])
+
 
 '''ANIMAL2D_17 (full-body animal)
 https://github.com/AlexTheBad/AP-10K/'''
@@ -832,7 +946,7 @@ BODY_135 = Node("CHip", id=None, children=[
 ])
 
 
-'''BLAZEPOSE (full-body with simplified hand and foot, from mediapipe)
+'''BLAZEPOSE (full-body with simplified hand and foot, from Mediapipe)
 https://google.github.io/mediapipe/solutions/pose'''
 BLAZEPOSE = Node("Hip", id=None, children=[
     Node("RHip", id=24, children=[
@@ -844,7 +958,7 @@ BLAZEPOSE = Node("Hip", id=None, children=[
         ]),
     ]),
     Node("LHip", id=23, children=[
-        Node("Lknee", id=25, children=[
+        Node("LKnee", id=25, children=[
             Node("LAnkle", id=27, children=[
                 Node("LHeel", id=29),
                 Node("LBigToe", id=31),

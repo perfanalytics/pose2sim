@@ -23,6 +23,7 @@ OUTPUT:
 
 ## INIT
 import os
+import sys
 import math
 import numpy as np
 np.set_printoptions(legacy='1.21') # otherwise prints np.float64(3.0) rather than 3.0
@@ -30,16 +31,15 @@ import logging
 from importlib.metadata import version
 from pathlib import Path
 import matplotlib as mpl
+headless = not (os.environ.get('DISPLAY') or sys.platform in ('win32', 'darwin'))
 try:
-    mpl.use('qtagg')
+    mpl.use('Agg' if headless else 'qtagg')
     import matplotlib.pyplot as plt
-    fig = plt.figure()
-    plt.close(fig)
+    fig = plt.figure(); plt.close(fig)
 except Exception as e:
     logging.warning(f"GUI not available ({e}), falling back to 'Agg' backend.")
     mpl.use('Agg')
     import matplotlib.pyplot as plt
-
 from scipy import signal
 from scipy.interpolate import make_smoothing_spline
 from scipy.interpolate._bsplines import _coeff_of_divided_diff, _compute_optimal_gcv_parameter

@@ -20,7 +20,7 @@
 [project]
 project_dir = '.' # '.' if Config.toml is in the root of the project, path to the project root otherwise
 multi_person = false # true for trials with multiple participants. If false, only the person with lowest reprojection error is analyzed
-participant_height = 'auto' # 'auto', float (eg 1.72), or list of floats (eg [1.72, 1.40])  # meters  # Only used for marker augmentation 
+participant_height = 'auto' # 'auto', float (eg 1.72), or list of floats (eg [1.72, 1.40])  # meters  # Only used for marker augmentation and calibration (if extrinsics_method = 'keypoints')
 participant_mass = 70.0             # float (eg 70.0), or list of floats (eg [70.0, 63.5])  # kg      # Only used for marker augmentation and scaling, no impact on results unless you need to further compute forces
 
 frame_rate = 'auto' # fps # int or 'auto'. If 'auto', finds from video (or defaults to 60 fps if you work with images) 
@@ -51,7 +51,7 @@ pose_model = 'Body_with_feet'  #With RTMLib:
                          #With openpose: BODY_25B, BODY_25, BODY_135, COCO, MPII
                          #With mediapipe: BLAZEPOSE
                          #With alphapose: HALPE_26, HALPE_68, HALPE_136, COCO_133
-                         #With deeplabcut: CUSTOM. See example at the end of the file
+                         #With deeplabcut: SUPERANIMAL_QUADRUPED_39, SUPERANIMAL_TOPVIEWMOUSE_27, CUSTOM. See example at the end of the file
 
 mode = 'balanced' # 'lightweight', 'balanced', 'performance', 
                   # or """{dictionary}""" (see below)
@@ -85,6 +85,7 @@ parallel_workers_pose = 'auto' # 'auto', int, or false # One worker per video, u
 display_detection = true # Real-time display of the videos with pose estimation. Set to false for parallel processing.
 overwrite_pose = false # Set to false if you don't want to recalculate pose estimation when it has already been done
 save_video = 'to_video' # 'to_video' or 'to_images', 'none', or ['to_video', 'to_images']
+blur_faces = true # Blur faces in saved videos/images (ignored if save_video is 'none')
 output_format = 'openpose' # 'openpose', 'mmpose', 'deeplabcut', 'none' or a list of them # /!\ only 'openpose' is supported for now
 
 handle_LR_swap = false # Not implemented yet. Might be useful if cameras film from the sagittal plane and the right and left sides are hard to differenciate to your eye.
@@ -144,46 +145,58 @@ calibration_type = 'convert' # 'convert' or 'calculate'
 
    [calibration.calculate] 
       save_debug_images = true       # Save images with clicked points (and their reprojections for extrinsic calibration)
-      # Camera properties, theoretically need to be calculated only once in a camera lifetime
-      [calibration.calculate.intrinsics]
-      overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
-      intrinsics_extension = 'jpg' # any video or image extension
-      extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
-      intrinsics_corners_nb = [4,7] 
-      intrinsics_square_size = 60 # mm
-      show_detection_intrinsics = true # true or false (lowercase)
 
-      # Camera placements, need to be done before every session
+      [calibration.calculate.intrinsics]
+      # Camera properties, theoretically need to be calculated only once in a camera lifetime
+      # If not provided, will be estimated in the next stage (assuming no distortion, a centered optical center, and squared and unskewed pixels)
+      # Recommended: 20 corners/markers minimum, but the board can be as small as A4/US-letter
+      board_type = 'chess' # 'charuco' or 'chess' # charuco is more robust to occlusions but very slightly less accurate (expect 0.5 px error instead of 0.2)
+      corners_nb = [4,7] # /!\ internal corners rather, ie [rows-1, cols-1]
+      square_size = 60 # mm
+      marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
+
+      show_detection_intrinsics = true # true or false (lowercase)
+      overwrite_intrinsics = false # set to false if you don't want to recalculate intrinsic parameters
+      extract_every_N_sec = 1 # if video, extract frames every N seconds (can be <1 )
+
       [calibration.calculate.extrinsics]
-      calculate_extrinsics = true # true or false (lowercase) 
-      extrinsics_method = 'scene' # 'board', 'scene', 'keypoints'
-      extrinsics_extension = 'png' # any video or image extension
-      # 'board' should be large enough to be detected when laid on the floor. Not recommended.
-      # 'scene' involves manually clicking any point of know coordinates on scene. Usually more accurate if points are spread out.
-      # 'keypoints' uses automatic pose estimation of a person freely walking and waving arms in the scene. Slighlty less accurate, requires synchronized cameras.
+      # Camera placements, need to be done before every session
+      extrinsics_method = 'scene' # 'scene' OR 'chess_static' OR 'charuco_static' -> Single-image calibration
+                                  # OR 'charuco' OR 'keypoints' -> Multi-image calibration, requires synchronized cameras
       show_reprojection_error = true # true or false (lowercase)
+      calculate_extrinsics = true # true or false (lowercase) 
       moving_cameras = false # Not implemented yet
 
-         [calibration.calculate.extrinsics.board]
-         board_position = 'vertical' # 'vertical' or 'horizontal'
-         extrinsics_corners_nb = [4,7] # [H,W] rather than [w,h]
-         extrinsics_square_size = 60 # mm # [h,w] if square is actually a rectangle
-
          [calibration.calculate.extrinsics.scene]
-         # list of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
+         # Manually click on any point of know coordinates in the scene. Usually more accurate if points are spread out.
+         object_coords_3d = [[-2.0,  0.3,  0.0], 
+                            [-2.0 , 0.0,  0.0], 
+                            [-2.0, 0.0,  0.05], 
+                            [-2.0, -0.3 ,  0.0], 
+                            [0.0,  0.3,  0.0], 
+                            [0.0, 0.0,  0.0], 
+                            [0.0, 0.0,  0.05], 
+                            [0.0, -0.3,  0.0]]
+         # List of 3D coordinates to be manually labelled on images. Can also be a 2 dimensional plane. 
          # in m -> unlike for intrinsics, NOT in mm!
          # [X,Y,Z], which becomes [Z,X,Y] in the TRC reference frame, and [-Y,X,Z] in the Blender one
-         object_coords_3d =   [[-2.0,  0.3,  0.0], 
-                              [-2.0 , 0.0,  0.0], 
-                              [-2.0, 0.0,  0.05], 
-                              [-2.0, -0.3 ,  0.0], 
-                              [0.0,  0.3,  0.0], 
-                              [0.0, 0.0,  0.0], 
-                              [0.0, 0.0,  0.05], 
-                              [0.0, -0.3,  0.0]]
-        
-         [calibration.calculate.extrinsics.keypoints]
-         # Coming soon!
+
+         [calibration.calculate.extrinsics.static] # 'chess_static' OR 'charuco_static'
+         # Recommendations: Not recommended. The board needs to be seen by all cameras: if 'vertical', cameras can't circle around the scene; if 'horizontal', they need to be high enough to detect it. 
+         board_position = 'vertical' # 'vertical' or 'horizontal'
+         corners_nb = [4,7] # [H,W] rather than [w,h]
+         square_size = 60 # mm # [h,w] if square is actually a rectangle
+         marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
+      
+         [calibration.calculate.extrinsics.charuco] # Coming soon!
+         # Requires synchronized camera. Uses a moving charuco board. 
+         # Recommendations: The markers need to be large, but don't need to be numerous. Even a single one works.
+         corners_nb = [4,7] # [H,W] rather than [w,h]
+         square_size = 60 # mm # [h,w] if square is actually a rectangle
+         marker_resolution = 5 # charuco only: Resolution of the aruco marker (e.g. 4 for 'DICT_5X5_50', 'DICT_5X5_100', ...)
+      
+         [calibration.calculate.extrinsics.keypoints] # Coming soon!
+         # Requires synchronized cameras. Uses pose estimation of a person freely walking and waving arms in the scene.
 
 
 [personAssociation]
@@ -191,7 +204,7 @@ calibration_type = 'convert' # 'convert' or 'calculate'
    likelihood_threshold_association = 0.3 
    reproj_error_threshold_association = 20 # px
    tracked_keypoint = 'Neck' # If the neck is not detected by the pose_model, check skeleton.py 
-               # and choose a stable point for tracking the person of interest (e.g., 'right_shoulder' or 'RShoulder')
+               # and choose a stable point for tracking the person of interest (e.g. 'RShoulder')
    
    [personAssociation.multi_person]
    reconstruction_error_threshold = 0.1 # 0.1 = 10 cm
@@ -294,6 +307,7 @@ make_c3d = true # save triangulated data in c3d format in addition to trc
 
 
 [kinematics]
+# Run OpenSim scaling and inverse kinematics
 use_augmentation = true  # true or false (lowercase) # Set to true if you want to use the model with augmented markers
 use_simple_model = false # true or false # >10 times faster IK if true. No muscles, no constraints (eg stiff spine and shoulders, no patella)
 filter_ik = false # true or false # Useful for force estimations if results are noisy 
@@ -328,8 +342,14 @@ use_custom_logging = false # if integrated in an API that already has logging
 # You can create as many custom skeletons as you want, just add them further down and rename them.
 # 
 # Check your model hierarchy with:  
-# from anytree import Node, RenderTree
-# for pre, _, node in RenderTree(model): 
+# config_path = r'path_to_Config.toml'
+# import rtoml, anytree
+# from pathlib import Path
+# from anytree.importer import DictImporter
+# config = rtoml.load(Path(config_path))
+# pose_model = config.get('pose').get('pose_model')
+# model = DictImporter().import_(config.get('pose').get(pose_model)[0])
+# for pre, _, node in anytree.RenderTree(model): 
 #     print(f'{pre}{node.name} id={node.id}')
 [[pose.CUSTOM]]
 name = "Hip"
