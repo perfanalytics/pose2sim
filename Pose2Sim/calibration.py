@@ -13,7 +13,8 @@ Several ways to do it:
 - Convert existing calibration files from Qualisys, Optitrack, Vicon, EasyMocap, bioCV, or OpenCap
 - Calibrate from scratch
   - Intrinsics: Use a checkerboard or a charucoboard
-      Optional for scene calibration, assuming fx=fy, centered principal point, zero skew, and no distortion
+      Optional for scene calibration. Otherwise estimated assuming 
+      no distortions, square pixels, centered principal point, zero skew (generally reasonable).
   - Extrinsics: 
     - Use a static or moving checkerboard / charucoboard, or 
     - Use a single image of the scene per camera, or
@@ -615,11 +616,12 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
     ret, C, S, D, K, R, T = [], [], [], [], [], [], []
     
     # Load clicked image points if exist
-    img_pts_path = Path(calib_dir) / f'Image_points.json'
-    if Path(img_pts_path).exists():
+    image_points = []
+    img_pts_path = Path(calib_dir) / 'Image_points.json'
+    if img_pts_path.exists():
         with open(img_pts_path, 'r') as f:
             imgp_data = json.load(f)
-        image_points = imgp_data['intrinsics']
+            image_points = imgp_data.get('intrinsics', [])
 
     for cam in intrinsics_cam_listdirs_names:
         cam_dir_or_vid = intrinsics_dir / cam
@@ -655,30 +657,29 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
 
         # find corners
         for img_path in img_vid_files:
+            img_name = Path(img_path).name
             if show_detection_intrinsics == True:
                 # If previously labeled points exist, check if they are satisfying
-                if 'image_points' in locals():
-                    imgp = next((entry['image_points_2d'] for entry in image_points if entry["cam_name"] == cam_name), [])
-                    objp_ = next((entry['object_points_3d'] for entry in image_points if entry["cam_name"] == cam_name), [])
-                    if len(objp_) > 0:
-                        objp = objp_
-                    if len(imgp) > 0:
-                        # recalculate reprojected points
-                        imgp = np.array(imgp).reshape(-1, 2)
-                        objp = np.array(objp).reshape(-1, 3)
-                        saved_img_path = create_image_labels(img_path, imgp, calib_dir, 'int', reprojected_points=None, show=True, save=save_debug_images)
-                        # Are you satisfied? If so, add to imgpoints and continue; else, redo detection
-                        satisfied = show_qt_message_box(
-                            "Loaded previous labels", 
-                            f"Are you satisfied with the previous labels for {cam_name}?",
-                            question=True
-                        )
-                        if satisfied:
-                            imgpoints.append(imgp)
-                            objpoints.append(objp)
-                            plt.close('all')
-                            continue
-                plt.close('all')
+                entry = next((e for e in image_points
+                            if e["cam_name"] == cam_name and e.get("img_name") == img_name), None)
+                if entry is not None and len(entry.get('image_points_2d', [])) > 0:
+                    # recalculate reprojected points
+                    imgp_prev = np.array(entry['image_points_2d'], dtype=np.float32).reshape(-1, 2)
+                    objp_prev = entry.get('object_points_3d', [])
+                    objp_prev = np.array(objp_prev, dtype=np.float32).reshape(-1, 3) if len(objp_prev) > 0 else objp
+                    create_image_labels(img_path, imgp_prev, calib_dir, 'int', reprojected_points=None, show=True, save=save_debug_images)
+                    # Are you satisfied? If so, add to imgpoints and continue; else, redo detection
+                    satisfied = show_qt_message_box(
+                        "Loaded previous labels",
+                        f"Are you satisfied with the previous labels for {cam_name} / {img_name}?",
+                        question=True
+                    )
+                    plt.close('all')
+                    if satisfied:
+                        imgpoints.append(imgp_prev)
+                        objpoints.append(objp_prev)
+                        continue
+            plt.close('all')
 
             # If not satisfied, tries to detect corners
             imgp_objp_confirmed = findCorners(img_path, corners_nb, objp=objp, show=show_detection_intrinsics,
@@ -696,8 +697,8 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
                     objpoints.append(objp_confirmed)
                     # Save detection image and JSON
                     saved_img_path = create_image_labels(img_path, imgp_confirmed, calib_dir, 'int', reprojected_points=None, show=False, save=save_debug_images)
-                    append_points_to_json(calib_dir, 'intrinsics', cam_name, imgp_confirmed)
-                    append_points_to_json(calib_dir, 'intrinsics', cam_name, objp_confirmed, object_points=True)
+                    append_points_to_json(calib_dir, 'intrinsics', cam_name, imgp_confirmed, img_name=img_name)
+                    append_points_to_json(calib_dir, 'intrinsics', cam_name, objp_confirmed, object_points=True, img_name=img_name)
 
         if len(imgpoints) < 10:
             logging.info(f'Corners were detected only on {len(imgpoints)} images for camera {cam}. Calibration of intrinsic parameters may not be accurate with fewer than 10 good images of the board.')
@@ -892,11 +893,15 @@ def calibrate_extrinsics(calib_dir, extrinsics_config_dict, C, S, K, D, save_deb
 
             # Save detection image with reprojected points and image points in json file
             saved_img_path = create_image_labels(img_vid_file, imgp, calib_dir, f'ext_{cam_name}', reprojected_points=proj_obj_all, show=show_reprojection_error, save=save_debug_images)
-            fig = plt.gcf()
-            fig.canvas.manager.set_window_title(f'Close {cam_name} to continue to the next image')
-            plt.show(block=True)
             append_points_to_json(calib_dir, 'extrinsics', cam_name, imgp)
             append_points_to_json(calib_dir, 'extrinsics', cam_name, objp, object_points=True)
+            if show_reprojection_error:
+                show_qt_message_box(
+                    "Check reprojection",
+                    "Check reprojection and label the next image.",
+                    question=False
+                )
+                plt.close('all')
 
             # Calculate reprojection error
             imgp_to_objreproj_dist = [euclidean_distance(proj_obj[n], imgp[n]) for n in range(len(proj_obj))]
@@ -958,8 +963,7 @@ def golden_section_search(objp, imgp, size, iter=10, n_grid=50):
     '''
     Estimate focal length (and full calibration) from known 3D points and their corresponding 
     image points, assuming fx=fy, centered principal point, zero skew, and no distortion.
-    Log-grid scan to find a plausible valley for f, then golden-section refinement.
-    Number of proposals is minimized using golden-section 1D search.
+    Log-grid scan to find a plausible valley for f, then 1D golden-section refinement.
 
     INPUTS:
     - objp: 3D object points (N, 3)
@@ -976,14 +980,14 @@ def golden_section_search(objp, imgp, size, iter=10, n_grid=50):
 
     # Log grid scan to find a plausible global valley for f
     f_low_init, f_high_init = 0.3 * max(size), 50.0 * max(size)
-    logging.info(f'Scanning plausible global valley with f spanning [{f_low_init:.2f}, {f_high_init:.2f}] px')
+    logging.info(f'Intrinsic parameters not found. Scanning plausible global valley with focal length spanning [{f_low_init:.2f}, {f_high_init:.2f}] px.')
     fs = np.geomspace(f_low_init, f_high_init, n_grid)
     errs = np.array([reproj_err_for_focal(f, objp, imgp, size)[0] for f in fs])
     if np.all(errs >= 1e9):
         raise ValueError('solvePnP failed for every tested focal length.')
     i = int(np.argmin(errs))
     f_low, f_high = fs[max(i - 1, 0)], fs[min(i + 1, n_grid - 1)]
-    logging.info(f'Searching f around [{f_low:.2f}, {f_high:.2f}] px, starting with a reprojection error of {min(errs):.2f} px')
+    logging.info(f'Golden section search around [{f_low:.2f}, {f_high:.2f}] px, starting with a reprojection error of {min(errs):.2f} px.')
 
     # # Verify f single valley
     # import matplotlib.pyplot as plt
@@ -1085,26 +1089,28 @@ def list_extrinsics_files(extrinsics_dir):
     return img_vid_files
 
 
-def append_points_to_json(calib_dir, category, img_filename, points, object_points=False):
+def append_points_to_json(calib_dir, category, cam_name, points, object_points=False, img_name=None):
     '''
     Append points to Image_points.json file incrementally.
     
     INPUTS:
     - calib_dir: calibration directory path
     - category: "intrinsics" or "extrinsics"
-    - img_filename: original image filename
+    - cam_name: camera name (folder name or video stem)
     - points: array of shape (N, 1, 2) or (N, 2), or list with None for invisible points
     - object_points: bool. If true, points needs to be an array of shape (N, 3)
+    - img_name: image file name (intrinsics: several images per camera). None for extrinsics.
     '''
 
     json_path = Path(calib_dir) / 'Image_points.json'
     
     # Load existing JSON or create new structure
-    if Path(json_path).exists():
+    if json_path.exists():
         with open(json_path, 'r') as f:
             data = json.load(f)
     else:
         data = {"intrinsics": [], "extrinsics": []}
+    data.setdefault(category, [])
 
     # Convert imgpoints to flat list [x1, y1, x2, y2, ...]
     if not object_points:
@@ -1135,7 +1141,7 @@ def append_points_to_json(calib_dir, category, img_filename, points, object_poin
     # Check if an entry with the same cam_name already exists
     found = False
     for existing_entry in data[category]:
-        if existing_entry["cam_name"] == img_filename:
+        if existing_entry["cam_name"] == cam_name and existing_entry.get("img_name") == img_name:
             # Overwrite the existing entry
             if not object_points:
                 existing_entry['image_points_2d'] = image_points_2d
@@ -1144,7 +1150,9 @@ def append_points_to_json(calib_dir, category, img_filename, points, object_poin
             found = True
             break
     if not found: # Append new entry
-        entry = {"cam_name": img_filename}
+        entry = {"cam_name": cam_name}
+        if img_name is not None:
+            entry["img_name"] = img_name
         if not object_points:
             entry['image_points_2d'] = image_points_2d
         else:
@@ -1168,6 +1176,7 @@ def create_image_labels(img_path, imgpoints, calib_dir, prefix, reprojected_poin
     - reprojected_points: optional array of reprojected points for extrinsics (N, 2)
     '''
 
+    img_name = Path(img_path).name
     img = cv2.imread(img_path)
     if img is None:
         cap = cv2.VideoCapture(img_path)
@@ -1205,14 +1214,14 @@ def create_image_labels(img_path, imgpoints, calib_dir, prefix, reprojected_poin
         fig = plt.figure()
         plt.imshow(im_pil)
         plt.axis('off')
-        fig.canvas.manager.set_window_title(Path(img_path).name)
+        fig.canvas.manager.set_window_title(img_name)
         fig.canvas.manager.window.showMaximized()
         plt.tight_layout()
         plt.show(block=False)
 
     # Save image
     if save:
-        original_filename = Path(img_path).name
+        original_filename = img_name
         save_filename = f'{prefix}_{original_filename}'
         save_filename = Path(save_filename).stem + '.png' # if original is .mp4 or other video format
         save_path = Path(calib_dir) / 'debug_images' / save_filename
@@ -1297,6 +1306,7 @@ def findCorners(img_path, corner_nb, objp=[], show=True, board_type='charuco', a
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001) # stop refining after 30 iterations or if error less than 0.001px
     
+    img_name = Path(img_path).name
     img = cv2.imread(img_path)
     if img is None:
         cap = cv2.VideoCapture(img_path)
@@ -1331,7 +1341,7 @@ def findCorners(img_path, corner_nb, objp=[], show=True, board_type='charuco', a
         if ret:
             imgp = charuco_corners  # shape (N, 1, 2)
             objp = board.getChessboardCorners()[charuco_ids.flatten()]  # objp needed because we may detect a partial board
-            logging.info(f'{Path(img_path).name}: {len(charuco_ids)} CharUco corners found.')
+            logging.info(f'{img_name}: {len(charuco_ids)} CharUco corners found.')
 
             if show:
                 # Draw detected CharUco corners
@@ -1366,7 +1376,7 @@ def findCorners(img_path, corner_nb, objp=[], show=True, board_type='charuco', a
         # If corners are found, refine corners
         if ret: 
             imgp = cv2.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
-            logging.info(f'{Path(img_path).name}: Chessboard corners found.')
+            logging.info(f'{img_name}: Chessboard corners found.')
             
             if show:
                 # Draw corners
@@ -1395,10 +1405,10 @@ def findCorners(img_path, corner_nb, objp=[], show=True, board_type='charuco', a
     if not ret:
         if show:
             # Visualizer and key press event handler
-            logging.info(f'{Path(img_path).name}: Corners not found: please label them by hand.')
+            logging.info(f'{img_name}: Corners not found: please label them by hand.')
             imgp_objp_confirmed = imgp_objp_visualizer_clicker(img, imgp=[], objp=objp, img_path=img_path)
         else:
-            logging.info(f'{Path(img_path).name}: Corners not found. To label them by hand, set "show_detection_intrinsics" to true in the Config.toml file.')
+            logging.info(f'{img_name}: Corners not found. To label them by hand, set "show_detection_intrinsics" to true in the Config.toml file.')
             imgp_objp_confirmed = []
 
     return imgp_objp_confirmed
@@ -1433,6 +1443,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
 
     global old_image_path
     old_image_path = img_path
+    img_name = Path(img_path).name
                                  
     def on_key(event):
         '''
@@ -1530,7 +1541,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     # Ask for confirmation
                     satisfied = show_qt_message_box(
                         "Confirm labeling", 
-                        f"Are you satisfied with your labeling for {Path(img_path).name}?",
+                        f"Are you satisfied with your labeling for {img_name}?",
                         question=True
                     )
                     # Disable event picking
@@ -1601,7 +1612,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
                     # Ask for confirmation
                     satisfied = show_qt_message_box(
                         "Confirm labeling",
-                        f"Are you satisfied with your labeling for {Path(img_path).name}?",
+                        f"Are you satisfied with your labeling for {img_name}?",
                         question=True
                     )
                     # Disable event picking
@@ -1727,7 +1738,7 @@ def imgp_objp_visualizer_clicker(img, imgp=[], objp=[], img_path=''):
     plt.rcParams['toolbar'] = 'None'
     fig, ax = plt.subplots()
     fig = plt.gcf()
-    fig.canvas.manager.set_window_title(Path(img_path).name)
+    fig.canvas.manager.set_window_title(img_name)
     ax.axis("off")
     for corner in imgp:
         x, y = corner.ravel()
