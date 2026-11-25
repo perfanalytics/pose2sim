@@ -1742,6 +1742,9 @@ Reprojects 3D coordinates of a trc file to the image planes defined by a calibra
 [trc_from_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_easymocap.py) 
 Convert EasyMocap results keypoints3d .json files to .trc.
 
+[pose_correction.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/pose_correction.py)
+Manually correct 2D keypoints before triangulation. All cameras side by side; suspect points (low confidence, jumps, disagreement with the other cameras) are ringed. Drag a point, place it where the other cameras see it, swap it, or spread an edit over the neighbouring frames with a weight.
+
    </pre>
 </details>
 
