@@ -2146,7 +2146,7 @@ Find the Sports2D validation studies [here](https://davidpagnon.github.io/Sports
 
 - *Zhao, X., Zhang, Y., & Graham, R. B. (2026). Influence of camera geometry on 3D joint angle estimation in markerless motion capture. Frontiers in Sports and Active Living, 8, 1850018. [https://doi.org/10.3389/fspor.2026.1850018](https://doi.org/10.3389/fspor.2026.1850018)*
 
-  --> With 2 cameras, a front configuration with 69° separation yielded the best results with 4.8° RMSE accross all joint angles. Back configuration with 81° separation also had comparable results. Same-quadrant configurations with 28° had the worst results, especially for ankle angles and hip rotations. Most importantly, foot and ankle visibility across the whole range of movement is key. 25 female athletes were involved across 5 tasks. Compared with an 8-camera @ 60 fps Theia3D setup.
+  --> With 2 cameras, a front configuration with 69° separation yielded the best results with 4.8° RMSE across all joint angles. Back configuration with 81° separation also had comparable results. Same-quadrant configurations with 28° had the worst results, especially for ankle angles and hip rotations. Most importantly, foot and ankle visibility across the whole range of movement is key. 25 female athletes were involved across 5 tasks. Compared with an 8-camera @ 60 fps Theia3D setup.
 
   <img src="Content/website/Zhao2026.png" width="760">
 
