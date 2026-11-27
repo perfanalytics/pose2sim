@@ -114,9 +114,10 @@ https://github.com/user-attachments/assets/51a9c5a1-a168-4747-9f99-b0670927df95
       3. [Command line](#command-line)
 3. [All the parameters](#all-the-parameters)
 4. [Utilities](#utilities)
-5. [How to cite and how to contribute](#how-to-cite-and-how-to-contribute)
+5. [Cite, Contribute, Validate](#cite-contribute-validate)
    1. [How to cite](#how-to-cite)
    2. [How to contribute and to-do list](#how-to-contribute-and-to-do-list)
+   3. [Validation studies](#validation-studies)
 
 </br>
 
@@ -388,6 +389,15 @@ Pose2Sim.runAll()
   Pose2Sim.calibration()
   ```
 
+  Then try again without any information on intrinsic parameters, by deleting your `intrinsics` folder and your existing calibration file!
+
+   ```python
+   Pose2Sim.calibration()
+   ```
+
+SEE HOW TRIANGULATION RESULTS AND ERRORS CHANGE USING QUALISYS, CHARUCO, STATIC SCENE, AND STATIC SCENE WITHOUT INTRINSICS. ERRORS SHOULD BE ... 
+VIDEO WITH OVERLAID SKELETONS WITH DIFFERENT COLORS
+
 <br>
 
 - **Pass an updated config dictionary** instead of editing Config.toml, and test whole_body pose estimation:
@@ -433,8 +443,12 @@ Pose2Sim.runAll()
 - Set `multi_person = True` in your `Config.toml` file, and remove all the detections other than the ones of interest. It works as well as the single person mode, and is much faster. In the future, I plan to add a person selection feature (like on Sports2D) and to remove the old single person mode.
 - Limit `frame_range` to only process a subset of frames.
 
+<br>
+
 **Pose2Sim.calibration():**\
 Run it only when your cameras are moved or changed. If they are not, just copy a previous calibration.toml file into your new calibration folder.
+
+<br>
 
 **Pose2Sim.poseEstimation():**
 
@@ -452,20 +466,32 @@ Run it only when your cameras are moved or changed. If they are not, just copy a
 *6.5 s -> 5 s*
 - Set `tracking_mode = 'sports2d'` or `tracking_mode = 'none'`. If several persons are in the scene, use the sports2d tracker or no tracker at all, but not 'deepsort' (sports2d tracking is almost instantaneous though).
 
+<br>
+
 **Pose2Sim.synchronization():**\
 Do not run if your cameras are natively synchronized.
+
+<br>
 
 **Pose2Sim.personAssociation()**:\
 Do not run if there is only one person in the scene.
 
+<br>
+
 **Pose2Sim.triangulation()**:\
 Not much to do here.
+
+<br>
 
 **Pose2Sim.filtering()**:\
 You can skip this step, but it is quite fast already.
 
+<br>
+
 **Pose2Sim.markerAugmentation()**:\
 Very fast, too. Note that marker augmentation won't necessarily improve results so you can consider skipping it.
+
+<br>
 
 **Pose2Sim.kinematics()**:
 
@@ -487,7 +513,7 @@ Film your participant(s) from at least 2 points of view.
 > [!TIP]
 > #### Camera placement:
 > 
-> - **With 2 cameras, one person:** According to [Samani et al, 2026](https://link.springer.com/article/10.1186/s13104-026-07886-4), best results are achieved when one camera is in front of the person, the other at 45° to the side, both at hip level. Acceptable results are achieved with one camera in front and one on the side at 90°; or two cameras in front, one at hip level and the other at eye level. [Zhao et al, 2026](https://pmc.ncbi.nlm.nih.gov/articles/PMC13402369/) recommend front or back configurations, especially for frontal- and tranverse-plane angle measurements.\
+> - **With 2 cameras, one person:** According to [Samani et al, 2026](https://link.springer.com/article/10.1186/s13104-026-07886-4), best results are achieved with a moderate angular separation (one camera in front, the other at 45° to the side at hip level). Acceptable results are achieved when the side camera is at 90°, or if it is replaced by a camera at eye level. They caution against larger camera separations. [Zhao et al, 2026](https://pmc.ncbi.nlm.nih.gov/articles/PMC13402369/) recommend front and back configurations with 69 to 81° separation. They caution against camera separation below 30°. Most importantly, foot and ankle visibility across the whole range of movement is key.\
 > **With 2 cameras, multiple people**: Try to place cameras in a way that minimizes occlusions.
 > - **With multiple cameras:** Make sure the cameras see the subjects from as many different angles as possible and with minimal occlusions. Note that top views right above the subjects do not yield good results.
 > - **In difficult settings with limited space and obstacles:** consider using the [Lab Camera Optimizer](https://github.com/flodelaplace/lab-camera-optimizer).
@@ -514,7 +540,7 @@ Film your participant(s) from at least 2 points of view.
 > - **Decrease resolution:** Decreasing from HD (1080 x 1920) to SD (720 x 1280) or even further has little impact, and *decreases storage use by about 8 times*.
 > - **Audio does not matter:** Audio tracks take between 1 and (rarely) 10% of the file size.
 > - **Camera number:** 6 is generally a good camera number. Of course, complex motions and occlusions require more cameras, and gait requires fewer.
-> - **Face blurring:** Preserves privacy with little impact on accuracy. Use this [Utility script](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/face_blurring.py).
+> - **Face blurring:** Preserves privacy with little impact on accuracy. 
 > - **Keep high framerate:** Framerates below 60 Hz lead to accuracy drops, especially for fast motions.
 > 
 > In practice, here is how you can compress your video and decrease its resolution with ffmpeg:
@@ -846,7 +872,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 > **Warning:** This does not hold true if you zoom in or out. In this case, you will need to recalculate intrinsic parameters.
 
 > [!TIP]
-> If you are working with historical videos and cannot film a board, you can still estimate the camera intrinsic parameters, assuming no distortion, a centered optical center, and squared and unskewed pixels. Camera distances may be slightly inaccurate, but this is generally compensated by the focal length and does not hurt triangulation.
+> If you are working with historical videos and cannot film a board, you can still estimate the camera intrinsic parameters, assuming no distortion, a centered optical center, and squared and unskewed pixels. Camera distances may be slightly inaccurate, but this is generally compensated by the focal length and does not hurt triangulation.\
 
 - For each camera, film a chessboard or a charucoboard. You can either move the board in front of the camera, or move the camera around the board.\
   ***N.B.:*** Make sure you film from multiple angles and cover most of frame.
@@ -877,7 +903,7 @@ If you already have a calibration file, set `calibration_type` type to `convert`
 > - Focus: Sharp, in-focus images
 > - No glare: Avoid reflections
 >
-> <img src="Content/charuco_help.png" width="760">
+> <img src="Content/charuco_help.png" width="380">
 
 > [!IMPORTANT]
 > Common errors:
@@ -1630,7 +1656,7 @@ Open a terminal in your project folder, [activate your environment](#activate-yo
    <summary><b>Video editing</b> (CLICK TO SHOW)</summary>
      <pre>
      
- [face_blurring.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/face_blurring.py)
+ - [face_blurring.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/face_blurring.py)
  Blurs or masks faces on a video.
     </pre>
 </details>
@@ -1639,13 +1665,13 @@ Open a terminal in your project folder, [activate your environment](#activate-yo
   <summary><b>Converting pose files</b> (CLICK TO SHOW)</summary>
     <pre>
 
-[Mediapipe_to_pose_or_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/Mediapipe_to_pose_or_trc.py)
+- [Mediapipe_to_pose_or_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/Mediapipe_to_pose_or_trc.py)
 Runs Mediapipe BlazePose on a video or a webcam stream, and saves coordinates in OpenPose (json), DeepLabCut (h5 or csv), or 3D trc format.
 
-[DLC_to_OpenPose.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/DLC_to_OpenPose.py)
+- [DLC_to_OpenPose.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/DLC_to_OpenPose.py)
 Converts a DeepLabCut (h5) 2D pose estimation file into OpenPose (json) files.
 
-[AlphaPose_to_OpenPose.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/AlphaPose_to_OpenPose.py)
+- [AlphaPose_to_OpenPose.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/AlphaPose_to_OpenPose.py)
 Converts AlphaPose single json file to OpenPose frame-by-frame files.
    </pre>
 </details>
@@ -1654,29 +1680,29 @@ Converts AlphaPose single json file to OpenPose frame-by-frame files.
   <summary><b>Converting calibration files</b> (CLICK TO SHOW)</summary>
     <pre>
 
-[calib_from_image.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_from_image.py)
+- [calib_from_image.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_from_image.py)
 Calibrate from a single image with known scene coordinates. Intrinsic parameters are optional.
 
-[calib_toml_to_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_easymocap.py)
+- [calib_toml_to_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_easymocap.py)
 Converts an OpenCV .toml calibration file to EasyMocap intrinsic and extrinsic .yml calibration files.
 
-[calib_easymocap_to_toml.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_easymocap_to_toml.py)
+- [calib_easymocap_to_toml.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_easymocap_to_toml.py)
 Converts EasyMocap intrinsic and extrinsic .yml calibration files to an OpenCV .toml calibration file.
 
-[calib_from_checkerboard.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_from_checkerboard.py)
+- [calib_from_checkerboard.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_from_checkerboard.py)
 Calibrates cameras with images or a video of a checkerboard, saves calibration in a Pose2Sim .toml calibration file.
 You should probably use Pose2Sim.calibration() instead, which is much easier and better.
 
-[calib_qca_to_toml.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_qca_to_toml.py)
+- [calib_qca_to_toml.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_qca_to_toml.py)
 Converts a Qualisys .qca.txt calibration file to the Pose2Sim .toml calibration file (similar to what is used in [AniPose](https://anipose.readthedocs.io/en/latest/)).
 
-[calib_toml_to_qca.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_qca.py)
+- [calib_toml_to_qca.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_qca.py)
 Converts a Pose2Sim .toml calibration file (e.g., from a checkerboard) to a Qualisys .qca.txt calibration file.
 
-[calib_toml_to_opencap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_opencap.py)
+- [calib_toml_to_opencap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/calib_toml_to_opencap.py)
 Converts an OpenCV .toml calibration file to OpenCap .pickle calibration files.
 
-[calib_toml_to_opencap.py]( )
+- [calib_toml_to_opencap.py]( )
 To convert OpenCap calibration tiles to a .toml file, please use Pose2Sim.calibration() and set convert_from = 'opencap' in [Config.toml](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Demo_SinglePerson/Config.toml).
    </pre>
 </details>
@@ -1685,13 +1711,13 @@ To convert OpenCap calibration tiles to a .toml file, please use Pose2Sim.calibr
   <summary><b>Plotting tools</b> (CLICK TO SHOW)</summary>
     <pre>
 
-[json_display_with_img.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/json_display_with_img.py)
+- [json_display_with_img.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/json_display_with_img.py)
 Overlays 2D detected json coordinates on original raw images. High confidence keypoints are green, low confidence ones are red.
 
-[json_display_without_img.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/json_display_without_img.py)
+- [json_display_without_img.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/json_display_without_img.py)
 Plots an animation of 2D detected json coordinates. 
 
-[trc_plot.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_plot.py)
+- [trc_plot.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_plot.py)
 Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different matplotlib tab.
    </pre>
 </details>
@@ -1700,46 +1726,46 @@ Displays X, Y, Z coordinates of each 3D keypoint of a TRC file in a different ma
   <summary><b>Other trc tools</b> (CLICK TO SHOW)</summary>
     <pre>
 
-[c3d_to_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/c3d_to_trc.py)
+- [c3d_to_trc.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/c3d_to_trc.py)
 Converts 3D point data from a .c3d file to a .trc file compatible with OpenSim. No analog data (force plates, emg) nor computed data (angles, powers, etc.) are retrieved.
 
-[trc_to_c3d.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_to_c3d.py)
+- [trc_to_c3d.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_to_c3d.py)
 Converts 3D point data from a .trc file to a .c3d file compatible with Visual3D.
 
-[trc_desample.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_desample.py)
+- [trc_desample.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_desample.py)
 Undersamples a trc file.
 
-[trc_scale.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_scale.py)
+- [trc_scale.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_scale.py)
 Scale trc coordinates by a desired factor.
 
-[trc_rotate.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_rotate.py)
+- [trc_rotate.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_rotate.py)
 Rotate trc coordinates by 90° around an axis. You can either choose an axis to rotate around, or use one of the predefined conversions from and axis-up to another one.
 
-[trc_Zup_to_Yup.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_Zup_to_Yup.py)
+- [trc_Zup_to_Yup.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_Zup_to_Yup.py)
 Changes Z-up system coordinates to Y-up system coordinates.
 
-[trc_mot_filter.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_filter.py)
+- [trc_mot_filter.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_filter.py)
 Filters trc or mot files. Available filters: Butterworth, Kalman, Butterworth on speed, Gaussian, LOESS, Median.
 
-[trc_gaitevents.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_gaitevents.py)
+- [trc_gaitevents.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_gaitevents.py)
 Detects gait events from point coordinates according to [Zeni et al. (2008)](https://www.sciencedirect.com/science/article/abs/pii/S0966636207001804?via%3Dihub).
 
-[trc_combine.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_combine.py)
+- [trc_combine.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_combine.py)
 Combine two trc files, for example a triangulated DeepLabCut trc file and a triangulated OpenPose trc file.
 
-[trc_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_mot_osim.py)
+- [trc_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_mot_osim.py)
 Build a trc file from a .mot motion file and a .osim model file.
 
-[bodykin_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/bodykin_from_mot_osim.py)
+- [bodykin_from_mot_osim.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/bodykin_from_mot_osim.py)
 Converts a mot file to a .csv file with rotation and orientation of all segments.
 
-[osim_to_bvh.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/osim_to_bvh.py)
+- [osim_to_bvh.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/osim_to_bvh.py)
 Exports OpenSim .osim models and .mot animations to rigged animations in the BVH MoCap format.
 
-[reproj_from_trc_calib.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/reproj_from_trc_calib.py)
+- [reproj_from_trc_calib.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/reproj_from_trc_calib.py)
 Reprojects 3D coordinates of a trc file to the image planes defined by a calibration file. Output in OpenPose or DeepLabCut format.
 
-[trc_from_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_easymocap.py) 
+- [trc_from_easymocap.py](https://github.com/perfanalytics/pose2sim/blob/main/Pose2Sim/Utilities/trc_from_easymocap.py) 
 Convert EasyMocap results keypoints3d .json files to .trc.
 
    </pre>
@@ -1747,8 +1773,11 @@ Convert EasyMocap results keypoints3d .json files to .trc.
 
 <br>
 
-# How to cite and how to contribute
-### How to cite
+
+# Cite, Contribute, Validate
+
+## How to cite
+
 If you use this Pose2Sim, please cite [Pagnon et al., 2022b](https://doi.org/10.21105/joss.04362), [Pagnon et al., 2022a](https://www.mdpi.com/1424-8220/22/7/2712), or [Pagnon et al., 2021](https://www.mdpi.com/1424-8220/21/19/6530).
     
     @Article{Pagnon_2022_JOSS, 
@@ -1778,9 +1807,19 @@ If you use this Pose2Sim, please cite [Pagnon et al., 2022b](https://doi.org/10.
       URL = {https://www.mdpi.com/1424-8220/21/19/6530}
     }
 
+<br>
+
+### Acknowledgements:
+
+- Supervised my PhD: [@lreveret](https://github.com/lreveret) (INRIA, Université Grenoble Alpes), and [@mdomalai](https://github.com/mdomalai) (Université de Poitiers).
+- Post-doc at the [University of Bath (UK)](https://www.bath.ac.uk/).
+- Former engineering position at [Forceteck](https://forceteck.com).
+- Demo data from [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
+- Big thanks to [all the contributors](https://github.com/perfanalytics/pose2sim/graphs/contributors), past and to come! Big thanks to everyone who gave feedback and contributed to making this software program better, too.
+
 </br>
 
-### How to contribute and to-do list
+## How to contribute and to-do list
 
 > [!TIP]
 > If you want to contribute to Sports2D or Pose2Sim, please see [this issue](https://github.com/perfanalytics/pose2sim/issues/40) or join the Discord community! [![Discord](https://img.shields.io/discord/1183750225471492206?logo=Discord&label=Discord%20community)](https://discord.com/invite/4mXUdSFjmt)
@@ -2020,9 +2059,171 @@ Run `uv pip install pose2sim --upgrade` to get the latest version!
 
 </br>
 
-### Acknowledgements:
 
-- Supervised my PhD: [@lreveret](https://github.com/lreveret) (INRIA, Université Grenoble Alpes), and [@mdomalai](https://github.com/mdomalai) (Université de Poitiers).
-- Post-doc at the [University of Bath (UK)](https://www.bath.ac.uk/) and engineer at [ForceTeck](https://forceteck.com/).
-- Demo data from [@aaiaueil](https://github.com/aaiaueil) from Université Gustave Eiffel.
-- Big thanks to [all the contributors](https://github.com/perfanalytics/pose2sim/graphs/contributors), past and to come! Big thanks to everyone who gave feedback and contributed to making this software program better, too.
+## Validation studies
+
+### Main findings
+
+**Accuracy:**
+
+- Typical errors on lower-body angles: 3–5°.
+- Weak spots: 
+  - Ankle and foot
+  - Transverse-plane angles, especially hip rotation
+  - Systematic hip offsets (large errors but high correlations)
+  - Elbow and wrist acceptable, but pronation/supination and shoulder angles are worse
+  - Positions and velocities are reliable, accelerations are underestimated compared with IMUs
+
+<br> 
+
+**Ideal setup:**
+
+- Cameras: 
+  - Placement matters more than quantity. 
+  - Foot visibility is especially important. Hip rotation is what degrades the most when lowering camera number
+  - Going from 8 to 4 cameras cost only about 1.5° of MAE. 
+  - With 2 cameras, front or back pairs separated by 70–80° works best, same-quadrant pairs separated by 28° works worst
+- Frame rate: High impact. Aim for at least 60 fps for dynamic tasks, and higher for impacts. 
+- Compression: Low impact
+- Resolution: Low impact
+- Face blurring: Low impact
+- Calibration: Low impact (1 cm calibration error costs under 0.5°)
+
+<br>
+
+
+### Feel free to propose your own study!
+
+In particular, we are lacking validation on:
+
+- Sports2D in general
+- Spatio-temporal parameters
+- The impact of synchronization methods (Hardware vs. Clap/flash vs. Pose2Sim)
+- The impact of calibration methods (Marker-based vs. Scene w/o intrinsics vs. Scene with intrinsics vs. Moving board vs. Keypoint-based)
+- The impact of the pose model (OpenPose body_25/Body_25B, RTMPose Body_with_feet/Whole_body)
+- The impact of marker augmentation vs. no marker-augmentation
+- The impact of direct angle calculation vs. using a kinematic model (neutral or female/male)
+- Multi-person analysis
+- Acrobatic motion
+
+Find the Sports2D validation studies [here](https://davidpagnon.github.io/Sports2D/#validation-studies).
+
+<br>
+
+### 2026
+
+- *Kim, H., Kim, L., Ko, S., Norcross, M., Kim, K. M., & Chang, E. (2026). Validation of video-based motion capture for lower body and trunk kinematics with marker augmentation. Measurement in Physical Education and Exercise Science, 1–12. [https://doi.org/10.1080/1091367X.2026.2763492](https://doi.org/10.1080/1091367X.2026.2763492)*
+
+  --> Segment angle errors for Lower-body and Trunk < 5° compared with marker-based results, except for the foot segment and vertical-axis angles. Comparable or better than OpenCap results. Used 4 GoPros @ 120 fps. Used the non-default Whole_body pose model and did not leverage OpenSim inverse kinematics.
+  
+  <img src="Content/website/Kim2026.png" width="760">
+
+<br>
+
+- *Shaver, B. K. (2026). Open-Source Markerless Motion Capture for Biomechanical Analysis in Clinical Settings: Validation and Practical Implementation of Pose2Sim (Master's thesis, University of Colorado at Denver). [https://www.proquest.com/openview/5f46fcc3574c1c6de01a6666990bcc29/1](https://www.proquest.com/openview/5f46fcc3574c1c6de01a6666990bcc29/1)*
+
+  --> Most joint angles demonstrated good to excellent agreement with marker results (RMSE < 10°), except the ankle. However, the ankle's Pearson correlation was good so the error may be mostly due to a systematic offset. Conversely, hip showed high agreement but bad correlation. Results started to degrade when going from 11 to 3, especially at hip rotation. This study involved 20 people performing gait and stepping tasks with 11 GoPros @ 60 Hz.
+
+  <img src="Content/website/Shaver2026.png" width="760">
+
+<br>
+
+- *Rozaire, et al. (2026). Agreement of markerless pose estimation with marker-based motion analysis for pediatric upper limb kinematics during daily living activities. HAL Science. [https://hal.science/hal-05738105/document](https://hal.science/hal-05738105/document)*
+
+  --> Median errors for elbow flexion/extension, wrist flexion/extension, wrist deviation between -4.0° and 1.0°. Pronation/supination and shoulder angles were not as good. Used 8 RGB cameras @ 60 fps.
+
+  <img src="Content/website/Rozaire2026.png" width="760">
+
+<br>
+
+- *Carretier, N., Beurienne, E., Beausejour, M.-H., et al. (2026). Validation of a markerless multi-camera pipeline for bouldering fall kinematics. Sensors, 26(2), 662. [https://doi.org/10.3390/s26020662](https://doi.org/10.3390/s26020662)*
+
+  --> Excellent agreement on fall height and peak velocity during bouldering falls compared with Kinovea results. Underestimated accelerations compared to IMUs, especially at the ankle. Used 5 GoPRos @ 240 fps.
+
+  <img src="Content/website/Carretier2026.png" width="760">
+
+<br>
+
+- *Zhao, X., Zhang, Y., & Graham, R. B. (2026). Influence of camera geometry on 3D joint angle estimation in markerless motion capture. Frontiers in Sports and Active Living, 8, 1850018. [https://doi.org/10.3389/fspor.2026.1850018](https://doi.org/10.3389/fspor.2026.1850018)*
+
+  --> With 2 cameras, a front configuration with 69° separation yielded the best results with 4.8° RMSE accross all joint angles. Back configuration with 81° separation also had comparable results. Same-quadrant configurations with 28° had the worst results, especially for ankle angles and hip rotations. Most importantly, foot and ankle visibility across the whole range of movement is key. 25 female athletes were involved across 5 tasks. Compared with an 8-camera @ 60 fps Theia3D setup.
+
+  <img src="Content/website/Zhao2026.png" width="760">
+
+<br>
+
+- *Hardy, C., Fertray, E., Guillo, L., Pontonnier, C., & Hellier, P. (2026, June). Robustness of markerless biomechanical analysis using pose2sim: a sensitivity study on transmission and privacy constraints for cloud-based computation. In CVBW 2026-Computer Vision for Biomechanics Workshop at the 2026 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR 2026). [https://inria.hal.science/hal-05611590/](https://inria.hal.science/hal-05611590/)*
+
+  --> Joint angle MAE mostly remained under 2° when acting on the following parameters:
+  Compression: Increasing crf from 20 to 30 has virtually no impact and decreases storage use by up to 10 times.
+  Resolution: Decreasing from HD (1080 x 1920) to SD (720 x 1280) or even further has little impact, and decreases storage use by about 8 times.
+  Audio: Don't take much space but can be removed.
+  Camera number: 6 is generally a good camera number. Complex motions and occlusions require more, gait fewer.
+  Face blurring: Preserves privacy with little impact on accuracy.
+  Framerate: Framerates below 60 Hz lead to accuracy drops, especially for fast motions.
+
+  <img src="Content/website/Hardy2026.png" width="760">
+
+<br>
+
+- *Delaplace, F., Piche, E., Chorin, F., & Zory, R. (2026). Calibrating markerless multi-camera motion capture from a single walk: accuracy against five reference calibrations and effect on joint angles. [https://hal.science/hal-05855397/](https://hal.science/hal-05855397/)*
+
+  --> Automatic calibration using the recorded person as a target does not impact 3D reconstruction. Joint angle results are mostly unchanged (RMSE mostly < 1°). Marker errors were between 24-74 mm, mostly due to scaling errors. Will soon be integrated into Pose2Sim!
+
+  <img src="Content/website/Delaplace2026.png" width="760">
+
+<br>
+
+### 2025
+
+- *Muller, A., Boulaire, B., Chaumeil, A., Hagemeister, N., Dumas, R., & Robert, T. (2025). Comparison of marker-based and markerless motion analysis: robustness to camera reduction. Multidisciplinary Biomechanics Journal, 1. [https://mbj.episciences.org/en/articles/14481](https://mbj.episciences.org/en/articles/14481)*
+
+  --> Using only 3 cameras ensured 100% marker reconstruction of a static T-pose, while at least 8 were required in the marker-based case. However, with only 2 cameras, the setup started becoming sensitive to camera positioning (errors < 1 cm) while errors remained below 1 mm with markers.
+
+  <img src="Content/website/Muller2025.png" width="760">
+
+<br>
+
+- *Roinson, R., Hardouin, E., Karamanoukian, A., & Vignais, N. (2025). Markerless motion capture for biomechanical analysis of running: influence of number and configuration of cameras. Multidisciplinary Biomechanics Journal, 2(Sport biomechanics), 513-515 [https://mbj.episciences.org/en/articles/16200/download](https://mbj.episciences.org/en/articles/16200/download).*
+
+  --> Camera placement matters more than quantity. Best RMSE were 8.5° (Hip), 6.0–6.3° (Hip), 6.2–6.9° (Ankle). 10 trials by 3 participants preforming 10 m overground running at 3 different speeds, recorded @ 60 fps
+
+<br>
+
+- *Papatiero, M. Valutazione dell'affidabilità di un approccio di markerless motion capture basato sull'AI: confronto tra Pose2Sim e Track on Field. https://thesis.unipd.it/handle/20.500.12608/91738*
+
+  --> Pose2Sim required much shorter analysis times than using TrackOnField as no experienced operator is needed. Results are qualitative but consistent with the other system's, although it cannot be considered a ground truth. 8 GoPros @ 30 fps were used to record 3 tasks performed twice by 62 rugby and soccer players.
+
+<br>
+
+### 2024
+
+- *Lin, Z.-Y., Lyu, B., Fernandez, J. C., Van Der Kruk, E., Seth, A., & Zhang, X. (2024). 3D kinematics estimation from video with a biomechanical model and synthetic training data. Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops, 1441–1450. [https://doi.org/10.1109/CVPRW63382.2024.00151](https://doi.org/10.1109/CVPRW63382.2024.00151)*
+
+  --> Tested Pose2Sim, OpenCap, and their system on several datasets. MAE_angle was 10.48° for Pose2Sim (OpenCap: 11.14°) and PA-MPJPE was 62.30 mm (OpenCap: 77.19).
+
+<br>
+
+### 2022
+
+- *Pagnon, D., Domalain, M., & Reveret, L. (2022). Pose2Sim: An end-to-end workflow for 3D markerless sports kinematics—Part 2: Accuracy. Sensors, 22(7), 2712. [https://doi.org/10.3390/s22072712](https://doi.org/10.3390/s22072712)*
+
+  <img src="Content/website/Pagnon2022.png" width="760">
+
+  --> Mean lower-body joint angle errors averaged over all joint angles and DoF were between 1.9° and 5.3°. Upper-body errors were slightly larger. Evaluated for one single subject in walking, running, and cycling, using 8 synthetic cameras @ 30 fps.
+
+<br>
+
+- *Pagnon, D., Domalain, M., & Reveret, L. (2022). Pose2Sim: An open-source Python package for multiview markerless kinematics. Journal of Open Source Software, 7(77), 4362. [https://doi.org/10.21105/joss.04362](https://doi.org/10.21105/joss.04362)*
+
+  --> Software paper.
+
+<br>
+
+### 2021
+
+- *Pagnon, D., Domalain, M., & Reveret, L. (2021). Pose2Sim: An end-to-end workflow for 3D markerless sports kinematics—Part 1: Robustness. Sensors, 21(19), 6530. [https://doi.org/10.3390/s21196530](https://doi.org/10.3390/s21196530)*
+
+  <img src="Content/website/Pagnon2021.png" width="760">
+
+  --> Pose2Sim was robust to 1 cm calibration error (MAE < 0.5°), Image blur and compression (MAE between 0.9° and 1.7°), and using 4 cameras instead of 8 (MAE between 1.5° and 1.6°). Evaluated for one single subject in walking, running, and cycling, with synthetic cameras @ 30 fps.
